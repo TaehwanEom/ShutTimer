@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -121,7 +121,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
 export default function RunningScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { mission, minutes } = route.params;
   const TOTAL_SECONDS = minutes * 60;

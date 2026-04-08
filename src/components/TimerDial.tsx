@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, PanResponder, Animated, Easing } from 'react-native';
 import Svg, { Circle, Path, Line } from 'react-native-svg';
 import { ThemeColors } from '../constants/theme';
@@ -98,6 +98,35 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
+  const ticks = useMemo(() => Array.from({ length: 60 }, (_, i) => {
+    const angleDeg = i * 6;
+    const isMajor = i % 5 === 0;
+    const inner = polarToCartesian(cx, cy, isMajor ? TICK_INNER_MAJOR : TICK_INNER_MINOR, angleDeg);
+    const outer = polarToCartesian(cx, cy, isMajor ? TICK_OUTER_MAJOR : TICK_OUTER_MINOR, angleDeg);
+    return (
+      <Line
+        key={i}
+        x1={inner.x} y1={inner.y}
+        x2={outer.x} y2={outer.y}
+        stroke={colors.onBackground}
+        strokeWidth={isMajor ? 2 : 1}
+        strokeOpacity={isMajor ? 0.8 : 0.4}
+      />
+    );
+  }), [colors.onBackground]);
+
+  const labels = useMemo(() => LABELS.map((label, i) => {
+    const angleDeg = i * 30 - 90;
+    const angleRad = angleDeg * (Math.PI / 180);
+    const x = cx + LABEL_RADIUS * Math.cos(angleRad);
+    const y = cy + LABEL_RADIUS * Math.sin(angleRad);
+    return (
+      <Text key={label} style={[styles.label, { left: x - 12, top: y - 10 }]}>
+        {label}
+      </Text>
+    );
+  }), [colors.secondary]);
+
   const prevMinutesRef = React.useRef<number | null>(null);
   const isDragging = useRef(false);
   const progressAnim = useRef(new Animated.Value(progress)).current;
@@ -194,37 +223,12 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
         ) : null}
 
         {/* 2. 눈금 60개 — 섹터 위 레이어 (항상 보임) */}
-        {Array.from({ length: 60 }, (_, i) => {
-          const angleDeg = i * 6;
-          const isMajor = i % 5 === 0;
-          const inner = polarToCartesian(cx, cy, isMajor ? TICK_INNER_MAJOR : TICK_INNER_MINOR, angleDeg);
-          const outer = polarToCartesian(cx, cy, isMajor ? TICK_OUTER_MAJOR : TICK_OUTER_MINOR, angleDeg);
-          return (
-            <Line
-              key={i}
-              x1={inner.x} y1={inner.y}
-              x2={outer.x} y2={outer.y}
-              stroke={colors.onBackground}
-              strokeWidth={isMajor ? 2 : 1}
-              strokeOpacity={isMajor ? 0.8 : 0.4}
-            />
-          );
-        })}
+        {ticks}
 
       </Svg>
 
       {/* 4. 숫자 레이블 */}
-      {LABELS.map((label, i) => {
-        const angleDeg = i * 30 - 90;
-        const angleRad = angleDeg * (Math.PI / 180);
-        const x = cx + LABEL_RADIUS * Math.cos(angleRad);
-        const y = cy + LABEL_RADIUS * Math.sin(angleRad);
-        return (
-          <Text key={label} style={[styles.label, { left: x - 12, top: y - 10 }]}>
-            {label}
-          </Text>
-        );
-      })}
+      {labels}
 
       {/* 중앙 원 */}
       <View style={styles.centerCircle} pointerEvents="none">

@@ -13,3 +13,9 @@ yarn-debug.*
 yarn-error.*
 .env
 .DS_Store
+
+# 루트 이미지 / 스크린샷
+/*.jpeg
+/*.jpg
+/*.png
+/*.PNG

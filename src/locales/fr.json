@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Favoris",
+    "add": "Ajouter",
+    "start": "DÉMARRER",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Pause",
+    "resume": "Reprendre",
+    "cancel": "Annuler",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "Le minuteur est terminé. Prenez une photo pour arrêter."
+  },
+  "alarm": {
+    "timerExpired": "TEMPS ÉCOULÉ",
+    "takePhoto": "Prenez une photo pour arrêter l'alarme",
+    "cameraRequired": "CAMÉRA REQUISE",
+    "allowCamera": "Autoriser la caméra",
+    "flash": "FLASH",
+    "flip": "INVERSER",
+    "timerDone": "Minuteur terminé",
+    "tapInstruction": "Appuyez sur le bouton pour arrêter l'alarme",
+    "tapButton": "Appuyer pour arrêter",
+    "shakeInstruction": "Secouez l'appareil pour arrêter l'alarme"
+  },
+  "addTimer": {
+    "editTitle": "Modifier le favori",
+    "addTitle": "Ajouter un favori",
+    "minutes": "MINUTES",
+    "timerType": "Type de minuteur",
+    "selectType": "Choisir le type",
+    "save": "Enregistrer"
+  },
+  "editMissions": {
+    "title": "Favoris",
+    "repeat": "RÉPÉTER",
+    "addButton": "Ajouter un favori"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "dismissMethod": "Mode d'arrêt",
+    "camera": "Prendre une photo",
+    "cameraDesc": "Prendre une photo pour arrêter l'alarme",
+    "tap": "Appuyer",
+    "tapDesc": "Appuyer sur un bouton pour arrêter l'alarme",
+    "shake": "Secouer",
+    "shakeDesc": "Secouer l'appareil pour arrêter l'alarme",
+    "alarm": "Alarme",
+    "vibration": "Vibration",
+    "alarmSound": "Son d'alarme",
+    "soundSelect": "Choisir le son",
+    "screen": "Affichage",
+    "darkMode": "Mode sombre",
+    "purchase": "Achat",
+    "removeAds": "Supprimer les pubs",
+    "restorePurchase": "Restaurer l'achat",
+    "widget": "Widget",
+    "homeWidget": "Widget d'accueil",
+    "comingSoon": "BIENTÔT",
+    "language": "Langue",
+    "languageAuto": "Détection auto"
+  },
+  "icons": {
+    "tv": "Télévision",
+    "bathtub": "Bain",
+    "menu-book": "Lecture",
+    "school": "Études",
+    "toys": "Jeux",
+    "sports-esports": "Jeux vidéo",
+    "outdoor-grill": "Cuisine",
+    "fitness-center": "Sport",
+    "directions-run": "Course",
+    "self-improvement": "Méditation",
+    "music-note": "Musique",
+    "brush": "Dessin",
+    "palette": "Peinture",
+    "pets": "Animaux",
+    "local-cafe": "Café",
+    "restaurant": "Repas",
+    "shopping-cart": "Shopping",
+    "work": "Travail",
+    "computer": "Ordinateur",
+    "phone-android": "Téléphone",
+    "camera-alt": "Photo",
+    "directions-bike": "Vélo",
+    "spa": "Détente",
+    "nightlight": "Sommeil",
+    "clean-hands": "Brossage"
+  }
+}

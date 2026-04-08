@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "المفضلة",
+    "add": "إضافة",
+    "start": "ابدأ",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "إيقاف مؤقت",
+    "resume": "استئناف",
+    "cancel": "إلغاء",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "انتهى المؤقت. التقط صورة للإغلاق."
+  },
+  "alarm": {
+    "timerExpired": "انتهى الوقت",
+    "takePhoto": "التقط صورة لإيقاف المنبه",
+    "cameraRequired": "الكاميرا مطلوبة",
+    "allowCamera": "السماح بالكاميرا",
+    "flash": "فلاش",
+    "flip": "تبديل",
+    "timerDone": "انتهى المؤقت",
+    "tapInstruction": "اضغط على الزر لإيقاف المنبه",
+    "tapButton": "اضغط للإيقاف",
+    "shakeInstruction": "هز الجهاز لإيقاف المنبه"
+  },
+  "addTimer": {
+    "editTitle": "تعديل المفضلة",
+    "addTitle": "إضافة مفضلة",
+    "minutes": "MINUTES",
+    "timerType": "نوع المؤقت",
+    "selectType": "اختر النوع",
+    "save": "حفظ"
+  },
+  "editMissions": {
+    "title": "المفضلة",
+    "repeat": "تكرار",
+    "addButton": "إضافة مفضلة"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "dismissMethod": "طريقة إيقاف المنبه",
+    "camera": "التقاط صورة",
+    "cameraDesc": "التقط صورة لإيقاف المنبه",
+    "tap": "نقر",
+    "tapDesc": "انقر على الزر لإيقاف المنبه",
+    "shake": "هز",
+    "shakeDesc": "هز الجهاز لإيقاف المنبه",
+    "alarm": "المنبه",
+    "vibration": "الاهتزاز",
+    "alarmSound": "صوت المنبه",
+    "soundSelect": "اختيار الصوت",
+    "screen": "الشاشة",
+    "darkMode": "الوضع الداكن",
+    "purchase": "الشراء",
+    "removeAds": "إزالة الإعلانات",
+    "restorePurchase": "استعادة الشراء",
+    "widget": "الأداة",
+    "homeWidget": "أداة الشاشة الرئيسية",
+    "comingSoon": "قريباً",
+    "language": "اللغة",
+    "languageAuto": "كشف تلقائي"
+  },
+  "icons": {
+    "tv": "تلفزيون",
+    "bathtub": "استحمام",
+    "menu-book": "قراءة",
+    "school": "دراسة",
+    "toys": "لعب",
+    "sports-esports": "ألعاب",
+    "outdoor-grill": "طبخ",
+    "fitness-center": "تمارين",
+    "directions-run": "جري",
+    "self-improvement": "تأمل",
+    "music-note": "موسيقى",
+    "brush": "رسم",
+    "palette": "تلوين",
+    "pets": "حيوانات",
+    "local-cafe": "مقهى",
+    "restaurant": "طعام",
+    "shopping-cart": "تسوق",
+    "work": "عمل",
+    "computer": "كمبيوتر",
+    "phone-android": "هاتف",
+    "camera-alt": "صورة",
+    "directions-bike": "دراجة",
+    "spa": "استراحة",
+    "nightlight": "نوم",
+    "clean-hands": "تنظيف"
+  }
+}

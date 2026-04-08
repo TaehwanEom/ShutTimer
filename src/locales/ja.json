@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "お気に入り",
+    "add": "追加",
+    "start": "スタート",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "一時停止",
+    "resume": "再開",
+    "cancel": "キャンセル",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "タイマーが終了しました。写真を撮って終了してください。"
+  },
+  "alarm": {
+    "timerExpired": "時間終了",
+    "takePhoto": "写真を撮ってアラームを止めてください",
+    "cameraRequired": "カメラが必要",
+    "allowCamera": "カメラを許可",
+    "flash": "フラッシュ",
+    "flip": "切替",
+    "timerDone": "タイマー終了",
+    "tapInstruction": "ボタンをタップしてアラームを止めてください",
+    "tapButton": "タップして終了",
+    "shakeInstruction": "デバイスを振ってアラームを止めてください"
+  },
+  "addTimer": {
+    "editTitle": "お気に入り編集",
+    "addTitle": "お気に入り追加",
+    "minutes": "MINUTES",
+    "timerType": "タイマーの種類",
+    "selectType": "種類を選択",
+    "save": "保存"
+  },
+  "editMissions": {
+    "title": "お気に入り",
+    "repeat": "リピート",
+    "addButton": "お気に入り追加"
+  },
+  "settings": {
+    "title": "設定",
+    "dismissMethod": "アラーム解除方法",
+    "camera": "写真撮影",
+    "cameraDesc": "写真を撮ってアラームを解除",
+    "tap": "タップ",
+    "tapDesc": "ボタンをタップしてアラームを解除",
+    "shake": "シェイク",
+    "shakeDesc": "デバイスを振ってアラームを解除",
+    "alarm": "アラーム",
+    "vibration": "バイブレーション",
+    "alarmSound": "アラーム音",
+    "soundSelect": "サウンド選択",
+    "screen": "画面",
+    "darkMode": "ダークモード",
+    "purchase": "購入",
+    "removeAds": "広告を削除",
+    "restorePurchase": "購入を復元",
+    "widget": "ウィジェット",
+    "homeWidget": "ホームウィジェット",
+    "comingSoon": "近日公開",
+    "language": "言語",
+    "languageAuto": "自動検出"
+  },
+  "icons": {
+    "tv": "テレビ",
+    "bathtub": "お風呂",
+    "menu-book": "読書",
+    "school": "勉強",
+    "toys": "遊び",
+    "sports-esports": "ゲーム",
+    "outdoor-grill": "料理",
+    "fitness-center": "運動",
+    "directions-run": "ランニング",
+    "self-improvement": "瞑想",
+    "music-note": "音楽",
+    "brush": "お絵描き",
+    "palette": "色塗り",
+    "pets": "ペット",
+    "local-cafe": "カフェ",
+    "restaurant": "食事",
+    "shopping-cart": "ショッピング",
+    "work": "仕事",
+    "computer": "パソコン",
+    "phone-android": "スマホ",
+    "camera-alt": "写真",
+    "directions-bike": "自転車",
+    "spa": "リラックス",
+    "nightlight": "就寝",
+    "clean-hands": "歯磨き"
+  }
+}

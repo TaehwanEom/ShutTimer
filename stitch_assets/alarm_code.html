@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#e2e2e7",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#d9dade",
+                    "inverse-on-surface": "#f0f0f5",
+                    "tertiary-fixed-dim": "#68d3fc",
+                    "inverse-primary": "#ffb4aa",
+                    "on-primary-fixed": "#410001",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#930005",
+                    "on-background": "#1a1c1f",
+                    "tertiary-container": "#007fa0",
+                    "surface": "#f9f9fe",
+                    "surface-container-low": "#f3f3f8",
+                    "secondary-fixed-dim": "#c6c6cb",
+                    "on-surface": "#1a1c1f",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#e8e8ed",
+                    "on-error-container": "#93000a",
+                    "secondary": "#5d5e63",
+                    "on-tertiary-fixed": "#001f29",
+                    "on-tertiary-fixed-variant": "#004d63",
+                    "primary": "#bc000a",
+                    "on-secondary-container": "#626267",
+                    "error-container": "#ffdad6",
+                    "secondary-fixed": "#e3e2e7",
+                    "surface-container-highest": "#e2e2e7",
+                    "outline": "#926f6a",
+                    "surface-bright": "#f9f9fe",
+                    "on-secondary-fixed-variant": "#46464b",
+                    "primary-container": "#e2241f",
+                    "primary-fixed": "#ffdad5",
+                    "on-primary-container": "#fffbff",
+                    "on-secondary-fixed": "#1a1b1f",
+                    "background": "#f9f9fe",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#e7bdb7",
+                    "on-surface-variant": "#5d3f3b",
+                    "surface-container": "#ededf2",
+                    "tertiary": "#00647f",
+                    "tertiary-fixed": "#bbe9ff",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed-dim": "#ffb4aa",
+                    "on-tertiary-container": "#fafdff",
+                    "secondary-container": "#e0dfe4",
+                    "surface-tint": "#c0000a",
+                    "on-secondary": "#ffffff",
+                    "inverse-surface": "#2e3034"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Pulse effect for the background without standard CSS animations, 
+           simulated through background color layering for static rendering */
+        .alarm-bg {
+            background: linear-gradient(180deg, #bc000a 0%, #e2241f 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-primary text-on-primary font-body overflow-hidden">
+<!-- Header / Brand Anchor (Suppressed for transactional screen focus) -->
+<!-- As per instructions, Navigation shells are suppressed for Focused/Transactional journeys -->
+<main class="relative h-screen w-full flex flex-col items-center justify-between alarm-bg">
+<!-- Top Status Area -->
+<div class="pt-16 px-8 w-full flex justify-between items-start">
+<div class="flex flex-col">
+<span class="text-on-primary/60 font-medium tracking-widest text-xs">TIMER EXPIRED</span>
+<h1 class="text-4xl font-bold tracking-tighter mt-1">ShutTimer</h1>
+</div>
+<div class="bg-on-primary/10 backdrop-blur-md rounded-full p-3">
+<span class="material-symbols-outlined text-on-primary" data-icon="timer">timer</span>
+</div>
+</div>
+<!-- Central Alert Message -->
+<div class="flex-1 flex flex-col items-center justify-center px-12 text-center">
+<!-- Chrono-Dial Concept Reflected in the circular camera viewfinder backdrop -->
+<div class="relative w-72 h-72 md:w-96 md:h-96 rounded-full border-4 border-on-primary/20 flex items-center justify-center overflow-hidden">
+<img class="absolute inset-0 w-full h-full object-cover opacity-30 grayscale blur-sm" data-alt="blurred view through a camera lens focusing on a bright minimalist indoor environment with high key lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKlnwtByEUFXFNIwlzhDkROSGBWemdDGa2OLeRuuY9z5vQwBlrx5S73PRqvEhmGttNkAzRqK3I5YunSvx4JeZE6tceor96_TixNVZxGfCTSsWHYwLWBtyjOb80iLPbwiIIuL9koaywW7ejNC7Cfy4Yz7OtSSyMZY3fATfeU0fJltiJI2r41k1r4_UN_nco1NBEfShC-z-GOrsbv-m3-hHKfr01NjN8V-hHDQIVCYdXupjZor5YP4KoaiBD2J3rFe9rCelMGs7wZFqQ"/>
+<div class="relative z-10 space-y-4">
+<p class="text-xl md:text-2xl font-semibold tracking-tight leading-tight">
+                        Take a photo to stop the alarm
+                    </p>
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-on-primary text-primary font-bold text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="photo_camera" data-weight="fill" style="font-variation-settings: 'FILL' 1;">photo_camera</span>
+                        REQUIRED
+                    </div>
+</div>
+</div>
+</div>
+<!-- Large Prominent Shutter Button & Controls -->
+<div class="pb-16 flex flex-col items-center w-full gap-8">
+<!-- Shutter Assembly -->
+<div class="relative flex items-center justify-center">
+<!-- Inner Outer Glow / Tonal Shift -->
+<div class="absolute w-28 h-28 bg-on-primary/20 rounded-full blur-xl"></div>
+<!-- Physical-feeling Shutter Button -->
+<button class="relative w-24 h-24 bg-on-primary rounded-full flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.15)] active:scale-95 transition-transform duration-200 group">
+<div class="w-20 h-20 border-2 border-primary/10 rounded-full flex items-center justify-center">
+<div class="w-16 h-16 bg-on-primary border-[6px] border-primary rounded-full"></div>
+</div>
+</button>
+</div>
+<!-- Tertiary Controls -->
+<div class="flex items-center gap-12 text-on-primary/80 font-medium">
+<button class="flex flex-col items-center gap-2 hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="flash_off">flash_off</span>
+<span class="text-xs tracking-wide">FLASH</span>
+</button>
+<button class="flex flex-col items-center gap-2 hover:text-on-primary transition-colors">
+<span class="material-symbols-outlined text-2xl" data-icon="flip_camera_ios">flip_camera_ios</span>
+<span class="text-xs tracking-wide">FLIP</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Overlay Glass Effect for "Task Focus" -->
+<div class="fixed inset-0 pointer-events-none border-[12px] border-on-primary/5 rounded-[2.5rem] z-50"></div>
+</body></html>

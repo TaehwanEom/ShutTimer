@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "즐겨찾기 추가",
+    "add": "추가",
+    "start": "시작",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "일시정지",
+    "resume": "계속",
+    "cancel": "취소",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "타이머가 종료되었습니다. 사진을 찍어 종료하세요."
+  },
+  "alarm": {
+    "timerExpired": "시간 종료",
+    "takePhoto": "Take a photo to stop the alarm",
+    "cameraRequired": "카메라 필요",
+    "allowCamera": "권한 허용",
+    "flash": "플래시",
+    "flip": "전환",
+    "timerDone": "타이머 종료",
+    "tapInstruction": "버튼을 탭해 알람을 종료하세요",
+    "tapButton": "탭해서 종료",
+    "shakeInstruction": "기기를 흔들어 알람을 종료하세요"
+  },
+  "addTimer": {
+    "editTitle": "즐겨찾기 편집",
+    "addTitle": "즐겨찾기 추가",
+    "minutes": "MINUTES",
+    "timerType": "타이머 종류",
+    "selectType": "종류 선택",
+    "save": "저장"
+  },
+  "editMissions": {
+    "title": "즐겨찾기 추가",
+    "repeat": "반복",
+    "addButton": "즐겨찾기 추가"
+  },
+  "settings": {
+    "title": "설정",
+    "dismissMethod": "알람 종료 방식",
+    "camera": "사진 촬영",
+    "cameraDesc": "카메라로 사진을 찍어 알람 종료",
+    "tap": "탭",
+    "tapDesc": "버튼을 한 번 탭해 알람 종료",
+    "shake": "흔들기",
+    "shakeDesc": "기기를 흔들어 알람 종료",
+    "alarm": "알람",
+    "vibration": "진동",
+    "alarmSound": "알람 사운드",
+    "soundSelect": "사운드 선택",
+    "screen": "화면",
+    "darkMode": "다크 모드",
+    "purchase": "구매",
+    "removeAds": "광고 제거",
+    "restorePurchase": "구매 복원",
+    "widget": "위젯",
+    "homeWidget": "홈화면 위젯",
+    "comingSoon": "준비 중",
+    "language": "언어",
+    "languageAuto": "자동 감지"
+  },
+  "icons": {
+    "tv": "TV시청",
+    "bathtub": "목욕",
+    "menu-book": "독서",
+    "school": "공부",
+    "toys": "놀이",
+    "sports-esports": "게임",
+    "outdoor-grill": "요리",
+    "fitness-center": "운동",
+    "directions-run": "달리기",
+    "self-improvement": "명상",
+    "music-note": "음악",
+    "brush": "그림",
+    "palette": "채색",
+    "pets": "반려동물",
+    "local-cafe": "카페",
+    "restaurant": "식사",
+    "shopping-cart": "쇼핑",
+    "work": "업무",
+    "computer": "컴퓨터",
+    "phone-android": "스마트폰",
+    "camera-alt": "사진",
+    "directions-bike": "자전거",
+    "spa": "휴식",
+    "nightlight": "취침",
+    "clean-hands": "양치"
+  }
+}

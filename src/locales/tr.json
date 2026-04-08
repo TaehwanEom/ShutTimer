@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Favoriler",
+    "add": "Ekle",
+    "start": "BAŞLAT",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Duraklat",
+    "resume": "Devam",
+    "cancel": "İptal",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "Zamanlayıcı sona erdi. Kapatmak için fotoğraf çekin."
+  },
+  "alarm": {
+    "timerExpired": "SÜRE DOLDU",
+    "takePhoto": "Alarmı durdurmak için fotoğraf çekin",
+    "cameraRequired": "KAMERA GEREKLİ",
+    "allowCamera": "Kameraya izin ver",
+    "flash": "FLAŞ",
+    "flip": "ÇEVİR",
+    "timerDone": "Süre doldu",
+    "tapInstruction": "Alarmı durdurmak için düğmeye dokunun",
+    "tapButton": "Durdurmak için dokun",
+    "shakeInstruction": "Alarmı durdurmak için cihazı sallayın"
+  },
+  "addTimer": {
+    "editTitle": "Favoriyi düzenle",
+    "addTitle": "Favori ekle",
+    "minutes": "MINUTES",
+    "timerType": "Zamanlayıcı türü",
+    "selectType": "Tür seçin",
+    "save": "Kaydet"
+  },
+  "editMissions": {
+    "title": "Favoriler",
+    "repeat": "TEKRAR",
+    "addButton": "Favori ekle"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "dismissMethod": "Alarm kapatma yöntemi",
+    "camera": "Fotoğraf çek",
+    "cameraDesc": "Alarmı kapatmak için fotoğraf çekin",
+    "tap": "Dokun",
+    "tapDesc": "Alarmı kapatmak için düğmeye dokunun",
+    "shake": "Salla",
+    "shakeDesc": "Alarmı kapatmak için cihazı sallayın",
+    "alarm": "Alarm",
+    "vibration": "Titreşim",
+    "alarmSound": "Alarm sesi",
+    "soundSelect": "Ses seçin",
+    "screen": "Ekran",
+    "darkMode": "Karanlık mod",
+    "purchase": "Satın alma",
+    "removeAds": "Reklamları kaldır",
+    "restorePurchase": "Satın almayı geri yükle",
+    "widget": "Widget",
+    "homeWidget": "Ana ekran widget'ı",
+    "comingSoon": "YAKINDA",
+    "language": "Dil",
+    "languageAuto": "Otomatik Algıla"
+  },
+  "icons": {
+    "tv": "TV",
+    "bathtub": "Banyo",
+    "menu-book": "Okuma",
+    "school": "Çalışma",
+    "toys": "Oyun",
+    "sports-esports": "Oyun",
+    "outdoor-grill": "Yemek",
+    "fitness-center": "Egzersiz",
+    "directions-run": "Koşu",
+    "self-improvement": "Meditasyon",
+    "music-note": "Müzik",
+    "brush": "Çizim",
+    "palette": "Boyama",
+    "pets": "Evcil hayvan",
+    "local-cafe": "Kafe",
+    "restaurant": "Yemek",
+    "shopping-cart": "Alışveriş",
+    "work": "İş",
+    "computer": "Bilgisayar",
+    "phone-android": "Telefon",
+    "camera-alt": "Fotoğraf",
+    "directions-bike": "Bisiklet",
+    "spa": "Dinlenme",
+    "nightlight": "Uyku",
+    "clean-hands": "Diş fırçalama"
+  }
+}

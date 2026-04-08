@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "收藏夹",
+    "add": "添加",
+    "start": "开始",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "暂停",
+    "resume": "继续",
+    "cancel": "取消",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "计时器已结束。请拍照以关闭。"
+  },
+  "alarm": {
+    "timerExpired": "时间到",
+    "takePhoto": "拍照以关闭闹钟",
+    "cameraRequired": "需要相机",
+    "allowCamera": "允许相机",
+    "flash": "闪光灯",
+    "flip": "翻转",
+    "timerDone": "计时结束",
+    "tapInstruction": "点击按钮以关闭闹钟",
+    "tapButton": "点击关闭",
+    "shakeInstruction": "摇晃设备以关闭闹钟"
+  },
+  "addTimer": {
+    "editTitle": "编辑收藏",
+    "addTitle": "添加收藏",
+    "minutes": "MINUTES",
+    "timerType": "计时器类型",
+    "selectType": "选择类型",
+    "save": "保存"
+  },
+  "editMissions": {
+    "title": "收藏夹",
+    "repeat": "重复",
+    "addButton": "添加收藏"
+  },
+  "settings": {
+    "title": "设置",
+    "dismissMethod": "闹钟关闭方式",
+    "camera": "拍照",
+    "cameraDesc": "拍照以关闭闹钟",
+    "tap": "点击",
+    "tapDesc": "点击按钮以关闭闹钟",
+    "shake": "摇晃",
+    "shakeDesc": "摇晃设备以关闭闹钟",
+    "alarm": "闹钟",
+    "vibration": "振动",
+    "alarmSound": "闹钟铃声",
+    "soundSelect": "选择铃声",
+    "screen": "显示",
+    "darkMode": "深色模式",
+    "purchase": "购买",
+    "removeAds": "去除广告",
+    "restorePurchase": "恢复购买",
+    "widget": "小组件",
+    "homeWidget": "主屏小组件",
+    "comingSoon": "即将推出",
+    "language": "语言",
+    "languageAuto": "自动检测"
+  },
+  "icons": {
+    "tv": "电视",
+    "bathtub": "洗澡",
+    "menu-book": "阅读",
+    "school": "学习",
+    "toys": "玩耍",
+    "sports-esports": "游戏",
+    "outdoor-grill": "烹饪",
+    "fitness-center": "健身",
+    "directions-run": "跑步",
+    "self-improvement": "冥想",
+    "music-note": "音乐",
+    "brush": "绘画",
+    "palette": "涂色",
+    "pets": "宠物",
+    "local-cafe": "咖啡",
+    "restaurant": "用餐",
+    "shopping-cart": "购物",
+    "work": "工作",
+    "computer": "电脑",
+    "phone-android": "手机",
+    "camera-alt": "拍照",
+    "directions-bike": "骑行",
+    "spa": "休息",
+    "nightlight": "睡眠",
+    "clean-hands": "刷牙"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Favorit",
+    "add": "Tambah",
+    "start": "MULAI",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Jeda",
+    "resume": "Lanjut",
+    "cancel": "Batal",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "Timer telah berakhir. Ambil foto untuk menutup."
+  },
+  "alarm": {
+    "timerExpired": "WAKTU HABIS",
+    "takePhoto": "Ambil foto untuk mematikan alarm",
+    "cameraRequired": "KAMERA DIPERLUKAN",
+    "allowCamera": "Izinkan Kamera",
+    "flash": "FLASH",
+    "flip": "BALIK",
+    "timerDone": "Timer Selesai",
+    "tapInstruction": "Ketuk tombol untuk mematikan alarm",
+    "tapButton": "Ketuk untuk Berhenti",
+    "shakeInstruction": "Goyangkan perangkat untuk mematikan alarm"
+  },
+  "addTimer": {
+    "editTitle": "Edit Favorit",
+    "addTitle": "Tambah Favorit",
+    "minutes": "MINUTES",
+    "timerType": "Jenis Timer",
+    "selectType": "Pilih Jenis",
+    "save": "Simpan"
+  },
+  "editMissions": {
+    "title": "Favorit",
+    "repeat": "ULANGI",
+    "addButton": "Tambah Favorit"
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "dismissMethod": "Cara Menutup Alarm",
+    "camera": "Ambil Foto",
+    "cameraDesc": "Ambil foto untuk menutup alarm",
+    "tap": "Ketuk",
+    "tapDesc": "Ketuk tombol untuk menutup alarm",
+    "shake": "Goyangkan",
+    "shakeDesc": "Goyangkan perangkat untuk menutup alarm",
+    "alarm": "Alarm",
+    "vibration": "Getaran",
+    "alarmSound": "Suara Alarm",
+    "soundSelect": "Pilih Suara",
+    "screen": "Tampilan",
+    "darkMode": "Mode Gelap",
+    "purchase": "Pembelian",
+    "removeAds": "Hapus Iklan",
+    "restorePurchase": "Pulihkan Pembelian",
+    "widget": "Widget",
+    "homeWidget": "Widget Layar Utama",
+    "comingSoon": "SEGERA HADIR",
+    "language": "Bahasa",
+    "languageAuto": "Deteksi Otomatis"
+  },
+  "icons": {
+    "tv": "TV",
+    "bathtub": "Mandi",
+    "menu-book": "Membaca",
+    "school": "Belajar",
+    "toys": "Bermain",
+    "sports-esports": "Game",
+    "outdoor-grill": "Memasak",
+    "fitness-center": "Olahraga",
+    "directions-run": "Lari",
+    "self-improvement": "Meditasi",
+    "music-note": "Musik",
+    "brush": "Menggambar",
+    "palette": "Melukis",
+    "pets": "Hewan",
+    "local-cafe": "Kafe",
+    "restaurant": "Makan",
+    "shopping-cart": "Belanja",
+    "work": "Kerja",
+    "computer": "Komputer",
+    "phone-android": "Ponsel",
+    "camera-alt": "Foto",
+    "directions-bike": "Bersepeda",
+    "spa": "Istirahat",
+    "nightlight": "Tidur",
+    "clean-hands": "Sikat Gigi"
+  }
+}

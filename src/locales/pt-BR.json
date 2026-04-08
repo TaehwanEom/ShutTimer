@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Favoritos",
+    "add": "Adicionar",
+    "start": "INICIAR",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Pausa",
+    "resume": "Retomar",
+    "cancel": "Cancelar",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "O temporizador terminou. Tire uma foto para encerrar."
+  },
+  "alarm": {
+    "timerExpired": "TEMPO ESGOTADO",
+    "takePhoto": "Tire uma foto para parar o alarme",
+    "cameraRequired": "CÂMERA NECESSÁRIA",
+    "allowCamera": "Permitir câmera",
+    "flash": "FLASH",
+    "flip": "VIRAR",
+    "timerDone": "Timer encerrado",
+    "tapInstruction": "Toque no botão para parar o alarme",
+    "tapButton": "Toque para parar",
+    "shakeInstruction": "Agite o dispositivo para parar o alarme"
+  },
+  "addTimer": {
+    "editTitle": "Editar favorito",
+    "addTitle": "Adicionar favorito",
+    "minutes": "MINUTES",
+    "timerType": "Tipo de timer",
+    "selectType": "Selecionar tipo",
+    "save": "Salvar"
+  },
+  "editMissions": {
+    "title": "Favoritos",
+    "repeat": "REPETIR",
+    "addButton": "Adicionar favorito"
+  },
+  "settings": {
+    "title": "Configurações",
+    "dismissMethod": "Método de encerramento",
+    "camera": "Tirar foto",
+    "cameraDesc": "Tire uma foto para encerrar o alarme",
+    "tap": "Toque",
+    "tapDesc": "Toque em um botão para encerrar o alarme",
+    "shake": "Agitar",
+    "shakeDesc": "Agite o dispositivo para encerrar o alarme",
+    "alarm": "Alarme",
+    "vibration": "Vibração",
+    "alarmSound": "Som do alarme",
+    "soundSelect": "Selecionar som",
+    "screen": "Tela",
+    "darkMode": "Modo escuro",
+    "purchase": "Compra",
+    "removeAds": "Remover anúncios",
+    "restorePurchase": "Restaurar compra",
+    "widget": "Widget",
+    "homeWidget": "Widget da tela inicial",
+    "comingSoon": "EM BREVE",
+    "language": "Idioma",
+    "languageAuto": "Detecção automática"
+  },
+  "icons": {
+    "tv": "TV",
+    "bathtub": "Banho",
+    "menu-book": "Leitura",
+    "school": "Estudo",
+    "toys": "Brincar",
+    "sports-esports": "Jogos",
+    "outdoor-grill": "Cozinhar",
+    "fitness-center": "Exercício",
+    "directions-run": "Corrida",
+    "self-improvement": "Meditação",
+    "music-note": "Música",
+    "brush": "Desenho",
+    "palette": "Pintura",
+    "pets": "Animais",
+    "local-cafe": "Café",
+    "restaurant": "Refeição",
+    "shopping-cart": "Compras",
+    "work": "Trabalho",
+    "computer": "Computador",
+    "phone-android": "Celular",
+    "camera-alt": "Foto",
+    "directions-bike": "Ciclismo",
+    "spa": "Descanso",
+    "nightlight": "Dormir",
+    "clean-hands": "Escovar"
+  }
+}

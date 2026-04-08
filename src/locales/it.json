@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Preferiti",
+    "add": "Aggiungi",
+    "start": "AVVIA",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Pausa",
+    "resume": "Riprendi",
+    "cancel": "Annulla",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "Il timer è scaduto. Scatta una foto per chiudere."
+  },
+  "alarm": {
+    "timerExpired": "TEMPO SCADUTO",
+    "takePhoto": "Scatta una foto per fermare la sveglia",
+    "cameraRequired": "FOTOCAMERA RICHIESTA",
+    "allowCamera": "Consenti fotocamera",
+    "flash": "FLASH",
+    "flip": "INVERTI",
+    "timerDone": "Timer scaduto",
+    "tapInstruction": "Tocca il pulsante per fermare la sveglia",
+    "tapButton": "Tocca per fermare",
+    "shakeInstruction": "Scuoti il dispositivo per fermare la sveglia"
+  },
+  "addTimer": {
+    "editTitle": "Modifica preferito",
+    "addTitle": "Aggiungi preferito",
+    "minutes": "MINUTES",
+    "timerType": "Tipo di timer",
+    "selectType": "Seleziona tipo",
+    "save": "Salva"
+  },
+  "editMissions": {
+    "title": "Preferiti",
+    "repeat": "RIPETI",
+    "addButton": "Aggiungi preferito"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "dismissMethod": "Metodo di chiusura",
+    "camera": "Scatta foto",
+    "cameraDesc": "Scatta una foto per chiudere la sveglia",
+    "tap": "Tocca",
+    "tapDesc": "Tocca un pulsante per chiudere la sveglia",
+    "shake": "Scuoti",
+    "shakeDesc": "Scuoti il dispositivo per chiudere la sveglia",
+    "alarm": "Sveglia",
+    "vibration": "Vibrazione",
+    "alarmSound": "Suono sveglia",
+    "soundSelect": "Seleziona suono",
+    "screen": "Schermo",
+    "darkMode": "Modalità scura",
+    "purchase": "Acquisto",
+    "removeAds": "Rimuovi pubblicità",
+    "restorePurchase": "Ripristina acquisto",
+    "widget": "Widget",
+    "homeWidget": "Widget Home",
+    "comingSoon": "IN ARRIVO",
+    "language": "Lingua",
+    "languageAuto": "Rilevamento auto"
+  },
+  "icons": {
+    "tv": "TV",
+    "bathtub": "Bagno",
+    "menu-book": "Lettura",
+    "school": "Studio",
+    "toys": "Giochi",
+    "sports-esports": "Videogiochi",
+    "outdoor-grill": "Cucina",
+    "fitness-center": "Esercizio",
+    "directions-run": "Corsa",
+    "self-improvement": "Meditazione",
+    "music-note": "Musica",
+    "brush": "Disegno",
+    "palette": "Pittura",
+    "pets": "Animali",
+    "local-cafe": "Caffè",
+    "restaurant": "Pranzo",
+    "shopping-cart": "Shopping",
+    "work": "Lavoro",
+    "computer": "Computer",
+    "phone-android": "Telefono",
+    "camera-alt": "Foto",
+    "directions-bike": "Ciclismo",
+    "spa": "Relax",
+    "nightlight": "Dormire",
+    "clean-hands": "Lavarsi"
+  }
+}

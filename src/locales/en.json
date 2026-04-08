@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "Favorites",
+    "add": "Add",
+    "start": "START",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "Timer has ended. Take a photo to dismiss."
+  },
+  "alarm": {
+    "timerExpired": "TIMER EXPIRED",
+    "takePhoto": "Take a photo to stop the alarm",
+    "cameraRequired": "CAMERA REQUIRED",
+    "allowCamera": "Allow Camera",
+    "flash": "FLASH",
+    "flip": "FLIP",
+    "timerDone": "Timer Done",
+    "tapInstruction": "Tap the button to stop the alarm",
+    "tapButton": "Tap to Stop",
+    "shakeInstruction": "Shake the device to stop the alarm"
+  },
+  "addTimer": {
+    "editTitle": "Edit Favorite",
+    "addTitle": "Add Favorite",
+    "minutes": "MINUTES",
+    "timerType": "Timer Type",
+    "selectType": "Select Type",
+    "save": "Save"
+  },
+  "editMissions": {
+    "title": "Favorites",
+    "repeat": "REPEAT",
+    "addButton": "Add Favorite"
+  },
+  "settings": {
+    "title": "Settings",
+    "dismissMethod": "Dismiss Method",
+    "camera": "Take Photo",
+    "cameraDesc": "Take a photo to dismiss the alarm",
+    "tap": "Tap",
+    "tapDesc": "Tap a button to dismiss the alarm",
+    "shake": "Shake",
+    "shakeDesc": "Shake the device to dismiss the alarm",
+    "alarm": "Alarm",
+    "vibration": "Vibration",
+    "alarmSound": "Alarm Sound",
+    "soundSelect": "Select Sound",
+    "screen": "Display",
+    "darkMode": "Dark Mode",
+    "purchase": "Purchase",
+    "removeAds": "Remove Ads",
+    "restorePurchase": "Restore Purchase",
+    "widget": "Widget",
+    "homeWidget": "Home Widget",
+    "comingSoon": "COMING SOON",
+    "language": "Language",
+    "languageAuto": "Auto Detect"
+  },
+  "icons": {
+    "tv": "TV",
+    "bathtub": "Bath",
+    "menu-book": "Reading",
+    "school": "Study",
+    "toys": "Play",
+    "sports-esports": "Gaming",
+    "outdoor-grill": "Cooking",
+    "fitness-center": "Exercise",
+    "directions-run": "Running",
+    "self-improvement": "Meditation",
+    "music-note": "Music",
+    "brush": "Drawing",
+    "palette": "Painting",
+    "pets": "Pets",
+    "local-cafe": "Café",
+    "restaurant": "Dining",
+    "shopping-cart": "Shopping",
+    "work": "Work",
+    "computer": "Computer",
+    "phone-android": "Phone",
+    "camera-alt": "Photo",
+    "directions-bike": "Cycling",
+    "spa": "Relax",
+    "nightlight": "Sleep",
+    "clean-hands": "Brushing"
+  }
+}

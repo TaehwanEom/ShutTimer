@@ -1,0 +1,92 @@
+{
+  "home": {
+    "favorites": "รายการโปรด",
+    "add": "เพิ่ม",
+    "start": "เริ่ม",
+    "minutes": "MINUTES"
+  },
+  "running": {
+    "minutesLeft": "MINUTES LEFT",
+    "pause": "หยุดชั่วคราว",
+    "resume": "ดำเนินต่อ",
+    "cancel": "ยกเลิก",
+    "notifTitle": "ShutTimer ⏰",
+    "notifBody": "หมดเวลาแล้ว ถ่ายรูปเพื่อปิดการแจ้งเตือน"
+  },
+  "alarm": {
+    "timerExpired": "หมดเวลา",
+    "takePhoto": "ถ่ายรูปเพื่อปิดการแจ้งเตือน",
+    "cameraRequired": "ต้องใช้กล้อง",
+    "allowCamera": "อนุญาตกล้อง",
+    "flash": "แฟลช",
+    "flip": "สลับ",
+    "timerDone": "หมดเวลา",
+    "tapInstruction": "แตะปุ่มเพื่อปิดการแจ้งเตือน",
+    "tapButton": "แตะเพื่อปิด",
+    "shakeInstruction": "เขย่าอุปกรณ์เพื่อปิดการแจ้งเตือน"
+  },
+  "addTimer": {
+    "editTitle": "แก้ไขรายการโปรด",
+    "addTitle": "เพิ่มรายการโปรด",
+    "minutes": "MINUTES",
+    "timerType": "ประเภทตัวจับเวลา",
+    "selectType": "เลือกประเภท",
+    "save": "บันทึก"
+  },
+  "editMissions": {
+    "title": "รายการโปรด",
+    "repeat": "ซ้ำ",
+    "addButton": "เพิ่มรายการโปรด"
+  },
+  "settings": {
+    "title": "การตั้งค่า",
+    "dismissMethod": "วิธีปิดการแจ้งเตือน",
+    "camera": "ถ่ายรูป",
+    "cameraDesc": "ถ่ายรูปเพื่อปิดการแจ้งเตือน",
+    "tap": "แตะ",
+    "tapDesc": "แตะปุ่มเพื่อปิดการแจ้งเตือน",
+    "shake": "เขย่า",
+    "shakeDesc": "เขย่าอุปกรณ์เพื่อปิดการแจ้งเตือน",
+    "alarm": "การแจ้งเตือน",
+    "vibration": "การสั่น",
+    "alarmSound": "เสียงแจ้งเตือน",
+    "soundSelect": "เลือกเสียง",
+    "screen": "หน้าจอ",
+    "darkMode": "โหมดมืด",
+    "purchase": "ซื้อ",
+    "removeAds": "ลบโฆษณา",
+    "restorePurchase": "กู้คืนการซื้อ",
+    "widget": "วิดเจ็ต",
+    "homeWidget": "วิดเจ็ตหน้าจอหลัก",
+    "comingSoon": "เร็วๆ นี้",
+    "language": "ภาษา",
+    "languageAuto": "ตรวจจับอัตโนมัติ"
+  },
+  "icons": {
+    "tv": "ทีวี",
+    "bathtub": "อาบน้ำ",
+    "menu-book": "อ่านหนังสือ",
+    "school": "เรียน",
+    "toys": "เล่น",
+    "sports-esports": "เกม",
+    "outdoor-grill": "ทำอาหาร",
+    "fitness-center": "ออกกำลังกาย",
+    "directions-run": "วิ่ง",
+    "self-improvement": "นั่งสมาธิ",
+    "music-note": "ดนตรี",
+    "brush": "วาดรูป",
+    "palette": "ระบายสี",
+    "pets": "สัตว์เลี้ยง",
+    "local-cafe": "คาเฟ่",
+    "restaurant": "อาหาร",
+    "shopping-cart": "ช้อปปิ้ง",
+    "work": "ทำงาน",
+    "computer": "คอมพิวเตอร์",
+    "phone-android": "โทรศัพท์",
+    "camera-alt": "ถ่ายรูป",
+    "directions-bike": "ปั่นจักรยาน",
+    "spa": "พักผ่อน",
+    "nightlight": "นอน",
+    "clean-hands": "แปรงฟัน"
+  }
+}

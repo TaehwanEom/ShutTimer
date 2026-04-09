@@ -16,6 +16,7 @@ import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import TimerDial from '../components/TimerDial';
 import AdBanner from '../components/AdBanner';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -52,9 +53,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.onBackground,
     letterSpacing: -0.5,
   },
-  settingsBtn: {
-    padding: 8,
-    borderRadius: 50,
+  headerRight: {
+    flexDirection: 'row',
+    gap: 16,
   },
   content: {
     flex: 1,
@@ -63,8 +64,8 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 48,
   },
   dialSection: {
-    marginTop: 32,
-    marginBottom: 48,
+    marginTop: 12,
+    marginBottom: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -80,12 +81,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 8,
     paddingVertical: 24,
     borderRadius: 12,
-    backgroundColor: colors.surfaceContainerLowest,
-    shadowColor: '#1a1c1f',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: colors.background,
   },
   controlIconWrapper: {
     width: 48,
@@ -116,11 +112,41 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
   },
+  endTimeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    width: '100%',
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceContainerLow,
+  },
+  endTimeIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(220,53,53,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endTimeLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.onBackground,
+  },
+  endTimeSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.secondary,
+    marginTop: 2,
+  },
 });
 
 export default function RunningScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { mission, minutes } = route.params;
@@ -156,10 +182,14 @@ export default function RunningScreen({ navigation, route }: Props) {
     }
   };
 
-  // 마운트 1회: 권한 요청 + 알람 예약
+  // 마운트 1회: 권한 요청 + 알람 예약 + portrait 잠금
   useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     Notifications.requestPermissionsAsync();
     scheduleAlarm(TOTAL_SECONDS);
+    return () => {
+      cancelAlarm(notificationIdRef.current);
+    };
   }, []);
 
   // interval — isPaused 변화 시 재등록
@@ -181,7 +211,7 @@ export default function RunningScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (remainingSeconds === 0) {
       cancelAlarm(notificationIdRef.current).then(() => {
-        navigation.navigate('Alarm');
+        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
       });
     }
   }, [remainingSeconds]);
@@ -200,17 +230,20 @@ export default function RunningScreen({ navigation, route }: Props) {
         setRemainingSeconds(newVal);
         if (newVal === 0) {
           cancelAlarm(notificationIdRef.current).then(() => {
-            navigation.navigate('Alarm');
+            navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
           });
         }
       }
     });
 
     return () => subscription.remove();
-  }, []);
+  }, [mission?.id]);
 
   const progress = remainingSeconds / TOTAL_SECONDS;
   const timeText = formatTime(remainingSeconds);
+
+  const estimatedEnd = new Date(Date.now() + remainingSeconds * 1000);
+  const estimatedEndTime = estimatedEnd.toLocaleDateString(i18n.language, { year: 'numeric', month: 'long', day: 'numeric' }) + ' ' + estimatedEnd.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' });
 
   const handlePauseResume = () => {
     const next = !isPausedRef.current;
@@ -237,9 +270,12 @@ export default function RunningScreen({ navigation, route }: Props) {
           <MaterialIcons name="timer" size={24} color={colors.primary} />
           <Text style={styles.headerTitle}>ShutTimer</Text>
         </View>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Settings')}>
-          <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <MaterialIcons name="notifications" size={24} color={colors.secondary} style={{ opacity: 0.4 }} />
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
+            <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -271,13 +307,17 @@ export default function RunningScreen({ navigation, route }: Props) {
             </View>
             <Text style={[styles.controlLabel, { color: colors.secondary }]}>{t('running.cancel')}</Text>
           </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={styles.controlBtn} onPress={() => navigation.navigate('Alarm')}>
-            <View style={[styles.controlIconWrapper, { borderColor: '#F59E0B' }]}>
-              <MaterialIcons name="alarm" size={24} color="#F59E0B" />
-            </View>
-            <Text style={[styles.controlLabel, { color: '#F59E0B' }]}>DEV</Text>
-          </TouchableOpacity>
+        {/* End Time Card */}
+        <View style={styles.endTimeCard}>
+          <View style={styles.endTimeIconCircle}>
+            <MaterialIcons name="notifications" size={22} color="#dc3535" />
+          </View>
+          <View>
+            <Text style={styles.endTimeLabel}>{t('running.endTime')}</Text>
+            <Text style={styles.endTimeSub}>{t('running.estimatedAt', { time: estimatedEndTime })}</Text>
+          </View>
         </View>
 
       </View>

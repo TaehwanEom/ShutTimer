@@ -27,7 +27,7 @@ export const lightColors: ThemeColors = {
 };
 
 export const darkColors: ThemeColors = {
-  primary: '#be3816ff',
+  primary: '#bc000a',
   background: '#111318',
   surfaceContainerLow: '#1d2024',
   surfaceContainerLowest: '#282c31',

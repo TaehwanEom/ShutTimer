@@ -17,6 +17,7 @@ import PresentationScreen from './src/screens/PresentationScreen';
 import PresentationRunningScreen from './src/screens/PresentationRunningScreen';
 import PresentationFullScreen from './src/screens/PresentationFullScreen';
 import SplashScreen from './src/screens/SplashScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
+  History: undefined;
   Presentation: undefined;
   PresentationRunning: { minutes: number; seconds: number; recordingEnabled: boolean };
   PresentationFull: { minutes: number; seconds: number; remainingSeconds: number; isRunning: boolean; recordingEnabled: boolean };
@@ -71,6 +73,7 @@ function AppNavigator() {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="EditMissions" component={EditMissionsScreen} />
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
+        <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Presentation" component={PresentationScreen} options={{ contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="PresentationRunning" component={PresentationRunningScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="PresentationFull" component={PresentationFullScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />

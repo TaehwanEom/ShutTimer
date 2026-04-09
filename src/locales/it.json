@@ -11,7 +11,9 @@
     "resume": "Riprendi",
     "cancel": "Annulla",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Il timer è scaduto. Scatta una foto per chiudere."
+    "notifBody": "Il timer è scaduto. Scatta una foto per chiudere.",
+    "endTime": "Ora di fine",
+    "estimatedAt": "Stimato alle {{time}}"
   },
   "alarm": {
     "timerExpired": "TEMPO SCADUTO",
@@ -23,7 +25,9 @@
     "timerDone": "Timer scaduto",
     "tapInstruction": "Tocca il pulsante per fermare la sveglia",
     "tapButton": "Tocca per fermare",
-    "shakeInstruction": "Scuoti il dispositivo per fermare la sveglia"
+    "shakeInstruction": "Scuoti il dispositivo per fermare la sveglia",
+    "retakePhoto": "Riprova",
+    "forceClose": "Chiudi forzatamente"
   },
   "addTimer": {
     "editTitle": "Modifica preferito",
@@ -88,5 +92,32 @@
     "spa": "Relax",
     "nightlight": "Dormire",
     "clean-hands": "Lavarsi"
+  },
+  "presentation": {
+    "title": "Presentazione",
+    "timer": "Timer",
+    "start": "Tocca per iniziare",
+    "stop": "Tocca per fermare",
+    "recording": "Registrazione",
+    "records": "Registrazioni",
+    "noRecords": "Nessuna registrazione",
+    "delete": "Elimina",
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "sounds": {
+    "alarm": "Allarme",
+    "ringtone": "Suoneria"
+  },
+  "history": {
+    "title": "Cronologia",
+    "noSessions": "Nessun record",
+    "timer": "Timer",
+    "minutesFmt": "{{min}} min",
+    "monthStats": "Statistiche di {{month}}",
+    "totalTime": "Totale del mese",
+    "activeDays": "Giorni attivi",
+    "daysFmt": "{{days}} giorni"
   }
 }

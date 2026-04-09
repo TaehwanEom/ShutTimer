@@ -16,6 +16,7 @@ import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import { Mission, MISSIONS, MISSIONS_STORAGE_KEY } from '../constants/missions';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -171,6 +172,7 @@ export default function EditMissionsScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
       AsyncStorage.getItem(MISSIONS_STORAGE_KEY).then(value => {
         setMissions(value ? JSON.parse(value) : MISSIONS);
       });
@@ -206,10 +208,10 @@ export default function EditMissionsScreen({ navigation }: Props) {
           {missions.map((item) => (
             <TouchableOpacity key={item.id} style={styles.itemCard} onPress={() => navigation.navigate('AddTimer', { editId: item.id, editIcon: item.icon, editMinutes: item.defaultMinutes ?? 60 })}>
               <View style={styles.itemIconWrapper}>
-                <MaterialIcons name={item.icon as any} size={22} color={colors.primary} />
+                <MaterialIcons name={item.icon as React.ComponentProps<typeof MaterialIcons>['name']} size={22} color={colors.primary} />
               </View>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemLabel}>{item.label}</Text>
+                <Text style={styles.itemLabel}>{t(`icons.${item.icon}`)}</Text>
                 {item.defaultMinutes != null && (
                   <Text style={styles.itemTime}>{`${item.defaultMinutes}:00`}</Text>
                 )}
@@ -217,7 +219,7 @@ export default function EditMissionsScreen({ navigation }: Props) {
               <View style={styles.itemRepeat}>
                 <Text style={styles.itemRepeatLabel}>{t('editMissions.repeat')}</Text>
                 <Switch
-                  value={item.enabled !== false}
+                  value={item.enabled ?? true}
                   onValueChange={(v) => handleToggle(item.id, v)}
                   trackColor={{ false: colors.surfaceContainerLowest, true: colors.primary }}
                   thumbColor={colors.onPrimary}

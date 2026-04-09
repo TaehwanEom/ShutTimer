@@ -11,7 +11,9 @@
     "resume": "Resume",
     "cancel": "Cancel",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Timer has ended. Take a photo to dismiss."
+    "notifBody": "Timer has ended. Take a photo to dismiss.",
+    "endTime": "End Time",
+    "estimatedAt": "Estimated at {{time}}"
   },
   "alarm": {
     "timerExpired": "TIMER EXPIRED",
@@ -23,7 +25,9 @@
     "timerDone": "Timer Done",
     "tapInstruction": "Tap the button to stop the alarm",
     "tapButton": "Tap to Stop",
-    "shakeInstruction": "Shake the device to stop the alarm"
+    "shakeInstruction": "Shake the device to stop the alarm",
+    "retakePhoto": "Please try again",
+    "forceClose": "Force Close"
   },
   "addTimer": {
     "editTitle": "Edit Favorite",
@@ -88,5 +92,32 @@
     "spa": "Relax",
     "nightlight": "Sleep",
     "clean-hands": "Brushing"
+  },
+  "presentation": {
+    "title": "Presentation",
+    "timer": "Timer",
+    "start": "Tap to start",
+    "stop": "Tap to stop",
+    "recording": "Recording",
+    "records": "Records",
+    "noRecords": "No records",
+    "delete": "Delete",
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "sounds": {
+    "alarm": "Alarm",
+    "ringtone": "Ringtone"
+  },
+  "history": {
+    "title": "History",
+    "noSessions": "No sessions",
+    "timer": "Timer",
+    "minutesFmt": "{{min}}m",
+    "monthStats": "{{month}} Stats",
+    "totalTime": "Monthly total",
+    "activeDays": "Active days",
+    "daysFmt": "{{days}} days"
   }
 }

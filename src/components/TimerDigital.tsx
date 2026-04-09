@@ -24,33 +24,28 @@ const MS_DIGIT_SIZE = 26;
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 
-export default function TimerDigital({ progress, timeText, subText: _subText, onSeek, onSeekStart, onSeekEnd, isWarning = false, isRunning = false, isPaused = false, totalSeconds = 0 }: Props) {
+export default function TimerDigital({ progress, timeText, subText: _subText, onSeek, onSeekStart, onSeekEnd, isWarning = false, isRunning = false, isPaused = false }: Props) {
   const { colors } = useTheme();
   const now = new Date();
   const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
 
-  // 디지털 게이지: 항상 1(풀) → 0(빈) 한 번의 연속 애니메이션
-  const smoothGauge = useRef(new Animated.Value(1)).current;
+  // 초당 800ms 짧은 애니메이션 — 부드럽고 배터리 효율적
+  const smoothGauge = useRef(new Animated.Value(progress)).current;
   useEffect(() => {
-    if (!isRunning) {
+    if (!isRunning || isPaused) {
       smoothGauge.stopAnimation();
-      smoothGauge.setValue(1);
+      if (!isRunning) smoothGauge.setValue(1);
       return;
     }
-    if (isPaused) {
-      smoothGauge.stopAnimation();
-      return;
-    }
-    // progress = remaining / total → 남은 시간(ms) = progress * totalSeconds * 1000
-    const remainingMs = progress * totalSeconds * 1000;
-    smoothGauge.setValue(progress);
-    Animated.timing(smoothGauge, {
-      toValue: 0,
-      duration: Math.max(0, remainingMs),
+    const anim = Animated.timing(smoothGauge, {
+      toValue: progress,
+      duration: 1000,
       easing: Easing.linear,
       useNativeDriver: false,
-    }).start();
-  }, [isRunning, isPaused]);
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [progress, isRunning, isPaused]);
   const hiddenInputRef = useRef<TextInput>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -90,7 +85,7 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
     if (digits.length === 4) {
       const min = Math.min(60, parseInt(digits.slice(0, 2), 10) || 0);
       const sec = Math.min(59, parseInt(digits.slice(2, 4), 10) || 0);
-      onSeek?.(min === 0 && sec === 0 ? 1 : min, min === 0 && sec === 0 ? 0 : sec);
+      onSeek?.(min, sec);
       setTimeout(() => {
         setIsEditing(false);
         hiddenInputRef.current?.blur();
@@ -102,7 +97,7 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
     if (editValue.length > 0) {
       const min = Math.min(60, parseInt(editValue.slice(0, 2).padEnd(2, '0'), 10) || 0);
       const sec = Math.min(59, parseInt(editValue.slice(2, 4).padEnd(2, '0'), 10) || 0);
-      onSeek?.(min === 0 && sec === 0 ? 1 : min, min === 0 && sec === 0 ? 0 : sec);
+      onSeek?.(min, sec);
     }
     setIsEditing(false);
   };
@@ -255,7 +250,7 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
                       stroke={colors.primary}
                       strokeWidth={18}
                       strokeDasharray={perimeter}
-                      strokeDashoffset={animOffset as any}
+                      strokeDashoffset={animOffset as Animated.AnimatedInterpolation<number>}
                       strokeLinecap="round"
                     />
                   );

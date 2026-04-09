@@ -11,7 +11,9 @@
     "resume": "Devam",
     "cancel": "İptal",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Zamanlayıcı sona erdi. Kapatmak için fotoğraf çekin."
+    "notifBody": "Zamanlayıcı sona erdi. Kapatmak için fotoğraf çekin.",
+    "endTime": "Bitiş Zamanı",
+    "estimatedAt": "Tahmini {{time}}"
   },
   "alarm": {
     "timerExpired": "SÜRE DOLDU",
@@ -23,7 +25,9 @@
     "timerDone": "Süre doldu",
     "tapInstruction": "Alarmı durdurmak için düğmeye dokunun",
     "tapButton": "Durdurmak için dokun",
-    "shakeInstruction": "Alarmı durdurmak için cihazı sallayın"
+    "shakeInstruction": "Alarmı durdurmak için cihazı sallayın",
+    "retakePhoto": "Lütfen tekrar deneyin",
+    "forceClose": "Zorla kapat"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -88,5 +92,32 @@
     "spa": "Dinlenme",
     "nightlight": "Uyku",
     "clean-hands": "Diş fırçalama"
+  },
+  "presentation": {
+    "title": "Sunum",
+    "timer": "Zamanlayıcı",
+    "start": "Başlatmak için dokunun",
+    "stop": "Durdurmak için dokunun",
+    "recording": "Kayıt",
+    "records": "Kayıtlar",
+    "noRecords": "Kayıt yok",
+    "delete": "Sil",
+    "hours": "sa",
+    "minutes": "dk",
+    "seconds": "sn"
+  },
+  "sounds": {
+    "alarm": "Alarm",
+    "ringtone": "Zil Sesi"
+  },
+  "history": {
+    "title": "Geçmiş",
+    "noSessions": "Kayıt yok",
+    "timer": "Zamanlayıcı",
+    "minutesFmt": "{{min}} dk",
+    "monthStats": "{{month}} İstatistikleri",
+    "totalTime": "Aylık toplam",
+    "activeDays": "Aktif günler",
+    "daysFmt": "{{days}} gün"
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,8 +18,10 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
-import { MISSIONS, MISSIONS_STORAGE_KEY, ICON_OPTIONS, ICON_LABELS } from '../constants/missions';
+import { MISSIONS, MISSIONS_STORAGE_KEY, ICON_OPTIONS, Mission } from '../constants/missions';
 import TimerDial from '../components/TimerDial';
+import TimerDigital from '../components/TimerDigital';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 
 import { RouteProp } from '@react-navigation/native';
@@ -135,7 +137,6 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 9,
-    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -181,6 +182,7 @@ export default function AddTimerScreen({ navigation, route }: Props) {
 
   const editId = route?.params?.editId;
   const isEdit = !!editId;
+  const dialType = route?.params?.dialType ?? 'classic';
 
   const [selectedMinutes, setSelectedMinutes] = useState(route?.params?.editMinutes ?? 60);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -188,6 +190,10 @@ export default function AddTimerScreen({ navigation, route }: Props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const pageScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, []);
 
 
   const handleSelectIcon = (icon: string) => {
@@ -197,12 +203,11 @@ export default function AddTimerScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!selectedIcon) return;
-    const label = t(`icons.${selectedIcon}`);
     const value = await AsyncStorage.getItem(MISSIONS_STORAGE_KEY);
     const list = value ? JSON.parse(value) : MISSIONS;
     const updated = isEdit
-      ? list.map((m: any) => m.id === editId ? { ...m, label, icon: selectedIcon, defaultMinutes: selectedMinutes } : m)
-      : [...list, { id: Date.now().toString(), label, icon: selectedIcon, enabled: true, defaultMinutes: selectedMinutes }];
+      ? list.map((m: Mission) => m.id === editId ? { ...m, icon: selectedIcon, defaultMinutes: selectedMinutes } : m)
+      : [...list, { id: Date.now().toString(), icon: selectedIcon, enabled: true, defaultMinutes: selectedMinutes }];
     await AsyncStorage.setItem(MISSIONS_STORAGE_KEY, JSON.stringify(updated));
     navigation.goBack();
   };
@@ -226,14 +231,25 @@ export default function AddTimerScreen({ navigation, route }: Props) {
       <ScrollView scrollEnabled={scrollEnabled} showsVerticalScrollIndicator={false}>
         {/* Dial */}
         <View style={styles.dialSection}>
-          <TimerDial
-            progress={selectedMinutes / 60}
-            timeText={`${selectedMinutes}:00`}
-            subText={t('addTimer.minutes')}
-            onSeek={(m) => setSelectedMinutes(m)}
-            onSeekStart={() => setScrollEnabled(false)}
-            onSeekEnd={() => setScrollEnabled(true)}
-          />
+          {dialType === 'digital' ? (
+            <TimerDigital
+              progress={selectedMinutes / 60}
+              timeText={`${String(selectedMinutes).padStart(2, '0')}:00`}
+              subText={t('addTimer.minutes')}
+              onSeek={(m, s) => { setSelectedMinutes(m); }}
+              onSeekStart={() => setScrollEnabled(false)}
+              onSeekEnd={() => setScrollEnabled(true)}
+            />
+          ) : (
+            <TimerDial
+              progress={selectedMinutes / 60}
+              timeText={`${selectedMinutes}:00`}
+              subText={t('addTimer.minutes')}
+              onSeek={(m) => setSelectedMinutes(m)}
+              onSeekStart={() => setScrollEnabled(false)}
+              onSeekEnd={() => setScrollEnabled(true)}
+            />
+          )}
         </View>
 
         {/* 타이머 종류 */}
@@ -296,7 +312,7 @@ export default function AddTimerScreen({ navigation, route }: Props) {
                       {page.slice(rowIdx * 2, rowIdx * 2 + 2).map(icon => (
                         <TouchableOpacity key={icon} style={styles.iconCell} onPress={() => handleSelectIcon(icon)}>
                           <View style={styles.iconCellWrapper}>
-                            <MaterialIcons name={icon as any} size={22} color={colors.primary} />
+                            <MaterialIcons name={icon as React.ComponentProps<typeof MaterialIcons>['name']} size={22} color={colors.primary} />
                           </View>
                           <Text style={styles.iconCellLabel}>{t(`icons.${icon}`)}</Text>
                         </TouchableOpacity>

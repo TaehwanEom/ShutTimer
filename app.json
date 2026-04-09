@@ -3,13 +3,11 @@
     "name": "ShutTimer",
     "slug": "ShutTimer",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
@@ -19,8 +17,10 @@
         "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
         "NSMicrophoneUsageDescription": "카메라 사용에 필요합니다.",
         "UIBackgroundModes": [
-          "remote-notification"
-        ]
+          "remote-notification",
+          "audio"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -32,8 +32,11 @@
       "permissions": [
         "CAMERA",
         "VIBRATE",
+        "RECORD_AUDIO",
         "RECEIVE_BOOT_COMPLETED",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -61,6 +64,11 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "beb94412-73f7-4df6-9078-e83421d49fc2"
+      }
     }
   }
 }

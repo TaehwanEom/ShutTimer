@@ -11,7 +11,9 @@
     "resume": "继续",
     "cancel": "取消",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "计时器已结束。请拍照以关闭。"
+    "notifBody": "计时器已结束。请拍照以关闭。",
+    "endTime": "预计结束",
+    "estimatedAt": "预计 {{time}}"
   },
   "alarm": {
     "timerExpired": "时间到",
@@ -23,7 +25,9 @@
     "timerDone": "计时结束",
     "tapInstruction": "点击按钮以关闭闹钟",
     "tapButton": "点击关闭",
-    "shakeInstruction": "摇晃设备以关闭闹钟"
+    "shakeInstruction": "摇晃设备以关闭闹钟",
+    "retakePhoto": "请重新拍照",
+    "forceClose": "强制关闭"
   },
   "addTimer": {
     "editTitle": "编辑收藏",
@@ -88,5 +92,32 @@
     "spa": "休息",
     "nightlight": "睡眠",
     "clean-hands": "刷牙"
+  },
+  "presentation": {
+    "title": "演讲",
+    "timer": "计时器",
+    "start": "点击开始",
+    "stop": "点击停止",
+    "recording": "录音",
+    "records": "记录",
+    "noRecords": "暂无记录",
+    "delete": "删除",
+    "hours": "时",
+    "minutes": "分",
+    "seconds": "秒"
+  },
+  "sounds": {
+    "alarm": "警报音",
+    "ringtone": "铃声"
+  },
+  "history": {
+    "title": "记录",
+    "noSessions": "没有记录",
+    "timer": "计时器",
+    "minutesFmt": "{{min}}分钟",
+    "monthStats": "{{month}}统计",
+    "totalTime": "本月总时长",
+    "activeDays": "活跃天数",
+    "daysFmt": "{{days}}天"
   }
 }

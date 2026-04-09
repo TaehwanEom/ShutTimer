@@ -26,6 +26,7 @@ import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
 import AdBanner from '../components/AdBanner';
 import { SETTINGS_KEY, DialType } from '../constants/settings';
+import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -214,7 +215,7 @@ function MissionItem({ mission, isSelected, onPress, onLongPress, t }: {
           </Svg>
         )}
         <MaterialIcons
-          name={mission.icon as any}
+          name={mission.icon as React.ComponentProps<typeof MaterialIcons>['name']}
           size={28}
           color={sectorProgress > 0 ? colors.onPrimary : (isSelected ? colors.primary : colors.secondary)}
         />
@@ -264,14 +265,6 @@ export default function HomeScreen({ navigation }: Props) {
   const isPausedRef = useRef(false);
   const backgroundedAt = useRef<number | null>(null);
   const notificationIdRef = useRef<string | null>(null);
-  const gaugeAnim = useRef(new Animated.Value(1)).current;
-
-  // 미실행 중 선택 시간에 맞춰 gaugeAnim 동기화
-  useEffect(() => {
-    if (!isRunning) {
-      gaugeAnim.setValue((selectedMinutes * 60 + selectedSeconds) / 3600);
-    }
-  }, [selectedMinutes, selectedSeconds, isRunning]);
 
   useFocusEffect(
     useCallback(() => {
@@ -318,8 +311,6 @@ export default function HomeScreen({ navigation }: Props) {
     setIsRunning(true);
     setIsPaused(false);
     isPausedRef.current = false;
-    gaugeAnim.setValue(total / 3600);
-    Animated.timing(gaugeAnim, { toValue: 0, duration: total * 1000, useNativeDriver: false }).start();
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
   };
@@ -337,12 +328,37 @@ export default function HomeScreen({ navigation }: Props) {
     return () => clearInterval(id);
   }, [isRunning, isPaused]);
 
+  // --- 세션 저장 ---
+  const saveSession = async (totalSecs: number, icon: string) => {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const record: SessionRecord = {
+      id: Date.now().toString(),
+      date,
+      icon,
+      minutes: Math.max(1, Math.round(totalSecs / 60)),
+    };
+    const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
+    const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
+    list.push(record);
+
+    // 6개월 이전 제거
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - 6);
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+    const trimmed = list.filter(s => s.date >= cutoffStr);
+
+    await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(trimmed));
+  };
+
   // --- 0 감지 ---
   useEffect(() => {
     if (isRunning && remainingSeconds === 0) {
       setIsRunning(false);
+      const mission = missionList[selectedIndex] ?? null;
+      const icon = mission?.icon ?? 'timer';
+      saveSession(totalSecondsRef.current, icon);
       cancelAlarm(notificationIdRef.current).then(() => {
-        const mission = missionList[selectedIndex] ?? null;
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
       });
     }
@@ -374,10 +390,8 @@ export default function HomeScreen({ navigation }: Props) {
     isPausedRef.current = next;
     setIsPaused(next);
     if (next) {
-      gaugeAnim.stopAnimation();
       cancelAlarm(notificationIdRef.current);
     } else {
-      Animated.timing(gaugeAnim, { toValue: 0, duration: remainingSecondsRef.current * 1000, useNativeDriver: false }).start();
       scheduleAlarm(remainingSecondsRef.current);
     }
   };
@@ -385,8 +399,6 @@ export default function HomeScreen({ navigation }: Props) {
   // --- 취소 ---
   const handleCancel = () => {
     cancelAlarm(notificationIdRef.current);
-    gaugeAnim.stopAnimation();
-    gaugeAnim.setValue((selectedMinutes * 60 + selectedSeconds) / 3600);
     setIsRunning(false);
     setIsPaused(false);
     isPausedRef.current = false;
@@ -434,7 +446,13 @@ export default function HomeScreen({ navigation }: Props) {
     outputRange: [BTN_CIRCUMFERENCE, 0],
   });
 
-  const progress = isRunning
+  // 다이얼: 항상 60분 기준 (1분 타이머 → 게이지 1/60)
+  const dialProgress = isRunning
+    ? remainingSeconds / (60 * 60)
+    : (selectedMinutes * 60 + selectedSeconds) / (60 * 60);
+
+  // 디지털: 설정 시간 기준 (1분 타이머 → 게이지 100% → 0%)
+  const digitalProgress = isRunning
     ? remainingSeconds / totalSecondsRef.current
     : (selectedMinutes * 60 + selectedSeconds) / (60 * 60);
 
@@ -452,6 +470,9 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
         <View style={styles.headerRight}>
           <MaterialIcons name="notifications" size={24} color={colors.secondary} style={{ opacity: 0.4 }} />
+          <TouchableOpacity onPress={() => navigation.navigate('History')}>
+            <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
           </TouchableOpacity>
@@ -463,19 +484,18 @@ export default function HomeScreen({ navigation }: Props) {
         <Animated.View style={{ transform: [{ translateX: dialSlide }], overflow: 'visible' }}>
         {dialType === 'classic' && (
           <TimerDial
-            progress={progress}
+            progress={dialProgress}
             timeText={timeText}
             subText={isRunning ? t('running.minutesLeft') : t('home.minutes')}
             onSeek={isRunning ? undefined : (m) => { setSelectedMinutes(m); setSelectedSeconds(0); setSelectedIndex(-1); }}
             onSeekStart={() => {}}
             onSeekEnd={() => {}}
             isWarning={isRunning && remainingSeconds <= 60}
-            gaugeAnim={gaugeAnim}
           />
         )}
         {dialType === 'digital' && (
           <TimerDigital
-            progress={progress}
+            progress={digitalProgress}
             timeText={timeText}
             subText={isRunning ? t('running.minutesLeft') : t('home.minutes')}
             onSeek={isRunning ? undefined : (m: number, s?: number) => { setSelectedMinutes(m); setSelectedSeconds(s ?? 0); setSelectedIndex(-1); }}
@@ -484,7 +504,6 @@ export default function HomeScreen({ navigation }: Props) {
             isWarning={isRunning && remainingSeconds <= 60}
             isRunning={isRunning}
             isPaused={isPaused}
-            totalSeconds={totalSecondsRef.current}
           />
         )}
         </Animated.View>

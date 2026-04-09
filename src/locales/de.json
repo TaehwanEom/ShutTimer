@@ -11,7 +11,9 @@
     "resume": "Weiter",
     "cancel": "Abbrechen",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Der Timer ist abgelaufen. Machen Sie ein Foto zum Beenden."
+    "notifBody": "Der Timer ist abgelaufen. Machen Sie ein Foto zum Beenden.",
+    "endTime": "Endzeit",
+    "estimatedAt": "Geschätzt um {{time}}"
   },
   "alarm": {
     "timerExpired": "ZEIT ABGELAUFEN",
@@ -23,7 +25,9 @@
     "timerDone": "Timer beendet",
     "tapInstruction": "Tippen Sie auf die Taste, um den Alarm zu stoppen",
     "tapButton": "Tippen zum Stoppen",
-    "shakeInstruction": "Schütteln Sie das Gerät, um den Alarm zu stoppen"
+    "shakeInstruction": "Schütteln Sie das Gerät, um den Alarm zu stoppen",
+    "retakePhoto": "Bitte erneut versuchen",
+    "forceClose": "Schließen erzwingen"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -88,5 +92,32 @@
     "spa": "Entspannung",
     "nightlight": "Schlafen",
     "clean-hands": "Zähneputzen"
+  },
+  "presentation": {
+    "title": "Präsentation",
+    "timer": "Timer",
+    "start": "Tippen zum Starten",
+    "stop": "Tippen zum Stoppen",
+    "recording": "Aufnahme",
+    "records": "Aufzeichnungen",
+    "noRecords": "Keine Aufzeichnungen",
+    "delete": "Löschen",
+    "hours": "Std",
+    "minutes": "Min",
+    "seconds": "Sek"
+  },
+  "sounds": {
+    "alarm": "Alarm",
+    "ringtone": "Klingelton"
+  },
+  "history": {
+    "title": "Verlauf",
+    "noSessions": "Keine Einträge",
+    "timer": "Timer",
+    "minutesFmt": "{{min}} Min.",
+    "monthStats": "{{month}}-Statistik",
+    "totalTime": "Monatsgesamt",
+    "activeDays": "Aktive Tage",
+    "daysFmt": "{{days}} Tage"
   }
 }

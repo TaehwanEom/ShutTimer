@@ -11,7 +11,9 @@
     "resume": "Reprendre",
     "cancel": "Annuler",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Le minuteur est terminé. Prenez une photo pour arrêter."
+    "notifBody": "Le minuteur est terminé. Prenez une photo pour arrêter.",
+    "endTime": "Heure de fin",
+    "estimatedAt": "Estimé à {{time}}"
   },
   "alarm": {
     "timerExpired": "TEMPS ÉCOULÉ",
@@ -23,7 +25,9 @@
     "timerDone": "Minuteur terminé",
     "tapInstruction": "Appuyez sur le bouton pour arrêter l'alarme",
     "tapButton": "Appuyer pour arrêter",
-    "shakeInstruction": "Secouez l'appareil pour arrêter l'alarme"
+    "shakeInstruction": "Secouez l'appareil pour arrêter l'alarme",
+    "retakePhoto": "Veuillez réessayer",
+    "forceClose": "Forcer la fermeture"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",
@@ -88,5 +92,32 @@
     "spa": "Détente",
     "nightlight": "Sommeil",
     "clean-hands": "Brossage"
+  },
+  "presentation": {
+    "title": "Présentation",
+    "timer": "Minuteur",
+    "start": "Appuyez pour démarrer",
+    "stop": "Appuyez pour arrêter",
+    "recording": "Enregistrement",
+    "records": "Historique",
+    "noRecords": "Aucun enregistrement",
+    "delete": "Supprimer",
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "sounds": {
+    "alarm": "Alarme",
+    "ringtone": "Sonnerie"
+  },
+  "history": {
+    "title": "Historique",
+    "noSessions": "Aucun enregistrement",
+    "timer": "Minuteur",
+    "minutesFmt": "{{min}} min",
+    "monthStats": "Statistiques de {{month}}",
+    "totalTime": "Total du mois",
+    "activeDays": "Jours actifs",
+    "daysFmt": "{{days}} jours"
   }
 }

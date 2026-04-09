@@ -11,7 +11,9 @@
     "resume": "ดำเนินต่อ",
     "cancel": "ยกเลิก",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "หมดเวลาแล้ว ถ่ายรูปเพื่อปิดการแจ้งเตือน"
+    "notifBody": "หมดเวลาแล้ว ถ่ายรูปเพื่อปิดการแจ้งเตือน",
+    "endTime": "เวลาสิ้นสุด",
+    "estimatedAt": "ประมาณ {{time}}"
   },
   "alarm": {
     "timerExpired": "หมดเวลา",
@@ -23,7 +25,9 @@
     "timerDone": "หมดเวลา",
     "tapInstruction": "แตะปุ่มเพื่อปิดการแจ้งเตือน",
     "tapButton": "แตะเพื่อปิด",
-    "shakeInstruction": "เขย่าอุปกรณ์เพื่อปิดการแจ้งเตือน"
+    "shakeInstruction": "เขย่าอุปกรณ์เพื่อปิดการแจ้งเตือน",
+    "retakePhoto": "กรุณาลองอีกครั้ง",
+    "forceClose": "บังคับปิด"
   },
   "addTimer": {
     "editTitle": "แก้ไขรายการโปรด",
@@ -88,5 +92,32 @@
     "spa": "พักผ่อน",
     "nightlight": "นอน",
     "clean-hands": "แปรงฟัน"
+  },
+  "presentation": {
+    "title": "การนำเสนอ",
+    "timer": "ตั้งเวลา",
+    "start": "แตะเพื่อเริ่ม",
+    "stop": "แตะเพื่อหยุด",
+    "recording": "บันทึกเสียง",
+    "records": "บันทึก",
+    "noRecords": "ไม่มีบันทึก",
+    "delete": "ลบ",
+    "hours": "ชม.",
+    "minutes": "น.",
+    "seconds": "วิ."
+  },
+  "sounds": {
+    "alarm": "เสียงเตือน",
+    "ringtone": "เสียงเรียกเข้า"
+  },
+  "history": {
+    "title": "ประวัติ",
+    "noSessions": "ไม่มีบันทึก",
+    "timer": "ตั้งเวลา",
+    "minutesFmt": "{{min}} นาที",
+    "monthStats": "สถิติ {{month}}",
+    "totalTime": "รวมเดือนนี้",
+    "activeDays": "วันที่ใช้งาน",
+    "daysFmt": "{{days}} วัน"
   }
 }

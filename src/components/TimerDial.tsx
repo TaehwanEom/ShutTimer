@@ -18,7 +18,6 @@ type Props = {
   onSeekStart?: () => void;
   onSeekEnd?: () => void;
   isWarning?: boolean;
-  gaugeAnim?: Animated.Value;
 };
 
 const SIZE = 330;
@@ -95,7 +94,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 });
 
-export default function TimerDial({ progress, timeText: _timeText, subText: _subText, variant: _variant = 'classic', onSeek, onSeekStart, onSeekEnd, isWarning = false, gaugeAnim }: Props) {
+export default function TimerDial({ progress, timeText: _timeText, subText: _subText, variant: _variant = 'classic', onSeek, onSeekStart, onSeekEnd, isWarning = false }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -130,33 +129,20 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
 
   const prevMinutesRef = React.useRef<number | null>(null);
   const isDragging = useRef(false);
+
+  // 초당 800ms 짧은 애니메이션 — 부드럽고 배터리 효율적
   const progressAnim = useRef(new Animated.Value(progress)).current;
   const [displayProgress, setDisplayProgress] = useState(progress);
-
   useEffect(() => {
-    if (gaugeAnim) {
-      const id = gaugeAnim.addListener(({ value }) => setDisplayProgress(value));
-      return () => gaugeAnim.removeListener(id);
-    }
     const id = progressAnim.addListener(({ value }) => setDisplayProgress(value));
     return () => progressAnim.removeListener(id);
   }, []);
-
   useEffect(() => {
-    if (gaugeAnim) return; // gaugeAnim이 드라이브
-    if (isDragging.current) {
-      progressAnim.setValue(progress);
-      return;
-    }
-    const anim = Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 450,
-      useNativeDriver: false,
-      easing: Easing.out(Easing.cubic),
-    });
+    if (isDragging.current) { progressAnim.setValue(progress); return; }
+    const anim = Animated.timing(progressAnim, { toValue: progress, duration: 800, useNativeDriver: false, easing: Easing.linear });
     anim.start();
     return () => anim.stop();
-  }, [progress, gaugeAnim]);
+  }, [progress]);
 
   const blinkAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -195,7 +181,8 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
       const { locationX, locationY } = evt.nativeEvent;
       const angle = Math.atan2(locationY - cy, locationX - cx) * (180 / Math.PI);
       const normalized = (angle + 90 + 360) % 360;
-      let minutes = Math.round(normalized / 6);
+      let minutes = Math.floor(normalized / 6);
+      if (normalized >= 354) minutes = 60;
       minutes = Math.max(0, Math.min(60, minutes));
       prevMinutesRef.current = minutes;
       onSeek(minutes);
@@ -205,7 +192,8 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
       const { locationX, locationY } = evt.nativeEvent;
       const angle = Math.atan2(locationY - cy, locationX - cx) * (180 / Math.PI);
       const normalized = (angle + 90 + 360) % 360;
-      let minutes = Math.round(normalized / 6);
+      let minutes = Math.floor(normalized / 6);
+      if (normalized >= 354) minutes = 60;
       minutes = Math.max(0, Math.min(60, minutes));
       if (prevMinutesRef.current !== null && Math.abs(minutes - prevMinutesRef.current) > 30) return;
       prevMinutesRef.current = minutes;
@@ -240,18 +228,29 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
         </Defs>
         <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill="url(#innerShadow)" />
 
-        {/* 6. 바늘 — 동그라미에서 짧게 */}
-        {displayProgress > 0 && (() => {
+        {/* 6. 세모 — 다이얼 중간 지점 */}
+        {(() => {
           const needleAngle = displayProgress * 360;
-          const tail = polarToCartesian(cx, cy, CENTER_RADIUS - 2, needleAngle);
-          const tip = polarToCartesian(cx, cy, CENTER_RADIUS + 14, needleAngle);
+          const side = 20;
+          const base = 15;
+          const h = side * Math.sqrt(3) / 2;
+          const rad = (needleAngle - 90) * (Math.PI / 180);
+          const perp = rad + Math.PI / 2;
+          // 무게중심을 동그라미 테두리에 위치
+          const gcx = cx + (CENTER_RADIUS + 4) * Math.cos(rad);
+          const gcy = cy + (CENTER_RADIUS + 4) * Math.sin(rad);
+          const tipX = gcx + (h * 2 / 3) * Math.cos(rad);
+          const tipY = gcy + (h * 2 / 3) * Math.sin(rad);
+          const bcx = gcx - (h / 3) * Math.cos(rad);
+          const bcy = gcy - (h / 3) * Math.sin(rad);
+          const blX = bcx - (base / 2) * Math.cos(perp);
+          const blY = bcy - (base / 2) * Math.sin(perp);
+          const brX = bcx + (base / 2) * Math.cos(perp);
+          const brY = bcy + (base / 2) * Math.sin(perp);
           return (
-            <Line
-              x1={tail.x} y1={tail.y}
-              x2={tip.x} y2={tip.y}
-              stroke={colors.onBackground}
-              strokeWidth={3}
-              strokeLinecap="round"
+            <Path
+              d={`M ${tipX} ${tipY} L ${blX} ${blY} L ${brX} ${brY} Z`}
+              fill={colors.onBackground}
             />
           );
         })()}

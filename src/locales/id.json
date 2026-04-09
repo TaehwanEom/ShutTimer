@@ -11,7 +11,9 @@
     "resume": "Lanjut",
     "cancel": "Batal",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Timer telah berakhir. Ambil foto untuk menutup."
+    "notifBody": "Timer telah berakhir. Ambil foto untuk menutup.",
+    "endTime": "Waktu selesai",
+    "estimatedAt": "Perkiraan {{time}}"
   },
   "alarm": {
     "timerExpired": "WAKTU HABIS",
@@ -23,7 +25,9 @@
     "timerDone": "Timer Selesai",
     "tapInstruction": "Ketuk tombol untuk mematikan alarm",
     "tapButton": "Ketuk untuk Berhenti",
-    "shakeInstruction": "Goyangkan perangkat untuk mematikan alarm"
+    "shakeInstruction": "Goyangkan perangkat untuk mematikan alarm",
+    "retakePhoto": "Silakan coba lagi",
+    "forceClose": "Paksa tutup"
   },
   "addTimer": {
     "editTitle": "Edit Favorit",
@@ -88,5 +92,32 @@
     "spa": "Istirahat",
     "nightlight": "Tidur",
     "clean-hands": "Sikat Gigi"
+  },
+  "presentation": {
+    "title": "Presentasi",
+    "timer": "Timer",
+    "start": "Ketuk untuk mulai",
+    "stop": "Ketuk untuk berhenti",
+    "recording": "Rekaman",
+    "records": "Riwayat",
+    "noRecords": "Tidak ada riwayat",
+    "delete": "Hapus",
+    "hours": "j",
+    "minutes": "m",
+    "seconds": "d"
+  },
+  "sounds": {
+    "alarm": "Alarm",
+    "ringtone": "Nada Dering"
+  },
+  "history": {
+    "title": "Riwayat",
+    "noSessions": "Tidak ada catatan",
+    "timer": "Timer",
+    "minutesFmt": "{{min}} mnt",
+    "monthStats": "Statistik {{month}}",
+    "totalTime": "Total bulan ini",
+    "activeDays": "Hari aktif",
+    "daysFmt": "{{days}} hari"
   }
 }

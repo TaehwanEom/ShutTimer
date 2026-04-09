@@ -11,7 +11,9 @@
     "resume": "Retomar",
     "cancel": "Cancelar",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "O temporizador terminou. Tire uma foto para encerrar."
+    "notifBody": "O temporizador terminou. Tire uma foto para encerrar.",
+    "endTime": "Hora de término",
+    "estimatedAt": "Estimado às {{time}}"
   },
   "alarm": {
     "timerExpired": "TEMPO ESGOTADO",
@@ -23,7 +25,9 @@
     "timerDone": "Timer encerrado",
     "tapInstruction": "Toque no botão para parar o alarme",
     "tapButton": "Toque para parar",
-    "shakeInstruction": "Agite o dispositivo para parar o alarme"
+    "shakeInstruction": "Agite o dispositivo para parar o alarme",
+    "retakePhoto": "Por favor, tente novamente",
+    "forceClose": "Forçar fechamento"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -88,5 +92,32 @@
     "spa": "Descanso",
     "nightlight": "Dormir",
     "clean-hands": "Escovar"
+  },
+  "presentation": {
+    "title": "Apresentação",
+    "timer": "Temporizador",
+    "start": "Toque para iniciar",
+    "stop": "Toque para parar",
+    "recording": "Gravação",
+    "records": "Registros",
+    "noRecords": "Sem registros",
+    "delete": "Excluir",
+    "hours": "h",
+    "minutes": "m",
+    "seconds": "s"
+  },
+  "sounds": {
+    "alarm": "Alarme",
+    "ringtone": "Toque"
+  },
+  "history": {
+    "title": "Histórico",
+    "noSessions": "Sem registros",
+    "timer": "Timer",
+    "minutesFmt": "{{min}} min",
+    "monthStats": "Estatísticas de {{month}}",
+    "totalTime": "Total do mês",
+    "activeDays": "Dias ativos",
+    "daysFmt": "{{days}} dias"
   }
 }

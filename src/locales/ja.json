@@ -11,7 +11,9 @@
     "resume": "再開",
     "cancel": "キャンセル",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "タイマーが終了しました。写真を撮って終了してください。"
+    "notifBody": "タイマーが終了しました。写真を撮って終了してください。",
+    "endTime": "終了予定",
+    "estimatedAt": "{{time}} 終了予定"
   },
   "alarm": {
     "timerExpired": "時間終了",
@@ -23,7 +25,9 @@
     "timerDone": "タイマー終了",
     "tapInstruction": "ボタンをタップしてアラームを止めてください",
     "tapButton": "タップして終了",
-    "shakeInstruction": "デバイスを振ってアラームを止めてください"
+    "shakeInstruction": "デバイスを振ってアラームを止めてください",
+    "retakePhoto": "もう一度撮ってください",
+    "forceClose": "強制終了"
   },
   "addTimer": {
     "editTitle": "お気に入り編集",
@@ -88,5 +92,32 @@
     "spa": "リラックス",
     "nightlight": "就寝",
     "clean-hands": "歯磨き"
+  },
+  "presentation": {
+    "title": "プレゼン",
+    "timer": "タイマー",
+    "start": "タップして開始",
+    "stop": "タップして停止",
+    "recording": "録音",
+    "records": "記録",
+    "noRecords": "記録がありません",
+    "delete": "削除",
+    "hours": "時",
+    "minutes": "分",
+    "seconds": "秒"
+  },
+  "sounds": {
+    "alarm": "アラーム",
+    "ringtone": "着信音"
+  },
+  "history": {
+    "title": "履歴",
+    "noSessions": "記録がありません",
+    "timer": "タイマー",
+    "minutesFmt": "{{min}}分",
+    "monthStats": "{{month}}の統計",
+    "totalTime": "今月の合計",
+    "activeDays": "活動日数",
+    "daysFmt": "{{days}}日"
   }
 }

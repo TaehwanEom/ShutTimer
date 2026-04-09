@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,71 +8,136 @@ import {
   Vibration,
   Animated,
   Easing,
+  AppState,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
+import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
+// TODO: EAS Build 후 활성화
+// import ImageLabeling from '@react-native-ml-kit/image-labeling';
+const ImageLabeling: { label: (uri: string) => Promise<Array<{ text: string; confidence: number }>> } | null = null;
 import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS } from '../constants/settings';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 // AdMob — EAS Development Build 필요, Expo Go 불가
 // import { RewardedInterstitialAd, TestIds, AdEventType } from 'react-native-google-mobile-ads';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Alarm'>;
+  route: RouteProp<RootStackParamList, 'Alarm'>;
+};
+
+const MISSION_LABELS: Record<string, string[]> = {
+  tv: ['Television', 'Screen', 'Monitor', 'Television set'],
+  read: ['Book', 'Magazine'],
+  study: ['Book', 'Laptop', 'Notebook', 'Pen'],
+  brush: ['Toothbrush'],
+  bath: ['Bathtub', 'Sink', 'Bathroom'],
+  play: ['Toy'],
+  game: [], // 검증 스킵
 };
 
 const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT_REQUIRED = 3;
 const SHAKE_COOLDOWN_MS = 500;
+const VIBRATION_PATTERN = [0, 500, 300, 500, 300, 500];
+const AUTO_DISMISS_MS: Record<string, number> = {
+  camera: 5 * 60 * 1000,
+  tap: 3 * 60 * 1000,
+  shake: 3 * 60 * 1000,
+};
 
-export default function AlarmScreen({ navigation }: Props) {
+export default function AlarmScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
+  const missionId = route.params?.missionId ?? null;
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const [failCount, setFailCount] = useState(0);
+  const [failMessage, setFailMessage] = useState(false);
 
   const hasCameraPermission = permission?.granted === true;
   const shakeCountRef = useRef(0);
   const lastShakeTimeRef = useRef(0);
 
+  const goHome = useCallback(() => {
+    Vibration.cancel();
+    soundRef.current?.stopAsync().catch(() => {});
+    soundRef.current?.unloadAsync().catch(() => {});
+    soundRef.current = null;
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }, [navigation]);
+
+  const dismiss = useCallback(() => {
+    goHome();
+  }, [goHome]);
+
   // 자동 종료 타이머
   useEffect(() => {
-    if (dismissMethod === 'camera') return; // camera는 별도 처리
-    const timeout = setTimeout(() => dismiss(), 3 * 60 * 1000);
+    if (!settingsLoaded) return;
+    const timeout = setTimeout(dismiss, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
     return () => clearTimeout(timeout);
-  }, [dismissMethod]);
+  }, [dismissMethod, settingsLoaded, dismiss]);
 
+  // portrait 잠금 + 설정 로드
   useEffect(() => {
-    if (dismissMethod !== 'camera') return;
-    const timeout = setTimeout(() => dismiss(), 5 * 60 * 1000);
-    return () => clearTimeout(timeout);
-  }, [dismissMethod]);
-
-  // 설정 로드
-  useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED]).then(pairs => {
-      const method = pairs[0][1] as DismissMethod | null;
-      const vibration = pairs[1][1];
-      if (method) setDismissMethod(method);
-      if (vibration !== null) setVibrationEnabled(vibration === 'true');
-    });
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
   }, []);
 
-  // 진동
+  useEffect(() => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, SETTINGS_KEY.ALARM_SOUND]).then(pairs => {
+      const method = pairs[0][1] as DismissMethod | null;
+      const vibration = pairs[1][1];
+      const soundId = pairs[2][1] ?? DEFAULT_SOUND_ID;
+      if (method) setDismissMethod(method);
+      if (vibration !== null) setVibrationEnabled(vibration === 'true');
+      setSettingsLoaded(true);
+
+      // 알람 사운드 재생
+      const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true }).then(() => {
+        Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
+          soundRef.current = sound;
+          sound.playAsync();
+        }).catch(() => {});
+      });
+    });
+
+    return () => {
+      soundRef.current?.stopAsync().catch(() => {});
+      soundRef.current?.unloadAsync().catch(() => {});
+    };
+  }, []);
+
+  // 진동 + 백그라운드 복귀 시 재시작
   useEffect(() => {
     if (!vibrationEnabled) return;
-    const pattern = [0, 500, 300, 500, 300, 500];
-    Vibration.vibrate(pattern, true);
-    return () => Vibration.cancel();
+    Vibration.vibrate(VIBRATION_PATTERN, true);
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        Vibration.vibrate(VIBRATION_PATTERN, true);
+      }
+    });
+
+    return () => {
+      Vibration.cancel();
+      sub.remove();
+    };
   }, [vibrationEnabled]);
 
   // 흔들기 감지
@@ -191,21 +256,48 @@ export default function AlarmScreen({ navigation }: Props) {
     transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }],
   });
 
-  const goHome = () => {
-    Vibration.cancel();
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  const handleShutter = async () => {
+    try {
+      const photo = await cameraRef.current?.takePictureAsync();
+      if (!photo?.uri) return;
+
+      // missionId 없음 or game 미션 or ML Kit 미설치 → 검증 스킵
+      const labels = missionId ? MISSION_LABELS[missionId] : null;
+      if (!labels || labels.length === 0 || !ImageLabeling) {
+        dismiss();
+        return;
+      }
+
+      // Image Labeling 검증
+      const result = await ImageLabeling.label(photo.uri);
+      const matched = result.some(
+        (item: { text: string; confidence: number }) =>
+          item.confidence >= 0.6 &&
+          labels.some(l => item.text.toLowerCase().includes(l.toLowerCase()))
+      );
+
+      if (matched) {
+        dismiss();
+      } else {
+        const newCount = failCount + 1;
+        setFailCount(newCount);
+        if (newCount >= 3) {
+          // 3회 실패 → 강제 종료 허용 (failCount 유지, UI에서 버튼 표시)
+        }
+        Vibration.vibrate(200);
+        setFailMessage(true);
+        setTimeout(() => setFailMessage(false), 1500);
+      }
+    } catch {
+      // 인식 실패 시 그냥 종료
+      dismiss();
+    }
   };
 
-  const dismiss = () => {
-    // AdMob 비활성화 중 (EAS Development Build 필요)
-    goHome();
-  };
-
-  const handleShutter = () => {
-    cameraRef.current?.takePictureAsync()
-      .then(() => dismiss())
-      .catch(() => {});
-  };
+  // 설정 로드 전 빈 화면
+  if (!settingsLoaded) {
+    return <SafeAreaView style={styles.container} />;
+  }
 
   // Camera 모드 레이아웃
   if (dismissMethod === 'camera') {
@@ -274,6 +366,21 @@ export default function AlarmScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
         </View>
+        {failMessage && (
+          <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '700', textAlign: 'center', marginBottom: 8, opacity: 0.9 }}>
+            {t('alarm.retakePhoto', { defaultValue: '다시 찍어주세요' })}
+          </Text>
+        )}
+        {failCount >= 3 && (
+          <TouchableOpacity
+            style={{ paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 8 }}
+            onPress={dismiss}
+          >
+            <Text style={{ color: colors.onPrimary, fontSize: 14, fontWeight: '700' }}>
+              {t('alarm.forceClose', { defaultValue: '강제 종료' })}
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.adSlot}><Text style={styles.adLabel}>AD</Text></View>
       </SafeAreaView>
     );
@@ -307,7 +414,7 @@ export default function AlarmScreen({ navigation }: Props) {
 
         <View style={styles.tapSection}>
           <TouchableOpacity style={styles.tapButton} onPress={dismiss} activeOpacity={0.8}>
-            <Text style={styles.tapButtonText}>종료</Text>
+            <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.adSlot}><Text style={styles.adLabel}>AD</Text></View>

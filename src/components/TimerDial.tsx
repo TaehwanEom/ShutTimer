@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, PanResponder, Animated, Easing } from 'react-native';
-import Svg, { Circle, Path, Line } from 'react-native-svg';
+import Svg, { Circle, Path, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 
@@ -18,18 +18,19 @@ type Props = {
   onSeekStart?: () => void;
   onSeekEnd?: () => void;
   isWarning?: boolean;
+  gaugeAnim?: Animated.Value;
 };
 
-const SIZE = 300;
-const cx = 150;
-const cy = 150;
-const LABEL_RADIUS = 140;
-const SECTOR_RADIUS = 128;
-const CENTER_RADIUS = 75;
-const TICK_OUTER_MAJOR = 122;
-const TICK_INNER_MAJOR = 102;
-const TICK_OUTER_MINOR = 122;
-const TICK_INNER_MINOR = 110;
+const SIZE = 330;
+const cx = 165;
+const cy = 165;
+const LABEL_RADIUS = 164;
+const SECTOR_RADIUS = 141;
+const CENTER_RADIUS = 18;
+const TICK_OUTER_MAJOR = 134;
+const TICK_INNER_MAJOR = 100;
+const TICK_OUTER_MINOR = 134;
+const TICK_INNER_MINOR = 112;
 
 const LABELS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -58,17 +59,17 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   label: {
     position: 'absolute',
-    fontSize: 13,
+    fontSize: 19,
     fontWeight: '700',
     color: colors.secondary,
-    width: 24,
+    width: 36,
     textAlign: 'center',
   },
   centerCircle: {
     width: CENTER_RADIUS * 2,
     height: CENTER_RADIUS * 2,
     borderRadius: CENTER_RADIUS,
-    backgroundColor: colors.surfaceContainerLowest,
+    backgroundColor: colors.onBackground,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#1a1c1f',
@@ -78,23 +79,23 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     elevation: 4,
   },
   timeText: {
-    fontSize: 35,
+    fontSize: 20,
     fontWeight: '800',
     color: colors.onBackground,
-    letterSpacing: -2,
+    letterSpacing: 1,
   },
   subText: {
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: '600',
     color: colors.secondary,
     opacity: 0.6,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    marginTop: 4,
+    marginTop: 2,
   },
 });
 
-export default function TimerDial({ progress, timeText, subText, variant: _variant = 'classic', onSeek, onSeekStart, onSeekEnd, isWarning = false }: Props) {
+export default function TimerDial({ progress, timeText: _timeText, subText: _subText, variant: _variant = 'classic', onSeek, onSeekStart, onSeekEnd, isWarning = false, gaugeAnim }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -121,7 +122,7 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
     const x = cx + LABEL_RADIUS * Math.cos(angleRad);
     const y = cy + LABEL_RADIUS * Math.sin(angleRad);
     return (
-      <Text key={label} style={[styles.label, { left: x - 12, top: y - 10 }]}>
+      <Text key={label} style={[styles.label, { left: x - 18, top: y - 13 }]}>
         {label}
       </Text>
     );
@@ -133,22 +134,29 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
   const [displayProgress, setDisplayProgress] = useState(progress);
 
   useEffect(() => {
+    if (gaugeAnim) {
+      const id = gaugeAnim.addListener(({ value }) => setDisplayProgress(value));
+      return () => gaugeAnim.removeListener(id);
+    }
     const id = progressAnim.addListener(({ value }) => setDisplayProgress(value));
     return () => progressAnim.removeListener(id);
   }, []);
 
   useEffect(() => {
+    if (gaugeAnim) return; // gaugeAnim이 드라이브
     if (isDragging.current) {
       progressAnim.setValue(progress);
       return;
     }
-    Animated.timing(progressAnim, {
+    const anim = Animated.timing(progressAnim, {
       toValue: progress,
       duration: 450,
       useNativeDriver: false,
       easing: Easing.out(Easing.cubic),
-    }).start();
-  }, [progress]);
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [progress, gaugeAnim]);
 
   const blinkAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -172,13 +180,13 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
       if (!onSeek) return false;
       const { locationX, locationY } = evt.nativeEvent;
       const dist = Math.sqrt((locationX - cx) ** 2 + (locationY - cy) ** 2);
-      return dist > CENTER_RADIUS;
+      return dist > CENTER_RADIUS && dist <= SECTOR_RADIUS;
     },
     onMoveShouldSetPanResponder: (evt) => {
       if (!onSeek) return false;
       const { locationX, locationY } = evt.nativeEvent;
       const dist = Math.sqrt((locationX - cx) ** 2 + (locationY - cy) ** 2);
-      return dist > CENTER_RADIUS;
+      return dist > CENTER_RADIUS && dist <= SECTOR_RADIUS;
     },
     onPanResponderGrant: (evt) => {
       if (!onSeek) return;
@@ -188,8 +196,7 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
       const angle = Math.atan2(locationY - cy, locationX - cx) * (180 / Math.PI);
       const normalized = (angle + 90 + 360) % 360;
       let minutes = Math.round(normalized / 6);
-      if (minutes === 0) minutes = 60;
-      minutes = Math.max(1, Math.min(60, minutes));
+      minutes = Math.max(0, Math.min(60, minutes));
       prevMinutesRef.current = minutes;
       onSeek(minutes);
     },
@@ -199,8 +206,7 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
       const angle = Math.atan2(locationY - cy, locationX - cx) * (180 / Math.PI);
       const normalized = (angle + 90 + 360) % 360;
       let minutes = Math.round(normalized / 6);
-      if (minutes === 0) minutes = 60;
-      minutes = Math.max(1, Math.min(60, minutes));
+      minutes = Math.max(0, Math.min(60, minutes));
       if (prevMinutesRef.current !== null && Math.abs(minutes - prevMinutesRef.current) > 30) return;
       prevMinutesRef.current = minutes;
       onSeek(minutes);
@@ -225,18 +231,39 @@ export default function TimerDial({ progress, timeText, subText, variant: _varia
         {/* 2. 눈금 60개 — 섹터 위 레이어 (항상 보임) */}
         {ticks}
 
+        {/* 5. 다이얼 테두리 안쪽 그라데이션 */}
+        <Defs>
+          <RadialGradient id="innerShadow" cx="50%" cy="50%" r="50%">
+            <Stop offset="80%" stopColor={colors.onBackground} stopOpacity={0} />
+            <Stop offset="100%" stopColor={colors.onBackground} stopOpacity={0.15} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill="url(#innerShadow)" />
+
+        {/* 6. 바늘 — 동그라미에서 짧게 */}
+        {displayProgress > 0 && (() => {
+          const needleAngle = displayProgress * 360;
+          const tail = polarToCartesian(cx, cy, CENTER_RADIUS - 2, needleAngle);
+          const tip = polarToCartesian(cx, cy, CENTER_RADIUS + 14, needleAngle);
+          return (
+            <Line
+              x1={tail.x} y1={tail.y}
+              x2={tip.x} y2={tip.y}
+              stroke={colors.onBackground}
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+          );
+        })()}
+
       </Svg>
 
       {/* 4. 숫자 레이블 */}
       {labels}
 
       {/* 중앙 원 */}
-      <View style={styles.centerCircle} pointerEvents="none">
-        <Text style={styles.timeText}>
-          {onSeek ? `${Math.max(1, Math.round(displayProgress * 60))}:00` : timeText}
-        </Text>
-        <Text style={styles.subText}>{subText}</Text>
-      </View>
+      <View style={styles.centerCircle} pointerEvents="none" />
+
     </View>
   );
 }

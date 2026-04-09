@@ -1,6 +1,9 @@
 import './src/i18n';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+
+ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
@@ -10,16 +13,24 @@ import AlarmScreen from './src/screens/AlarmScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import EditMissionsScreen from './src/screens/EditMissionsScreen';
 import AddTimerScreen from './src/screens/AddTimerScreen';
+import PresentationScreen from './src/screens/PresentationScreen';
+import PresentationRunningScreen from './src/screens/PresentationRunningScreen';
+import PresentationFullScreen from './src/screens/PresentationFullScreen';
+import SplashScreen from './src/screens/SplashScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 export type RootStackParamList = {
+  Splash: undefined;
   Home: undefined;
   Running: { mission: Mission | null; minutes: number };
-  Alarm: undefined;
+  Alarm: { missionId?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
-  AddTimer: { editId?: string; editIcon?: string; editMinutes?: number } | undefined;
+  AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
+  Presentation: undefined;
+  PresentationRunning: { minutes: number; seconds: number; recordingEnabled: boolean };
+  PresentationFull: { minutes: number; seconds: number; remainingSeconds: number; isRunning: boolean; recordingEnabled: boolean };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -50,15 +61,19 @@ function AppNavigator() {
     <StatusBar style={isDark ? 'light' : 'dark'} />
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
-        initialRouteName="Home"
+        initialRouteName="Splash"
         screenOptions={{ headerShown: false }}
       >
+        <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Running" component={RunningScreen} options={{ gestureEnabled: false }} />
-        <Stack.Screen name="Alarm" component={AlarmScreen} />
+        <Stack.Screen name="Alarm" component={AlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="EditMissions" component={EditMissionsScreen} />
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
+        <Stack.Screen name="Presentation" component={PresentationScreen} options={{ contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="PresentationRunning" component={PresentationRunningScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="PresentationFull" component={PresentationFullScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
       </Stack.Navigator>
     </NavigationContainer>
     </>

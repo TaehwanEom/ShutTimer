@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,17 +18,24 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
-// TODO: EAS Build 후 활성화
 // import ImageLabeling from '@react-native-ml-kit/image-labeling';
-const ImageLabeling: { label: (uri: string) => Promise<Array<{ text: string; confidence: number }>> } | null = null;
+const ImageLabeling: any = null;
 import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS } from '../constants/settings';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
-// AdMob — EAS Development Build 필요, Expo Go 불가
-// import { RewardedInterstitialAd, TestIds, AdEventType } from 'react-native-google-mobile-ads';
+// import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+const InterstitialAd: any = { createForAdRequest: () => ({ addAdEventListener: () => () => {}, load: () => {}, show: () => Promise.reject() }) };
+const AdEventType: any = { LOADED: 'loaded', CLOSED: 'closed' };
+import AdBanner from '../components/AdBanner';
+import { usePurchase } from '../context/PurchaseContext';
+
+const INTERSTITIAL_UNIT_ID = 'ca-app-pub-3940256099942544/1033173712';
+const interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
+  requestNonPersonalizedAdsOnly: true,
+});
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Alarm'>;
@@ -36,14 +43,38 @@ type Props = {
 };
 
 const MISSION_LABELS: Record<string, string[]> = {
-  tv: ['Television', 'Screen', 'Monitor', 'Television set'],
-  read: ['Book', 'Magazine'],
-  study: ['Book', 'Laptop', 'Notebook', 'Pen'],
-  brush: ['Toothbrush'],
-  bath: ['Bathtub', 'Sink', 'Bathroom'],
-  play: ['Toy'],
-  game: [], // 검증 스킵
+  'tv':               ['Television', 'Television set'],
+  'bathtub':          ['Bathtub', 'Shower'],
+  'menu-book':        ['Paper'],
+  'school':           ['Paper'],
+  'toys':             ['Toy', 'Play'],
+  'sports-esports':   ['Game controller', 'Joystick', 'Mobile phone'],
+  'outdoor-grill':    ['Food', 'Meal'],
+  'fitness-center':   ['Gym', 'Exercise equipment'],
+  'directions-run':   ['Footwear', 'Road'],
+  'self-improvement': ['Person', 'Face', 'Human face'],
+  'music-note':       ['Musical instrument'],
+  'brush':            ['Painting', 'Paint'],
+  'pets':             ['Dog', 'Cat', 'Animal'],
+  'local-cafe':       ['Cup'],
+  'restaurant':       ['Food', 'Meal'],
+  'shopping-cart':    ['Shopping cart'],
+  'work':             ['Computer', 'Document'],
+  'computer':         ['Computer', 'Laptop'],
+  'phone-android':    ['Mobile phone'],
+  'camera-alt':       ['Camera'],
+  'directions-bike':  ['Bicycle'],
+  'spa':              ['Bathtub', 'Bathroom'],
+  'nightlight':       ['Bed', 'Pillow'],
+  'clean-hands':      ['Sink'],
 };
+
+// 1차 검증: 신뢰도 높은 5개만 랜덤 출제 (검증 후 순차 확대)
+const VERIFIED_ICONS = ['tv', 'toys', 'music-note', 'pets', 'local-cafe'];
+const RANDOM_TARGETS = VERIFIED_ICONS.map(icon => ({
+  labels: MISSION_LABELS[icon],
+  guideKey: `alarm.guide_${icon}`,
+}));
 
 const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT_REQUIRED = 3;
@@ -57,12 +88,27 @@ const AUTO_DISMISS_MS: Record<string, number> = {
 
 export default function AlarmScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
+  const { isAdFree } = usePurchase();
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  const missionId = route.params?.missionId ?? null;
+  const missionIcon = route.params?.missionIcon ?? null;
+
+  const randomTarget = useMemo(() => {
+    if (missionIcon) return null;
+    return RANDOM_TARGETS[Math.floor(Math.random() * RANDOM_TARGETS.length)];
+  }, []);
+
+  const activeLabels = missionIcon
+    ? (MISSION_LABELS[missionIcon] ?? [])
+    : (randomTarget?.labels ?? []);
+
+  const guideKey = missionIcon
+    ? `alarm.guide_${missionIcon}`
+    : randomTarget?.guideKey ?? null;
+
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
@@ -74,17 +120,44 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const shakeCountRef = useRef(0);
   const lastShakeTimeRef = useRef(0);
 
-  const goHome = useCallback(() => {
+  const adLoadedRef = useRef(false);
+  const dismissedRef = useRef(false);
+
+  const dismiss = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
     Vibration.cancel();
     soundRef.current?.stopAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
     soundRef.current = null;
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  }, [navigation]);
+    if (!isAdFree && adLoadedRef.current) {
+      interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
+    } else {
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    }
+  }, [navigation, isAdFree]);
 
-  const dismiss = useCallback(() => {
-    goHome();
-  }, [goHome]);
+  // 전면 광고 로드
+  useEffect(() => {
+    adLoadedRef.current = false;
+    dismissedRef.current = false;
+
+    if (isAdFree) return; // 구매 시 전면 광고 로드 안 함
+
+    const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+      adLoadedRef.current = true;
+    });
+    const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    });
+
+    interstitial.load();
+
+    return () => {
+      unsubLoaded();
+      unsubClosed();
+    };
+  }, [navigation, isAdFree]);
 
   // 자동 종료 타이머
   useEffect(() => {
@@ -261,19 +334,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
       const photo = await cameraRef.current?.takePictureAsync();
       if (!photo?.uri) return;
 
-      // missionId 없음 or game 미션 or ML Kit 미설치 → 검증 스킵
-      const labels = missionId ? MISSION_LABELS[missionId] : null;
-      if (!labels || labels.length === 0 || !ImageLabeling) {
+      if (activeLabels.length === 0 || !ImageLabeling) {
         dismiss();
         return;
       }
 
-      // Image Labeling 검증
       const result = await ImageLabeling.label(photo.uri);
       const matched = result.some(
         (item: { text: string; confidence: number }) =>
-          item.confidence >= 0.6 &&
-          labels.some(l => item.text.toLowerCase().includes(l.toLowerCase()))
+          item.confidence >= 0.3 &&
+          activeLabels.some(l => item.text.toLowerCase().includes(l.toLowerCase()))
       );
 
       if (matched) {
@@ -282,14 +352,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const newCount = failCount + 1;
         setFailCount(newCount);
         if (newCount >= 3) {
-          // 3회 실패 → 강제 종료 허용 (failCount 유지, UI에서 버튼 표시)
+          dismiss();
+          return;
         }
         Vibration.vibrate(200);
         setFailMessage(true);
         setTimeout(() => setFailMessage(false), 1500);
       }
     } catch {
-      // 인식 실패 시 그냥 종료
       dismiss();
     }
   };
@@ -315,12 +385,21 @@ export default function AlarmScreen({ navigation, route }: Props) {
           </Svg>
           <View style={styles.viewfinder}>
             {hasCameraPermission ? (
-              <CameraView
-                ref={cameraRef}
-                style={StyleSheet.absoluteFill}
-                facing={facing}
-                flash={flash}
-              />
+              <>
+                <CameraView
+                  ref={cameraRef}
+                  style={StyleSheet.absoluteFill}
+                  facing={facing}
+                  flash={flash}
+                />
+                {guideKey && (
+                  <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: colors.onPrimary, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+                      {failMessage ? t('alarm.retakePhoto', { defaultValue: '다시 찍어주세요' }) : t(guideKey)}
+                    </Text>
+                  </View>
+                )}
+              </>
             ) : (
               <View style={styles.instructionWrapper}>
                 <Text style={styles.instructionText}>{t('alarm.takePhoto')}</Text>
@@ -366,22 +445,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
             </TouchableOpacity>
           </View>
         </View>
-        {failMessage && (
-          <Text style={{ color: colors.onPrimary, fontSize: 15, fontWeight: '700', textAlign: 'center', marginBottom: 8, opacity: 0.9 }}>
-            {t('alarm.retakePhoto', { defaultValue: '다시 찍어주세요' })}
-          </Text>
-        )}
-        {failCount >= 3 && (
-          <TouchableOpacity
-            style={{ paddingVertical: 12, paddingHorizontal: 32, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 8 }}
-            onPress={dismiss}
-          >
-            <Text style={{ color: colors.onPrimary, fontSize: 14, fontWeight: '700' }}>
-              {t('alarm.forceClose', { defaultValue: '강제 종료' })}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <View style={styles.adSlot}><Text style={styles.adLabel}>AD</Text></View>
+        <AdBanner />
       </SafeAreaView>
     );
   }
@@ -417,7 +481,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
             <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.adSlot}><Text style={styles.adLabel}>AD</Text></View>
+        <AdBanner />
       </SafeAreaView>
     );
   }
@@ -447,7 +511,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
         <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
         <Text style={styles.centerSubtitle}>{t('alarm.shakeInstruction')}</Text>
       </View>
-      <View style={styles.adSlot}><Text style={styles.adLabel}>AD</Text></View>
+      <AdBanner />
     </SafeAreaView>
   );
 }
@@ -615,18 +679,13 @@ const styles = StyleSheet.create({
     color: colors.primary,
     letterSpacing: -0.3,
   },
-  adSlot: {
-    width: '100%',
-    height: 60,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  adLabel: {
-    fontSize: 11,
+  guideText: {
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 2,
-    color: 'rgba(255,255,255,0.35)',
+    color: colors.onPrimary,
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 12,
+    paddingHorizontal: 24,
   },
 });

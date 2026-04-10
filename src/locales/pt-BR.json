@@ -27,7 +27,37 @@
     "tapButton": "Toque para parar",
     "shakeInstruction": "Agite o dispositivo para parar o alarme",
     "retakePhoto": "Por favor, tente novamente",
-    "forceClose": "Forçar fechamento"
+    "forceClose": "Forçar fechamento",
+    "guide_tv": "Tire uma foto da sua TV",
+    "guide_bathtub": "Tire uma foto da banheira ou chuveiro",
+    "guide_menu-book": "Tire uma foto de um livro",
+    "guide_school": "Tire uma foto de um livro ou caderno",
+    "guide_toys": "Tire uma foto de um brinquedo",
+    "guide_outdoor-grill": "Tire uma foto da comida",
+    "guide_fitness-center": "Tire uma foto do equipamento de exercício",
+    "guide_directions-run": "Tire uma foto dos seus tênis ou ao ar livre",
+    "guide_self-improvement": "Tire uma selfie",
+    "guide_music-note": "Tire uma foto de um instrumento",
+    "guide_brush": "Tire uma foto de uma pintura ou pincel",
+    "guide_pets": "Tire uma foto do seu animal",
+    "guide_local-cafe": "Tire uma foto de café ou cafeteria",
+    "guide_restaurant": "Tire uma foto da comida",
+    "guide_shopping-cart": "Tire uma foto de um carrinho de compras",
+    "guide_work": "Tire uma foto de documentos ou computador",
+    "guide_computer": "Tire uma foto de um computador",
+    "guide_phone-android": "Tire uma foto de um smartphone",
+    "guide_camera-alt": "Tire uma foto de uma câmera",
+    "guide_directions-bike": "Tire uma foto de uma bicicleta",
+    "guide_spa": "Tire uma foto da banheira",
+    "guide_nightlight": "Tire uma foto da cama ou travesseiro",
+    "guide_clean-hands": "Tire uma foto de uma escova de dentes",
+    "guide_book": "Tire uma foto de um livro",
+    "guide_coffee": "Tire uma foto de café",
+    "guide_food": "Tire uma foto da comida",
+    "guide_pet": "Tire uma foto do seu animal",
+    "guide_bike": "Tire uma foto de uma bicicleta",
+    "guide_toothbrush": "Tire uma foto de uma escova de dentes",
+    "guide_phone": "Tire uma foto de um smartphone"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -64,7 +94,12 @@
     "homeWidget": "Widget da tela inicial",
     "comingSoon": "EM BREVE",
     "language": "Idioma",
-    "languageAuto": "Detecção automática"
+    "languageAuto": "Detecção automática",
+    "removeAdsPrice": "$2.99 · Vitalício",
+    "restoreSuccess": "Compra restaurada com sucesso",
+    "restoreNone": "Nenhuma compra para restaurar",
+    "adFreeActive": "Sem anúncios ativo",
+    "purchaseFailed": "Falha na compra"
   },
   "icons": {
     "tv": "TV",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditação",
     "music-note": "Música",
     "brush": "Desenho",
-    "palette": "Pintura",
     "pets": "Animais",
     "local-cafe": "Café",
     "restaurant": "Refeição",
@@ -119,5 +153,14 @@
     "totalTime": "Total do mês",
     "activeDays": "Dias ativos",
     "daysFmt": "{{days}} dias"
+  },
+  "forceUpdate": {
+    "title": "Atualização necessária",
+    "message": "Uma nova versão está disponível.\nPor favor, atualize o app.",
+    "button": "Atualizar"
+  },
+  "notices": {
+    "title": "Avisos",
+    "empty": "Nenhum aviso"
   }
 }

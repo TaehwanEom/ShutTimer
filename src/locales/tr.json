@@ -27,7 +27,37 @@
     "tapButton": "Durdurmak için dokun",
     "shakeInstruction": "Alarmı durdurmak için cihazı sallayın",
     "retakePhoto": "Lütfen tekrar deneyin",
-    "forceClose": "Zorla kapat"
+    "forceClose": "Zorla kapat",
+    "guide_tv": "Televizyonunuzun fotoğrafını çekin",
+    "guide_bathtub": "Küvet veya duşun fotoğrafını çekin",
+    "guide_menu-book": "Bir kitabın fotoğrafını çekin",
+    "guide_school": "Kitap veya defterin fotoğrafını çekin",
+    "guide_toys": "Bir oyuncağın fotoğrafını çekin",
+    "guide_outdoor-grill": "Yemeğin fotoğrafını çekin",
+    "guide_fitness-center": "Spor ekipmanının fotoğrafını çekin",
+    "guide_directions-run": "Ayakkabılarınızın veya dışarının fotoğrafını çekin",
+    "guide_self-improvement": "Selfie çekin",
+    "guide_music-note": "Bir enstrümanın fotoğrafını çekin",
+    "guide_brush": "Bir resim veya fırçanın fotoğrafını çekin",
+    "guide_pets": "Evcil hayvanınızın fotoğrafını çekin",
+    "guide_local-cafe": "Kahve veya kafeninizin fotoğrafını çekin",
+    "guide_restaurant": "Yemeğin fotoğrafını çekin",
+    "guide_shopping-cart": "Alışveriş arabasının fotoğrafını çekin",
+    "guide_work": "Belge veya bilgisayarın fotoğrafını çekin",
+    "guide_computer": "Bilgisayarın fotoğrafını çekin",
+    "guide_phone-android": "Akıllı telefonun fotoğrafını çekin",
+    "guide_camera-alt": "Kameranın fotoğrafını çekin",
+    "guide_directions-bike": "Bisikletin fotoğrafını çekin",
+    "guide_spa": "Küvetin fotoğrafını çekin",
+    "guide_nightlight": "Yatağınızın veya yastığınızın fotoğrafını çekin",
+    "guide_clean-hands": "Diş fırçasının fotoğrafını çekin",
+    "guide_book": "Bir kitabın fotoğrafını çekin",
+    "guide_coffee": "Kahvenin fotoğrafını çekin",
+    "guide_food": "Yemeğin fotoğrafını çekin",
+    "guide_pet": "Evcil hayvanınızın fotoğrafını çekin",
+    "guide_bike": "Bisikletin fotoğrafını çekin",
+    "guide_toothbrush": "Diş fırçasının fotoğrafını çekin",
+    "guide_phone": "Akıllı telefonun fotoğrafını çekin"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -64,7 +94,12 @@
     "homeWidget": "Ana ekran widget'ı",
     "comingSoon": "YAKINDA",
     "language": "Dil",
-    "languageAuto": "Otomatik Algıla"
+    "languageAuto": "Otomatik Algıla",
+    "removeAdsPrice": "$2.99 · Ömür boyu",
+    "restoreSuccess": "Satın alma başarıyla geri yüklendi",
+    "restoreNone": "Geri yüklenecek satın alma yok",
+    "adFreeActive": "Reklamsız aktif",
+    "purchaseFailed": "Satın alma başarısız"
   },
   "icons": {
     "tv": "TV",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditasyon",
     "music-note": "Müzik",
     "brush": "Çizim",
-    "palette": "Boyama",
     "pets": "Evcil hayvan",
     "local-cafe": "Kafe",
     "restaurant": "Yemek",
@@ -119,5 +153,14 @@
     "totalTime": "Aylık toplam",
     "activeDays": "Aktif günler",
     "daysFmt": "{{days}} gün"
+  },
+  "forceUpdate": {
+    "title": "Güncelleme gerekli",
+    "message": "Yeni bir sürüm yayınlandı.\nLütfen uygulamayı güncelleyin.",
+    "button": "Güncelle"
+  },
+  "notices": {
+    "title": "Bildirimler",
+    "empty": "Bildirim yok"
   }
 }

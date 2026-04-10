@@ -211,7 +211,7 @@ export default function RunningScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (remainingSeconds === 0) {
       cancelAlarm(notificationIdRef.current).then(() => {
-        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
+        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }
   }, [remainingSeconds]);
@@ -230,7 +230,7 @@ export default function RunningScreen({ navigation, route }: Props) {
         setRemainingSeconds(newVal);
         if (newVal === 0) {
           cancelAlarm(notificationIdRef.current).then(() => {
-            navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
+            navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
           });
         }
       }

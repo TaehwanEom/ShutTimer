@@ -27,7 +27,37 @@
     "tapButton": "Tap to Stop",
     "shakeInstruction": "Shake the device to stop the alarm",
     "retakePhoto": "Please try again",
-    "forceClose": "Force Close"
+    "forceClose": "Force Close",
+    "guide_tv": "Take a photo of your TV",
+    "guide_bathtub": "Take a photo of the bathtub or shower",
+    "guide_menu-book": "Take a photo of a book",
+    "guide_school": "Take a photo of a book or notebook",
+    "guide_toys": "Take a photo of a toy",
+    "guide_outdoor-grill": "Take a photo of food",
+    "guide_fitness-center": "Take a photo of exercise equipment",
+    "guide_directions-run": "Take a photo of your shoes or outdoors",
+    "guide_self-improvement": "Take a selfie",
+    "guide_music-note": "Take a photo of an instrument",
+    "guide_brush": "Take a photo of a painting or brush",
+    "guide_pets": "Take a photo of your pet",
+    "guide_local-cafe": "Take a photo of coffee or a cafe",
+    "guide_restaurant": "Take a photo of food",
+    "guide_shopping-cart": "Take a photo of a shopping cart",
+    "guide_work": "Take a photo of documents or a computer",
+    "guide_computer": "Take a photo of a computer",
+    "guide_phone-android": "Take a photo of a smartphone",
+    "guide_camera-alt": "Take a photo of a camera",
+    "guide_directions-bike": "Take a photo of a bicycle",
+    "guide_spa": "Take a photo of the bathtub",
+    "guide_nightlight": "Take a photo of your bed or pillow",
+    "guide_clean-hands": "Take a photo of a toothbrush",
+    "guide_book": "Take a photo of a book",
+    "guide_coffee": "Take a photo of coffee",
+    "guide_food": "Take a photo of food",
+    "guide_pet": "Take a photo of your pet",
+    "guide_bike": "Take a photo of a bicycle",
+    "guide_toothbrush": "Take a photo of a toothbrush",
+    "guide_phone": "Take a photo of a smartphone"
   },
   "addTimer": {
     "editTitle": "Edit Favorite",
@@ -64,7 +94,12 @@
     "homeWidget": "Home Widget",
     "comingSoon": "COMING SOON",
     "language": "Language",
-    "languageAuto": "Auto Detect"
+    "languageAuto": "Auto Detect",
+    "removeAdsPrice": "$2.99 · Lifetime",
+    "restoreSuccess": "Purchase restored successfully",
+    "restoreNone": "No purchases to restore",
+    "adFreeActive": "Ad-Free Active",
+    "purchaseFailed": "Purchase failed"
   },
   "icons": {
     "tv": "TV",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditation",
     "music-note": "Music",
     "brush": "Drawing",
-    "palette": "Painting",
     "pets": "Pets",
     "local-cafe": "Café",
     "restaurant": "Dining",
@@ -119,5 +153,14 @@
     "totalTime": "Monthly total",
     "activeDays": "Active days",
     "daysFmt": "{{days}} days"
+  },
+  "forceUpdate": {
+    "title": "Update Required",
+    "message": "A new version is available.\nPlease update the app.",
+    "button": "Update"
+  },
+  "notices": {
+    "title": "Notices",
+    "empty": "No notices"
   }
 }

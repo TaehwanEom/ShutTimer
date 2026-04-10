@@ -65,7 +65,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   dayCell: {
     flex: 1, aspectRatio: 1,
     alignItems: 'center', justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 999,
   },
   dayCellSelected: { backgroundColor: colors.primary },
   dayCellToday: { borderWidth: 1.5, borderColor: colors.primary },

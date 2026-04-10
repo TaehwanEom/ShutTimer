@@ -27,7 +27,37 @@
     "tapButton": "แตะเพื่อปิด",
     "shakeInstruction": "เขย่าอุปกรณ์เพื่อปิดการแจ้งเตือน",
     "retakePhoto": "กรุณาลองอีกครั้ง",
-    "forceClose": "บังคับปิด"
+    "forceClose": "บังคับปิด",
+    "guide_tv": "ถ่ายรูปทีวีของคุณ",
+    "guide_bathtub": "ถ่ายรูปอ่างอาบน้ำหรือฝักบัว",
+    "guide_menu-book": "ถ่ายรูปหนังสือ",
+    "guide_school": "ถ่ายรูปหนังสือหรือสมุดบันทึก",
+    "guide_toys": "ถ่ายรูปของเล่น",
+    "guide_outdoor-grill": "ถ่ายรูปอาหาร",
+    "guide_fitness-center": "ถ่ายรูปอุปกรณ์ออกกำลังกาย",
+    "guide_directions-run": "ถ่ายรูปรองเท้าหรือภายนอก",
+    "guide_self-improvement": "ถ่ายเซลฟี่",
+    "guide_music-note": "ถ่ายรูปเครื่องดนตรี",
+    "guide_brush": "ถ่ายรูปภาพวาดหรือแปรง",
+    "guide_pets": "ถ่ายรูปสัตว์เลี้ยงของคุณ",
+    "guide_local-cafe": "ถ่ายรูปกาแฟหรือคาเฟ่",
+    "guide_restaurant": "ถ่ายรูปอาหาร",
+    "guide_shopping-cart": "ถ่ายรูปรถเข็นช้อปปิ้ง",
+    "guide_work": "ถ่ายรูปเอกสารหรือคอมพิวเตอร์",
+    "guide_computer": "ถ่ายรูปคอมพิวเตอร์",
+    "guide_phone-android": "ถ่ายรูปสมาร์ทโฟน",
+    "guide_camera-alt": "ถ่ายรูปกล้อง",
+    "guide_directions-bike": "ถ่ายรูปจักรยาน",
+    "guide_spa": "ถ่ายรูปอ่างอาบน้ำ",
+    "guide_nightlight": "ถ่ายรูปเตียงหรือหมอน",
+    "guide_clean-hands": "ถ่ายรูปแปรงสีฟัน",
+    "guide_book": "ถ่ายรูปหนังสือ",
+    "guide_coffee": "ถ่ายรูปกาแฟ",
+    "guide_food": "ถ่ายรูปอาหาร",
+    "guide_pet": "ถ่ายรูปสัตว์เลี้ยงของคุณ",
+    "guide_bike": "ถ่ายรูปจักรยาน",
+    "guide_toothbrush": "ถ่ายรูปแปรงสีฟัน",
+    "guide_phone": "ถ่ายรูปสมาร์ทโฟน"
   },
   "addTimer": {
     "editTitle": "แก้ไขรายการโปรด",
@@ -64,7 +94,12 @@
     "homeWidget": "วิดเจ็ตหน้าจอหลัก",
     "comingSoon": "เร็วๆ นี้",
     "language": "ภาษา",
-    "languageAuto": "ตรวจจับอัตโนมัติ"
+    "languageAuto": "ตรวจจับอัตโนมัติ",
+    "removeAdsPrice": "$2.99 · ตลอดชีพ",
+    "restoreSuccess": "คืนการซื้อสำเร็จ",
+    "restoreNone": "ไม่มีการซื้อที่จะคืน",
+    "adFreeActive": "ปิดโฆษณาแล้ว",
+    "purchaseFailed": "การซื้อล้มเหลว"
   },
   "icons": {
     "tv": "ทีวี",
@@ -79,7 +114,6 @@
     "self-improvement": "นั่งสมาธิ",
     "music-note": "ดนตรี",
     "brush": "วาดรูป",
-    "palette": "ระบายสี",
     "pets": "สัตว์เลี้ยง",
     "local-cafe": "คาเฟ่",
     "restaurant": "อาหาร",
@@ -119,5 +153,14 @@
     "totalTime": "รวมเดือนนี้",
     "activeDays": "วันที่ใช้งาน",
     "daysFmt": "{{days}} วัน"
+  },
+  "forceUpdate": {
+    "title": "ต้องอัปเดต",
+    "message": "เวอร์ชันใหม่พร้อมใช้งานแล้ว\nกรุณาอัปเดตแอป",
+    "button": "อัปเดต"
+  },
+  "notices": {
+    "title": "การแจ้งเตือน",
+    "empty": "ไม่มีการแจ้งเตือน"
   }
 }

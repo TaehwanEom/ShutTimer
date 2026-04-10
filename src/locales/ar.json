@@ -27,7 +27,37 @@
     "tapButton": "اضغط للإيقاف",
     "shakeInstruction": "هز الجهاز لإيقاف المنبه",
     "retakePhoto": "يرجى المحاولة مجدداً",
-    "forceClose": "إغلاق إجباري"
+    "forceClose": "إغلاق إجباري",
+    "guide_tv": "التقط صورة للتلفزيون",
+    "guide_bathtub": "التقط صورة للحوض أو الدش",
+    "guide_menu-book": "التقط صورة لكتاب",
+    "guide_school": "التقط صورة لكتاب أو دفتر",
+    "guide_toys": "التقط صورة للعبة",
+    "guide_outdoor-grill": "التقط صورة للطعام",
+    "guide_fitness-center": "التقط صورة لمعدات التمرين",
+    "guide_directions-run": "التقط صورة لحذائك أو الخارج",
+    "guide_self-improvement": "التقط صورة سيلفي",
+    "guide_music-note": "التقط صورة لآلة موسيقية",
+    "guide_brush": "التقط صورة للوحة أو فرشاة",
+    "guide_pets": "التقط صورة لحيوانك الأليف",
+    "guide_local-cafe": "التقط صورة للقهوة أو المقهى",
+    "guide_restaurant": "التقط صورة للطعام",
+    "guide_shopping-cart": "التقط صورة لعربة التسوق",
+    "guide_work": "التقط صورة للوثائق أو الحاسوب",
+    "guide_computer": "التقط صورة للحاسوب",
+    "guide_phone-android": "التقط صورة للهاتف الذكي",
+    "guide_camera-alt": "التقط صورة للكاميرا",
+    "guide_directions-bike": "التقط صورة للدراجة",
+    "guide_spa": "التقط صورة للحوض",
+    "guide_nightlight": "التقط صورة للسرير أو الوسادة",
+    "guide_clean-hands": "التقط صورة لفرشاة الأسنان",
+    "guide_book": "التقط صورة لكتاب",
+    "guide_coffee": "التقط صورة للقهوة",
+    "guide_food": "التقط صورة للطعام",
+    "guide_pet": "التقط صورة لحيوانك الأليف",
+    "guide_bike": "التقط صورة للدراجة",
+    "guide_toothbrush": "التقط صورة لفرشاة الأسنان",
+    "guide_phone": "التقط صورة للهاتف الذكي"
   },
   "addTimer": {
     "editTitle": "تعديل المفضلة",
@@ -64,7 +94,12 @@
     "homeWidget": "أداة الشاشة الرئيسية",
     "comingSoon": "قريباً",
     "language": "اللغة",
-    "languageAuto": "كشف تلقائي"
+    "languageAuto": "كشف تلقائي",
+    "removeAdsPrice": "$2.99 · مدى الحياة",
+    "restoreSuccess": "تمت استعادة الشراء بنجاح",
+    "restoreNone": "لا توجد مشتريات للاستعادة",
+    "adFreeActive": "إزالة الإعلانات مفعّلة",
+    "purchaseFailed": "فشل الشراء"
   },
   "icons": {
     "tv": "تلفزيون",
@@ -79,7 +114,6 @@
     "self-improvement": "تأمل",
     "music-note": "موسيقى",
     "brush": "رسم",
-    "palette": "تلوين",
     "pets": "حيوانات",
     "local-cafe": "مقهى",
     "restaurant": "طعام",
@@ -119,5 +153,14 @@
     "totalTime": "إجمالي الشهر",
     "activeDays": "الأيام النشطة",
     "daysFmt": "{{days}} يوم"
+  },
+  "forceUpdate": {
+    "title": "التحديث مطلوب",
+    "message": "إصدار جديد متاح.\nيرجى تحديث التطبيق.",
+    "button": "تحديث"
+  },
+  "notices": {
+    "title": "إشعارات",
+    "empty": "لا توجد إشعارات"
   }
 }

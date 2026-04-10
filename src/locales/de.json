@@ -27,7 +27,37 @@
     "tapButton": "Tippen zum Stoppen",
     "shakeInstruction": "Schütteln Sie das Gerät, um den Alarm zu stoppen",
     "retakePhoto": "Bitte erneut versuchen",
-    "forceClose": "Schließen erzwingen"
+    "forceClose": "Schließen erzwingen",
+    "guide_tv": "Fotografiere deinen Fernseher",
+    "guide_bathtub": "Fotografiere die Badewanne oder Dusche",
+    "guide_menu-book": "Fotografiere ein Buch",
+    "guide_school": "Fotografiere ein Buch oder Notizbuch",
+    "guide_toys": "Fotografiere ein Spielzeug",
+    "guide_outdoor-grill": "Fotografiere das Essen",
+    "guide_fitness-center": "Fotografiere Trainingsgeräte",
+    "guide_directions-run": "Fotografiere deine Schuhe oder die Umgebung",
+    "guide_self-improvement": "Mach ein Selfie",
+    "guide_music-note": "Fotografiere ein Instrument",
+    "guide_brush": "Fotografiere ein Gemälde oder einen Pinsel",
+    "guide_pets": "Fotografiere dein Haustier",
+    "guide_local-cafe": "Fotografiere Kaffee oder ein Café",
+    "guide_restaurant": "Fotografiere das Essen",
+    "guide_shopping-cart": "Fotografiere einen Einkaufswagen",
+    "guide_work": "Fotografiere Dokumente oder einen Computer",
+    "guide_computer": "Fotografiere einen Computer",
+    "guide_phone-android": "Fotografiere ein Smartphone",
+    "guide_camera-alt": "Fotografiere eine Kamera",
+    "guide_directions-bike": "Fotografiere ein Fahrrad",
+    "guide_spa": "Fotografiere die Badewanne",
+    "guide_nightlight": "Fotografiere dein Bett oder Kissen",
+    "guide_clean-hands": "Fotografiere eine Zahnbürste",
+    "guide_book": "Fotografiere ein Buch",
+    "guide_coffee": "Fotografiere Kaffee",
+    "guide_food": "Fotografiere das Essen",
+    "guide_pet": "Fotografiere dein Haustier",
+    "guide_bike": "Fotografiere ein Fahrrad",
+    "guide_toothbrush": "Fotografiere eine Zahnbürste",
+    "guide_phone": "Fotografiere ein Smartphone"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -64,7 +94,12 @@
     "homeWidget": "Home-Widget",
     "comingSoon": "DEMNÄCHST",
     "language": "Sprache",
-    "languageAuto": "Automatisch"
+    "languageAuto": "Automatisch",
+    "removeAdsPrice": "$2.99 · Dauerhaft",
+    "restoreSuccess": "Kauf erfolgreich wiederhergestellt",
+    "restoreNone": "Keine Käufe zum Wiederherstellen",
+    "adFreeActive": "Werbefrei aktiv",
+    "purchaseFailed": "Kauf fehlgeschlagen"
   },
   "icons": {
     "tv": "Fernsehen",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditation",
     "music-note": "Musik",
     "brush": "Zeichnen",
-    "palette": "Malen",
     "pets": "Haustiere",
     "local-cafe": "Café",
     "restaurant": "Essen",
@@ -119,5 +153,14 @@
     "totalTime": "Monatsgesamt",
     "activeDays": "Aktive Tage",
     "daysFmt": "{{days}} Tage"
+  },
+  "forceUpdate": {
+    "title": "Update erforderlich",
+    "message": "Eine neue Version ist verfügbar.\nBitte aktualisieren Sie die App.",
+    "button": "Aktualisieren"
+  },
+  "notices": {
+    "title": "Mitteilungen",
+    "empty": "Keine Mitteilungen"
   }
 }

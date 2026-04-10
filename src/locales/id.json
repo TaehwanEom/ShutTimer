@@ -27,7 +27,37 @@
     "tapButton": "Ketuk untuk Berhenti",
     "shakeInstruction": "Goyangkan perangkat untuk mematikan alarm",
     "retakePhoto": "Silakan coba lagi",
-    "forceClose": "Paksa tutup"
+    "forceClose": "Paksa tutup",
+    "guide_tv": "Ambil foto TV Anda",
+    "guide_bathtub": "Ambil foto bak mandi atau shower",
+    "guide_menu-book": "Ambil foto buku",
+    "guide_school": "Ambil foto buku atau buku catatan",
+    "guide_toys": "Ambil foto mainan",
+    "guide_outdoor-grill": "Ambil foto makanan",
+    "guide_fitness-center": "Ambil foto peralatan olahraga",
+    "guide_directions-run": "Ambil foto sepatu atau luar ruangan",
+    "guide_self-improvement": "Ambil selfie",
+    "guide_music-note": "Ambil foto alat musik",
+    "guide_brush": "Ambil foto lukisan atau kuas",
+    "guide_pets": "Ambil foto hewan peliharaan Anda",
+    "guide_local-cafe": "Ambil foto kopi atau kafe",
+    "guide_restaurant": "Ambil foto makanan",
+    "guide_shopping-cart": "Ambil foto keranjang belanja",
+    "guide_work": "Ambil foto dokumen atau komputer",
+    "guide_computer": "Ambil foto komputer",
+    "guide_phone-android": "Ambil foto smartphone",
+    "guide_camera-alt": "Ambil foto kamera",
+    "guide_directions-bike": "Ambil foto sepeda",
+    "guide_spa": "Ambil foto bak mandi",
+    "guide_nightlight": "Ambil foto tempat tidur atau bantal",
+    "guide_clean-hands": "Ambil foto sikat gigi",
+    "guide_book": "Ambil foto buku",
+    "guide_coffee": "Ambil foto kopi",
+    "guide_food": "Ambil foto makanan",
+    "guide_pet": "Ambil foto hewan peliharaan Anda",
+    "guide_bike": "Ambil foto sepeda",
+    "guide_toothbrush": "Ambil foto sikat gigi",
+    "guide_phone": "Ambil foto smartphone"
   },
   "addTimer": {
     "editTitle": "Edit Favorit",
@@ -64,7 +94,12 @@
     "homeWidget": "Widget Layar Utama",
     "comingSoon": "SEGERA HADIR",
     "language": "Bahasa",
-    "languageAuto": "Deteksi Otomatis"
+    "languageAuto": "Deteksi Otomatis",
+    "removeAdsPrice": "$2.99 · Seumur hidup",
+    "restoreSuccess": "Pembelian berhasil dipulihkan",
+    "restoreNone": "Tidak ada pembelian untuk dipulihkan",
+    "adFreeActive": "Bebas Iklan Aktif",
+    "purchaseFailed": "Pembelian gagal"
   },
   "icons": {
     "tv": "TV",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditasi",
     "music-note": "Musik",
     "brush": "Menggambar",
-    "palette": "Melukis",
     "pets": "Hewan",
     "local-cafe": "Kafe",
     "restaurant": "Makan",
@@ -119,5 +153,14 @@
     "totalTime": "Total bulan ini",
     "activeDays": "Hari aktif",
     "daysFmt": "{{days}} hari"
+  },
+  "forceUpdate": {
+    "title": "Pembaruan diperlukan",
+    "message": "Versi baru telah tersedia.\nSilakan perbarui aplikasi.",
+    "button": "Perbarui"
+  },
+  "notices": {
+    "title": "Pemberitahuan",
+    "empty": "Tidak ada pemberitahuan"
   }
 }

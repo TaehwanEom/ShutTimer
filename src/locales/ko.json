@@ -27,7 +27,37 @@
     "tapButton": "탭해서 종료",
     "shakeInstruction": "기기를 흔들어 알람을 종료하세요",
     "retakePhoto": "다시 찍어주세요",
-    "forceClose": "강제 종료"
+    "forceClose": "강제 종료",
+    "guide_tv": "TV를 찍어주세요",
+    "guide_bathtub": "욕조나 샤워기를 찍어주세요",
+    "guide_menu-book": "책을 찍어주세요",
+    "guide_school": "책이나 노트를 찍어주세요",
+    "guide_toys": "장난감을 찍어주세요",
+    "guide_outdoor-grill": "음식을 찍어주세요",
+    "guide_fitness-center": "운동 기구를 찍어주세요",
+    "guide_directions-run": "운동화나 야외를 찍어주세요",
+    "guide_self-improvement": "셀카 찍어주세요",
+    "guide_music-note": "악기를 찍어주세요",
+    "guide_brush": "그림이나 붓을 찍어주세요",
+    "guide_pets": "반려동물을 찍어주세요",
+    "guide_local-cafe": "커피나 카페를 찍어주세요",
+    "guide_restaurant": "음식을 찍어주세요",
+    "guide_shopping-cart": "쇼핑 카트를 찍어주세요",
+    "guide_work": "서류나 컴퓨터를 찍어주세요",
+    "guide_computer": "컴퓨터를 찍어주세요",
+    "guide_phone-android": "스마트폰을 찍어주세요",
+    "guide_camera-alt": "카메라를 찍어주세요",
+    "guide_directions-bike": "자전거를 찍어주세요",
+    "guide_spa": "욕조를 찍어주세요",
+    "guide_nightlight": "침대나 베개를 찍어주세요",
+    "guide_clean-hands": "칫솔을 찍어주세요",
+    "guide_book": "책을 찍어주세요",
+    "guide_coffee": "커피를 찍어주세요",
+    "guide_food": "음식을 찍어주세요",
+    "guide_pet": "반려동물을 찍어주세요",
+    "guide_bike": "자전거를 찍어주세요",
+    "guide_toothbrush": "칫솔을 찍어주세요",
+    "guide_phone": "스마트폰을 찍어주세요"
   },
   "addTimer": {
     "editTitle": "즐겨찾기 편집",
@@ -64,7 +94,12 @@
     "homeWidget": "홈화면 위젯",
     "comingSoon": "준비 중",
     "language": "언어",
-    "languageAuto": "자동 감지"
+    "languageAuto": "자동 감지",
+    "removeAdsPrice": "$2.99 · 영구",
+    "restoreSuccess": "구매가 복원됐습니다",
+    "restoreNone": "복원할 구매 내역이 없습니다",
+    "adFreeActive": "광고 제거 활성화됨",
+    "purchaseFailed": "구매에 실패했습니다"
   },
   "icons": {
     "tv": "TV시청",
@@ -79,7 +114,6 @@
     "self-improvement": "명상",
     "music-note": "음악",
     "brush": "그림",
-    "palette": "채색",
     "pets": "반려동물",
     "local-cafe": "간식",
     "restaurant": "식사",
@@ -119,5 +153,14 @@
     "totalTime": "이번 달 총 시간",
     "activeDays": "활동한 날",
     "daysFmt": "{{days}}일"
+  },
+  "forceUpdate": {
+    "title": "업데이트 필요",
+    "message": "새로운 버전이 출시되었습니다.\n앱을 업데이트해 주세요.",
+    "button": "업데이트"
+  },
+  "notices": {
+    "title": "알림",
+    "empty": "알림이 없습니다"
   }
 }

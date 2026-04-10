@@ -27,7 +27,37 @@
     "tapButton": "Tocar para detener",
     "shakeInstruction": "Agita el dispositivo para detener la alarma",
     "retakePhoto": "Por favor, inténtalo de nuevo",
-    "forceClose": "Forzar cierre"
+    "forceClose": "Forzar cierre",
+    "guide_tv": "Toma una foto de tu televisor",
+    "guide_bathtub": "Toma una foto de la bañera o ducha",
+    "guide_menu-book": "Toma una foto de un libro",
+    "guide_school": "Toma una foto de un libro o cuaderno",
+    "guide_toys": "Toma una foto de un juguete",
+    "guide_outdoor-grill": "Toma una foto de la comida",
+    "guide_fitness-center": "Toma una foto del equipo de ejercicio",
+    "guide_directions-run": "Toma una foto de tus zapatos o el exterior",
+    "guide_self-improvement": "Tómate una selfie",
+    "guide_music-note": "Toma una foto de un instrumento",
+    "guide_brush": "Toma una foto de una pintura o pincel",
+    "guide_pets": "Toma una foto de tu mascota",
+    "guide_local-cafe": "Toma una foto de café o una cafetería",
+    "guide_restaurant": "Toma una foto de la comida",
+    "guide_shopping-cart": "Toma una foto de un carrito de compras",
+    "guide_work": "Toma una foto de documentos o un ordenador",
+    "guide_computer": "Toma una foto de un ordenador",
+    "guide_phone-android": "Toma una foto de un smartphone",
+    "guide_camera-alt": "Toma una foto de una cámara",
+    "guide_directions-bike": "Toma una foto de una bicicleta",
+    "guide_spa": "Toma una foto de la bañera",
+    "guide_nightlight": "Toma una foto de tu cama o almohada",
+    "guide_clean-hands": "Toma una foto de un cepillo de dientes",
+    "guide_book": "Toma una foto de un libro",
+    "guide_coffee": "Toma una foto de café",
+    "guide_food": "Toma una foto de la comida",
+    "guide_pet": "Toma una foto de tu mascota",
+    "guide_bike": "Toma una foto de una bicicleta",
+    "guide_toothbrush": "Toma una foto de un cepillo de dientes",
+    "guide_phone": "Toma una foto de un smartphone"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -64,7 +94,12 @@
     "homeWidget": "Widget de inicio",
     "comingSoon": "PRÓXIMAMENTE",
     "language": "Idioma",
-    "languageAuto": "Detección automática"
+    "languageAuto": "Detección automática",
+    "removeAdsPrice": "$2.99 · De por vida",
+    "restoreSuccess": "Compra restaurada con éxito",
+    "restoreNone": "No hay compras para restaurar",
+    "adFreeActive": "Sin anuncios activo",
+    "purchaseFailed": "Error en la compra"
   },
   "icons": {
     "tv": "Televisión",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditación",
     "music-note": "Música",
     "brush": "Dibujo",
-    "palette": "Pintura",
     "pets": "Mascotas",
     "local-cafe": "Café",
     "restaurant": "Comida",
@@ -119,5 +153,14 @@
     "totalTime": "Total del mes",
     "activeDays": "Días activos",
     "daysFmt": "{{days}} días"
+  },
+  "forceUpdate": {
+    "title": "Actualización necesaria",
+    "message": "Una nueva versión está disponible.\nPor favor, actualiza la app.",
+    "button": "Actualizar"
+  },
+  "notices": {
+    "title": "Avisos",
+    "empty": "No hay avisos"
   }
 }

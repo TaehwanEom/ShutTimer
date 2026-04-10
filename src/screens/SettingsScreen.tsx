@@ -8,6 +8,7 @@ import {
   Switch,
   ScrollView,
   Modal,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
 import { useTranslation } from 'react-i18next';
 import AdBanner from '../components/AdBanner';
+import { usePurchase } from '../context/PurchaseContext';
 import { getLocales } from 'expo-localization';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
@@ -158,6 +160,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
 export default function SettingsScreen({ navigation }: Props) {
   const { colors, isDark, toggleTheme, primaryColor, setPrimaryColor } = useTheme();
   const { t } = useTranslation();
+  const { isAdFree, purchaseAdFree, restorePurchases } = usePurchase();
   const styles = makeStyles(colors);
 
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
@@ -379,27 +382,52 @@ export default function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* 구매 — v2 */}
+        {/* 구매 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.purchase')}</Text>
-          <View style={[styles.toggleRow, styles.disabledRow]}>
+          {isAdFree ? (
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleLeft}>
+                <MaterialIcons name="check-circle" size={22} color={colors.primary} />
+                <Text style={[styles.toggleLabel, { color: colors.primary }]}>{t('settings.adFreeActive')}</Text>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={async () => {
+                try {
+                  await purchaseAdFree();
+                } catch {
+                  Alert.alert(t('settings.purchaseFailed'));
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.toggleLeft}>
+                <MaterialIcons name="stars" size={22} color={colors.onBackground} />
+                <View>
+                  <Text style={styles.toggleLabel}>{t('settings.removeAds')}</Text>
+                  <Text style={{ fontSize: 12, color: colors.secondary }}>{t('settings.removeAdsPrice')}</Text>
+                </View>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              const restored = await restorePurchases();
+              Alert.alert(restored ? t('settings.restoreSuccess') : t('settings.restoreNone'));
+            }}
+            activeOpacity={0.7}
+          >
             <View style={styles.toggleLeft}>
-              <MaterialIcons name="stars" size={22} color={colors.secondary} style={{ opacity: 0.4 }} />
-              <Text style={[styles.toggleLabel, styles.disabledText]}>{t('settings.removeAds')}</Text>
+              <MaterialIcons name="restore" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>{t('settings.restorePurchase')}</Text>
             </View>
-            <View style={styles.comingSoonBadge}>
-              <Text style={styles.comingSoonText}>{t('settings.comingSoon')}</Text>
-            </View>
-          </View>
-          <View style={[styles.toggleRow, styles.disabledRow]}>
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="restore" size={22} color={colors.secondary} style={{ opacity: 0.4 }} />
-              <Text style={[styles.toggleLabel, styles.disabledText]}>{t('settings.restorePurchase')}</Text>
-            </View>
-            <View style={styles.comingSoonBadge}>
-              <Text style={styles.comingSoonText}>{t('settings.comingSoon')}</Text>
-            </View>
-          </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
         </View>
 
         {/* 위젯 — v2 */}

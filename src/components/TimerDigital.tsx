@@ -78,6 +78,19 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
     }, 50);
   };
 
+  const handleDigitTap = (digitIndex: number) => {
+    if (!onSeek || isRunning) return;
+    if (!isEditing) {
+      setIsEditing(true);
+      setEditValue('');
+      setTimeout(() => {
+        hiddenInputRef.current?.clear();
+        hiddenInputRef.current?.focus();
+      }, 50);
+    }
+    setEditValue(prev => prev.slice(0, digitIndex));
+  };
+
   const handleInput = (text: string) => {
     const digits = text.replace(/[^0-9]/g, '').slice(0, 4);
     setEditValue(digits);
@@ -278,14 +291,22 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
                 const isCursorHere = isEditing && i === cursorCharIdx && totalDigits < 4;
                 const isEditablePos = i === 0 || i === 1 || i === 3 || i === 4;
                 const isEmpty = isEditing && isEditablePos && ch === ' ';
+                // charIndex → digitIndex 변환 (0,1 → 0,1 / 3,4 → 2,3, 콜론은 건너뜀)
+                const digitIndex = i < 2 ? i : i === 2 ? -1 : i - 1;
                 return (
-                  <SevenSegment
+                  <TouchableOpacity
                     key={i}
-                    digit={isEmpty ? '8' : ch}
-                    size={DIGIT_SIZE}
-                    color={isEmpty ? `${colors.primary}08` : colors.primary}
-                    bottomBlink={isCursorHere ? cursorColor : undefined}
-                  />
+                    activeOpacity={0.7}
+                    onPress={() => digitIndex >= 0 && handleDigitTap(digitIndex)}
+                    disabled={!isEditablePos}
+                  >
+                    <SevenSegment
+                      digit={isEmpty ? '8' : ch}
+                      size={DIGIT_SIZE}
+                      color={isEmpty ? `${colors.primary}08` : colors.primary}
+                      bottomBlink={isCursorHere ? cursorColor : undefined}
+                    />
+                  </TouchableOpacity>
                 );
               })}
             </View>

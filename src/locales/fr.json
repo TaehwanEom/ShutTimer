@@ -27,7 +27,37 @@
     "tapButton": "Appuyer pour arrêter",
     "shakeInstruction": "Secouez l'appareil pour arrêter l'alarme",
     "retakePhoto": "Veuillez réessayer",
-    "forceClose": "Forcer la fermeture"
+    "forceClose": "Forcer la fermeture",
+    "guide_tv": "Prenez une photo de votre télévision",
+    "guide_bathtub": "Prenez une photo de la baignoire ou douche",
+    "guide_menu-book": "Prenez une photo d'un livre",
+    "guide_school": "Prenez une photo d'un livre ou cahier",
+    "guide_toys": "Prenez une photo d'un jouet",
+    "guide_outdoor-grill": "Prenez une photo de la nourriture",
+    "guide_fitness-center": "Prenez une photo d'équipement de sport",
+    "guide_directions-run": "Prenez une photo de vos chaussures ou l'extérieur",
+    "guide_self-improvement": "Prenez un selfie",
+    "guide_music-note": "Prenez une photo d'un instrument",
+    "guide_brush": "Prenez une photo d'un tableau ou pinceau",
+    "guide_pets": "Prenez une photo de votre animal",
+    "guide_local-cafe": "Prenez une photo de café ou d'un café",
+    "guide_restaurant": "Prenez une photo de la nourriture",
+    "guide_shopping-cart": "Prenez une photo d'un caddie",
+    "guide_work": "Prenez une photo de documents ou d'un ordinateur",
+    "guide_computer": "Prenez une photo d'un ordinateur",
+    "guide_phone-android": "Prenez une photo d'un smartphone",
+    "guide_camera-alt": "Prenez une photo d'un appareil photo",
+    "guide_directions-bike": "Prenez une photo d'un vélo",
+    "guide_spa": "Prenez une photo de la baignoire",
+    "guide_nightlight": "Prenez une photo de votre lit ou oreiller",
+    "guide_clean-hands": "Prenez une photo d'une brosse à dents",
+    "guide_book": "Prenez une photo d'un livre",
+    "guide_coffee": "Prenez une photo de café",
+    "guide_food": "Prenez une photo de la nourriture",
+    "guide_pet": "Prenez une photo de votre animal",
+    "guide_bike": "Prenez une photo d'un vélo",
+    "guide_toothbrush": "Prenez une photo d'une brosse à dents",
+    "guide_phone": "Prenez une photo d'un smartphone"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",
@@ -64,7 +94,12 @@
     "homeWidget": "Widget d'accueil",
     "comingSoon": "BIENTÔT",
     "language": "Langue",
-    "languageAuto": "Détection auto"
+    "languageAuto": "Détection auto",
+    "removeAdsPrice": "$2.99 · À vie",
+    "restoreSuccess": "Achat restauré avec succès",
+    "restoreNone": "Aucun achat à restaurer",
+    "adFreeActive": "Sans publicité actif",
+    "purchaseFailed": "Échec de l'achat"
   },
   "icons": {
     "tv": "Télévision",
@@ -79,7 +114,6 @@
     "self-improvement": "Méditation",
     "music-note": "Musique",
     "brush": "Dessin",
-    "palette": "Peinture",
     "pets": "Animaux",
     "local-cafe": "Café",
     "restaurant": "Repas",
@@ -119,5 +153,14 @@
     "totalTime": "Total du mois",
     "activeDays": "Jours actifs",
     "daysFmt": "{{days}} jours"
+  },
+  "forceUpdate": {
+    "title": "Mise à jour requise",
+    "message": "Une nouvelle version est disponible.\nVeuillez mettre à jour l'application.",
+    "button": "Mettre à jour"
+  },
+  "notices": {
+    "title": "Notifications",
+    "empty": "Aucune notification"
   }
 }

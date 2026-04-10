@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   AppState,
   Animated,
+  PanResponder,
 } from 'react-native';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 
@@ -232,6 +233,33 @@ export default function HomeScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const styles = makeStyles(colors);
 
+  // 알림 상태
+  const NOTICES_URL = 'https://taehwaneom.github.io/shuttimer-config/notices.json';
+  const NOTICES_READ_KEY = 'shuttimer_notices_read';
+  const [notices, setNotices] = useState<{ id: string; date: string; title: string; message: string }[]>([]);
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      Promise.all([
+        fetch(NOTICES_URL).then(r => r.json()).catch(() => ({ notices: [] })),
+        AsyncStorage.getItem(NOTICES_READ_KEY),
+      ]).then(([data, readJson]) => {
+        const list = data.notices ?? [];
+        setNotices(list);
+        const readIds: string[] = readJson ? JSON.parse(readJson) : [];
+        setHasUnread(list.some((n: { id: string }) => !readIds.includes(n.id)));
+      });
+    }, [])
+  );
+
+  const openNotices = () => {
+    navigation.navigate('Notice');
+    const ids = notices.map(n => n.id);
+    AsyncStorage.setItem(NOTICES_READ_KEY, JSON.stringify(ids));
+    setHasUnread(false);
+  };
+
   const [missionList, setMissionList] = useState<Mission[]>(MISSIONS);
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [selectedMinutes, setSelectedMinutes] = useState(0);
@@ -255,6 +283,19 @@ export default function HomeScreen({ navigation }: Props) {
       Animated.timing(dialSlide, { toValue: 0, duration: 220, useNativeDriver: true }).start();
     });
   };
+
+  const switchDialRef = useRef(switchDial);
+  switchDialRef.current = switchDial;
+
+  const swipeResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dy) < 40,
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > 50) switchDialRef.current('right');
+        else if (g.dx < -50) switchDialRef.current('left');
+      },
+    })
+  ).current;
 
   // --- Running state ---
   const [isRunning, setIsRunning] = useState(false);
@@ -359,7 +400,7 @@ export default function HomeScreen({ navigation }: Props) {
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
       cancelAlarm(notificationIdRef.current).then(() => {
-        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined });
+        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }
   }, [remainingSeconds, isRunning]);
@@ -469,9 +510,30 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.headerTitle}>ShutTimer</Text>
         </View>
         <View style={styles.headerRight}>
-          <MaterialIcons name="notifications" size={24} color={colors.secondary} style={{ opacity: 0.4 }} />
+          <TouchableOpacity onPress={openNotices}>
+            <View>
+              <MaterialIcons name="notifications" size={24} color={hasUnread ? colors.primary : colors.secondary} style={{ opacity: hasUnread ? 1 : 0.4 }} />
+              {hasUnread && (
+                <View style={{ position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error }} />
+              )}
+            </View>
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('History')}>
-            <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
+            <View>
+              <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
+              <View style={{ position: 'absolute', top: 9, left: 5, right: 5, gap: 2 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
+                </View>
+              </View>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
@@ -525,7 +587,7 @@ export default function HomeScreen({ navigation }: Props) {
       </View>
 
       {/* 하단 버튼 영역 + 60:00 */}
-      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
+      <View {...swipeResponder.panHandlers} style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
         {/* 60:00 표시 */}
         <View style={{ borderWidth: 2, borderColor: colors.outlineVariant, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onBackground, letterSpacing: 1 }}>
@@ -620,6 +682,7 @@ export default function HomeScreen({ navigation }: Props) {
           )}
         </View>
       <AdBanner />
+
     </SafeAreaView>
   );
 }

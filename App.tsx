@@ -18,18 +18,22 @@ import PresentationRunningScreen from './src/screens/PresentationRunningScreen';
 import PresentationFullScreen from './src/screens/PresentationFullScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import NoticeScreen from './src/screens/NoticeScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { PurchaseProvider } from './src/context/PurchaseContext';
+import ForceUpdate from './src/components/ForceUpdate';
 
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
   Running: { mission: Mission | null; minutes: number };
-  Alarm: { missionId?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
   History: undefined;
+  Notice: undefined;
   Presentation: undefined;
   PresentationRunning: { minutes: number; seconds: number; recordingEnabled: boolean };
   PresentationFull: { minutes: number; seconds: number; remainingSeconds: number; isRunning: boolean; recordingEnabled: boolean };
@@ -74,6 +78,7 @@ function AppNavigator() {
         <Stack.Screen name="EditMissions" component={EditMissionsScreen} />
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
+        <Stack.Screen name="Notice" component={NoticeScreen} />
         <Stack.Screen name="Presentation" component={PresentationScreen} options={{ contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="PresentationRunning" component={PresentationRunningScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="PresentationFull" component={PresentationFullScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
@@ -86,7 +91,10 @@ function AppNavigator() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppNavigator />
+      <PurchaseProvider>
+        <ForceUpdate />
+        <AppNavigator />
+      </PurchaseProvider>
     </ThemeProvider>
   );
 }

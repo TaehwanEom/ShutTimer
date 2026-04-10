@@ -1,37 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { View, Text } from 'react-native';
+import { usePurchase } from '../context/PurchaseContext';
+// import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
 
-// AdMob — EAS Development Build 필요, Expo Go 불가
-// import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+// const BANNER_UNIT_ID = 'ca-app-pub-3940256099942544/9214589741';
 
 export default function AdBanner() {
-  const { colors } = useTheme();
+  const { isAdFree, loading } = usePurchase();
+  if (loading || isAdFree) return null;
 
   return (
-    <View style={[styles.container, { borderColor: colors.outlineVariant }]}>
-      <Text style={[styles.label, { color: colors.secondary }]}>AD</Text>
-      {/* <BannerAd
-        unitId={TestIds.ADAPTIVE_BANNER}
-        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-      /> */}
+    <View style={{ width: '100%', height: 60, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 2, opacity: 0.4 }}>AD</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    height: 60,
-    borderTopWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2,
-    opacity: 0.4,
-  },
-});

@@ -27,7 +27,37 @@
     "tapButton": "Tocca per fermare",
     "shakeInstruction": "Scuoti il dispositivo per fermare la sveglia",
     "retakePhoto": "Riprova",
-    "forceClose": "Chiudi forzatamente"
+    "forceClose": "Chiudi forzatamente",
+    "guide_tv": "Scatta una foto alla tua TV",
+    "guide_bathtub": "Scatta una foto alla vasca o doccia",
+    "guide_menu-book": "Scatta una foto a un libro",
+    "guide_school": "Scatta una foto a un libro o quaderno",
+    "guide_toys": "Scatta una foto a un giocattolo",
+    "guide_outdoor-grill": "Scatta una foto al cibo",
+    "guide_fitness-center": "Scatta una foto all'attrezzatura da palestra",
+    "guide_directions-run": "Scatta una foto alle scarpe o all'esterno",
+    "guide_self-improvement": "Fai un selfie",
+    "guide_music-note": "Scatta una foto a uno strumento",
+    "guide_brush": "Scatta una foto a un dipinto o pennello",
+    "guide_pets": "Scatta una foto al tuo animale",
+    "guide_local-cafe": "Scatta una foto al caffè o bar",
+    "guide_restaurant": "Scatta una foto al cibo",
+    "guide_shopping-cart": "Scatta una foto a un carrello",
+    "guide_work": "Scatta una foto a documenti o computer",
+    "guide_computer": "Scatta una foto a un computer",
+    "guide_phone-android": "Scatta una foto a uno smartphone",
+    "guide_camera-alt": "Scatta una foto a una fotocamera",
+    "guide_directions-bike": "Scatta una foto a una bicicletta",
+    "guide_spa": "Scatta una foto alla vasca",
+    "guide_nightlight": "Scatta una foto al letto o cuscino",
+    "guide_clean-hands": "Scatta una foto a uno spazzolino",
+    "guide_book": "Scatta una foto a un libro",
+    "guide_coffee": "Scatta una foto al caffè",
+    "guide_food": "Scatta una foto al cibo",
+    "guide_pet": "Scatta una foto al tuo animale",
+    "guide_bike": "Scatta una foto a una bicicletta",
+    "guide_toothbrush": "Scatta una foto a uno spazzolino",
+    "guide_phone": "Scatta una foto a uno smartphone"
   },
   "addTimer": {
     "editTitle": "Modifica preferito",
@@ -64,7 +94,12 @@
     "homeWidget": "Widget Home",
     "comingSoon": "IN ARRIVO",
     "language": "Lingua",
-    "languageAuto": "Rilevamento auto"
+    "languageAuto": "Rilevamento auto",
+    "removeAdsPrice": "$2.99 · A vita",
+    "restoreSuccess": "Acquisto ripristinato con successo",
+    "restoreNone": "Nessun acquisto da ripristinare",
+    "adFreeActive": "Senza pubblicità attivo",
+    "purchaseFailed": "Acquisto fallito"
   },
   "icons": {
     "tv": "TV",
@@ -79,7 +114,6 @@
     "self-improvement": "Meditazione",
     "music-note": "Musica",
     "brush": "Disegno",
-    "palette": "Pittura",
     "pets": "Animali",
     "local-cafe": "Caffè",
     "restaurant": "Pranzo",
@@ -119,5 +153,14 @@
     "totalTime": "Totale del mese",
     "activeDays": "Giorni attivi",
     "daysFmt": "{{days}} giorni"
+  },
+  "forceUpdate": {
+    "title": "Aggiornamento necessario",
+    "message": "Una nuova versione è disponibile.\nAggiorna l'app.",
+    "button": "Aggiorna"
+  },
+  "notices": {
+    "title": "Avvisi",
+    "empty": "Nessun avviso"
   }
 }

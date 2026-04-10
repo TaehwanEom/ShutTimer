@@ -27,7 +27,37 @@
     "tapButton": "点击关闭",
     "shakeInstruction": "摇晃设备以关闭闹钟",
     "retakePhoto": "请重新拍照",
-    "forceClose": "强制关闭"
+    "forceClose": "强制关闭",
+    "guide_tv": "请拍摄电视",
+    "guide_bathtub": "请拍摄浴缸或淋浴",
+    "guide_menu-book": "请拍摄书本",
+    "guide_school": "请拍摄书本或笔记本",
+    "guide_toys": "请拍摄玩具",
+    "guide_outdoor-grill": "请拍摄食物",
+    "guide_fitness-center": "请拍摄运动器材",
+    "guide_directions-run": "请拍摄运动鞋或户外",
+    "guide_self-improvement": "请自拍",
+    "guide_music-note": "请拍摄乐器",
+    "guide_brush": "请拍摄画作或画笔",
+    "guide_pets": "请拍摄宠物",
+    "guide_local-cafe": "请拍摄咖啡或咖啡馆",
+    "guide_restaurant": "请拍摄食物",
+    "guide_shopping-cart": "请拍摄购物车",
+    "guide_work": "请拍摄文件或电脑",
+    "guide_computer": "请拍摄电脑",
+    "guide_phone-android": "请拍摄智能手机",
+    "guide_camera-alt": "请拍摄相机",
+    "guide_directions-bike": "请拍摄自行车",
+    "guide_spa": "请拍摄浴缸",
+    "guide_nightlight": "请拍摄床或枕头",
+    "guide_clean-hands": "请拍摄牙刷",
+    "guide_book": "请拍摄书本",
+    "guide_coffee": "请拍摄咖啡",
+    "guide_food": "请拍摄食物",
+    "guide_pet": "请拍摄宠物",
+    "guide_bike": "请拍摄自行车",
+    "guide_toothbrush": "请拍摄牙刷",
+    "guide_phone": "请拍摄智能手机"
   },
   "addTimer": {
     "editTitle": "编辑收藏",
@@ -64,7 +94,12 @@
     "homeWidget": "主屏小组件",
     "comingSoon": "即将推出",
     "language": "语言",
-    "languageAuto": "自动检测"
+    "languageAuto": "自动检测",
+    "removeAdsPrice": "$2.99 · 永久",
+    "restoreSuccess": "购买已恢复",
+    "restoreNone": "没有可恢复的购买记录",
+    "adFreeActive": "去广告已激活",
+    "purchaseFailed": "购买失败"
   },
   "icons": {
     "tv": "电视",
@@ -79,7 +114,6 @@
     "self-improvement": "冥想",
     "music-note": "音乐",
     "brush": "绘画",
-    "palette": "涂色",
     "pets": "宠物",
     "local-cafe": "咖啡",
     "restaurant": "用餐",
@@ -119,5 +153,14 @@
     "totalTime": "本月总时长",
     "activeDays": "活跃天数",
     "daysFmt": "{{days}}天"
+  },
+  "forceUpdate": {
+    "title": "需要更新",
+    "message": "新版本已发布。\n请更新应用。",
+    "button": "更新"
+  },
+  "notices": {
+    "title": "通知",
+    "empty": "暂无通知"
   }
 }

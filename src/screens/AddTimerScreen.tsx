@@ -7,10 +7,9 @@ import {
   SafeAreaView,
   Modal,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
 const ICONS_PER_PAGE = 8;
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -31,7 +30,7 @@ type Props = {
   route: RouteProp<RootStackParamList, 'AddTimer'>;
 };
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const makeStyles = (colors: ThemeColors, screenWidth: number) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -147,7 +146,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
   },
   iconPage: {
-    width: SCREEN_WIDTH,
+    width: screenWidth,
     paddingHorizontal: 12,
   },
   iconRow: {
@@ -176,9 +175,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
 });
 
 export default function AddTimerScreen({ navigation, route }: Props) {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, SCREEN_WIDTH);
 
   const editId = route?.params?.editId;
   const isEdit = !!editId;

@@ -27,7 +27,37 @@
     "tapButton": "タップして終了",
     "shakeInstruction": "デバイスを振ってアラームを止めてください",
     "retakePhoto": "もう一度撮ってください",
-    "forceClose": "強制終了"
+    "forceClose": "強制終了",
+    "guide_tv": "テレビを撮影してください",
+    "guide_bathtub": "浴槽やシャワーを撮影してください",
+    "guide_menu-book": "本を撮影してください",
+    "guide_school": "本やノートを撮影してください",
+    "guide_toys": "おもちゃを撮影してください",
+    "guide_outdoor-grill": "食べ物を撮影してください",
+    "guide_fitness-center": "運動器具を撮影してください",
+    "guide_directions-run": "靴や屋外を撮影してください",
+    "guide_self-improvement": "自撮りしてください",
+    "guide_music-note": "楽器を撮影してください",
+    "guide_brush": "絵や筆を撮影してください",
+    "guide_pets": "ペットを撮影してください",
+    "guide_local-cafe": "コーヒーやカフェを撮影してください",
+    "guide_restaurant": "食べ物を撮影してください",
+    "guide_shopping-cart": "ショッピングカートを撮影してください",
+    "guide_work": "書類やコンピュータを撮影してください",
+    "guide_computer": "コンピュータを撮影してください",
+    "guide_phone-android": "スマートフォンを撮影してください",
+    "guide_camera-alt": "カメラを撮影してください",
+    "guide_directions-bike": "自転車を撮影してください",
+    "guide_spa": "浴槽を撮影してください",
+    "guide_nightlight": "ベッドや枕を撮影してください",
+    "guide_clean-hands": "歯ブラシを撮影してください",
+    "guide_book": "本を撮影してください",
+    "guide_coffee": "コーヒーを撮影してください",
+    "guide_food": "食べ物を撮影してください",
+    "guide_pet": "ペットを撮影してください",
+    "guide_bike": "自転車を撮影してください",
+    "guide_toothbrush": "歯ブラシを撮影してください",
+    "guide_phone": "スマートフォンを撮影してください"
   },
   "addTimer": {
     "editTitle": "お気に入り編集",
@@ -64,7 +94,12 @@
     "homeWidget": "ホームウィジェット",
     "comingSoon": "近日公開",
     "language": "言語",
-    "languageAuto": "自動検出"
+    "languageAuto": "自動検出",
+    "removeAdsPrice": "$2.99 · 永続",
+    "restoreSuccess": "購入が復元されました",
+    "restoreNone": "復元できる購入履歴がありません",
+    "adFreeActive": "広告削除が有効です",
+    "purchaseFailed": "購入に失敗しました"
   },
   "icons": {
     "tv": "テレビ",
@@ -79,7 +114,6 @@
     "self-improvement": "瞑想",
     "music-note": "音楽",
     "brush": "お絵描き",
-    "palette": "色塗り",
     "pets": "ペット",
     "local-cafe": "カフェ",
     "restaurant": "食事",
@@ -119,5 +153,14 @@
     "totalTime": "今月の合計",
     "activeDays": "活動日数",
     "daysFmt": "{{days}}日"
+  },
+  "forceUpdate": {
+    "title": "アップデートが必要です",
+    "message": "新しいバージョンがリリースされました。\nアプリを更新してください。",
+    "button": "アップデート"
+  },
+  "notices": {
+    "title": "お知らせ",
+    "empty": "お知らせはありません"
   }
 }

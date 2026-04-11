@@ -19,3 +19,11 @@ yarn-error.*
 /*.jpg
 /*.png
 /*.PNG
+
+# 빌드 산출물
+*.ipa
+*.apk
+*.aab
+build/
+build */
+ios/

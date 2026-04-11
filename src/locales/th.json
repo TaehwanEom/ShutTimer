@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "หมดเวลาแล้ว ถ่ายรูปเพื่อปิดการแจ้งเตือน",
     "endTime": "เวลาสิ้นสุด",
-    "estimatedAt": "ประมาณ {{time}}"
+    "estimatedAt": "ประมาณ {{time}}",
+    "notifBodyCamera": "หมดเวลาแล้ว ถ่ายรูปเพื่อปิดการปลุก",
+    "notifBodyTap": "หมดเวลาแล้ว กดปุ่มเพื่อปิดการปลุก",
+    "notifBodyShake": "หมดเวลาแล้ว เขย่าโทรศัพท์เพื่อปิดการปลุก",
+    "notifBodyReminder": "นาฬิกาปลุกกำลังดัง เปิดแอปเพื่อปิด",
+    "notifBodyReminder2": "นาฬิกาปลุกยังดังอยู่ ฉันแทบจะส่งเสียงต่อไม่ไหวแล้ว"
   },
   "alarm": {
     "timerExpired": "หมดเวลา",
@@ -40,7 +45,7 @@
     "guide_music-note": "ถ่ายรูปเครื่องดนตรี",
     "guide_brush": "ถ่ายรูปภาพวาดหรือแปรง",
     "guide_pets": "ถ่ายรูปสัตว์เลี้ยงของคุณ",
-    "guide_local-cafe": "ถ่ายรูปกาแฟหรือคาเฟ่",
+    "guide_local-cafe": "ถ่ายรูปแก้ว",
     "guide_restaurant": "ถ่ายรูปอาหาร",
     "guide_shopping-cart": "ถ่ายรูปรถเข็นช้อปปิ้ง",
     "guide_work": "ถ่ายรูปเอกสารหรือคอมพิวเตอร์",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "ถ่ายรูปจักรยาน",
     "guide_spa": "ถ่ายรูปอ่างอาบน้ำ",
     "guide_nightlight": "ถ่ายรูปเตียงหรือหมอน",
-    "guide_clean-hands": "ถ่ายรูปแปรงสีฟัน",
+    "guide_clean-hands": "ถ่ายรูปอ่างล้างหน้า",
     "guide_book": "ถ่ายรูปหนังสือ",
     "guide_coffee": "ถ่ายรูปกาแฟ",
     "guide_food": "ถ่ายรูปอาหาร",
@@ -99,7 +104,8 @@
     "restoreSuccess": "คืนการซื้อสำเร็จ",
     "restoreNone": "ไม่มีการซื้อที่จะคืน",
     "adFreeActive": "ปิดโฆษณาแล้ว",
-    "purchaseFailed": "การซื้อล้มเหลว"
+    "purchaseFailed": "การซื้อล้มเหลว",
+    "alarmEnabled": "เสียงปลุก"
   },
   "icons": {
     "tv": "ทีวี",
@@ -124,7 +130,7 @@
     "camera-alt": "ถ่ายรูป",
     "directions-bike": "ปั่นจักรยาน",
     "spa": "พักผ่อน",
-    "nightlight": "นอน",
+    "nightlight": "งีบหลับ",
     "clean-hands": "แปรงฟัน"
   },
   "presentation": {

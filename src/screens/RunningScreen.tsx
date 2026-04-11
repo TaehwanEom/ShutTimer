@@ -16,8 +16,10 @@ import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import TimerDial from '../components/TimerDial';
 import AdBanner from '../components/AdBanner';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
+import { SETTINGS_KEY } from '../constants/settings';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Running'>;
@@ -159,37 +161,37 @@ export default function RunningScreen({ navigation, route }: Props) {
   const isPausedRef = useRef(false);
 
   const backgroundedAt = useRef<number | null>(null);
-  const notificationIdRef = useRef<string | null>(null);
 
-  const scheduleAlarm = async (seconds: number) => {
-    const id = await Notifications.scheduleNotificationAsync({
+  const getNotifBody = async (): Promise<string> => {
+    const method = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
+    if (method === 'tap') return t('running.notifBodyTap');
+    if (method === 'shake') return t('running.notifBodyShake');
+    return t('running.notifBodyCamera');
+  };
+
+  const scheduleAlarms = async (seconds: number) => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    const body = await getNotifBody();
+    await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
-        body: t('running.notifBody'),
+        body,
+        sound: 'notification_alarm.wav',
+        interruptionLevel: 'timeSensitive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: seconds,
+        seconds,
       },
     });
-    notificationIdRef.current = id;
-  };
-
-  const cancelAlarm = async (id: string | null) => {
-    if (id !== null) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-      notificationIdRef.current = null;
-    }
   };
 
   // 마운트 1회: 권한 요청 + 알람 예약 + portrait 잠금
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     Notifications.requestPermissionsAsync();
-    scheduleAlarm(TOTAL_SECONDS);
-    return () => {
-      cancelAlarm(notificationIdRef.current);
-    };
+    scheduleAlarms(TOTAL_SECONDS);
+    return () => {};
   }, []);
 
   // interval — isPaused 변화 시 재등록
@@ -210,9 +212,10 @@ export default function RunningScreen({ navigation, route }: Props) {
   // 0 감지 — interval과 분리
   useEffect(() => {
     if (remainingSeconds === 0) {
-      cancelAlarm(notificationIdRef.current).then(() => {
-        navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
-      });
+      if (AppState.currentState === 'active') {
+        Notifications.cancelAllScheduledNotificationsAsync();
+      }
+      navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
     }
   }, [remainingSeconds]);
 
@@ -229,9 +232,7 @@ export default function RunningScreen({ navigation, route }: Props) {
         remainingSecondsRef.current = newVal;
         setRemainingSeconds(newVal);
         if (newVal === 0) {
-          cancelAlarm(notificationIdRef.current).then(() => {
-            navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
-          });
+          navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
         }
       }
     });
@@ -250,14 +251,14 @@ export default function RunningScreen({ navigation, route }: Props) {
     isPausedRef.current = next;
     setIsPaused(next);
     if (next) {
-      cancelAlarm(notificationIdRef.current);
+      Notifications.cancelAllScheduledNotificationsAsync();
     } else {
-      scheduleAlarm(remainingSecondsRef.current);
+      scheduleAlarms(remainingSecondsRef.current);
     }
   };
 
   const handleCancel = () => {
-    cancelAlarm(notificationIdRef.current).then(() => {
+    Notifications.cancelAllScheduledNotificationsAsync().then(() => {
       navigation.navigate('Home');
     });
   };

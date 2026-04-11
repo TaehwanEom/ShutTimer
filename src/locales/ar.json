@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "انتهى المؤقت. التقط صورة للإغلاق.",
     "endTime": "وقت الانتهاء",
-    "estimatedAt": "المقدر {{time}}"
+    "estimatedAt": "المقدر {{time}}",
+    "notifBodyCamera": "انتهى المؤقت. التقط صورة لإيقاف المنبه.",
+    "notifBodyTap": "انتهى المؤقت. اضغط الزر لإيقاف المنبه.",
+    "notifBodyShake": "انتهى المؤقت. هز الهاتف لإيقاف المنبه.",
+    "notifBodyReminder": "المنبه يرن. افتح التطبيق لإيقافه.",
+    "notifBodyReminder2": "المنبه لا يزال يرن. لم أعد أستطيع الاستمرار في الرنين"
   },
   "alarm": {
     "timerExpired": "انتهى الوقت",
@@ -40,7 +45,7 @@
     "guide_music-note": "التقط صورة لآلة موسيقية",
     "guide_brush": "التقط صورة للوحة أو فرشاة",
     "guide_pets": "التقط صورة لحيوانك الأليف",
-    "guide_local-cafe": "التقط صورة للقهوة أو المقهى",
+    "guide_local-cafe": "التقط صورة لكوب",
     "guide_restaurant": "التقط صورة للطعام",
     "guide_shopping-cart": "التقط صورة لعربة التسوق",
     "guide_work": "التقط صورة للوثائق أو الحاسوب",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "التقط صورة للدراجة",
     "guide_spa": "التقط صورة للحوض",
     "guide_nightlight": "التقط صورة للسرير أو الوسادة",
-    "guide_clean-hands": "التقط صورة لفرشاة الأسنان",
+    "guide_clean-hands": "التقط صورة للحوض",
     "guide_book": "التقط صورة لكتاب",
     "guide_coffee": "التقط صورة للقهوة",
     "guide_food": "التقط صورة للطعام",
@@ -99,7 +104,8 @@
     "restoreSuccess": "تمت استعادة الشراء بنجاح",
     "restoreNone": "لا توجد مشتريات للاستعادة",
     "adFreeActive": "إزالة الإعلانات مفعّلة",
-    "purchaseFailed": "فشل الشراء"
+    "purchaseFailed": "فشل الشراء",
+    "alarmEnabled": "صوت المنبه"
   },
   "icons": {
     "tv": "تلفزيون",
@@ -124,7 +130,7 @@
     "camera-alt": "صورة",
     "directions-bike": "دراجة",
     "spa": "استراحة",
-    "nightlight": "نوم",
+    "nightlight": "قيلولة",
     "clean-hands": "تنظيف"
   },
   "presentation": {

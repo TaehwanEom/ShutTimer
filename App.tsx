@@ -6,6 +6,16 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';
 import RunningScreen from './src/screens/RunningScreen';
@@ -45,7 +55,15 @@ function AppNavigator() {
   const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
-  // 포어그라운드/백그라운드에서 알림 탭 시 AlarmScreen 이동
+  // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(() => {
+      navigationRef.current?.navigate('Alarm');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // 알림 탭 시 AlarmScreen 이동
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(() => {
       navigationRef.current?.navigate('Alarm');

@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "O temporizador terminou. Tire uma foto para encerrar.",
     "endTime": "Hora de término",
-    "estimatedAt": "Estimado às {{time}}"
+    "estimatedAt": "Estimado às {{time}}",
+    "notifBodyCamera": "Temporizador encerrado. Tire uma foto para desligar o alarme.",
+    "notifBodyTap": "Temporizador encerrado. Toque no botão para desligar o alarme.",
+    "notifBodyShake": "Temporizador encerrado. Agite o celular para desligar o alarme.",
+    "notifBodyReminder": "O alarme está tocando. Abra o app para desligar.",
+    "notifBodyReminder2": "O alarme ainda está tocando. Não aguento mais tocar por muito tempo"
   },
   "alarm": {
     "timerExpired": "TEMPO ESGOTADO",
@@ -40,7 +45,7 @@
     "guide_music-note": "Tire uma foto de um instrumento",
     "guide_brush": "Tire uma foto de uma pintura ou pincel",
     "guide_pets": "Tire uma foto do seu animal",
-    "guide_local-cafe": "Tire uma foto de café ou cafeteria",
+    "guide_local-cafe": "Tire uma foto de um copo",
     "guide_restaurant": "Tire uma foto da comida",
     "guide_shopping-cart": "Tire uma foto de um carrinho de compras",
     "guide_work": "Tire uma foto de documentos ou computador",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Tire uma foto de uma bicicleta",
     "guide_spa": "Tire uma foto da banheira",
     "guide_nightlight": "Tire uma foto da cama ou travesseiro",
-    "guide_clean-hands": "Tire uma foto de uma escova de dentes",
+    "guide_clean-hands": "Tire uma foto da pia",
     "guide_book": "Tire uma foto de um livro",
     "guide_coffee": "Tire uma foto de café",
     "guide_food": "Tire uma foto da comida",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Compra restaurada com sucesso",
     "restoreNone": "Nenhuma compra para restaurar",
     "adFreeActive": "Sem anúncios ativo",
-    "purchaseFailed": "Falha na compra"
+    "purchaseFailed": "Falha na compra",
+    "alarmEnabled": "Som do alarme"
   },
   "icons": {
     "tv": "TV",
@@ -124,7 +130,7 @@
     "camera-alt": "Foto",
     "directions-bike": "Ciclismo",
     "spa": "Descanso",
-    "nightlight": "Dormir",
+    "nightlight": "Cochilo",
     "clean-hands": "Escovar"
   },
   "presentation": {

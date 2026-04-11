@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "計時器已結束。請拍照以關閉。",
     "endTime": "預計結束",
-    "estimatedAt": "預計 {{time}}"
+    "estimatedAt": "預計 {{time}}",
+    "notifBodyCamera": "計時器已結束。拍照以關閉鬧鐘。",
+    "notifBodyTap": "計時器已結束。按下按鈕以關閉鬧鐘。",
+    "notifBodyShake": "計時器已結束。搖動手機以關閉鬧鐘。",
+    "notifBodyReminder": "鬧鐘正在響鈴。打開應用關閉鬧鐘。",
+    "notifBodyReminder2": "鬧鐘還在響。我已經快撐不住了"
   },
   "alarm": {
     "timerExpired": "時間到",
@@ -40,7 +45,7 @@
     "guide_music-note": "請拍攝樂器",
     "guide_brush": "請拍攝畫作或畫筆",
     "guide_pets": "請拍攝寵物",
-    "guide_local-cafe": "請拍攝咖啡或咖啡廳",
+    "guide_local-cafe": "請拍攝杯子",
     "guide_restaurant": "請拍攝食物",
     "guide_shopping-cart": "請拍攝購物車",
     "guide_work": "請拍攝文件或電腦",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "請拍攝自行車",
     "guide_spa": "請拍攝浴缸",
     "guide_nightlight": "請拍攝床或枕頭",
-    "guide_clean-hands": "請拍攝牙刷",
+    "guide_clean-hands": "請拍攝洗手台",
     "guide_book": "請拍攝書本",
     "guide_coffee": "請拍攝咖啡",
     "guide_food": "請拍攝食物",
@@ -99,7 +104,8 @@
     "restoreSuccess": "購買已恢復",
     "restoreNone": "沒有可恢復的購買記錄",
     "adFreeActive": "去廣告已啟用",
-    "purchaseFailed": "購買失敗"
+    "purchaseFailed": "購買失敗",
+    "alarmEnabled": "鬧鐘聲音"
   },
   "icons": {
     "tv": "電視",
@@ -124,7 +130,7 @@
     "camera-alt": "拍照",
     "directions-bike": "騎車",
     "spa": "休息",
-    "nightlight": "睡眠",
+    "nightlight": "午睡",
     "clean-hands": "刷牙"
   },
   "presentation": {

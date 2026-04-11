@@ -18,17 +18,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
-// import ImageLabeling from '@react-native-ml-kit/image-labeling';
-const ImageLabeling: any = null;
+import ImageLabeling from '@react-native-ml-kit/image-labeling';
 import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS } from '../constants/settings';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
-// import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
-const InterstitialAd: any = { createForAdRequest: () => ({ addAdEventListener: () => () => {}, load: () => {}, show: () => Promise.reject() }) };
-const AdEventType: any = { LOADED: 'loaded', CLOSED: 'closed' };
+import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 import { usePurchase } from '../context/PurchaseContext';
 
@@ -70,8 +68,9 @@ const MISSION_LABELS: Record<string, string[]> = {
 };
 
 // 1차 검증: 신뢰도 높은 5개만 랜덤 출제 (검증 후 순차 확대)
-const VERIFIED_ICONS = ['tv', 'toys', 'music-note', 'pets', 'local-cafe'];
+const VERIFIED_ICONS = ['tv', 'toys', 'clean-hands', 'pets', 'local-cafe'];
 const RANDOM_TARGETS = VERIFIED_ICONS.map(icon => ({
+  icon,
   labels: MISSION_LABELS[icon],
   guideKey: `alarm.guide_${icon}`,
 }));
@@ -94,20 +93,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
 
-  const missionIcon = route.params?.missionIcon ?? null;
-
   const randomTarget = useMemo(() => {
-    if (missionIcon) return null;
     return RANDOM_TARGETS[Math.floor(Math.random() * RANDOM_TARGETS.length)];
   }, []);
 
-  const activeLabels = missionIcon
-    ? (MISSION_LABELS[missionIcon] ?? [])
-    : (randomTarget?.labels ?? []);
-
-  const guideKey = missionIcon
-    ? `alarm.guide_${missionIcon}`
-    : randomTarget?.guideKey ?? null;
+  const activeLabels = randomTarget.labels;
+  const guideKey = randomTarget.guideKey;
+  const activeIcon = randomTarget.icon;
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
@@ -127,6 +119,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
     Vibration.cancel();
+    Notifications.cancelAllScheduledNotificationsAsync();
     soundRef.current?.stopAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
     soundRef.current = null;
@@ -166,9 +159,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     return () => clearTimeout(timeout);
   }, [dismissMethod, settingsLoaded, dismiss]);
 
-  // portrait 잠금 + 설정 로드
+  // portrait 잠금 + 예약 알림 전부 취소 (안전장치)
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    Notifications.cancelAllScheduledNotificationsAsync();
   }, []);
 
   useEffect(() => {
@@ -394,7 +388,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
                 />
                 {guideKey && (
                   <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: colors.onPrimary, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
+                    {!failMessage && activeIcon && (
+                      <MaterialIcons
+                        name={activeIcon as React.ComponentProps<typeof MaterialIcons>['name']}
+                        size={120}
+                        color="rgba(255,255,255,0.6)"
+                        style={{ marginBottom: 16 }}
+                      />
+                    )}
+                    <Text style={{ fontSize: 22, fontWeight: '800', color: 'rgba(255,255,255,0.6)', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 }}>
                       {failMessage ? t('alarm.retakePhoto', { defaultValue: '다시 찍어주세요' }) : t(guideKey)}
                     </Text>
                   </View>

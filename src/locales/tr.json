@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "Zamanlayıcı sona erdi. Kapatmak için fotoğraf çekin.",
     "endTime": "Bitiş Zamanı",
-    "estimatedAt": "Tahmini {{time}}"
+    "estimatedAt": "Tahmini {{time}}",
+    "notifBodyCamera": "Zamanlayıcı bitti. Alarmı kapatmak için fotoğraf çekin.",
+    "notifBodyTap": "Zamanlayıcı bitti. Alarmı kapatmak için düğmeye basın.",
+    "notifBodyShake": "Zamanlayıcı bitti. Alarmı kapatmak için telefonu sallayın.",
+    "notifBodyReminder": "Alarm çalıyor. Kapatmak için uygulamayı açın.",
+    "notifBodyReminder2": "Alarm hâlâ çalıyor. Artık daha fazla çalamayacağım"
   },
   "alarm": {
     "timerExpired": "SÜRE DOLDU",
@@ -40,7 +45,7 @@
     "guide_music-note": "Bir enstrümanın fotoğrafını çekin",
     "guide_brush": "Bir resim veya fırçanın fotoğrafını çekin",
     "guide_pets": "Evcil hayvanınızın fotoğrafını çekin",
-    "guide_local-cafe": "Kahve veya kafeninizin fotoğrafını çekin",
+    "guide_local-cafe": "Bir bardak fotoğrafı çekin",
     "guide_restaurant": "Yemeğin fotoğrafını çekin",
     "guide_shopping-cart": "Alışveriş arabasının fotoğrafını çekin",
     "guide_work": "Belge veya bilgisayarın fotoğrafını çekin",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Bisikletin fotoğrafını çekin",
     "guide_spa": "Küvetin fotoğrafını çekin",
     "guide_nightlight": "Yatağınızın veya yastığınızın fotoğrafını çekin",
-    "guide_clean-hands": "Diş fırçasının fotoğrafını çekin",
+    "guide_clean-hands": "Lavabo fotoğrafı çekin",
     "guide_book": "Bir kitabın fotoğrafını çekin",
     "guide_coffee": "Kahvenin fotoğrafını çekin",
     "guide_food": "Yemeğin fotoğrafını çekin",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Satın alma başarıyla geri yüklendi",
     "restoreNone": "Geri yüklenecek satın alma yok",
     "adFreeActive": "Reklamsız aktif",
-    "purchaseFailed": "Satın alma başarısız"
+    "purchaseFailed": "Satın alma başarısız",
+    "alarmEnabled": "Alarm sesi"
   },
   "icons": {
     "tv": "TV",
@@ -124,7 +130,7 @@
     "camera-alt": "Fotoğraf",
     "directions-bike": "Bisiklet",
     "spa": "Dinlenme",
-    "nightlight": "Uyku",
+    "nightlight": "Şekerleme",
     "clean-hands": "Diş fırçalama"
   },
   "presentation": {

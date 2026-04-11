@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "Timer telah berakhir. Ambil foto untuk menutup.",
     "endTime": "Waktu selesai",
-    "estimatedAt": "Perkiraan {{time}}"
+    "estimatedAt": "Perkiraan {{time}}",
+    "notifBodyCamera": "Timer selesai. Ambil foto untuk mematikan alarm.",
+    "notifBodyTap": "Timer selesai. Tekan tombol untuk mematikan alarm.",
+    "notifBodyShake": "Timer selesai. Goyangkan ponsel untuk mematikan alarm.",
+    "notifBodyReminder": "Alarm berbunyi. Buka aplikasi untuk mematikan.",
+    "notifBodyReminder2": "Alarm masih berbunyi. Saya sudah tidak kuat lagi"
   },
   "alarm": {
     "timerExpired": "WAKTU HABIS",
@@ -40,7 +45,7 @@
     "guide_music-note": "Ambil foto alat musik",
     "guide_brush": "Ambil foto lukisan atau kuas",
     "guide_pets": "Ambil foto hewan peliharaan Anda",
-    "guide_local-cafe": "Ambil foto kopi atau kafe",
+    "guide_local-cafe": "Ambil foto gelas",
     "guide_restaurant": "Ambil foto makanan",
     "guide_shopping-cart": "Ambil foto keranjang belanja",
     "guide_work": "Ambil foto dokumen atau komputer",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Ambil foto sepeda",
     "guide_spa": "Ambil foto bak mandi",
     "guide_nightlight": "Ambil foto tempat tidur atau bantal",
-    "guide_clean-hands": "Ambil foto sikat gigi",
+    "guide_clean-hands": "Ambil foto wastafel",
     "guide_book": "Ambil foto buku",
     "guide_coffee": "Ambil foto kopi",
     "guide_food": "Ambil foto makanan",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Pembelian berhasil dipulihkan",
     "restoreNone": "Tidak ada pembelian untuk dipulihkan",
     "adFreeActive": "Bebas Iklan Aktif",
-    "purchaseFailed": "Pembelian gagal"
+    "purchaseFailed": "Pembelian gagal",
+    "alarmEnabled": "Suara Alarm"
   },
   "icons": {
     "tv": "TV",
@@ -124,7 +130,7 @@
     "camera-alt": "Foto",
     "directions-bike": "Bersepeda",
     "spa": "Istirahat",
-    "nightlight": "Tidur",
+    "nightlight": "Tidur siang",
     "clean-hands": "Sikat Gigi"
   },
   "presentation": {

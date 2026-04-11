@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "타이머가 종료되었습니다. 사진을 찍어 종료하세요.",
     "endTime": "종료 시간",
-    "estimatedAt": "{{time}}으로 예상됨"
+    "estimatedAt": "{{time}}으로 예상됨",
+    "notifBodyCamera": "타이머가 종료되었습니다. 사진을 찍어 알람을 종료하세요.",
+    "notifBodyTap": "타이머가 종료되었습니다. 버튼을 눌러 알람을 종료하세요.",
+    "notifBodyShake": "타이머가 종료되었습니다. 폰을 흔들어 알람을 종료하세요.",
+    "notifBodyReminder": "알람이 울리고 있습니다. 앱을 열어 종료하세요.",
+    "notifBodyReminder2": "알람이 아직도 울리고 있습니다. 이젠 저도 더 이상 알람을 울리기 힘들어요"
   },
   "alarm": {
     "timerExpired": "시간 종료",
@@ -40,7 +45,7 @@
     "guide_music-note": "악기를 찍어주세요",
     "guide_brush": "그림이나 붓을 찍어주세요",
     "guide_pets": "반려동물을 찍어주세요",
-    "guide_local-cafe": "커피나 카페를 찍어주세요",
+    "guide_local-cafe": "컵을 찍어주세요",
     "guide_restaurant": "음식을 찍어주세요",
     "guide_shopping-cart": "쇼핑 카트를 찍어주세요",
     "guide_work": "서류나 컴퓨터를 찍어주세요",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "자전거를 찍어주세요",
     "guide_spa": "욕조를 찍어주세요",
     "guide_nightlight": "침대나 베개를 찍어주세요",
-    "guide_clean-hands": "칫솔을 찍어주세요",
+    "guide_clean-hands": "세면대를 찍어주세요",
     "guide_book": "책을 찍어주세요",
     "guide_coffee": "커피를 찍어주세요",
     "guide_food": "음식을 찍어주세요",
@@ -99,7 +104,8 @@
     "restoreSuccess": "구매가 복원됐습니다",
     "restoreNone": "복원할 구매 내역이 없습니다",
     "adFreeActive": "광고 제거 활성화됨",
-    "purchaseFailed": "구매에 실패했습니다"
+    "purchaseFailed": "구매에 실패했습니다",
+    "alarmEnabled": "알람 소리"
   },
   "icons": {
     "tv": "TV시청",
@@ -124,7 +130,7 @@
     "camera-alt": "사진",
     "directions-bike": "자전거",
     "spa": "휴식",
-    "nightlight": "취침",
+    "nightlight": "낮잠",
     "clean-hands": "세수"
   },
   "presentation": {

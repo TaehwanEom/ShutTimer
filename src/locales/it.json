@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "Il timer è scaduto. Scatta una foto per chiudere.",
     "endTime": "Ora di fine",
-    "estimatedAt": "Stimato alle {{time}}"
+    "estimatedAt": "Stimato alle {{time}}",
+    "notifBodyCamera": "Timer scaduto. Scatta una foto per disattivare la sveglia.",
+    "notifBodyTap": "Timer scaduto. Premi il pulsante per disattivare la sveglia.",
+    "notifBodyShake": "Timer scaduto. Scuoti il telefono per disattivare la sveglia.",
+    "notifBodyReminder": "La sveglia sta suonando. Apri l'app per disattivarla.",
+    "notifBodyReminder2": "La sveglia suona ancora. Non riesco più a suonare a lungo"
   },
   "alarm": {
     "timerExpired": "TEMPO SCADUTO",
@@ -40,7 +45,7 @@
     "guide_music-note": "Scatta una foto a uno strumento",
     "guide_brush": "Scatta una foto a un dipinto o pennello",
     "guide_pets": "Scatta una foto al tuo animale",
-    "guide_local-cafe": "Scatta una foto al caffè o bar",
+    "guide_local-cafe": "Scatta una foto di una tazza",
     "guide_restaurant": "Scatta una foto al cibo",
     "guide_shopping-cart": "Scatta una foto a un carrello",
     "guide_work": "Scatta una foto a documenti o computer",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Scatta una foto a una bicicletta",
     "guide_spa": "Scatta una foto alla vasca",
     "guide_nightlight": "Scatta una foto al letto o cuscino",
-    "guide_clean-hands": "Scatta una foto a uno spazzolino",
+    "guide_clean-hands": "Scatta una foto del lavandino",
     "guide_book": "Scatta una foto a un libro",
     "guide_coffee": "Scatta una foto al caffè",
     "guide_food": "Scatta una foto al cibo",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Acquisto ripristinato con successo",
     "restoreNone": "Nessun acquisto da ripristinare",
     "adFreeActive": "Senza pubblicità attivo",
-    "purchaseFailed": "Acquisto fallito"
+    "purchaseFailed": "Acquisto fallito",
+    "alarmEnabled": "Suono sveglia"
   },
   "icons": {
     "tv": "TV",
@@ -124,7 +130,7 @@
     "camera-alt": "Foto",
     "directions-bike": "Ciclismo",
     "spa": "Relax",
-    "nightlight": "Dormire",
+    "nightlight": "Pisolino",
     "clean-hands": "Lavarsi"
   },
   "presentation": {

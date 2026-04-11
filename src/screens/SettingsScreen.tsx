@@ -164,6 +164,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const styles = makeStyles(colors);
 
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
+  const [alarmEnabled, setAlarmEnabled] = useState(DEFAULT_SETTINGS.alarmEnabled);
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
   const [selectedSoundId, setSelectedSoundId] = useState(DEFAULT_SOUND_ID);
   const [soundModalVisible, setSoundModalVisible] = useState(false);
@@ -176,12 +177,14 @@ export default function SettingsScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND]).then(pairs => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
       const lang = pairs[2][1];
       const sound = pairs[3][1];
+      const alarm = pairs[4][1];
       if (method) setDismissMethod(method);
+      if (alarm !== null) setAlarmEnabled(alarm === 'true');
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
       if (lang) setSelectedLang(lang);
       if (sound) setSelectedSoundId(sound);
@@ -217,6 +220,11 @@ export default function SettingsScreen({ navigation }: Props) {
     const { sound } = await Audio.Sound.createAsync(item.source, { isLooping: true });
     previewSoundRef.current = sound;
     await sound.playAsync();
+  };
+
+  const handleAlarmEnabled = (value: boolean) => {
+    setAlarmEnabled(value);
+    AsyncStorage.setItem(SETTINGS_KEY.ALARM_ENABLED, String(value));
   };
 
   const handleVibration = (value: boolean) => {
@@ -315,6 +323,19 @@ export default function SettingsScreen({ navigation }: Props) {
         {/* 알람 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.alarm')}</Text>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="notifications-active" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>{t('settings.alarmEnabled')}</Text>
+            </View>
+            <Switch
+              value={alarmEnabled}
+              onValueChange={handleAlarmEnabled}
+              trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+              thumbColor={colors.onPrimary}
+              style={{ transform: [{ scale: 0.85 }] }}
+            />
+          </View>
           <View style={styles.toggleRow}>
             <View style={styles.toggleLeft}>
               <MaterialIcons name="vibration" size={22} color={colors.onBackground} />

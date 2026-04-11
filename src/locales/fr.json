@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "Le minuteur est terminé. Prenez une photo pour arrêter.",
     "endTime": "Heure de fin",
-    "estimatedAt": "Estimé à {{time}}"
+    "estimatedAt": "Estimé à {{time}}",
+    "notifBodyCamera": "Minuteur terminé. Prenez une photo pour arrêter l'alarme.",
+    "notifBodyTap": "Minuteur terminé. Appuyez sur le bouton pour arrêter l'alarme.",
+    "notifBodyShake": "Minuteur terminé. Secouez votre téléphone pour arrêter l'alarme.",
+    "notifBodyReminder": "L'alarme sonne. Ouvrez l'app pour l'arrêter.",
+    "notifBodyReminder2": "L'alarme sonne encore. Je ne peux plus continuer longtemps"
   },
   "alarm": {
     "timerExpired": "TEMPS ÉCOULÉ",
@@ -40,7 +45,7 @@
     "guide_music-note": "Prenez une photo d'un instrument",
     "guide_brush": "Prenez une photo d'un tableau ou pinceau",
     "guide_pets": "Prenez une photo de votre animal",
-    "guide_local-cafe": "Prenez une photo de café ou d'un café",
+    "guide_local-cafe": "Prenez une photo d'une tasse",
     "guide_restaurant": "Prenez une photo de la nourriture",
     "guide_shopping-cart": "Prenez une photo d'un caddie",
     "guide_work": "Prenez une photo de documents ou d'un ordinateur",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Prenez une photo d'un vélo",
     "guide_spa": "Prenez une photo de la baignoire",
     "guide_nightlight": "Prenez une photo de votre lit ou oreiller",
-    "guide_clean-hands": "Prenez une photo d'une brosse à dents",
+    "guide_clean-hands": "Prenez une photo d'un lavabo",
     "guide_book": "Prenez une photo d'un livre",
     "guide_coffee": "Prenez une photo de café",
     "guide_food": "Prenez une photo de la nourriture",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Achat restauré avec succès",
     "restoreNone": "Aucun achat à restaurer",
     "adFreeActive": "Sans publicité actif",
-    "purchaseFailed": "Échec de l'achat"
+    "purchaseFailed": "Échec de l'achat",
+    "alarmEnabled": "Son d'alarme"
   },
   "icons": {
     "tv": "Télévision",
@@ -124,7 +130,7 @@
     "camera-alt": "Photo",
     "directions-bike": "Vélo",
     "spa": "Détente",
-    "nightlight": "Sommeil",
+    "nightlight": "Sieste",
     "clean-hands": "Brossage"
   },
   "presentation": {

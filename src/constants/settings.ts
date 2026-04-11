@@ -5,6 +5,7 @@ export const SETTINGS_KEY = {
   ALARM_SOUND: 'shutimer_alarm_sound',
   PRIMARY_COLOR: 'shutimer_primary_color',
   DIAL_TYPE: 'shutimer_dial_type',
+  ALARM_ENABLED: 'shutimer_alarm_enabled',
 } as const;
 
 export type DialType = 'classic' | 'digital';
@@ -22,6 +23,7 @@ export type DismissMethod = 'tap' | 'shake' | 'camera';
 
 export const DEFAULT_SETTINGS = {
   dismissMethod: 'camera' as DismissMethod,
+  alarmEnabled: true,
   vibrationEnabled: true,
   darkMode: false,
 };

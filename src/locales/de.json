@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "Der Timer ist abgelaufen. Machen Sie ein Foto zum Beenden.",
     "endTime": "Endzeit",
-    "estimatedAt": "Geschätzt um {{time}}"
+    "estimatedAt": "Geschätzt um {{time}}",
+    "notifBodyCamera": "Timer abgelaufen. Mach ein Foto, um den Alarm zu beenden.",
+    "notifBodyTap": "Timer abgelaufen. Drück den Button, um den Alarm zu beenden.",
+    "notifBodyShake": "Timer abgelaufen. Schüttle dein Handy, um den Alarm zu beenden.",
+    "notifBodyReminder": "Alarm klingelt. Öffne die App zum Beenden.",
+    "notifBodyReminder2": "Der Alarm klingelt immer noch. Ich kann nicht mehr viel länger klingeln"
   },
   "alarm": {
     "timerExpired": "ZEIT ABGELAUFEN",
@@ -40,7 +45,7 @@
     "guide_music-note": "Fotografiere ein Instrument",
     "guide_brush": "Fotografiere ein Gemälde oder einen Pinsel",
     "guide_pets": "Fotografiere dein Haustier",
-    "guide_local-cafe": "Fotografiere Kaffee oder ein Café",
+    "guide_local-cafe": "Fotografiere eine Tasse",
     "guide_restaurant": "Fotografiere das Essen",
     "guide_shopping-cart": "Fotografiere einen Einkaufswagen",
     "guide_work": "Fotografiere Dokumente oder einen Computer",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "Fotografiere ein Fahrrad",
     "guide_spa": "Fotografiere die Badewanne",
     "guide_nightlight": "Fotografiere dein Bett oder Kissen",
-    "guide_clean-hands": "Fotografiere eine Zahnbürste",
+    "guide_clean-hands": "Fotografiere ein Waschbecken",
     "guide_book": "Fotografiere ein Buch",
     "guide_coffee": "Fotografiere Kaffee",
     "guide_food": "Fotografiere das Essen",
@@ -99,7 +104,8 @@
     "restoreSuccess": "Kauf erfolgreich wiederhergestellt",
     "restoreNone": "Keine Käufe zum Wiederherstellen",
     "adFreeActive": "Werbefrei aktiv",
-    "purchaseFailed": "Kauf fehlgeschlagen"
+    "purchaseFailed": "Kauf fehlgeschlagen",
+    "alarmEnabled": "Alarmton"
   },
   "icons": {
     "tv": "Fernsehen",
@@ -124,7 +130,7 @@
     "camera-alt": "Foto",
     "directions-bike": "Radfahren",
     "spa": "Entspannung",
-    "nightlight": "Schlafen",
+    "nightlight": "Nickerchen",
     "clean-hands": "Zähneputzen"
   },
   "presentation": {

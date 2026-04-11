@@ -15,6 +15,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.shuttimer.app",
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
         "NSMicrophoneUsageDescription": "카메라 사용에 필요합니다.",
@@ -46,7 +49,8 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#bc000a"
+          "color": "#bc000a",
+          "sounds": ["./assets/sounds/notification_alarm.wav", "./assets/sounds/notification_ringtone.wav"]
         }
       ],
       [

@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "タイマーが終了しました。写真を撮って終了してください。",
     "endTime": "終了予定",
-    "estimatedAt": "{{time}} 終了予定"
+    "estimatedAt": "{{time}} 終了予定",
+    "notifBodyCamera": "タイマーが終了しました。写真を撮ってアラームを止めてください。",
+    "notifBodyTap": "タイマーが終了しました。ボタンを押してアラームを止めてください。",
+    "notifBodyShake": "タイマーが終了しました。スマホを振ってアラームを止めてください。",
+    "notifBodyReminder": "アラームが鳴っています。アプリを開いて停止してください。",
+    "notifBodyReminder2": "まだアラームが鳴っています。もうこれ以上鳴らすのは厳しいです"
   },
   "alarm": {
     "timerExpired": "時間終了",
@@ -40,7 +45,7 @@
     "guide_music-note": "楽器を撮影してください",
     "guide_brush": "絵や筆を撮影してください",
     "guide_pets": "ペットを撮影してください",
-    "guide_local-cafe": "コーヒーやカフェを撮影してください",
+    "guide_local-cafe": "カップを撮影してください",
     "guide_restaurant": "食べ物を撮影してください",
     "guide_shopping-cart": "ショッピングカートを撮影してください",
     "guide_work": "書類やコンピュータを撮影してください",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "自転車を撮影してください",
     "guide_spa": "浴槽を撮影してください",
     "guide_nightlight": "ベッドや枕を撮影してください",
-    "guide_clean-hands": "歯ブラシを撮影してください",
+    "guide_clean-hands": "洗面台を撮影してください",
     "guide_book": "本を撮影してください",
     "guide_coffee": "コーヒーを撮影してください",
     "guide_food": "食べ物を撮影してください",
@@ -99,7 +104,8 @@
     "restoreSuccess": "購入が復元されました",
     "restoreNone": "復元できる購入履歴がありません",
     "adFreeActive": "広告削除が有効です",
-    "purchaseFailed": "購入に失敗しました"
+    "purchaseFailed": "購入に失敗しました",
+    "alarmEnabled": "アラーム音"
   },
   "icons": {
     "tv": "テレビ",
@@ -124,7 +130,7 @@
     "camera-alt": "写真",
     "directions-bike": "自転車",
     "spa": "リラックス",
-    "nightlight": "就寝",
+    "nightlight": "昼寝",
     "clean-hands": "歯磨き"
   },
   "presentation": {

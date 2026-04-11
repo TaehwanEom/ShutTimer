@@ -13,7 +13,12 @@
     "notifTitle": "ShutTimer ⏰",
     "notifBody": "计时器已结束。请拍照以关闭。",
     "endTime": "预计结束",
-    "estimatedAt": "预计 {{time}}"
+    "estimatedAt": "预计 {{time}}",
+    "notifBodyCamera": "计时器已结束。拍照以关闭闹钟。",
+    "notifBodyTap": "计时器已结束。按下按钮以关闭闹钟。",
+    "notifBodyShake": "计时器已结束。摇动手机以关闭闹钟。",
+    "notifBodyReminder": "闹钟正在响铃。打开应用关闭闹钟。",
+    "notifBodyReminder2": "闹钟还在响。我已经快撑不住了"
   },
   "alarm": {
     "timerExpired": "时间到",
@@ -40,7 +45,7 @@
     "guide_music-note": "请拍摄乐器",
     "guide_brush": "请拍摄画作或画笔",
     "guide_pets": "请拍摄宠物",
-    "guide_local-cafe": "请拍摄咖啡或咖啡馆",
+    "guide_local-cafe": "请拍摄杯子",
     "guide_restaurant": "请拍摄食物",
     "guide_shopping-cart": "请拍摄购物车",
     "guide_work": "请拍摄文件或电脑",
@@ -50,7 +55,7 @@
     "guide_directions-bike": "请拍摄自行车",
     "guide_spa": "请拍摄浴缸",
     "guide_nightlight": "请拍摄床或枕头",
-    "guide_clean-hands": "请拍摄牙刷",
+    "guide_clean-hands": "请拍摄洗手台",
     "guide_book": "请拍摄书本",
     "guide_coffee": "请拍摄咖啡",
     "guide_food": "请拍摄食物",
@@ -99,7 +104,8 @@
     "restoreSuccess": "购买已恢复",
     "restoreNone": "没有可恢复的购买记录",
     "adFreeActive": "去广告已激活",
-    "purchaseFailed": "购买失败"
+    "purchaseFailed": "购买失败",
+    "alarmEnabled": "闹钟声音"
   },
   "icons": {
     "tv": "电视",
@@ -124,7 +130,7 @@
     "camera-alt": "拍照",
     "directions-bike": "骑行",
     "spa": "休息",
-    "nightlight": "睡眠",
+    "nightlight": "午睡",
     "clean-hands": "刷牙"
   },
   "presentation": {

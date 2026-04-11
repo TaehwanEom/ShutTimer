@@ -93,6 +93,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   missionItem: {
     alignItems: 'center',
     gap: 8,
+    width: 64,
   },
   missionIcon: {
     width: 60,
@@ -326,6 +327,8 @@ export default function HomeScreen({ navigation }: Props) {
       content: {
         title: t('running.notifTitle'),
         body: t('running.notifBody'),
+        sound: 'notification_alarm.wav',
+        interruptionLevel: 'timeSensitive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -503,6 +506,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -682,7 +686,7 @@ export default function HomeScreen({ navigation }: Props) {
           )}
         </View>
       <AdBanner />
-
+      </ScrollView>
     </SafeAreaView>
   );
 }

@@ -133,19 +133,6 @@
     "nightlight": "قيلولة",
     "clean-hands": "تنظيف"
   },
-  "presentation": {
-    "title": "عرض تقديمي",
-    "timer": "مؤقت",
-    "start": "انقر للبدء",
-    "stop": "انقر للإيقاف",
-    "recording": "تسجيل",
-    "records": "السجلات",
-    "noRecords": "لا توجد سجلات",
-    "delete": "حذف",
-    "hours": "س",
-    "minutes": "د",
-    "seconds": "ث"
-  },
   "sounds": {
     "alarm": "تنبيه",
     "ringtone": "نغمة"

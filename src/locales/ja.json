@@ -133,19 +133,6 @@
     "nightlight": "昼寝",
     "clean-hands": "歯磨き"
   },
-  "presentation": {
-    "title": "プレゼン",
-    "timer": "タイマー",
-    "start": "タップして開始",
-    "stop": "タップして停止",
-    "recording": "録音",
-    "records": "記録",
-    "noRecords": "記録がありません",
-    "delete": "削除",
-    "hours": "時",
-    "minutes": "分",
-    "seconds": "秒"
-  },
   "sounds": {
     "alarm": "アラーム",
     "ringtone": "着信音"

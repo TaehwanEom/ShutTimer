@@ -133,19 +133,6 @@
     "nightlight": "Siesta",
     "clean-hands": "Cepillado"
   },
-  "presentation": {
-    "title": "Presentación",
-    "timer": "Temporizador",
-    "start": "Toca para iniciar",
-    "stop": "Toca para detener",
-    "recording": "Grabación",
-    "records": "Registros",
-    "noRecords": "Sin registros",
-    "delete": "Eliminar",
-    "hours": "h",
-    "minutes": "m",
-    "seconds": "s"
-  },
   "sounds": {
     "alarm": "Alarma",
     "ringtone": "Tono"

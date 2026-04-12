@@ -133,19 +133,6 @@
     "nightlight": "Nickerchen",
     "clean-hands": "Zähneputzen"
   },
-  "presentation": {
-    "title": "Präsentation",
-    "timer": "Timer",
-    "start": "Tippen zum Starten",
-    "stop": "Tippen zum Stoppen",
-    "recording": "Aufnahme",
-    "records": "Aufzeichnungen",
-    "noRecords": "Keine Aufzeichnungen",
-    "delete": "Löschen",
-    "hours": "Std",
-    "minutes": "Min",
-    "seconds": "Sek"
-  },
   "sounds": {
     "alarm": "Alarm",
     "ringtone": "Klingelton"

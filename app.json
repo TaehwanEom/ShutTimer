@@ -13,7 +13,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.shuttimer.app",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
@@ -21,11 +21,58 @@
       "infoPlist": {
         "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
         "NSMicrophoneUsageDescription": "카메라 사용에 필요합니다.",
+        "NSUserTrackingUsageDescription": "관련성 있는 광고를 표시하기 위해 사용됩니다.",
         "UIBackgroundModes": [
           "remote-notification",
           "audio"
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "SKAdNetworkItems": [
+          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork" },
+          { "SKAdNetworkIdentifier": "p78axxw29g.skadnetwork" },
+          { "SKAdNetworkIdentifier": "v72qych5uu.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ludvb6z3bs.skadnetwork" },
+          { "SKAdNetworkIdentifier": "cp8zw746q7.skadnetwork" },
+          { "SKAdNetworkIdentifier": "3sh42y64q3.skadnetwork" },
+          { "SKAdNetworkIdentifier": "c6k4g5qg8m.skadnetwork" },
+          { "SKAdNetworkIdentifier": "s39g8k73mm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "3qy4746246.skadnetwork" },
+          { "SKAdNetworkIdentifier": "hs6bdukanm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "mlmmfzh3r3.skadnetwork" },
+          { "SKAdNetworkIdentifier": "v4nxqhlyqp.skadnetwork" },
+          { "SKAdNetworkIdentifier": "wzmmz9fp6w.skadnetwork" },
+          { "SKAdNetworkIdentifier": "su67r6k2v3.skadnetwork" },
+          { "SKAdNetworkIdentifier": "yclnxrl5pm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "7ug5zh24hu.skadnetwork" },
+          { "SKAdNetworkIdentifier": "gta9lk7p23.skadnetwork" },
+          { "SKAdNetworkIdentifier": "vutu7akeur.skadnetwork" },
+          { "SKAdNetworkIdentifier": "y5ghdn5j9k.skadnetwork" },
+          { "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork" },
+          { "SKAdNetworkIdentifier": "47vhws6wlr.skadnetwork" },
+          { "SKAdNetworkIdentifier": "kbd757ywx3.skadnetwork" },
+          { "SKAdNetworkIdentifier": "9t245vhmpl.skadnetwork" },
+          { "SKAdNetworkIdentifier": "a2p9lx4jpn.skadnetwork" },
+          { "SKAdNetworkIdentifier": "22mmun2rn5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4468km3ulz.skadnetwork" },
+          { "SKAdNetworkIdentifier": "2u9pt9hc89.skadnetwork" },
+          { "SKAdNetworkIdentifier": "8s468mfl3y.skadnetwork" },
+          { "SKAdNetworkIdentifier": "klf5c3l5u5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ppxm28t8ap.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ecpz2srf59.skadnetwork" },
+          { "SKAdNetworkIdentifier": "uw77j35x4d.skadnetwork" },
+          { "SKAdNetworkIdentifier": "pwa73g5rt2.skadnetwork" },
+          { "SKAdNetworkIdentifier": "578prtvx9j.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4dzt52r2t5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "tl55sbb4fm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "e5fvkxwrpn.skadnetwork" },
+          { "SKAdNetworkIdentifier": "8c4e2ghe7u.skadnetwork" },
+          { "SKAdNetworkIdentifier": "3rd42ekr43.skadnetwork" },
+          { "SKAdNetworkIdentifier": "3qcr597p9d.skadnetwork" }
+        ]
       }
     },
     "android": {
@@ -63,7 +110,8 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3043284478228309~8099871544",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "iosAppId": "ca-app-pub-3043284478228309~6811665012",
+          "userTrackingPermission": "관련성 있는 광고를 표시하기 위해 사용됩니다."
         }
       ],
       "expo-localization",

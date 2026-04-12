@@ -133,19 +133,6 @@
     "nightlight": "Sieste",
     "clean-hands": "Brossage"
   },
-  "presentation": {
-    "title": "Présentation",
-    "timer": "Minuteur",
-    "start": "Appuyez pour démarrer",
-    "stop": "Appuyez pour arrêter",
-    "recording": "Enregistrement",
-    "records": "Historique",
-    "noRecords": "Aucun enregistrement",
-    "delete": "Supprimer",
-    "hours": "h",
-    "minutes": "m",
-    "seconds": "s"
-  },
   "sounds": {
     "alarm": "Alarme",
     "ringtone": "Sonnerie"

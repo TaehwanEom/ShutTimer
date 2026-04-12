@@ -133,19 +133,6 @@
     "nightlight": "Cochilo",
     "clean-hands": "Escovar"
   },
-  "presentation": {
-    "title": "Apresentação",
-    "timer": "Temporizador",
-    "start": "Toque para iniciar",
-    "stop": "Toque para parar",
-    "recording": "Gravação",
-    "records": "Registros",
-    "noRecords": "Sem registros",
-    "delete": "Excluir",
-    "hours": "h",
-    "minutes": "m",
-    "seconds": "s"
-  },
   "sounds": {
     "alarm": "Alarme",
     "ringtone": "Toque"

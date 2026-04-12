@@ -133,19 +133,6 @@
     "nightlight": "Şekerleme",
     "clean-hands": "Diş fırçalama"
   },
-  "presentation": {
-    "title": "Sunum",
-    "timer": "Zamanlayıcı",
-    "start": "Başlatmak için dokunun",
-    "stop": "Durdurmak için dokunun",
-    "recording": "Kayıt",
-    "records": "Kayıtlar",
-    "noRecords": "Kayıt yok",
-    "delete": "Sil",
-    "hours": "sa",
-    "minutes": "dk",
-    "seconds": "sn"
-  },
   "sounds": {
     "alarm": "Alarm",
     "ringtone": "Zil Sesi"

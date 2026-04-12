@@ -133,19 +133,6 @@
     "nightlight": "Nap",
     "clean-hands": "Brushing"
   },
-  "presentation": {
-    "title": "Presentation",
-    "timer": "Timer",
-    "start": "Tap to start",
-    "stop": "Tap to stop",
-    "recording": "Recording",
-    "records": "Records",
-    "noRecords": "No records",
-    "delete": "Delete",
-    "hours": "h",
-    "minutes": "m",
-    "seconds": "s"
-  },
   "sounds": {
     "alarm": "Alarm",
     "ringtone": "Ringtone"

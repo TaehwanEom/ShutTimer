@@ -133,19 +133,6 @@
     "nightlight": "午睡",
     "clean-hands": "刷牙"
   },
-  "presentation": {
-    "title": "演讲",
-    "timer": "计时器",
-    "start": "点击开始",
-    "stop": "点击停止",
-    "recording": "录音",
-    "records": "记录",
-    "noRecords": "暂无记录",
-    "delete": "删除",
-    "hours": "时",
-    "minutes": "分",
-    "seconds": "秒"
-  },
   "sounds": {
     "alarm": "警报音",
     "ringtone": "铃声"

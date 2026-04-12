@@ -133,19 +133,6 @@
     "nightlight": "Pisolino",
     "clean-hands": "Lavarsi"
   },
-  "presentation": {
-    "title": "Presentazione",
-    "timer": "Timer",
-    "start": "Tocca per iniziare",
-    "stop": "Tocca per fermare",
-    "recording": "Registrazione",
-    "records": "Registrazioni",
-    "noRecords": "Nessuna registrazione",
-    "delete": "Elimina",
-    "hours": "h",
-    "minutes": "m",
-    "seconds": "s"
-  },
   "sounds": {
     "alarm": "Allarme",
     "ringtone": "Suoneria"

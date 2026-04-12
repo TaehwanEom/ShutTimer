@@ -133,19 +133,6 @@
     "nightlight": "낮잠",
     "clean-hands": "세수"
   },
-  "presentation": {
-    "title": "발표",
-    "timer": "타이머",
-    "start": "터치하여 시작",
-    "stop": "터치하여 정지",
-    "recording": "녹음",
-    "records": "기록",
-    "noRecords": "기록이 없습니다",
-    "delete": "삭제",
-    "hours": "시",
-    "minutes": "분",
-    "seconds": "초"
-  },
   "sounds": {
     "alarm": "경고음",
     "ringtone": "벨소리"

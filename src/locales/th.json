@@ -133,19 +133,6 @@
     "nightlight": "งีบหลับ",
     "clean-hands": "แปรงฟัน"
   },
-  "presentation": {
-    "title": "การนำเสนอ",
-    "timer": "ตั้งเวลา",
-    "start": "แตะเพื่อเริ่ม",
-    "stop": "แตะเพื่อหยุด",
-    "recording": "บันทึกเสียง",
-    "records": "บันทึก",
-    "noRecords": "ไม่มีบันทึก",
-    "delete": "ลบ",
-    "hours": "ชม.",
-    "minutes": "น.",
-    "seconds": "วิ."
-  },
   "sounds": {
     "alarm": "เสียงเตือน",
     "ringtone": "เสียงเรียกเข้า"

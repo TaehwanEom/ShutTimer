@@ -9,6 +9,7 @@ import {
   Animated,
   Easing,
   AppState,
+  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
@@ -30,7 +31,9 @@ import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 import { usePurchase } from '../context/PurchaseContext';
 
-const INTERSTITIAL_UNIT_ID = 'ca-app-pub-3940256099942544/1033173712';
+const INTERSTITIAL_UNIT_ID = Platform.OS === 'ios'
+  ? 'ca-app-pub-3043284478228309/6510839159'
+  : 'ca-app-pub-3043284478228309/6667370376';
 const interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
   requestNonPersonalizedAdsOnly: true,
 });
@@ -143,12 +146,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     });
+    const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
+      console.warn('Interstitial ad failed:', error);
+    });
 
     interstitial.load();
 
     return () => {
       unsubLoaded();
       unsubClosed();
+      unsubError();
     };
   }, [navigation, isAdFree]);
 

@@ -133,19 +133,6 @@
     "nightlight": "Tidur siang",
     "clean-hands": "Sikat Gigi"
   },
-  "presentation": {
-    "title": "Presentasi",
-    "timer": "Timer",
-    "start": "Ketuk untuk mulai",
-    "stop": "Ketuk untuk berhenti",
-    "recording": "Rekaman",
-    "records": "Riwayat",
-    "noRecords": "Tidak ada riwayat",
-    "delete": "Hapus",
-    "hours": "j",
-    "minutes": "m",
-    "seconds": "d"
-  },
   "sounds": {
     "alarm": "Alarm",
     "ringtone": "Nada Dering"

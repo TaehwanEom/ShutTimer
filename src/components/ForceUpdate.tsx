@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 const VERSION_URL = 'https://taehwaneom.github.io/shuttimer-config/version.json';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.shuttimer.app';
-const APP_STORE_URL = 'https://apps.apple.com/app/shuttimer/id000000000'; // TODO: 실제 App Store ID로 교체
+const APP_STORE_URL = 'https://apps.apple.com/app/shuttimer/id6761991860';
 
 function compareVersions(current: string, required: string): boolean {
   const c = current.split('.').map(Number);

@@ -17,6 +17,9 @@ export const COLOR_PRESETS = [
   { id: 'green', color: '#00796b' },
   { id: 'teal', color: '#00838f' },
   { id: 'purple', color: '#4a148c' },
+  { id: 'lavender', color: '#9b8ec4' },
+  { id: 'coral', color: '#e08888' },
+  { id: 'mint', color: '#7bc4a8' },
 ] as const;
 
 export type DismissMethod = 'tap' | 'shake' | 'camera';

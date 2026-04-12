@@ -6,6 +6,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
+import mobileAds from 'react-native-google-mobile-ads';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -23,9 +24,6 @@ import AlarmScreen from './src/screens/AlarmScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import EditMissionsScreen from './src/screens/EditMissionsScreen';
 import AddTimerScreen from './src/screens/AddTimerScreen';
-import PresentationScreen from './src/screens/PresentationScreen';
-import PresentationRunningScreen from './src/screens/PresentationRunningScreen';
-import PresentationFullScreen from './src/screens/PresentationFullScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
@@ -44,9 +42,6 @@ export type RootStackParamList = {
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
   History: undefined;
   Notice: undefined;
-  Presentation: undefined;
-  PresentationRunning: { minutes: number; seconds: number; recordingEnabled: boolean };
-  PresentationFull: { minutes: number; seconds: number; remainingSeconds: number; isRunning: boolean; recordingEnabled: boolean };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -54,6 +49,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function AppNavigator() {
   const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+
+  // AdMob SDK 초기화 (마운트 1회)
+  useEffect(() => {
+    mobileAds().initialize().catch((e) => console.warn('AdMob init failed:', e));
+  }, []);
 
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)
   useEffect(() => {
@@ -97,9 +97,6 @@ function AppNavigator() {
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
-        <Stack.Screen name="Presentation" component={PresentationScreen} options={{ contentStyle: { backgroundColor: '#000' } }} />
-        <Stack.Screen name="PresentationRunning" component={PresentationRunningScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
-        <Stack.Screen name="PresentationFull" component={PresentationFullScreen} options={{ gestureEnabled: false, contentStyle: { backgroundColor: '#000' } }} />
       </Stack.Navigator>
     </NavigationContainer>
     </>

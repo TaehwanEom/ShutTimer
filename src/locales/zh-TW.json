@@ -133,19 +133,6 @@
     "nightlight": "午睡",
     "clean-hands": "刷牙"
   },
-  "presentation": {
-    "title": "演講",
-    "timer": "計時器",
-    "start": "點擊開始",
-    "stop": "點擊停止",
-    "recording": "錄音",
-    "records": "記錄",
-    "noRecords": "暫無記錄",
-    "delete": "刪除",
-    "hours": "時",
-    "minutes": "分",
-    "seconds": "秒"
-  },
   "sounds": {
     "alarm": "警報音",
     "ringtone": "鈴聲"

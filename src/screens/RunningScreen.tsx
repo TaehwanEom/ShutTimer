@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   AppState,
+  Platform,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -180,12 +181,19 @@ export default function RunningScreen({ navigation, route }: Props) {
     const alarmRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmRaw !== 'false';
     const notifSound = alarmEnabled ? await getNotifSound() : false;
+    // Android 채널 분기 (iOS에선 content에 포함돼도 무시됨)
+    let channelId = 'alarm-silent';
+    if (alarmEnabled) {
+      const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
+      channelId = soundId.startsWith('ringtone_') ? 'alarm-ringtone' : 'alarm-sound';
+    }
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
         body,
         sound: notifSound,
         interruptionLevel: 'timeSensitive',
+        ...(Platform.OS === 'android' ? { channelId } : {}),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

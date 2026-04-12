@@ -5,6 +5,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +27,28 @@ Notifications.setNotificationHandler({
     };
   },
 });
+
+// Android 알림 채널 등록 (iOS는 무영향)
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('alarm-sound', {
+    name: '경보음 알람',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'notification_alarm.wav',
+    vibrationPattern: [0, 500, 300, 500],
+  }).catch(() => {});
+  Notifications.setNotificationChannelAsync('alarm-ringtone', {
+    name: '벨소리 알람',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'notification_ringtone.wav',
+    vibrationPattern: [0, 500, 300, 500],
+  }).catch(() => {});
+  Notifications.setNotificationChannelAsync('alarm-silent', {
+    name: '무음 알람',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: null,
+    vibrationPattern: [0, 500, 300, 500],
+  }).catch(() => {});
+}
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';
 import RunningScreen from './src/screens/RunningScreen';

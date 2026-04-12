@@ -126,7 +126,9 @@ export default function AlarmScreen({ navigation }: Props) {
   const adLoadedRef = useRef(false);
   const dismissedRef = useRef(false);
   const resultEnteredRef = useRef(false);
+  const pendingResultRef = useRef<'success' | 'fail' | null>(null);
   const autoResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
   const handleConfirmRef = useRef<() => void>(() => {});
 
@@ -147,26 +149,43 @@ export default function AlarmScreen({ navigation }: Props) {
       clearTimeout(autoResultTimeoutRef.current);
       autoResultTimeoutRef.current = null;
     }
-    if (!isAdFree && adLoadedRef.current) {
-      interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
-    } else {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    }
-  }, [navigation, isAdFree]);
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }, [navigation]);
 
   useEffect(() => {
     handleConfirmRef.current = handleConfirm;
   }, [handleConfirm]);
 
-  const enterResult = useCallback((result: 'success' | 'fail') => {
-    if (resultEnteredRef.current) return;
-    resultEnteredRef.current = true;
-    stopAudioAndVibration();
+  const showResultScreen = useCallback((result: 'success' | 'fail') => {
     setResultState(result);
     autoResultTimeoutRef.current = setTimeout(() => {
       handleConfirmRef.current();
     }, RESULT_AUTO_CONFIRM_MS);
-  }, [stopAudioAndVibration]);
+  }, []);
+
+  const enterResult = useCallback((result: 'success' | 'fail') => {
+    if (resultEnteredRef.current) return;
+    resultEnteredRef.current = true;
+    // AUTO_DISMISS_MS 타이머 즉시 해제 (광고 재생 중 발사 방지)
+    if (autoDismissTimeoutRef.current) {
+      clearTimeout(autoDismissTimeoutRef.current);
+      autoDismissTimeoutRef.current = null;
+    }
+    stopAudioAndVibration();
+    pendingResultRef.current = result;
+    // 광고 로드됐고 비구매자면 즉시 광고 → CLOSED이 결과화면 전환
+    if (!isAdFree && adLoadedRef.current) {
+      interstitial.show().catch(() => {
+        // show 실패 시 결과화면 바로
+        pendingResultRef.current = null;
+        showResultScreen(result);
+      });
+    } else {
+      // 구매자 또는 광고 미로드 → 결과화면 바로
+      pendingResultRef.current = null;
+      showResultScreen(result);
+    }
+  }, [stopAudioAndVibration, isAdFree, showResultScreen]);
 
   const autoDismissNoResult = useCallback(() => {
     if (dismissedRef.current) return;
@@ -180,6 +199,7 @@ export default function AlarmScreen({ navigation }: Props) {
     adLoadedRef.current = false;
     dismissedRef.current = false;
     resultEnteredRef.current = false;
+    pendingResultRef.current = null;
 
     if (isAdFree) return;
 
@@ -187,7 +207,15 @@ export default function AlarmScreen({ navigation }: Props) {
       adLoadedRef.current = true;
     });
     const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      // enterResult 경로: 광고 본 후 결과화면 전환
+      if (pendingResultRef.current) {
+        const pending = pendingResultRef.current;
+        pendingResultRef.current = null;
+        showResultScreen(pending);
+      } else {
+        // 방어: pendingResultRef 없으면 홈 (비정상 경로)
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
     });
     const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
       console.warn('Interstitial ad failed:', error?.code, error?.message, error);
@@ -200,13 +228,18 @@ export default function AlarmScreen({ navigation }: Props) {
       unsubClosed();
       unsubError();
     };
-  }, [navigation, isAdFree]);
+  }, [navigation, isAdFree, showResultScreen]);
 
   // 자동 종료 타이머 (결과 화면 미진입 시에만)
   useEffect(() => {
     if (!settingsLoaded || resultState !== 'idle') return;
-    const timeout = setTimeout(autoDismissNoResult, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
-    return () => clearTimeout(timeout);
+    autoDismissTimeoutRef.current = setTimeout(autoDismissNoResult, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
+    return () => {
+      if (autoDismissTimeoutRef.current) {
+        clearTimeout(autoDismissTimeoutRef.current);
+        autoDismissTimeoutRef.current = null;
+      }
+    };
   }, [dismissMethod, settingsLoaded, autoDismissNoResult, resultState]);
 
   // 컴포넌트 언마운트 시 30초 타이머 정리

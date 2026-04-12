@@ -81,11 +81,9 @@
       "permissions": [
         "CAMERA",
         "VIBRATE",
-        "RECORD_AUDIO",
         "RECEIVE_BOOT_COMPLETED",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
@@ -101,7 +99,8 @@
         "expo-camera",
         {
           "cameraPermission": "사진을 찍어 타이머를 종료합니다.",
-          "microphonePermission": false
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [

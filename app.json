@@ -20,10 +20,8 @@
       },
       "infoPlist": {
         "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
-        "NSMicrophoneUsageDescription": "카메라 사용에 필요합니다.",
         "NSUserTrackingUsageDescription": "관련성 있는 광고를 표시하기 위해 사용됩니다.",
         "UIBackgroundModes": [
-          "remote-notification",
           "audio"
         ],
         "ITSAppUsesNonExemptEncryption": false,
@@ -103,7 +101,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "사진을 찍어 타이머를 종료합니다."
+          "cameraPermission": "사진을 찍어 타이머를 종료합니다.",
+          "microphonePermission": false
         }
       ],
       [
@@ -123,8 +122,7 @@
             "deploymentTarget": "16.0"
           }
         }
-      ],
-      "expo-build-properties"
+      ]
     ],
     "web": {
       "favicon": "./assets/favicon.png"

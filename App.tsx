@@ -6,7 +6,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
-import mobileAds from 'react-native-google-mobile-ads';
+import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -50,9 +50,18 @@ function AppNavigator() {
   const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
-  // AdMob SDK 초기화 (마운트 1회)
+  // AdMob SDK 초기화 (마운트 1회) + 테스트 디바이스 등록 (시뮬레이터)
   useEffect(() => {
-    mobileAds().initialize().catch((e) => console.warn('AdMob init failed:', e));
+    mobileAds()
+      .setRequestConfiguration({
+        maxAdContentRating: MaxAdContentRating.G,
+        testDeviceIdentifiers: ['EMULATOR'],
+      })
+      .then(() => mobileAds().initialize())
+      .then((adapterStatuses) => {
+        if (__DEV__) console.log('AdMob initialized. Adapter statuses:', adapterStatuses);
+      })
+      .catch((e) => console.warn('AdMob init failed:', e));
   }, []);
 
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)

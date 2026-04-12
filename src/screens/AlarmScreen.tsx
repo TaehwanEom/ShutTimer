@@ -27,13 +27,14 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
-import { InterstitialAd, AdEventType } from 'react-native-google-mobile-ads';
+import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 import { usePurchase } from '../context/PurchaseContext';
 
-const INTERSTITIAL_UNIT_ID = Platform.OS === 'ios'
+const PROD_INTERSTITIAL_UNIT_ID = Platform.OS === 'ios'
   ? 'ca-app-pub-3043284478228309/6510839159'
   : 'ca-app-pub-3043284478228309/6667370376';
+const INTERSTITIAL_UNIT_ID = __DEV__ ? TestIds.INTERSTITIAL : PROD_INTERSTITIAL_UNIT_ID;
 const interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
   requestNonPersonalizedAdsOnly: true,
 });
@@ -147,7 +148,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     });
     const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
-      console.warn('Interstitial ad failed:', error);
+      console.warn('Interstitial ad failed:', error?.code, error?.message, error);
     });
 
     interstitial.load();
@@ -173,13 +174,17 @@ export default function AlarmScreen({ navigation, route }: Props) {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, SETTINGS_KEY.ALARM_SOUND]).then(pairs => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
       const soundId = pairs[2][1] ?? DEFAULT_SOUND_ID;
+      const alarmRaw = pairs[3][1];
+      const alarmEnabled = alarmRaw !== 'false';
       if (method) setDismissMethod(method);
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
       setSettingsLoaded(true);
+
+      if (!alarmEnabled) return;
 
       // 알람 사운드 재생
       const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];

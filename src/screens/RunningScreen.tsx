@@ -169,14 +169,22 @@ export default function RunningScreen({ navigation, route }: Props) {
     return t('running.notifBodyCamera');
   };
 
+  const getNotifSound = async (): Promise<string> => {
+    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
+    return soundId.startsWith('ringtone_') ? 'notification_ringtone.wav' : 'notification_alarm.wav';
+  };
+
   const scheduleAlarms = async (seconds: number) => {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const body = await getNotifBody();
+    const alarmRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+    const alarmEnabled = alarmRaw !== 'false';
+    const notifSound = alarmEnabled ? await getNotifSound() : undefined;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
         body,
-        sound: 'notification_alarm.wav',
+        sound: notifSound,
         interruptionLevel: 'timeSensitive',
       },
       trigger: {

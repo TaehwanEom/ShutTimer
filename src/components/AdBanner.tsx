@@ -1,11 +1,13 @@
 import React from 'react';
 import { View, Platform } from 'react-native';
 import { usePurchase } from '../context/PurchaseContext';
-import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
-const BANNER_UNIT_ID = Platform.OS === 'ios'
+const PROD_BANNER_UNIT_ID = Platform.OS === 'ios'
   ? 'ca-app-pub-3043284478228309/4187716112'
   : 'ca-app-pub-3043284478228309/6158631734';
+
+const BANNER_UNIT_ID = __DEV__ ? TestIds.ADAPTIVE_BANNER : PROD_BANNER_UNIT_ID;
 
 export default function AdBanner() {
   const { isAdFree, loading } = usePurchase();
@@ -17,7 +19,7 @@ export default function AdBanner() {
         unitId={BANNER_UNIT_ID}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-        onAdFailedToLoad={(error) => console.warn('Banner ad failed:', error)}
+        onAdFailedToLoad={(error: any) => console.warn('Banner ad failed:', error?.code, error?.message, error)}
       />
     </View>
   );

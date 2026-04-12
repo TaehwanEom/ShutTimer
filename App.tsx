@@ -7,15 +7,24 @@ ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import mobileAds, { MaxAdContentRating } from 'react-native-google-mobile-ads';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SETTINGS_KEY } from './src/constants/settings';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async () => {
+    let shouldPlaySound = true;
+    try {
+      const raw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+      shouldPlaySound = raw !== 'false';
+    } catch {}
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    };
+  },
 });
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';

@@ -179,7 +179,7 @@ export default function RunningScreen({ navigation, route }: Props) {
     const body = await getNotifBody();
     const alarmRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmRaw !== 'false';
-    const notifSound = alarmEnabled ? await getNotifSound() : undefined;
+    const notifSound = alarmEnabled ? await getNotifSound() : false;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),

@@ -43,6 +43,8 @@ type Props = {
   route: RouteProp<RootStackParamList, 'Alarm'>;
 };
 
+type ResultState = 'idle' | 'success' | 'fail';
+
 const MISSION_LABELS: Record<string, string[]> = {
   'tv':               ['Television', 'Television set'],
   'bathtub':          ['Bathtub', 'Shower'],
@@ -87,8 +89,13 @@ const AUTO_DISMISS_MS: Record<string, number> = {
   tap: 3 * 60 * 1000,
   shake: 3 * 60 * 1000,
 };
+const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
+const RESULT_BG = {
+  success: '#2e7d32',
+  fail: '#c62828',
+};
 
-export default function AlarmScreen({ navigation, route }: Props) {
+export default function AlarmScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const { isAdFree } = usePurchase();
   const [flash, setFlash] = useState<'off' | 'on'>('off');
@@ -110,6 +117,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const [failCount, setFailCount] = useState(0);
   const [failMessage, setFailMessage] = useState(false);
+  const [resultState, setResultState] = useState<ResultState>('idle');
 
   const hasCameraPermission = permission?.granted === true;
   const shakeCountRef = useRef(0);
@@ -117,15 +125,28 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
   const adLoadedRef = useRef(false);
   const dismissedRef = useRef(false);
+  const resultEnteredRef = useRef(false);
+  const autoResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accelSubRef = useRef<{ remove: () => void } | null>(null);
+  const handleConfirmRef = useRef<() => void>(() => {});
 
-  const dismiss = useCallback(() => {
-    if (dismissedRef.current) return;
-    dismissedRef.current = true;
+  const stopAudioAndVibration = useCallback(() => {
     Vibration.cancel();
     Notifications.cancelAllScheduledNotificationsAsync();
     soundRef.current?.stopAsync().catch(() => {});
     soundRef.current?.unloadAsync().catch(() => {});
     soundRef.current = null;
+    accelSubRef.current?.remove();
+    accelSubRef.current = null;
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    if (autoResultTimeoutRef.current) {
+      clearTimeout(autoResultTimeoutRef.current);
+      autoResultTimeoutRef.current = null;
+    }
     if (!isAdFree && adLoadedRef.current) {
       interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
     } else {
@@ -133,12 +154,34 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }
   }, [navigation, isAdFree]);
 
+  useEffect(() => {
+    handleConfirmRef.current = handleConfirm;
+  }, [handleConfirm]);
+
+  const enterResult = useCallback((result: 'success' | 'fail') => {
+    if (resultEnteredRef.current) return;
+    resultEnteredRef.current = true;
+    stopAudioAndVibration();
+    setResultState(result);
+    autoResultTimeoutRef.current = setTimeout(() => {
+      handleConfirmRef.current();
+    }, RESULT_AUTO_CONFIRM_MS);
+  }, [stopAudioAndVibration]);
+
+  const autoDismissNoResult = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    stopAudioAndVibration();
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }, [navigation, stopAudioAndVibration]);
+
   // 전면 광고 로드
   useEffect(() => {
     adLoadedRef.current = false;
     dismissedRef.current = false;
+    resultEnteredRef.current = false;
 
-    if (isAdFree) return; // 구매 시 전면 광고 로드 안 함
+    if (isAdFree) return;
 
     const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
       adLoadedRef.current = true;
@@ -159,12 +202,22 @@ export default function AlarmScreen({ navigation, route }: Props) {
     };
   }, [navigation, isAdFree]);
 
-  // 자동 종료 타이머
+  // 자동 종료 타이머 (결과 화면 미진입 시에만)
   useEffect(() => {
-    if (!settingsLoaded) return;
-    const timeout = setTimeout(dismiss, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
+    if (!settingsLoaded || resultState !== 'idle') return;
+    const timeout = setTimeout(autoDismissNoResult, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
     return () => clearTimeout(timeout);
-  }, [dismissMethod, settingsLoaded, dismiss]);
+  }, [dismissMethod, settingsLoaded, autoDismissNoResult, resultState]);
+
+  // 컴포넌트 언마운트 시 30초 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (autoResultTimeoutRef.current) {
+        clearTimeout(autoResultTimeoutRef.current);
+        autoResultTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // portrait 잠금 + 예약 알림 전부 취소 (안전장치)
   useEffect(() => {
@@ -189,6 +242,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
       const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
       Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true }).then(() => {
         Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
+          // 로드 완료 시점에 이미 dismiss/결과 진입됐으면 재생하지 않고 언로드
+          if (resultEnteredRef.current || dismissedRef.current) {
+            sound.unloadAsync().catch(() => {});
+            return;
+          }
           soundRef.current = sound;
           sound.playAsync();
         }).catch(() => {});
@@ -201,9 +259,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     };
   }, []);
 
-  // 진동 + 백그라운드 복귀 시 재시작
+  // 진동 + 백그라운드 복귀 시 재시작 (결과 화면에선 중단)
   useEffect(() => {
-    if (!vibrationEnabled) return;
+    if (!vibrationEnabled || resultState !== 'idle') return;
     Vibration.vibrate(VIBRATION_PATTERN, true);
 
     const sub = AppState.addEventListener('change', (state) => {
@@ -216,11 +274,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
       Vibration.cancel();
       sub.remove();
     };
-  }, [vibrationEnabled]);
+  }, [vibrationEnabled, resultState]);
 
-  // 흔들기 감지
+  // 흔들기 감지 (결과 화면 진입 시 자동 해제)
   useEffect(() => {
-    if (dismissMethod !== 'shake') return;
+    if (dismissMethod !== 'shake' || resultState !== 'idle') return;
 
     shakeCountRef.current = 0;
     lastShakeTimeRef.current = 0;
@@ -233,12 +291,17 @@ export default function AlarmScreen({ navigation, route }: Props) {
         shakeCountRef.current += 1;
         if (shakeCountRef.current >= SHAKE_COUNT_REQUIRED) {
           sub.remove();
-          dismiss();
+          accelSubRef.current = null;
+          enterResult('success');
         }
       }
     });
-    return () => sub.remove();
-  }, [dismissMethod]);
+    accelSubRef.current = sub;
+    return () => {
+      sub.remove();
+      accelSubRef.current = null;
+    };
+  }, [dismissMethod, resultState, enterResult]);
 
   // Shake 애니메이션 — 훅은 항상 최상단
   const pulse = useRef(new Animated.Value(1)).current;
@@ -251,7 +314,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const tapFingerScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (dismissMethod !== 'shake') return;
+    if (dismissMethod !== 'shake' || resultState !== 'idle') return;
 
     const pulseAnim = Animated.loop(
       Animated.sequence([
@@ -291,10 +354,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
       ripple2.setValue(0);
       rotate.setValue(0);
     };
-  }, [dismissMethod]);
+  }, [dismissMethod, resultState]);
 
   useEffect(() => {
-    if (dismissMethod !== 'tap') return;
+    if (dismissMethod !== 'tap' || resultState !== 'idle') return;
 
     const fingerAnim = Animated.loop(
       Animated.sequence([
@@ -321,7 +384,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       fingerAnim.stop(); rippleAnim1.stop(); rippleAnim2.stop();
       tapFingerScale.setValue(1); tapRipple1.setValue(0); tapRipple2.setValue(0);
     };
-  }, [dismissMethod]);
+  }, [dismissMethod, resultState]);
 
   const rippleStyle = (anim: Animated.Value) => ({
     position: 'absolute' as const,
@@ -340,7 +403,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (!photo?.uri) return;
 
       if (activeLabels.length === 0 || !ImageLabeling) {
-        dismiss();
+        enterResult('success');
         return;
       }
 
@@ -352,12 +415,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
       );
 
       if (matched) {
-        dismiss();
+        enterResult('success');
       } else {
         const newCount = failCount + 1;
         setFailCount(newCount);
         if (newCount >= 3) {
-          dismiss();
+          enterResult('fail');
           return;
         }
         Vibration.vibrate(200);
@@ -365,13 +428,43 @@ export default function AlarmScreen({ navigation, route }: Props) {
         setTimeout(() => setFailMessage(false), 1500);
       }
     } catch {
-      dismiss();
+      enterResult('success');
     }
   };
 
   // 설정 로드 전 빈 화면
   if (!settingsLoaded) {
     return <SafeAreaView style={styles.container} />;
+  }
+
+  // 결과 화면 (최우선 렌더)
+  if (resultState !== 'idle') {
+    const bgColor = RESULT_BG[resultState];
+    const iconName = resultState === 'success' ? 'check-circle' : 'cancel';
+    const titleKey = resultState === 'success' ? 'alarm.resultSuccess' : 'alarm.resultFail';
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>ShutTimer</Text>
+          </View>
+        </View>
+
+        <View style={styles.centerSection}>
+          <View style={styles.resultIconWrapper}>
+            <MaterialIcons name={iconName} size={140} color={colors.onPrimary} />
+          </View>
+          <Text style={[styles.resultTitle]}>{t(titleKey)}</Text>
+        </View>
+
+        <View style={styles.tapSection}>
+          <TouchableOpacity style={styles.tapButton} onPress={handleConfirm} activeOpacity={0.8}>
+            <Text style={[styles.tapButtonText, { color: bgColor }]}>{t('alarm.resultConfirm')}</Text>
+          </TouchableOpacity>
+        </View>
+        <AdBanner />
+      </SafeAreaView>
+    );
   }
 
   // Camera 모드 레이아웃
@@ -490,7 +583,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.tapSection}>
-          <TouchableOpacity style={styles.tapButton} onPress={dismiss} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.tapButton} onPress={() => enterResult('success')} activeOpacity={0.8}>
             <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
           </TouchableOpacity>
         </View>
@@ -699,6 +792,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
     marginBottom: 12,
+    paddingHorizontal: 24,
+  },
+  // 결과 화면
+  resultIconWrapper: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+  },
+  resultTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.onPrimary,
+    textAlign: 'center',
+    letterSpacing: -0.3,
     paddingHorizontal: 24,
   },
 });

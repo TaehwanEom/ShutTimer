@@ -20,7 +20,6 @@
       },
       "infoPlist": {
         "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
-        "NSUserTrackingUsageDescription": "관련성 있는 광고를 표시하기 위해 사용됩니다.",
         "UIBackgroundModes": [
           "audio"
         ],
@@ -109,8 +108,7 @@
         "react-native-google-mobile-ads",
         {
           "androidAppId": "ca-app-pub-3043284478228309~8099871544",
-          "iosAppId": "ca-app-pub-3043284478228309~6811665012",
-          "userTrackingPermission": "관련성 있는 광고를 표시하기 위해 사용됩니다."
+          "iosAppId": "ca-app-pub-3043284478228309~6811665012"
         }
       ],
       "expo-localization",

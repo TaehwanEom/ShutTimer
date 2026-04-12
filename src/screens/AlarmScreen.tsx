@@ -9,7 +9,6 @@ import {
   Animated,
   Easing,
   AppState,
-  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
@@ -31,10 +30,10 @@ import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile
 import AdBanner from '../components/AdBanner';
 import { usePurchase } from '../context/PurchaseContext';
 
-const PROD_INTERSTITIAL_UNIT_ID = Platform.OS === 'ios'
-  ? 'ca-app-pub-3043284478228309/6510839159'
-  : 'ca-app-pub-3043284478228309/6667370376';
-const INTERSTITIAL_UNIT_ID = __DEV__ ? TestIds.INTERSTITIAL : PROD_INTERSTITIAL_UNIT_ID;
+// PROD IDs kept for restoration after verification build
+// iOS: ca-app-pub-3043284478228309/6510839159
+// Android: ca-app-pub-3043284478228309/6667370376
+const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
 const interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
   requestNonPersonalizedAdsOnly: true,
 });

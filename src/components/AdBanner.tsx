@@ -1,13 +1,12 @@
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View } from 'react-native';
 import { usePurchase } from '../context/PurchaseContext';
 import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
-const PROD_BANNER_UNIT_ID = Platform.OS === 'ios'
-  ? 'ca-app-pub-3043284478228309/4187716112'
-  : 'ca-app-pub-3043284478228309/6158631734';
-
-const BANNER_UNIT_ID = __DEV__ ? TestIds.ADAPTIVE_BANNER : PROD_BANNER_UNIT_ID;
+// PROD IDs kept for restoration after verification build
+// iOS: ca-app-pub-3043284478228309/4187716112
+// Android: ca-app-pub-3043284478228309/6158631734
+const BANNER_UNIT_ID = TestIds.ADAPTIVE_BANNER;
 
 export default function AdBanner() {
   const { isAdFree, loading } = usePurchase();

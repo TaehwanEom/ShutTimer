@@ -34,10 +34,11 @@ export function PurchaseProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         return;
       }
+      const timeout = new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 5000));
       try {
         await Purchases.configure({ apiKey: key });
-        const info = await Purchases.getCustomerInfo();
-        checkEntitlement(info);
+        const result = await Promise.race([Purchases.getCustomerInfo(), timeout]);
+        if (result !== 'timeout') checkEntitlement(result as CustomerInfo);
       } catch {}
       setLoading(false);
     };

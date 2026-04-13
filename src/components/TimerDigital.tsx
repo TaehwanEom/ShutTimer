@@ -135,7 +135,11 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
   useEffect(() => {
     if (!isWarning) {
       blinkAnim.stopAnimation();
-      blinkAnim.setValue(1);
+      Animated.timing(blinkAnim, {
+        toValue: 1,
+        duration: 0,
+        useNativeDriver: true,
+      }).start();
       return;
     }
     const anim = Animated.loop(
@@ -220,15 +224,8 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
             {/* 아웃라인 + 게이지 */}
             {screenSize.w > 0 && (
               <Svg width={screenSize.w} height={screenSize.h} style={{ position: 'absolute', top: 0, left: 0 }}>
-                <Defs>
-                  <RadialGradient id="outlineGrad" cx="50%" cy="50%" r="60%">
-                    <Stop offset="0%" stopColor="#888888" stopOpacity={1} />
-                    <Stop offset="70%" stopColor="#CCCCCC" stopOpacity={0.4} />
-                    <Stop offset="100%" stopColor="#F5F5F5" stopOpacity={0} />
-                  </RadialGradient>
-                </Defs>
                 {/* 배경 아웃라인 */}
-                <Rect x={9} y={9} width={screenSize.w - 18} height={screenSize.h - 18} rx={20} ry={20} fill="none" stroke="url(#outlineGrad)" strokeWidth={18} />
+                <Rect x={9} y={9} width={screenSize.w - 18} height={screenSize.h - 18} rx={20} ry={20} fill="none" stroke={colors.outlineVariant} strokeWidth={1} />
                 {/* 게이지 — 상단 중앙 시작, 시계방향 */}
                 {(() => {
                   const r = 20;

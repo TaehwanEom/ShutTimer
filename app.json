@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shuttimer.app",
+      "buildNumber": "10",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },
@@ -102,13 +103,6 @@
         {
           "cameraPermission": "사진을 찍어 타이머를 종료합니다.",
           "microphonePermission": false
-        }
-      ],
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-3043284478228309~8099871544",
-          "iosAppId": "ca-app-pub-3043284478228309~6811665012"
         }
       ],
       "expo-localization",

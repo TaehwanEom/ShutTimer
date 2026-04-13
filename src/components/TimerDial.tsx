@@ -23,13 +23,13 @@ type Props = {
 const SIZE = 330;
 const cx = 165;
 const cy = 165;
-const LABEL_RADIUS = 164;
-const SECTOR_RADIUS = 141;
-const CENTER_RADIUS = 18;
-const TICK_OUTER_MAJOR = 134;
-const TICK_INNER_MAJOR = 100;
-const TICK_OUTER_MINOR = 134;
-const TICK_INNER_MINOR = 112;
+const LABEL_RADIUS = 176;
+const SECTOR_RADIUS = 161; // 155 × 1.04
+const CENTER_RADIUS = 21; // 20 × 1.04
+const TICK_OUTER_MAJOR = 161; // SECTOR_RADIUS와 일치
+const TICK_INNER_MAJOR = 114; // 110 × 1.04
+const TICK_OUTER_MINOR = 161; // SECTOR_RADIUS와 일치
+const TICK_INNER_MINOR = 128; // 123 × 1.04
 
 const LABELS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -58,7 +58,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   label: {
     position: 'absolute',
-    fontSize: 19,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.secondary,
     width: 36,

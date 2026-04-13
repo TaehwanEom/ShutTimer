@@ -26,17 +26,28 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
-import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
+import Constants from 'expo-constants';
+// import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 import { usePurchase } from '../context/PurchaseContext';
+
+const isExpoGo = (Constants as any).appOwnership === 'expo';
 
 // PROD IDs kept for restoration after verification build
 // iOS: ca-app-pub-3043284478228309/6510839159
 // Android: ca-app-pub-3043284478228309/6667370376
-const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
-const interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
-  requestNonPersonalizedAdsOnly: true,
-});
+let interstitial: any = null;
+if (!isExpoGo) {
+  try {
+    const { InterstitialAd, TestIds } = require('react-native-google-mobile-ads');
+    const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
+    interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
+      requestNonPersonalizedAdsOnly: true,
+    });
+  } catch (e) {
+    console.warn('InterstitialAd failed to initialize:', e);
+  }
+}
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Alarm'>;
@@ -181,26 +192,32 @@ export default function AlarmScreen({ navigation }: Props) {
     dismissedRef.current = false;
     resultEnteredRef.current = false;
 
-    if (isAdFree) return;
+    if (isAdFree || isExpoGo || !interstitial) return;
 
-    const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
-      adLoadedRef.current = true;
-    });
-    const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    });
-    const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
-      console.warn('Interstitial ad failed:', error?.code, error?.message, error);
-    });
+    try {
+      const { AdEventType } = require('react-native-google-mobile-ads');
 
-    interstitial.load();
+      const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
+        adLoadedRef.current = true;
+      });
+      const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      });
+      const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
+        console.warn('Interstitial ad failed:', error?.code, error?.message, error);
+      });
 
-    return () => {
-      unsubLoaded();
-      unsubClosed();
-      unsubError();
-    };
-  }, [navigation, isAdFree]);
+      interstitial.load();
+
+      return () => {
+        unsubLoaded();
+        unsubClosed();
+        unsubError();
+      };
+    } catch (e) {
+      console.warn('AdEventType failed to load:', e);
+    }
+  }, [navigation, isAdFree, isExpoGo]);
 
   // 자동 종료 타이머 (결과 화면 미진입 시에만)
   useEffect(() => {

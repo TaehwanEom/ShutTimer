@@ -149,6 +149,16 @@ export default function AlarmScreen({ navigation }: Props) {
     soundRef.current = null;
     accelSubRef.current?.remove();
     accelSubRef.current = null;
+    // AlarmScreen 비활성: 다른 알림 음소거 해제
+    AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+  }, []);
+
+  // AlarmScreen 마운트 시 기존 플래그 정리 (비정상 종료 복구)
+  useEffect(() => {
+    return () => {
+      // 언마운트 시 플래그 확실히 제거
+      AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+    };
   }, []);
 
   const handleConfirm = useCallback(() => {
@@ -266,6 +276,8 @@ export default function AlarmScreen({ navigation }: Props) {
           }
           soundRef.current = sound;
           sound.playAsync();
+          // AlarmScreen 활성: 다른 알림 음소거
+          AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
         }).catch(() => {});
       });
     });
@@ -309,7 +321,7 @@ export default function AlarmScreen({ navigation }: Props) {
         if (shakeCountRef.current >= SHAKE_COUNT_REQUIRED) {
           sub.remove();
           accelSubRef.current = null;
-          enterResult('success');
+          handleConfirm();
         }
       }
     });

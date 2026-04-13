@@ -38,15 +38,19 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 // Android: ca-app-pub-3043284478228309/6667370376
 let interstitial: any = null;
 if (!isExpoGo) {
-  try {
-    const { InterstitialAd, TestIds } = require('react-native-google-mobile-ads');
-    const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
-    interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
-      requestNonPersonalizedAdsOnly: true,
-    });
-  } catch (e) {
-    console.warn('InterstitialAd failed to initialize:', e);
-  }
+  (async () => {
+    try {
+      const attStatus = await AsyncStorage.getItem('attStatus');
+      const npa = attStatus === 'granted' ? false : true;
+      const { InterstitialAd, TestIds } = require('react-native-google-mobile-ads');
+      const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
+      interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
+        requestNonPersonalizedAdsOnly: npa,
+      });
+    } catch (e) {
+      console.warn('InterstitialAd failed to initialize:', e);
+    }
+  })();
 }
 
 type Props = {

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePurchase } from '../context/PurchaseContext';
 // import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
@@ -12,6 +13,14 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 
 export default function AdBanner() {
   const { isAdFree, loading } = usePurchase();
+  const [npa, setNpa] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem('attStatus').then(status => {
+      if (status === 'granted') setNpa(false);
+    }).catch(() => {});
+  }, []);
+
   if (loading || isAdFree || isExpoGo) return null;
 
   try {
@@ -23,7 +32,7 @@ export default function AdBanner() {
         <BannerAd
           unitId={BANNER_UNIT_ID}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+          requestOptions={{ requestNonPersonalizedAdsOnly: npa }}
           onAdFailedToLoad={(error: any) => console.warn('Banner ad failed:', error?.code, error?.message, error)}
         />
       </View>

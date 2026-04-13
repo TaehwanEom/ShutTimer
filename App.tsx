@@ -1,6 +1,8 @@
 import './src/i18n';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 
 ExpoSplashScreen.preventAutoHideAsync();
@@ -52,6 +54,8 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { PurchaseProvider } from './src/context/PurchaseContext';
 import ForceUpdate from './src/components/ForceUpdate';
 
+const isExpoGo = (Constants as any).appOwnership === 'expo';
+
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
@@ -71,6 +75,21 @@ function AppNavigator() {
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
   // AdMob 초기화 비활성화 (Expo Go 호환)
+
+  // ATT 요청: iOS 14.5+ 에서 추적 허가 요청 후 AsyncStorage에 저장 (AdMob npa 판단에 활용)
+  useEffect(() => {
+    if (isExpoGo) return;
+    if (Platform.OS !== 'ios') return;
+    (async () => {
+      try {
+        const { requestTrackingPermissionsAsync } = require('expo-tracking-transparency');
+        const { status } = await requestTrackingPermissionsAsync();
+        await AsyncStorage.setItem('attStatus', status);
+      } catch (e) {
+        Logger.warn('ATT', `Failed to request tracking: ${e}`);
+      }
+    })();
+  }, []);
 
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)
   useEffect(() => {

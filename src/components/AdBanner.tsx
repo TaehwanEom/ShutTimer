@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePurchase } from '../context/PurchaseContext';
@@ -25,7 +25,10 @@ export default function AdBanner() {
 
   try {
     const { BannerAd, BannerAdSize, TestIds } = require('react-native-google-mobile-ads');
-    const BANNER_UNIT_ID = TestIds.ADAPTIVE_BANNER;
+    const BANNER_UNIT_ID = Platform.select({
+      ios: 'ca-app-pub-3043284478228309/4187716112',
+      android: 'ca-app-pub-3043284478228309/6158631734',
+    }) as string;
 
     return (
       <View style={{ width: '100%', alignItems: 'center' }}>

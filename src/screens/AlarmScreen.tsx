@@ -9,6 +9,7 @@ import {
   Animated,
   Easing,
   AppState,
+  Platform,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Accelerometer } from 'expo-sensors';
@@ -43,7 +44,10 @@ if (!isExpoGo) {
       const attStatus = await AsyncStorage.getItem('attStatus');
       const npa = attStatus === 'granted' ? false : true;
       const { InterstitialAd, TestIds } = require('react-native-google-mobile-ads');
-      const INTERSTITIAL_UNIT_ID = TestIds.INTERSTITIAL;
+      const INTERSTITIAL_UNIT_ID = Platform.select({
+        ios: 'ca-app-pub-3043284478228309/6510839159',
+        android: 'ca-app-pub-3043284478228309/6667370376',
+      }) as string;
       interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
         requestNonPersonalizedAdsOnly: npa,
       });

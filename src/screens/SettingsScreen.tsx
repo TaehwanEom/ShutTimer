@@ -9,7 +9,9 @@ import {
   ScrollView,
   Modal,
   Alert,
+  Platform,
 } from 'react-native';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -170,6 +172,23 @@ export default function SettingsScreen({ navigation }: Props) {
   const [soundModalVisible, setSoundModalVisible] = useState(false);
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
   const [langModalVisible, setLangModalVisible] = useState(false);
+  const [dbg, setDbg] = useState<Record<string, string>>({});
+  const [dbgLog, setDbgLog] = useState<string[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const attStatus = await AsyncStorage.getItem('attStatus');
+      const logRaw = await AsyncStorage.getItem('att_debug_log');
+      setDbg({
+        appOwnership: String((Constants as any).appOwnership),
+        executionEnvironment: String((Constants as any).executionEnvironment),
+        platform: Platform.OS,
+        platformVersion: String(Platform.Version),
+        attStatus: attStatus ?? '(null)',
+      });
+      setDbgLog(JSON.parse(logRaw || '[]'));
+    })();
+  }, []);
   const previewSoundRef = React.useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -551,6 +570,16 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+      <View style={{ padding: 16, backgroundColor: '#1a1a1a', marginTop: 20 }}>
+        <Text style={{ color: '#0f0', fontWeight: 'bold', marginBottom: 8 }}>[DEBUG]</Text>
+        {Object.entries(dbg).map(([k, v]) => (
+          <Text key={k} style={{ fontSize: 11, color: '#0f0' }}>{k}: {v}</Text>
+        ))}
+        <Text style={{ color: '#ff0', fontWeight: 'bold', marginTop: 12, marginBottom: 4 }}>ATT LOG</Text>
+        {dbgLog.map((line, i) => (
+          <Text key={i} style={{ fontSize: 10, color: '#ff0' }}>{line}</Text>
+        ))}
+      </View>
       <AdBanner />
     </SafeAreaView>
   );

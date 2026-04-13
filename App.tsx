@@ -1,7 +1,7 @@
 import './src/i18n';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 
@@ -76,19 +76,66 @@ function AppNavigator() {
 
   // AdMob 초기화 비활성화 (Expo Go 호환)
 
-  // ATT 요청: iOS 14.5+ 에서 추적 허가 요청 후 AsyncStorage에 저장 (AdMob npa 판단에 활용)
+  // ATT 요청 + 진단 로그: iOS 14.5+ 에서 추적 허가 요청 후 AsyncStorage에 저장 (AdMob npa 판단에 활용)
   useEffect(() => {
-    if (isExpoGo) return;
-    if (Platform.OS !== 'ios') return;
-    (async () => {
+    const run = async () => {
       try {
-        const { requestTrackingPermissionsAsync } = require('expo-tracking-transparency');
-        const { status } = await requestTrackingPermissionsAsync();
-        await AsyncStorage.setItem('attStatus', status);
-      } catch (e) {
-        Logger.warn('ATT', `Failed to request tracking: ${e}`);
+        await AsyncStorage.setItem('att_debug_log', JSON.stringify([]));
+        const appendLog = async (msg: string) => {
+          const prev = await AsyncStorage.getItem('att_debug_log');
+          const arr = JSON.parse(prev || '[]');
+          arr.push(`${new Date().toISOString()} ${msg}`);
+          await AsyncStorage.setItem('att_debug_log', JSON.stringify(arr));
+        };
+
+        const ownership = (Constants as any).appOwnership;
+        const execEnv = (Constants as any).executionEnvironment;
+        const isExpoGoLocal = ownership === 'expo' || execEnv === 'storeClient';
+
+        await appendLog(`Enter. ownership=${ownership}, execEnv=${execEnv}, isExpoGoLocal=${isExpoGoLocal}, platform=${Platform.OS}`);
+
+        if (isExpoGoLocal) { await appendLog('Skip: isExpoGo'); return; }
+        if (Platform.OS !== 'ios') { await appendLog('Skip: not iOS'); return; }
+
+        const callATT = async () => {
+          try {
+            await appendLog('Requiring module...');
+            const att = require('expo-tracking-transparency');
+            await appendLog(`Module loaded. keys=${Object.keys(att).join(',')}`);
+
+            const current = await att.getTrackingPermissionsAsync();
+            await appendLog(`Current status=${current.status}, canAskAgain=${current.canAskAgain}`);
+
+            if (current.status === 'undetermined') {
+              await appendLog('Calling request...');
+              const result = await att.requestTrackingPermissionsAsync();
+              await appendLog(`Request result=${result.status}`);
+              await AsyncStorage.setItem('attStatus', result.status);
+            } else {
+              await appendLog(`Already decided, storing: ${current.status}`);
+              await AsyncStorage.setItem('attStatus', current.status);
+            }
+          } catch (e: any) {
+            await appendLog(`ERROR in callATT: ${e?.message || e}`);
+          }
+        };
+
+        if (AppState.currentState === 'active') {
+          await callATT();
+        } else {
+          await appendLog(`AppState=${AppState.currentState}, waiting for active`);
+          const sub = AppState.addEventListener('change', async (s) => {
+            if (s === 'active') {
+              sub.remove();
+              await callATT();
+            }
+          });
+        }
+      } catch (e: any) {
+        Logger.warn('ATT', `Top-level error: ${e?.message || e}`);
       }
-    })();
+    };
+    run();
   }, []);
 
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)

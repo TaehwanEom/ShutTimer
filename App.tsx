@@ -13,7 +13,8 @@ import ErrorBoundary from './src/components/ErrorBoundary';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
-    let shouldPlaySound = true;
+    let shouldShowAlert = false;
+    let shouldPlaySound = false;
     try {
       const raw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
       shouldPlaySound = raw !== 'false';
@@ -22,12 +23,13 @@ Notifications.setNotificationHandler({
       const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
       if (isAlarmActive === 'true') {
         shouldPlaySound = false;
+        shouldShowAlert = false;
       }
     } catch (e) {
       Logger.warn('Notifications', `Failed to get notification settings: ${e}`);
     }
     return {
-      shouldShowAlert: true,
+      shouldShowAlert,
       shouldPlaySound,
       shouldSetBadge: true,
       shouldShowBanner: true,

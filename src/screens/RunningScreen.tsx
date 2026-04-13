@@ -177,15 +177,11 @@ export default function RunningScreen({ navigation, route }: Props) {
   const scheduleAlarms = async (seconds: number) => {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const body = await getNotifBody();
-    const alarmRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
-    const alarmEnabled = alarmRaw !== 'false';
-    const notifSound = alarmEnabled ? await getNotifSound() : false;
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
         body,
-        sound: notifSound,
-        interruptionLevel: 'timeSensitive',
+        sound: false,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

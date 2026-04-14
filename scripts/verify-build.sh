@@ -75,9 +75,18 @@ if [ ! -d "ios/Pods" ]; then
 else
   POD_MISSING=()
   for pod in "${REQUIRED_PODS[@]}"; do
-    if ! ls -d ios/Pods/${pod}* >/dev/null 2>&1; then
-      POD_MISSING+=("$pod")
+    # RN/Expo prebuilt 아키텍처에서는 pod 소스가 별도 디렉토리로 추출되지 않고
+    # Target Support Files / Headers/Public 경유로 통합됨. 둘 중 하나라도 있으면 설치 확인.
+    if ls -d ios/Pods/${pod}* >/dev/null 2>&1; then
+      continue
     fi
+    if [ -d "ios/Pods/Target Support Files/${pod}" ]; then
+      continue
+    fi
+    if [ -d "ios/Pods/Headers/Public/${pod}" ]; then
+      continue
+    fi
+    POD_MISSING+=("$pod")
   done
 
   if [ ${#POD_MISSING[@]} -eq 0 ]; then

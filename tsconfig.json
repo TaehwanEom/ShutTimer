@@ -2,5 +2,9 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "exclude": [
+    "*_Backup_*.tsx",
+    "*_Backup_*.ts"
+  ]
 }

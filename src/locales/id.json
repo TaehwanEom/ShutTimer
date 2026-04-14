@@ -11,12 +11,12 @@
     "resume": "Lanjut",
     "cancel": "Batal",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Timer telah berakhir. Ambil foto untuk menutup.",
+    "notifBody": "Timer selesai. Untuk mematikan alarm, ambil foto.",
     "endTime": "Waktu selesai",
     "estimatedAt": "Perkiraan {{time}}",
-    "notifBodyCamera": "Timer selesai. Ambil foto untuk mematikan alarm.",
-    "notifBodyTap": "Timer selesai. Tekan tombol untuk mematikan alarm.",
-    "notifBodyShake": "Timer selesai. Goyangkan ponsel untuk mematikan alarm.",
+    "notifBodyCamera": "Timer selesai. Untuk mematikan alarm, ambil foto.",
+    "notifBodyTap": "Timer selesai. Untuk mematikan alarm, tekan tombol.",
+    "notifBodyShake": "Timer selesai. Untuk mematikan alarm, goyangkan perangkat.",
     "notifBodyReminder": "Alarm berbunyi. Buka aplikasi untuk mematikan.",
     "notifBodyReminder2": "Alarm masih berbunyi. Saya sudah tidak kuat lagi"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Goyangkan perangkat untuk mematikan alarm",
     "retakePhoto": "Silakan coba lagi",
     "resultSuccess": "Misi selesai! Bagus sekali 🎉",
-    "resultFail": "Misi belum selesai. Lain kali coba lagi! 😠",
+    "resultFail": "Misi belum selesai. Lain kali coba lagi! 😂",
     "resultConfirm": "OK",
     "forceClose": "Paksa tutup",
     "guide_tv": "Ambil foto TV Anda",
@@ -134,7 +134,7 @@
     "directions-bike": "Bersepeda",
     "spa": "Istirahat",
     "nightlight": "Tidur siang",
-    "clean-hands": "Sikat Gigi"
+    "clean-hands": "Cuci Muka"
   },
   "sounds": {
     "alarm": "Alarm",

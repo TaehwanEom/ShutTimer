@@ -11,12 +11,12 @@
     "resume": "Weiter",
     "cancel": "Abbrechen",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Der Timer ist abgelaufen. Machen Sie ein Foto zum Beenden.",
+    "notifBody": "Timer abgelaufen. Um den Alarm zu beenden, mach ein Foto.",
     "endTime": "Endzeit",
     "estimatedAt": "Geschätzt um {{time}}",
-    "notifBodyCamera": "Timer abgelaufen. Mach ein Foto, um den Alarm zu beenden.",
-    "notifBodyTap": "Timer abgelaufen. Drück den Button, um den Alarm zu beenden.",
-    "notifBodyShake": "Timer abgelaufen. Schüttle dein Handy, um den Alarm zu beenden.",
+    "notifBodyCamera": "Timer abgelaufen. Um den Alarm zu beenden, mach ein Foto.",
+    "notifBodyTap": "Timer abgelaufen. Um den Alarm zu beenden, drück den Button.",
+    "notifBodyShake": "Timer abgelaufen. Um den Alarm zu beenden, schüttle dein Gerät.",
     "notifBodyReminder": "Alarm klingelt. Öffne die App zum Beenden.",
     "notifBodyReminder2": "Der Alarm klingelt immer noch. Ich kann nicht mehr viel länger klingeln"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Schütteln Sie das Gerät, um den Alarm zu stoppen",
     "retakePhoto": "Bitte erneut versuchen",
     "resultSuccess": "Mission erfüllt! Gut gemacht 🎉",
-    "resultFail": "Mission nicht erfüllt. Beim nächsten Mal! 😠",
+    "resultFail": "Mission nicht erfüllt. Beim nächsten Mal! 😂",
     "resultConfirm": "OK",
     "forceClose": "Schließen erzwingen",
     "guide_tv": "Fotografiere deinen Fernseher",
@@ -134,7 +134,7 @@
     "directions-bike": "Radfahren",
     "spa": "Entspannung",
     "nightlight": "Nickerchen",
-    "clean-hands": "Zähneputzen"
+    "clean-hands": "Waschen"
   },
   "sounds": {
     "alarm": "Alarm",

@@ -11,12 +11,12 @@
     "resume": "Reanudar",
     "cancel": "Cancelar",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "El temporizador ha terminado. Toma una foto para cerrar.",
+    "notifBody": "Temporizador terminado. Para detener la alarma, toma una foto.",
     "endTime": "Hora de fin",
     "estimatedAt": "Estimado a las {{time}}",
-    "notifBodyCamera": "Temporizador terminado. Toma una foto para apagar la alarma.",
-    "notifBodyTap": "Temporizador terminado. Pulsa el botón para apagar la alarma.",
-    "notifBodyShake": "Temporizador terminado. Agita el teléfono para apagar la alarma.",
+    "notifBodyCamera": "Temporizador terminado. Para detener la alarma, toma una foto.",
+    "notifBodyTap": "Temporizador terminado. Para detener la alarma, pulsa el botón.",
+    "notifBodyShake": "Temporizador terminado. Para detener la alarma, agita el dispositivo.",
     "notifBodyReminder": "La alarma está sonando. Abre la app para apagarla.",
     "notifBodyReminder2": "La alarma sigue sonando. Ya no puedo seguir mucho más"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Agita el dispositivo para detener la alarma",
     "retakePhoto": "Por favor, inténtalo de nuevo",
     "resultSuccess": "¡Misión cumplida! Bien hecho 🎉",
-    "resultFail": "No completaste la misión. ¡A por ello la próxima! 😠",
+    "resultFail": "No completaste la misión. ¡A por ello la próxima! 😂",
     "resultConfirm": "OK",
     "forceClose": "Forzar cierre",
     "guide_tv": "Toma una foto de tu televisor",
@@ -134,7 +134,7 @@
     "directions-bike": "Ciclismo",
     "spa": "Descanso",
     "nightlight": "Siesta",
-    "clean-hands": "Cepillado"
+    "clean-hands": "Lavarse"
   },
   "sounds": {
     "alarm": "Alarma",

@@ -11,12 +11,12 @@
     "resume": "再開",
     "cancel": "キャンセル",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "タイマーが終了しました。写真を撮って終了してください。",
+    "notifBody": "タイマーが終了しました。アラームを止めるには写真を撮ってください。",
     "endTime": "終了予定",
     "estimatedAt": "{{time}} 終了予定",
-    "notifBodyCamera": "タイマーが終了しました。写真を撮ってアラームを止めてください。",
-    "notifBodyTap": "タイマーが終了しました。ボタンを押してアラームを止めてください。",
-    "notifBodyShake": "タイマーが終了しました。スマホを振ってアラームを止めてください。",
+    "notifBodyCamera": "タイマーが終了しました。アラームを止めるには写真を撮ってください。",
+    "notifBodyTap": "タイマーが終了しました。アラームを止めるにはボタンを押してください。",
+    "notifBodyShake": "タイマーが終了しました。アラームを止めるには端末を振ってください。",
     "notifBodyReminder": "アラームが鳴っています。アプリを開いて停止してください。",
     "notifBodyReminder2": "まだアラームが鳴っています。もうこれ以上鳴らすのは厳しいです"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "デバイスを振ってアラームを止めてください",
     "retakePhoto": "もう一度撮ってください",
     "resultSuccess": "ミッションクリア！お見事です 🎉",
-    "resultFail": "ミッションを完了できませんでした。次は成功しましょう！ 😠",
+    "resultFail": "ミッションを完了できませんでした。次は成功しましょう！ 😂",
     "resultConfirm": "確認",
     "forceClose": "強制終了",
     "guide_tv": "テレビを撮影してください",
@@ -134,7 +134,7 @@
     "directions-bike": "自転車",
     "spa": "リラックス",
     "nightlight": "昼寝",
-    "clean-hands": "歯磨き"
+    "clean-hands": "洗顔"
   },
   "sounds": {
     "alarm": "アラーム",

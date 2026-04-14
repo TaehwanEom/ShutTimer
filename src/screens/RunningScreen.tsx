@@ -177,11 +177,13 @@ export default function RunningScreen({ navigation, route }: Props) {
   const scheduleAlarms = async (seconds: number) => {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const body = await getNotifBody();
+    const sound = await getNotifSound();
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
         body,
-        sound: false,
+        sound,
+        interruptionLevel: 'timeSensitive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -190,12 +192,15 @@ export default function RunningScreen({ navigation, route }: Props) {
     });
   };
 
-  // 마운트 1회: 권한 요청 + 알람 예약 + portrait 잠금
+  // 마운트 1회: 권한 요청 + 알람 예약 + portrait 잠금 + isTimerActive 플래그
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     Notifications.requestPermissionsAsync();
     scheduleAlarms(TOTAL_SECONDS);
-    return () => {};
+    AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
+    return () => {
+      AsyncStorage.removeItem('isTimerActive').catch(() => {});
+    };
   }, []);
 
   // interval — isPaused 변화 시 재등록

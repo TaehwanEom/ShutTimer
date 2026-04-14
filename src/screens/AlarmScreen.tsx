@@ -30,7 +30,8 @@ import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 // import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
-import { usePurchase } from '../context/PurchaseContext';
+// @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
+// import { usePurchase } from '../context/PurchaseContext';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
 
@@ -65,11 +66,11 @@ type Props = {
 type ResultState = 'idle' | 'success' | 'fail';
 
 const MISSION_LABELS: Record<string, string[]> = {
-  'tv':               ['Television', 'Television set'],
+  'tv':               ['Television', 'Television set', 'Monitor', 'Computer monitor', 'Display device', 'Screen', 'Laptop', 'Tablet computer', 'Tablet', 'LCD TV', 'Projector screen'],
   'bathtub':          ['Bathtub', 'Shower'],
   'menu-book':        ['Paper'],
   'school':           ['Paper'],
-  'toys':             ['Toy', 'Play'],
+  'toys':             ['Toy', 'Play', 'Stuffed toy'],
   'sports-esports':   ['Game controller', 'Joystick', 'Mobile phone'],
   'outdoor-grill':    ['Food', 'Meal'],
   'fitness-center':   ['Gym', 'Exercise equipment'],
@@ -77,7 +78,7 @@ const MISSION_LABELS: Record<string, string[]> = {
   'self-improvement': ['Person', 'Face', 'Human face'],
   'music-note':       ['Musical instrument'],
   'brush':            ['Painting', 'Paint'],
-  'pets':             ['Dog', 'Cat', 'Animal'],
+  'pets':             ['Dog', 'Cat', 'Animal', 'Fish', 'Goldfish', 'Turtle', 'Tortoise', 'Pet', 'Puppy', 'Kitten'],
   'local-cafe':       ['Cup'],
   'restaurant':       ['Food', 'Meal'],
   'shopping-cart':    ['Shopping cart'],
@@ -116,7 +117,8 @@ const RESULT_BG = {
 
 export default function AlarmScreen({ navigation }: Props) {
   const { t } = useTranslation();
-  const { isAdFree } = usePurchase();
+  // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
+  // const { isAdFree } = usePurchase();
   const [flash, setFlash] = useState<'off' | 'on'>('off');
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [permission, requestPermission] = useCameraPermissions();
@@ -161,10 +163,11 @@ export default function AlarmScreen({ navigation }: Props) {
     AsyncStorage.removeItem('isAlarmActive').catch(() => {});
   }, []);
 
-  // AlarmScreen 마운트 시 기존 플래그 정리 (비정상 종료 복구)
+  // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
+  // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
   useEffect(() => {
+    AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     return () => {
-      // 언마운트 시 플래그 확실히 제거
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});
     };
   }, []);
@@ -176,12 +179,29 @@ export default function AlarmScreen({ navigation }: Props) {
       clearTimeout(autoResultTimeoutRef.current);
       autoResultTimeoutRef.current = null;
     }
-    if (!isAdFree && adLoadedRef.current) {
+    /**
+     * ═══════════════════════════════════════════════════════════
+     *  @preserve IAP (Interstitial isAdFree 분기) — Phase 2+ 재활성화용
+     *  보존 결정일: 2026-04-14
+     *  비활성화 사유: IAP 보류 (B안). 알람 종료 시 항상 Interstitial 시도.
+     *  재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+     *  ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+     *
+     *  @preserve-original:
+     *  if (!isAdFree && adLoadedRef.current) {
+     *    interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
+     *  } else {
+     *    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+     *  }
+     *  deps: [navigation, isAdFree]
+     * ═══════════════════════════════════════════════════════════
+     */
+    if (adLoadedRef.current) {
       interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
     } else {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     }
-  }, [navigation, isAdFree]);
+  }, [navigation]);
 
   useEffect(() => {
     handleConfirmRef.current = handleConfirm;
@@ -210,7 +230,8 @@ export default function AlarmScreen({ navigation }: Props) {
     dismissedRef.current = false;
     resultEnteredRef.current = false;
 
-    if (isAdFree || isExpoGo || !interstitial) return;
+    // @preserve IAP — 원본: if (isAdFree || isExpoGo || !interstitial) return;
+    if (isExpoGo || !interstitial) return;
 
     try {
       const { AdEventType } = require('react-native-google-mobile-ads');
@@ -235,7 +256,8 @@ export default function AlarmScreen({ navigation }: Props) {
     } catch (e) {
       console.warn('AdEventType failed to load:', e);
     }
-  }, [navigation, isAdFree, isExpoGo]);
+    // @preserve IAP — deps 원본: [navigation, isAdFree, isExpoGo]
+  }, [navigation, isExpoGo]);
 
   // 자동 종료 타이머 (결과 화면 미진입 시에만)
   useEffect(() => {
@@ -284,8 +306,7 @@ export default function AlarmScreen({ navigation }: Props) {
           }
           soundRef.current = sound;
           sound.playAsync();
-          // AlarmScreen 활성: 다른 알림 음소거
-          AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
+          // isAlarmActive 플래그는 마운트 시 상단 useEffect에서 이미 설정됨 (중복 설정 제거)
         }).catch(() => {});
       });
     });
@@ -447,7 +468,7 @@ export default function AlarmScreen({ navigation }: Props) {
       const result = await ImageLabeling.label(photo.uri);
       const matched = result.some(
         (item: { text: string; confidence: number }) =>
-          item.confidence >= 0.3 &&
+          item.confidence >= 0.35 &&
           activeLabels.some(l => item.text.toLowerCase().includes(l.toLowerCase()))
       );
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { usePurchase } from '../context/PurchaseContext';
+// @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
+// import { usePurchase } from '../context/PurchaseContext';
 // import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
@@ -12,7 +13,8 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 // Android: ca-app-pub-3043284478228309/6158631734
 
 export default function AdBanner() {
-  const { isAdFree, loading } = usePurchase();
+  // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
+  // const { isAdFree, loading } = usePurchase();
   const [npa, setNpa] = useState(true);
 
   useEffect(() => {
@@ -21,7 +23,19 @@ export default function AdBanner() {
     }).catch(() => {});
   }, []);
 
-  if (loading || isAdFree || isExpoGo) return null;
+  /**
+   * ═══════════════════════════════════════════════════════════
+   *  @preserve IAP (isAdFree 배너 차단 분기) — Phase 2+ 재활성화용
+   *  보존 결정일: 2026-04-14
+   *  비활성화 사유: IAP 보류 (B안). 모든 사용자에게 배너 항상 노출.
+   *  재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+   *  ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+   *
+   *  @preserve-original:
+   *  if (loading || isAdFree || isExpoGo) return null;
+   * ═══════════════════════════════════════════════════════════
+   */
+  if (isExpoGo) return null;
 
   try {
     const { BannerAd, BannerAdSize, TestIds } = require('react-native-google-mobile-ads');

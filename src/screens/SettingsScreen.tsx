@@ -8,7 +8,8 @@ import {
   Switch,
   ScrollView,
   Modal,
-  Alert,
+  // @preserve IAP — Alert는 purchase 섹션에서만 사용. Phase 2+ 복원용.
+  // Alert,
   Platform,
 } from 'react-native';
 import Constants from 'expo-constants';
@@ -23,7 +24,8 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
 import { useTranslation } from 'react-i18next';
 import AdBanner from '../components/AdBanner';
-import { usePurchase } from '../context/PurchaseContext';
+// @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
+// import { usePurchase } from '../context/PurchaseContext';
 import { getLocales } from 'expo-localization';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
@@ -162,7 +164,8 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
 export default function SettingsScreen({ navigation }: Props) {
   const { colors, isDark, toggleTheme, primaryColor, setPrimaryColor } = useTheme();
   const { t } = useTranslation();
-  const { isAdFree, purchaseAdFree, restorePurchases } = usePurchase();
+  // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
+  // const { isAdFree, purchaseAdFree, restorePurchases } = usePurchase();
   const styles = makeStyles(colors);
 
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
@@ -422,53 +425,63 @@ export default function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* 구매 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.purchase')}</Text>
-          {isAdFree ? (
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleLeft}>
-                <MaterialIcons name="check-circle" size={22} color={colors.primary} />
-                <Text style={[styles.toggleLabel, { color: colors.primary }]}>{t('settings.adFreeActive')}</Text>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.toggleRow}
-              onPress={async () => {
-                try {
-                  await purchaseAdFree();
-                } catch {
-                  Alert.alert(t('settings.purchaseFailed'));
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.toggleLeft}>
-                <MaterialIcons name="stars" size={22} color={colors.onBackground} />
-                <View>
-                  <Text style={styles.toggleLabel}>{t('settings.removeAds')}</Text>
-                  <Text style={{ fontSize: 12, color: colors.secondary }}>{t('settings.removeAdsPrice')}</Text>
-                </View>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={async () => {
-              const restored = await restorePurchases();
-              Alert.alert(restored ? t('settings.restoreSuccess') : t('settings.restoreNone'));
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="restore" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>{t('settings.restorePurchase')}</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-          </TouchableOpacity>
-        </View>
+        {/*
+          ═══════════════════════════════════════════════════════════
+           @preserve IAP (구매 섹션 JSX) — Phase 2+ 재활성화용
+           보존 결정일: 2026-04-14
+           비활성화 사유: 사업자등록 전까지 IAP 보류 (B안)
+           재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+           ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+
+           @preserve-original:
+           <View style={styles.section}>
+             <Text style={styles.sectionTitle}>{t('settings.purchase')}</Text>
+             {isAdFree ? (
+               <View style={styles.toggleRow}>
+                 <View style={styles.toggleLeft}>
+                   <MaterialIcons name="check-circle" size={22} color={colors.primary} />
+                   <Text style={[styles.toggleLabel, { color: colors.primary }]}>{t('settings.adFreeActive')}</Text>
+                 </View>
+               </View>
+             ) : (
+               <TouchableOpacity
+                 style={styles.toggleRow}
+                 onPress={async () => {
+                   try {
+                     await purchaseAdFree();
+                   } catch {
+                     Alert.alert(t('settings.purchaseFailed'));
+                   }
+                 }}
+                 activeOpacity={0.7}
+               >
+                 <View style={styles.toggleLeft}>
+                   <MaterialIcons name="stars" size={22} color={colors.onBackground} />
+                   <View>
+                     <Text style={styles.toggleLabel}>{t('settings.removeAds')}</Text>
+                     <Text style={{ fontSize: 12, color: colors.secondary }}>{t('settings.removeAdsPrice')}</Text>
+                   </View>
+                 </View>
+                 <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+               </TouchableOpacity>
+             )}
+             <TouchableOpacity
+               style={styles.toggleRow}
+               onPress={async () => {
+                 const restored = await restorePurchases();
+                 Alert.alert(restored ? t('settings.restoreSuccess') : t('settings.restoreNone'));
+               }}
+               activeOpacity={0.7}
+             >
+               <View style={styles.toggleLeft}>
+                 <MaterialIcons name="restore" size={22} color={colors.onBackground} />
+                 <Text style={styles.toggleLabel}>{t('settings.restorePurchase')}</Text>
+               </View>
+               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+             </TouchableOpacity>
+           </View>
+          ═══════════════════════════════════════════════════════════
+        */}
 
         {/* 위젯 — v2 */}
         <View style={styles.section}>

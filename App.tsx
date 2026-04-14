@@ -17,15 +17,24 @@ Notifications.setNotificationHandler({
   handleNotification: async () => {
     let shouldShowAlert = false;
     let shouldPlaySound = false;
+    let shouldShowBanner = true;
+    let shouldShowList = true;
+    let shouldSetBadge = true;
     try {
       const raw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
       shouldPlaySound = raw !== 'false';
 
-      // AlarmScreen 활성 중에는 다른 알림 음소거
-      const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
-      if (isAlarmActive === 'true') {
+      // 타이머 실행 중(RunningScreen) 또는 알람 화면(AlarmScreen) 활성: 모든 알림 표시 억제
+      const [isAlarmActive, isTimerActive] = await Promise.all([
+        AsyncStorage.getItem('isAlarmActive'),
+        AsyncStorage.getItem('isTimerActive'),
+      ]);
+      if (isAlarmActive === 'true' || isTimerActive === 'true') {
         shouldPlaySound = false;
         shouldShowAlert = false;
+        shouldShowBanner = false;
+        shouldShowList = false;
+        shouldSetBadge = false;
       }
     } catch (e) {
       Logger.warn('Notifications', `Failed to get notification settings: ${e}`);
@@ -33,9 +42,9 @@ Notifications.setNotificationHandler({
     return {
       shouldShowAlert,
       shouldPlaySound,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
+      shouldSetBadge,
+      shouldShowBanner,
+      shouldShowList,
     };
   },
 });
@@ -51,7 +60,8 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
-import { PurchaseProvider } from './src/context/PurchaseContext';
+// @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
+// import { PurchaseProvider } from './src/context/PurchaseContext';
 import ForceUpdate from './src/components/ForceUpdate';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
@@ -74,7 +84,33 @@ function AppNavigator() {
   const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
-  // AdMob 초기화 비활성화 (Expo Go 호환)
+  // 앱 시작 시 stale 플래그 초기화 (killed 후 콜드 스타트 대비)
+  useEffect(() => {
+    AsyncStorage.removeItem('isTimerActive').catch(() => {});
+    AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+  }, []);
+
+  // AdMob 초기화: isExpoGo 분기로 Expo Go 호환
+  useEffect(() => {
+    const ownership = (Constants as any).appOwnership;
+    const execEnv = (Constants as any).executionEnvironment;
+    const isExpoGoLocal = ownership === 'expo' || execEnv === 'storeClient';
+    if (isExpoGoLocal) return;
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+    try {
+      const { default: mobileAds } = require('react-native-google-mobile-ads');
+      mobileAds()
+        .initialize()
+        .then(() => {
+          Logger.info('AdMob', 'MobileAds SDK initialized');
+        })
+        .catch((e: any) => {
+          Logger.warn('AdMob', `Initialize failed: ${e?.message || e}`);
+        });
+    } catch (e: any) {
+      Logger.warn('AdMob', `require failed: ${e?.message || e}`);
+    }
+  }, []);
 
   // ATT 요청 + 진단 로그: iOS 14.5+ 에서 추적 허가 요청 후 AsyncStorage에 저장 (AdMob npa 판단에 활용)
   useEffect(() => {
@@ -194,10 +230,23 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <PurchaseProvider>
-          <ForceUpdate />
-          <AppNavigator />
-        </PurchaseProvider>
+        {/*
+          ═══════════════════════════════════════════════════════════
+           @preserve IAP (PurchaseProvider 래퍼) — Phase 2+ 재활성화용
+           보존 결정일: 2026-04-14
+           비활성화 사유: 사업자등록 전까지 IAP 보류 (B안)
+           재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+           ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+
+           @preserve-original:
+           <PurchaseProvider>
+             <ForceUpdate />
+             <AppNavigator />
+           </PurchaseProvider>
+          ═══════════════════════════════════════════════════════════
+        */}
+        <ForceUpdate />
+        <AppNavigator />
       </ThemeProvider>
     </ErrorBoundary>
   );

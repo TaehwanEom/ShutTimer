@@ -11,12 +11,12 @@
     "resume": "Reprendre",
     "cancel": "Annuler",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Le minuteur est terminé. Prenez une photo pour arrêter.",
+    "notifBody": "Minuteur terminé. Pour arrêter l'alarme, prenez une photo.",
     "endTime": "Heure de fin",
     "estimatedAt": "Estimé à {{time}}",
-    "notifBodyCamera": "Minuteur terminé. Prenez une photo pour arrêter l'alarme.",
-    "notifBodyTap": "Minuteur terminé. Appuyez sur le bouton pour arrêter l'alarme.",
-    "notifBodyShake": "Minuteur terminé. Secouez votre téléphone pour arrêter l'alarme.",
+    "notifBodyCamera": "Minuteur terminé. Pour arrêter l'alarme, prenez une photo.",
+    "notifBodyTap": "Minuteur terminé. Pour arrêter l'alarme, appuyez sur le bouton.",
+    "notifBodyShake": "Minuteur terminé. Pour arrêter l'alarme, secouez votre appareil.",
     "notifBodyReminder": "L'alarme sonne. Ouvrez l'app pour l'arrêter.",
     "notifBodyReminder2": "L'alarme sonne encore. Je ne peux plus continuer longtemps"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Secouez l'appareil pour arrêter l'alarme",
     "retakePhoto": "Veuillez réessayer",
     "resultSuccess": "Mission accomplie ! Bien joué 🎉",
-    "resultFail": "Mission non accomplie. À la prochaine ! 😠",
+    "resultFail": "Mission non accomplie. À la prochaine ! 😂",
     "resultConfirm": "OK",
     "forceClose": "Forcer la fermeture",
     "guide_tv": "Prenez une photo de votre télévision",
@@ -134,7 +134,7 @@
     "directions-bike": "Vélo",
     "spa": "Détente",
     "nightlight": "Sieste",
-    "clean-hands": "Brossage"
+    "clean-hands": "Lavage"
   },
   "sounds": {
     "alarm": "Alarme",

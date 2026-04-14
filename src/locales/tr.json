@@ -11,12 +11,12 @@
     "resume": "Devam",
     "cancel": "İptal",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Zamanlayıcı sona erdi. Kapatmak için fotoğraf çekin.",
+    "notifBody": "Zamanlayıcı bitti. Alarmı kapatmak için fotoğraf çekin.",
     "endTime": "Bitiş Zamanı",
     "estimatedAt": "Tahmini {{time}}",
     "notifBodyCamera": "Zamanlayıcı bitti. Alarmı kapatmak için fotoğraf çekin.",
     "notifBodyTap": "Zamanlayıcı bitti. Alarmı kapatmak için düğmeye basın.",
-    "notifBodyShake": "Zamanlayıcı bitti. Alarmı kapatmak için telefonu sallayın.",
+    "notifBodyShake": "Zamanlayıcı bitti. Alarmı kapatmak için cihazı sallayın.",
     "notifBodyReminder": "Alarm çalıyor. Kapatmak için uygulamayı açın.",
     "notifBodyReminder2": "Alarm hâlâ çalıyor. Artık daha fazla çalamayacağım"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Alarmı durdurmak için cihazı sallayın",
     "retakePhoto": "Lütfen tekrar deneyin",
     "resultSuccess": "Görev tamam! Aferin 🎉",
-    "resultFail": "Görevi tamamlayamadın. Bir dahaki sefere! 😠",
+    "resultFail": "Görevi tamamlayamadın. Bir dahaki sefere! 😂",
     "resultConfirm": "Tamam",
     "forceClose": "Zorla kapat",
     "guide_tv": "Televizyonunuzun fotoğrafını çekin",
@@ -134,7 +134,7 @@
     "directions-bike": "Bisiklet",
     "spa": "Dinlenme",
     "nightlight": "Şekerleme",
-    "clean-hands": "Diş fırçalama"
+    "clean-hands": "Yıkanma"
   },
   "sounds": {
     "alarm": "Alarm",

@@ -1,3 +1,16 @@
+/**
+ * ═══════════════════════════════════════════════════════════
+ *  @preserve IAP (PurchaseContext 전체 파일) — Phase 2+ 재활성화용
+ *  보존 결정일: 2026-04-14
+ *  비활성화 사유: 사업자등록 전까지 IAP 보류 (B안)
+ *  현재 상태: 파일 전체 보존. App.tsx에서 Provider 래퍼가 주석 처리되어
+ *            이 파일은 import되지 않음. 코드 변경 금지.
+ *  재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+ *  복원 절차: App.tsx의 `@preserve IAP (PurchaseProvider 래퍼)` 블록
+ *            해제 + AdBanner/AlarmScreen/SettingsScreen의 @preserve 블록 해제
+ *  ⚠️ 이 파일 내부 코드 삭제/수정 금지. 보존 전용.
+ * ═══════════════════════════════════════════════════════════
+ */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';

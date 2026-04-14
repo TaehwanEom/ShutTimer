@@ -11,12 +11,12 @@
     "resume": "Resume",
     "cancel": "Cancel",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "Timer has ended. Take a photo to dismiss.",
+    "notifBody": "Timer ended. To dismiss the alarm, take a photo.",
     "endTime": "End Time",
     "estimatedAt": "Estimated at {{time}}",
-    "notifBodyCamera": "Timer ended. Take a photo to dismiss the alarm.",
-    "notifBodyTap": "Timer ended. Tap the button to dismiss the alarm.",
-    "notifBodyShake": "Timer ended. Shake your phone to dismiss the alarm.",
+    "notifBodyCamera": "Timer ended. To dismiss the alarm, take a photo.",
+    "notifBodyTap": "Timer ended. To dismiss the alarm, tap the button.",
+    "notifBodyShake": "Timer ended. To dismiss the alarm, shake your device.",
     "notifBodyReminder": "Alarm is ringing. Open the app to dismiss.",
     "notifBodyReminder2": "The alarm is still ringing. I can't keep ringing much longer"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "Shake the device to stop the alarm",
     "retakePhoto": "Please try again",
     "resultSuccess": "Mission clear! Well done 🎉",
-    "resultFail": "You didn't complete the mission. Try again next time! 😠",
+    "resultFail": "You didn't complete the mission. Try again next time! 😂",
     "resultConfirm": "OK",
     "forceClose": "Force Close",
     "guide_tv": "Take a photo of your TV",
@@ -134,7 +134,7 @@
     "directions-bike": "Cycling",
     "spa": "Relax",
     "nightlight": "Nap",
-    "clean-hands": "Brushing"
+    "clean-hands": "Washing"
   },
   "sounds": {
     "alarm": "Alarm",

@@ -11,12 +11,12 @@
     "resume": "继续",
     "cancel": "取消",
     "notifTitle": "ShutTimer ⏰",
-    "notifBody": "计时器已结束。请拍照以关闭。",
+    "notifBody": "计时器已结束。要关闭闹钟，请拍照。",
     "endTime": "预计结束",
     "estimatedAt": "预计 {{time}}",
-    "notifBodyCamera": "计时器已结束。拍照以关闭闹钟。",
-    "notifBodyTap": "计时器已结束。按下按钮以关闭闹钟。",
-    "notifBodyShake": "计时器已结束。摇动手机以关闭闹钟。",
+    "notifBodyCamera": "计时器已结束。要关闭闹钟，请拍照。",
+    "notifBodyTap": "计时器已结束。要关闭闹钟，请按下按钮。",
+    "notifBodyShake": "计时器已结束。要关闭闹钟,请摇晃设备。",
     "notifBodyReminder": "闹钟正在响铃。打开应用关闭闹钟。",
     "notifBodyReminder2": "闹钟还在响。我已经快撑不住了"
   },
@@ -33,7 +33,7 @@
     "shakeInstruction": "摇晃设备以关闭闹钟",
     "retakePhoto": "请重新拍照",
     "resultSuccess": "任务完成！做得好 🎉",
-    "resultFail": "任务未完成。下次再加油！ 😠",
+    "resultFail": "任务未完成。下次再加油！ 😂",
     "resultConfirm": "确认",
     "forceClose": "强制关闭",
     "guide_tv": "请拍摄电视",
@@ -134,7 +134,7 @@
     "directions-bike": "骑行",
     "spa": "休息",
     "nightlight": "午睡",
-    "clean-hands": "刷牙"
+    "clean-hands": "洗脸"
   },
   "sounds": {
     "alarm": "警报音",

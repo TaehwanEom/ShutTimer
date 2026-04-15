@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 import { SETTINGS_KEY } from '../constants/settings';
+import { Logger } from '../utils/logger';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Running'>;
@@ -178,24 +179,45 @@ export default function RunningScreen({ navigation, route }: Props) {
     await Notifications.cancelAllScheduledNotificationsAsync();
     const body = await getNotifBody();
     const sound = await getNotifSound();
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: t('running.notifTitle'),
-        body,
-        sound,
-        interruptionLevel: 'timeSensitive',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds,
-      },
-    });
+    Logger.info('ScheduleAlarm', `total=${seconds}s sound=${sound}`);
+    // 잠금 상태 백업 알림 (15초 간격 5회). 커스텀 wav는 29초 이내라 30s 제한 미저촉.
+    const backupOffsets = [0, 15, 30, 45, 60];
+    for (const offset of backupOffsets) {
+      const triggerSeconds = seconds + offset;
+      if (triggerSeconds <= 0) continue;
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t('running.notifTitle'),
+          body,
+          sound,
+          interruptionLevel: 'timeSensitive',
+          threadIdentifier: 'shuttimer-alarm',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: triggerSeconds,
+        },
+      });
+      Logger.info('ScheduleAlarm', `scheduled +${offset}s @ ${triggerSeconds}s`);
+    }
   };
 
   // 마운트 1회: 권한 요청 + 알람 예약 + portrait 잠금 + isTimerActive 플래그
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    Notifications.requestPermissionsAsync();
+    Notifications.requestPermissionsAsync({
+      ios: {
+        allowAlert: true,
+        allowBadge: true,
+        allowSound: true,
+      },
+    })
+      .then(status => {
+        Logger.info('Permission', `status=${status.status} granted=${status.granted} ios=${JSON.stringify(status.ios ?? {})}`);
+      })
+      .catch(e => {
+        Logger.error('Permission', e);
+      });
     scheduleAlarms(TOTAL_SECONDS);
     AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
     return () => {

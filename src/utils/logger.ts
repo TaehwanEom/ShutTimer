@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOG_STORAGE_KEY = 'app_debug_log';
-const MAX_LOGS = 20;
+const MAX_LOGS = 200;
 
 interface LogEntry {
   timestamp: string;

@@ -15,37 +15,44 @@ import ErrorBoundary from './src/components/ErrorBoundary';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
-    let shouldShowAlert = false;
-    let shouldPlaySound = false;
-    let shouldShowBanner = true;
-    let shouldShowList = true;
-    let shouldSetBadge = true;
-    try {
-      const raw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
-      shouldPlaySound = raw !== 'false';
+    const appState = AppState.currentState;
+    let phase = 'init';
+    let alarmEnabledRaw: string | null = null;
+    let isAlarmActive: string | null = null;
+    let isTimerActive: string | null = null;
 
-      // 타이머 실행 중(RunningScreen) 또는 알람 화면(AlarmScreen) 활성: 모든 알림 표시 억제
-      const [isAlarmActive, isTimerActive] = await Promise.all([
+    Logger.info('NotifHandler', `ENTER appState=${appState}`);
+
+    try {
+      phase = 'reading_storage';
+      [alarmEnabledRaw, isAlarmActive, isTimerActive] = await Promise.all([
+        AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
         AsyncStorage.getItem('isAlarmActive'),
         AsyncStorage.getItem('isTimerActive'),
       ]);
-      if (isAlarmActive === 'true' || isTimerActive === 'true') {
-        shouldPlaySound = false;
-        shouldShowAlert = false;
-        shouldShowBanner = false;
-        shouldShowList = false;
-        shouldSetBadge = false;
-      }
+      phase = 'computing';
+
+      const alarmEnabled = alarmEnabledRaw !== 'false';
+      const suppress = (isAlarmActive === 'true' || isTimerActive === 'true') && appState === 'active';
+
+      const result = suppress || !alarmEnabled
+        ? { shouldPlaySound: false, shouldShowBanner: false, shouldShowList: false, shouldSetBadge: false }
+        : { shouldPlaySound: true, shouldShowBanner: true, shouldShowList: true, shouldSetBadge: true };
+
+      Logger.info(
+        'NotifHandler',
+        `OK raw=${alarmEnabledRaw} alarm=${isAlarmActive} timer=${isTimerActive} suppress=${suppress} enabled=${alarmEnabled} → sound=${result.shouldPlaySound}`
+      );
+      return result;
     } catch (e) {
-      Logger.warn('Notifications', `Failed to get notification settings: ${e}`);
+      Logger.error('NotifHandler', `THROW phase=${phase} appState=${appState} err=${e instanceof Error ? e.message : String(e)}`);
+      return {
+        shouldPlaySound: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldSetBadge: true,
+      };
     }
-    return {
-      shouldShowAlert,
-      shouldPlaySound,
-      shouldSetBadge,
-      shouldShowBanner,
-      shouldShowList,
-    };
   },
 });
 import { StatusBar } from 'expo-status-bar';

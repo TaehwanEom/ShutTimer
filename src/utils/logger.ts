@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 각 로그를 독립된 키로 저장. read-modify-write 경쟁 조건 완전 제거.
-const LOG_KEY_PREFIX = 'app_debug_log_entry_';
+// 메모리 버퍼가 primary. AsyncStorage는 best-effort 백업.
+// AsyncStorage 어떤 이유로든 실패해도 세션 동안 로그는 반드시 보임.
+
+const MEMORY_BUFFER_KEY = 'app_debug_log_memory_v2';
 const MAX_LOGS = 200;
 
 interface LogEntry {
@@ -11,70 +13,88 @@ interface LogEntry {
   message: string;
 }
 
-let entryCounter = 0;
+const memoryBuffer: LogEntry[] = [];
 
-const saveEntry = (entry: LogEntry) => {
-  entryCounter += 1;
-  const key = `${LOG_KEY_PREFIX}${entry.timestamp}_${entryCounter}`;
-  AsyncStorage.setItem(key, JSON.stringify(entry)).catch((e) => {
-    console.warn('Logger save failed:', e);
-  });
+const pushToMemory = (entry: LogEntry) => {
+  memoryBuffer.unshift(entry);
+  if (memoryBuffer.length > MAX_LOGS) memoryBuffer.length = MAX_LOGS;
 };
+
+// 백그라운드로 스토리지 반영 (실패해도 메모리엔 이미 있음)
+const persistAll = () => {
+  try {
+    const snapshot = JSON.stringify(memoryBuffer);
+    AsyncStorage.setItem(MEMORY_BUFFER_KEY, snapshot).catch((e) => {
+      console.warn('Logger persist failed:', e);
+    });
+  } catch (e) {
+    console.warn('Logger persist error:', e);
+  }
+};
+
+const record = (level: 'info' | 'warn' | 'error', tag: string, message: string) => {
+  const entry: LogEntry = {
+    timestamp: new Date().toISOString(),
+    level,
+    tag,
+    message,
+  };
+  pushToMemory(entry);
+  persistAll();
+};
+
+// 앱 시작 시 이전 세션 로그 복원 시도 (실패 무시)
+AsyncStorage.getItem(MEMORY_BUFFER_KEY)
+  .then((raw) => {
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        // 기존 메모리 앞에 과거 로그를 붙임 (새 로그 유지)
+        for (const item of parsed) {
+          if (item && typeof item === 'object' && item.timestamp) {
+            memoryBuffer.push(item as LogEntry);
+          }
+        }
+        if (memoryBuffer.length > MAX_LOGS) memoryBuffer.length = MAX_LOGS;
+      }
+    } catch {
+      // 손상 무시
+    }
+  })
+  .catch(() => {});
 
 export const Logger = {
   info: (tag: string, message: string) => {
     console.log(`[${tag}] ${message}`);
-    saveEntry({ timestamp: new Date().toISOString(), level: 'info', tag, message });
+    record('info', tag, message);
   },
 
   warn: (tag: string, message: string) => {
     console.warn(`[${tag}] ${message}`);
-    saveEntry({ timestamp: new Date().toISOString(), level: 'warn', tag, message });
+    record('warn', tag, message);
   },
 
   error: (tag: string, error: unknown) => {
     const errorStr = error instanceof Error ? error.message : String(error);
     console.error(`[${tag}] ${errorStr}`);
-    saveEntry({ timestamp: new Date().toISOString(), level: 'error', tag, message: errorStr });
+    record('error', tag, errorStr);
   },
 
   getLogs: async (): Promise<LogEntry[]> => {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const logKeys = allKeys.filter((k) => k.startsWith(LOG_KEY_PREFIX));
-      if (logKeys.length === 0) return [];
-      const pairs = await AsyncStorage.multiGet(logKeys);
-      const entries: LogEntry[] = [];
-      for (const [, value] of pairs) {
-        if (!value) continue;
-        try {
-          const parsed = JSON.parse(value);
-          if (parsed && typeof parsed === 'object' && parsed.timestamp) {
-            entries.push(parsed as LogEntry);
-          }
-        } catch {
-          // 손상된 항목은 건너뜀
-        }
-      }
-      entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-      return entries.slice(0, MAX_LOGS);
-    } catch {
-      return [];
-    }
+    // 메모리 버퍼 직접 반환 (AsyncStorage 무관)
+    return [...memoryBuffer];
   },
 
   clearLogs: async () => {
+    memoryBuffer.length = 0;
     try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const logKeys = allKeys.filter((k) => k.startsWith(LOG_KEY_PREFIX));
-      if (logKeys.length > 0) {
-        await AsyncStorage.multiRemove(logKeys);
-      }
+      await AsyncStorage.removeItem(MEMORY_BUFFER_KEY);
     } catch (e) {
       console.warn('Failed to clear logs:', e);
     }
   },
 };
 
-// 모듈 로드 시 자기 확인 로그 — Logger 작동 여부 검증용
-Logger.info('Logger', 'initialized');
+// 모듈 로드 시 자기 확인 로그
+Logger.info('Logger', 'initialized (memory-first v2)');

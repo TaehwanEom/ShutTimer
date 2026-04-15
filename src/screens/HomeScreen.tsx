@@ -323,11 +323,16 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   const scheduleAlarm = async (seconds: number) => {
+    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
+    const pushSound = soundId.startsWith('ringtone_') ? 'notification_ringtone.wav' : 'notification_alarm.wav';
+    const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+    const alarmEnabled = alarmEnabledRaw !== 'false';
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: t('running.notifTitle'),
         body: t('running.notifBody'),
-        sound: false,
+        sound: alarmEnabled ? pushSound : false,
+        interruptionLevel: 'timeSensitive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

@@ -64,6 +64,7 @@ type Props = {
 };
 
 type ResultState = 'idle' | 'success' | 'fail';
+type AfterAdAction = 'result' | 'home';
 
 const MISSION_LABELS: Record<string, string[]> = {
   'tv':               ['Television', 'Television set', 'Monitor', 'Computer monitor', 'Display device', 'Screen', 'Laptop', 'Tablet computer', 'Tablet', 'LCD TV', 'Projector screen'],
@@ -106,8 +107,8 @@ const SHAKE_COOLDOWN_MS = 500;
 const VIBRATION_PATTERN = [0, 500, 300, 500, 300, 500];
 const AUTO_DISMISS_MS: Record<string, number> = {
   camera: 5 * 60 * 1000,
-  tap: 3 * 60 * 1000,
-  shake: 3 * 60 * 1000,
+  tap: 5 * 60 * 1000,
+  shake: 5 * 60 * 1000,
 };
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
 const RESULT_BG = {
@@ -149,7 +150,9 @@ export default function AlarmScreen({ navigation }: Props) {
   const resultEnteredRef = useRef(false);
   const autoResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
-  const handleConfirmRef = useRef<() => void>(() => {});
+  const pendingResultRef = useRef<'success' | 'fail' | null>(null);
+  const afterAdActionRef = useRef<AfterAdAction>('home');
+  const handleAfterAdRef = useRef<() => void>(() => {});
 
   const stopAudioAndVibration = useCallback(() => {
     Vibration.cancel();
@@ -172,57 +175,75 @@ export default function AlarmScreen({ navigation }: Props) {
     };
   }, []);
 
-  const handleConfirm = useCallback(() => {
+  const goHome = useCallback(() => {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
     if (autoResultTimeoutRef.current) {
       clearTimeout(autoResultTimeoutRef.current);
       autoResultTimeoutRef.current = null;
     }
-    /**
-     * ═══════════════════════════════════════════════════════════
-     *  @preserve IAP (Interstitial isAdFree 분기) — Phase 2+ 재활성화용
-     *  보존 결정일: 2026-04-14
-     *  비활성화 사유: IAP 보류 (B안). 알람 종료 시 항상 Interstitial 시도.
-     *  재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
-     *  ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
-     *
-     *  @preserve-original:
-     *  if (!isAdFree && adLoadedRef.current) {
-     *    interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
-     *  } else {
-     *    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-     *  }
-     *  deps: [navigation, isAdFree]
-     * ═══════════════════════════════════════════════════════════
-     */
-    if (adLoadedRef.current) {
-      interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
-    } else {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    }
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation]);
 
-  useEffect(() => {
-    handleConfirmRef.current = handleConfirm;
-  }, [handleConfirm]);
+  // 광고 종료 후 분기: 카메라 결과 화면 OR 홈
+  const handleAfterAd = useCallback(() => {
+    if (dismissedRef.current) return;
+    if (afterAdActionRef.current === 'result' && pendingResultRef.current) {
+      setResultState(pendingResultRef.current);
+      if (autoResultTimeoutRef.current) clearTimeout(autoResultTimeoutRef.current);
+      autoResultTimeoutRef.current = setTimeout(goHome, RESULT_AUTO_CONFIRM_MS);
+    } else {
+      goHome();
+    }
+  }, [goHome]);
 
+  // handleAfterAdRef 동기화 (광고 CLOSED 리스너에서 최신 참조 보장)
+  useEffect(() => {
+    handleAfterAdRef.current = handleAfterAd;
+  }, [handleAfterAd]);
+
+  /**
+   * ═══════════════════════════════════════════════════════════
+   *  @preserve IAP (Interstitial isAdFree 분기) — Phase 2+ 재활성화용
+   *  보존 결정일: 2026-04-14 (위치 이전: 2026-04-15, 광고→결과 흐름 재설계)
+   *  비활성화 사유: IAP 보류 (B안). 알람 종료 시 항상 Interstitial 시도.
+   *  재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+   *  ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+   *
+   *  @preserve-original (handleConfirm 내부):
+   *  if (!isAdFree && adLoadedRef.current) {
+   *    interstitial.show().catch(() => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }));
+   *  } else {
+   *    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+   *  }
+   *
+   *  재활성화 시 적용 위치: enterResult + autoDismissNoResult 두 곳의
+   *  adLoadedRef.current 체크 앞에 `!isAdFree &&` 가드 추가.
+   * ═══════════════════════════════════════════════════════════
+   */
   const enterResult = useCallback((result: 'success' | 'fail') => {
     if (resultEnteredRef.current) return;
     resultEnteredRef.current = true;
     stopAudioAndVibration();
-    setResultState(result);
-    autoResultTimeoutRef.current = setTimeout(() => {
-      handleConfirmRef.current();
-    }, RESULT_AUTO_CONFIRM_MS);
-  }, [stopAudioAndVibration]);
+    pendingResultRef.current = result;
+    afterAdActionRef.current = dismissMethod === 'camera' ? 'result' : 'home';
+    if (adLoadedRef.current && interstitial) {
+      interstitial.show().catch(handleAfterAd);
+    } else {
+      handleAfterAd();
+    }
+  }, [stopAudioAndVibration, dismissMethod, handleAfterAd]);
 
   const autoDismissNoResult = useCallback(() => {
     if (dismissedRef.current) return;
-    dismissedRef.current = true;
     stopAudioAndVibration();
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  }, [navigation, stopAudioAndVibration]);
+    afterAdActionRef.current = 'home';
+    if (adLoadedRef.current && interstitial) {
+      interstitial.show().catch(goHome);
+    } else {
+      goHome();
+    }
+  }, [stopAudioAndVibration, goHome]);
 
   // 전면 광고 로드
   useEffect(() => {
@@ -240,7 +261,7 @@ export default function AlarmScreen({ navigation }: Props) {
         adLoadedRef.current = true;
       });
       const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+        handleAfterAdRef.current();
       });
       const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
         console.warn('Interstitial ad failed:', error?.code, error?.message, error);
@@ -350,7 +371,7 @@ export default function AlarmScreen({ navigation }: Props) {
         if (shakeCountRef.current >= SHAKE_COUNT_REQUIRED) {
           sub.remove();
           accelSubRef.current = null;
-          handleConfirm();
+          enterResult('success');
         }
       }
     });
@@ -516,7 +537,7 @@ export default function AlarmScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.tapSection}>
-          <TouchableOpacity style={styles.tapButton} onPress={handleConfirm} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.tapButton} onPress={goHome} activeOpacity={0.8}>
             <Text style={[styles.tapButtonText, { color: bgColor }]}>{t('alarm.resultConfirm')}</Text>
           </TouchableOpacity>
         </View>

@@ -468,7 +468,7 @@ export default function AlarmScreen({ navigation }: Props) {
       const result = await ImageLabeling.label(photo.uri);
       const matched = result.some(
         (item: { text: string; confidence: number }) =>
-          item.confidence >= 0.35 &&
+          item.confidence >= 0.4 &&
           activeLabels.some(l => item.text.toLowerCase().includes(l.toLowerCase()))
       );
 

@@ -675,6 +675,7 @@ export default function HomeScreen({ navigation }: Props) {
                     } else {
                       setSelectedIndex(index);
                       setSelectedMinutes(mission.defaultMinutes ?? 60);
+                      setSelectedSeconds(0);
                     }
                   }}
                   onLongPress={() => navigation.navigate('AddTimer', { editId: mission.id, editIcon: mission.icon, editMinutes: mission.defaultMinutes ?? 60, dialType })}

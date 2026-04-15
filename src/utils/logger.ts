@@ -10,64 +10,70 @@ interface LogEntry {
   message: string;
 }
 
+// 모든 저장 작업을 순차 실행. 동시 read-modify-write로 인한 로그 유실 방지.
+let saveQueue: Promise<void> = Promise.resolve();
+
+const enqueueSave = (entry: LogEntry) => {
+  saveQueue = saveQueue.then(async () => {
+    try {
+      const prev = await AsyncStorage.getItem(LOG_STORAGE_KEY);
+      let logs: LogEntry[] = [];
+      if (prev) {
+        try {
+          const parsed = JSON.parse(prev);
+          if (Array.isArray(parsed)) logs = parsed;
+        } catch {
+          // 손상된 JSON이면 새로 시작
+        }
+      }
+      logs.unshift(entry);
+      const limited = logs.slice(0, MAX_LOGS);
+      await AsyncStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(limited));
+    } catch (e) {
+      console.warn('Logger._save failed:', e);
+    }
+  });
+};
+
 export const Logger = {
   info: (tag: string, message: string) => {
-    const msg = `[${tag}] ${message}`;
-    console.log(msg);
-    Logger._save('info', tag, message);
+    console.log(`[${tag}] ${message}`);
+    enqueueSave({ timestamp: new Date().toISOString(), level: 'info', tag, message });
   },
 
   warn: (tag: string, message: string) => {
-    const msg = `[${tag}] ${message}`;
-    console.warn(msg);
-    Logger._save('warn', tag, message);
+    console.warn(`[${tag}] ${message}`);
+    enqueueSave({ timestamp: new Date().toISOString(), level: 'warn', tag, message });
   },
 
   error: (tag: string, error: unknown) => {
     const errorStr = error instanceof Error ? error.message : String(error);
-    const msg = `[${tag}] ${errorStr}`;
-    console.error(msg);
-    Logger._save('error', tag, errorStr);
-  },
-
-  _save: async (
-    level: 'info' | 'warn' | 'error',
-    tag: string,
-    message: string
-  ) => {
-    try {
-      const entry: LogEntry = {
-        timestamp: new Date().toISOString(),
-        level,
-        tag,
-        message,
-      };
-
-      const prev = await AsyncStorage.getItem(LOG_STORAGE_KEY);
-      const logs: LogEntry[] = JSON.parse(prev || '[]');
-      logs.unshift(entry);
-      const limited = logs.slice(0, MAX_LOGS);
-
-      await AsyncStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(limited));
-    } catch (e) {
-      // 로그 저장 실패는 조용히 무시
-    }
+    console.error(`[${tag}] ${errorStr}`);
+    enqueueSave({ timestamp: new Date().toISOString(), level: 'error', tag, message: errorStr });
   },
 
   getLogs: async (): Promise<LogEntry[]> => {
     try {
       const data = await AsyncStorage.getItem(LOG_STORAGE_KEY);
-      return JSON.parse(data || '[]');
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
   },
 
   clearLogs: async () => {
-    try {
-      await AsyncStorage.removeItem(LOG_STORAGE_KEY);
-    } catch (e) {
-      console.warn('Failed to clear logs:', e);
-    }
+    saveQueue = saveQueue.then(async () => {
+      try {
+        await AsyncStorage.removeItem(LOG_STORAGE_KEY);
+      } catch (e) {
+        console.warn('Failed to clear logs:', e);
+      }
+    });
+    return saveQueue;
   },
 };
+
+// 모듈 로드 시 자기 확인 로그 — Logger 작동 여부 검증용
+Logger.info('Logger', 'initialized');

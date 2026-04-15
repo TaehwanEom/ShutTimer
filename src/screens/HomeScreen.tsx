@@ -34,6 +34,15 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
+// 진행 중인 타이머 영속화 (cold start 복원용)
+type ActiveTimer = {
+  startedAt: number;
+  totalSeconds: number;
+  missionId: string | null;
+  missionIcon: string | null;
+};
+const ACTIVE_TIMER_KEY = 'activeTimer';
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
@@ -372,9 +381,8 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const cancelAlarms = async () => {
-    for (const id of notificationIdsRef.current) {
-      await Notifications.cancelScheduledNotificationAsync(id);
-    }
+    // 메모리 배열 + 시스템 예약 양쪽 모두 정리 (cold start 복원 후 메모리 배열이 비어있어도 안전)
+    await Notifications.cancelAllScheduledNotificationsAsync();
     notificationIdsRef.current = [];
   };
 
@@ -382,6 +390,7 @@ export default function HomeScreen({ navigation }: Props) {
   const handleStart = () => {
     const total = selectedMinutes * 60 + selectedSeconds;
     if (total <= 0) return;
+    const mission = missionList[selectedIndex] ?? null;
     totalSecondsRef.current = total;
     remainingSecondsRef.current = total;
     setRemainingSeconds(total);
@@ -390,6 +399,13 @@ export default function HomeScreen({ navigation }: Props) {
     isPausedRef.current = false;
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
+    // 영속화 (cold start 복원용)
+    AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({
+      startedAt: Date.now(),
+      totalSeconds: total,
+      missionId: mission?.id ?? null,
+      missionIcon: mission?.icon ?? null,
+    } satisfies ActiveTimer)).catch(() => {});
   };
 
   // --- interval ---
@@ -435,11 +451,43 @@ export default function HomeScreen({ navigation }: Props) {
       const mission = missionList[selectedIndex] ?? null;
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
+      AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
       cancelAlarms().then(() => {
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }
   }, [remainingSeconds, isRunning]);
+
+  // --- Cold start 타이머 복원 (mount 1회) ---
+  useEffect(() => {
+    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
+      if (!raw) return;
+      let t: ActiveTimer;
+      try {
+        t = JSON.parse(raw);
+      } catch {
+        AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
+        return;
+      }
+      const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
+      const remaining = t.totalSeconds - elapsed;
+      if (remaining > 0) {
+        // 타이머 진행 중 → UI 복원
+        totalSecondsRef.current = t.totalSeconds;
+        remainingSecondsRef.current = remaining;
+        setRemainingSeconds(remaining);
+        setIsRunning(true);
+      } else {
+        // 알람 시간 지났음 → 세션 기록 + AlarmScreen
+        saveSession(t.totalSeconds, t.missionIcon ?? 'timer');
+        AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
+        navigation.navigate('Alarm', {
+          missionId: t.missionId ?? undefined,
+          missionIcon: t.missionIcon ?? undefined,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   // --- AppState ---
   useEffect(() => {
@@ -476,6 +524,7 @@ export default function HomeScreen({ navigation }: Props) {
   // --- 취소 ---
   const handleCancel = () => {
     cancelAlarms();
+    AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
     setIsRunning(false);
     setIsPaused(false);
     isPausedRef.current = false;

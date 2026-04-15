@@ -18,7 +18,8 @@
     "notifBodyTap": "Temporizador encerrado. Para desligar o alarme, toque no botão.",
     "notifBodyShake": "Temporizador encerrado. Para desligar o alarme, agite o dispositivo.",
     "notifBodyReminder": "O alarme está tocando. Abra o app para desligar.",
-    "notifBodyReminder2": "O alarme ainda está tocando. Não aguento mais tocar por muito tempo"
+    "notifBodyReminder2": "O alarme ainda está tocando. Não aguento mais tocar por muito tempo. 😂",
+    "notifBodyReminder3": "Esta é realmente a última... por favor desligue. 😭"
   },
   "alarm": {
     "timerExpired": "TEMPO ESGOTADO",

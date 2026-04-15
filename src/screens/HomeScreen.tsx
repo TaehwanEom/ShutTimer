@@ -306,7 +306,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
   const backgroundedAt = useRef<number | null>(null);
-  const notificationIdRef = useRef<string | null>(null);
+  const notificationIdsRef = useRef<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -323,29 +323,59 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   const scheduleAlarm = async (seconds: number) => {
+    // 기존 예약 모두 취소
+    for (const oldId of notificationIdsRef.current) {
+      await Notifications.cancelScheduledNotificationAsync(oldId);
+    }
+    notificationIdsRef.current = [];
+
+    // 사운드 + 사용자 설정
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
-    const pushSound = soundId.startsWith('ringtone_') ? 'notification_ringtone.wav' : 'notification_alarm.wav';
+    const pushSound = soundId.startsWith('ringtone_')
+      ? 'notification_ringtone.wav'
+      : 'notification_alarm.wav';
     const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmEnabledRaw !== 'false';
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: t('running.notifTitle'),
-        body: t('running.notifBody'),
-        sound: alarmEnabled ? pushSound : false,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: seconds,
-      },
-    });
-    notificationIdRef.current = id;
+    const sound = alarmEnabled ? pushSound : false;
+
+    // 종료 방식별 첫 본문
+    const method = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
+    const firstBodyKey =
+      method === 'tap' ? 'running.notifBodyTap'
+      : method === 'shake' ? 'running.notifBodyShake'
+      : 'running.notifBodyCamera';
+
+    // 3단계 알람 (30초 사운드 × 3, 60초 간격)
+    const stages: { offset: number; bodyKey: string }[] = [
+      { offset: 0,   bodyKey: firstBodyKey },
+      { offset: 60,  bodyKey: 'running.notifBodyReminder2' },
+      { offset: 120, bodyKey: 'running.notifBodyReminder3' },
+    ];
+
+    const ids: string[] = [];
+    for (const { offset, bodyKey } of stages) {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t('running.notifTitle'),
+          body: t(bodyKey),
+          sound,
+          interruptionLevel: 'active',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: seconds + offset,
+        },
+      });
+      ids.push(id);
+    }
+    notificationIdsRef.current = ids;
   };
 
-  const cancelAlarm = async (id: string | null) => {
-    if (id !== null) {
+  const cancelAlarms = async () => {
+    for (const id of notificationIdsRef.current) {
       await Notifications.cancelScheduledNotificationAsync(id);
-      notificationIdRef.current = null;
     }
+    notificationIdsRef.current = [];
   };
 
   // --- 타이머 시작 ---
@@ -405,7 +435,7 @@ export default function HomeScreen({ navigation }: Props) {
       const mission = missionList[selectedIndex] ?? null;
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
-      cancelAlarm(notificationIdRef.current).then(() => {
+      cancelAlarms().then(() => {
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }
@@ -437,7 +467,7 @@ export default function HomeScreen({ navigation }: Props) {
     isPausedRef.current = next;
     setIsPaused(next);
     if (next) {
-      cancelAlarm(notificationIdRef.current);
+      cancelAlarms();
     } else {
       scheduleAlarm(remainingSecondsRef.current);
     }
@@ -445,7 +475,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   // --- 취소 ---
   const handleCancel = () => {
-    cancelAlarm(notificationIdRef.current);
+    cancelAlarms();
     setIsRunning(false);
     setIsPaused(false);
     isPausedRef.current = false;

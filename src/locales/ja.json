@@ -18,7 +18,8 @@
     "notifBodyTap": "タイマーが終了しました。アラームを止めるにはボタンを押してください。",
     "notifBodyShake": "タイマーが終了しました。アラームを止めるには端末を振ってください。",
     "notifBodyReminder": "アラームが鳴っています。アプリを開いて停止してください。",
-    "notifBodyReminder2": "まだアラームが鳴っています。もうこれ以上鳴らすのは厳しいです"
+    "notifBodyReminder2": "まだアラームが鳴っています。もうこれ以上鳴らすのは厳しいです。😂",
+    "notifBodyReminder3": "本当に最後です... 早く消してください。😭"
   },
   "alarm": {
     "timerExpired": "時間終了",

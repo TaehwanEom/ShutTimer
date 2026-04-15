@@ -18,7 +18,8 @@
     "notifBodyTap": "Timer abgelaufen. Um den Alarm zu beenden, drück den Button.",
     "notifBodyShake": "Timer abgelaufen. Um den Alarm zu beenden, schüttle dein Gerät.",
     "notifBodyReminder": "Alarm klingelt. Öffne die App zum Beenden.",
-    "notifBodyReminder2": "Der Alarm klingelt immer noch. Ich kann nicht mehr viel länger klingeln"
+    "notifBodyReminder2": "Der Alarm klingelt immer noch. Ich kann nicht mehr viel länger klingeln. 😂",
+    "notifBodyReminder3": "Das ist wirklich das letzte Mal... bitte ausschalten. 😭"
   },
   "alarm": {
     "timerExpired": "ZEIT ABGELAUFEN",

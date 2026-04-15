@@ -18,7 +18,8 @@
     "notifBodyTap": "Minuteur terminé. Pour arrêter l'alarme, appuyez sur le bouton.",
     "notifBodyShake": "Minuteur terminé. Pour arrêter l'alarme, secouez votre appareil.",
     "notifBodyReminder": "L'alarme sonne. Ouvrez l'app pour l'arrêter.",
-    "notifBodyReminder2": "L'alarme sonne encore. Je ne peux plus continuer longtemps"
+    "notifBodyReminder2": "L'alarme sonne encore. Je ne peux plus continuer longtemps. 😂",
+    "notifBodyReminder3": "C'est vraiment la dernière... veuillez l'éteindre. 😭"
   },
   "alarm": {
     "timerExpired": "TEMPS ÉCOULÉ",

@@ -18,7 +18,8 @@
     "notifBodyTap": "計時器已結束。要關閉鬧鐘，請按下按鈕。",
     "notifBodyShake": "計時器已結束。要關閉鬧鐘，請搖晃裝置。",
     "notifBodyReminder": "鬧鐘正在響鈴。打開應用關閉鬧鐘。",
-    "notifBodyReminder2": "鬧鐘還在響。我已經快撐不住了"
+    "notifBodyReminder2": "鬧鐘還在響。我已經快撐不住了。😂",
+    "notifBodyReminder3": "真的是最後一次了... 請趕快關掉。😭"
   },
   "alarm": {
     "timerExpired": "時間到",

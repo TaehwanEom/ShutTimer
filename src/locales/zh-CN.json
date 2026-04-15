@@ -18,7 +18,8 @@
     "notifBodyTap": "计时器已结束。要关闭闹钟，请按下按钮。",
     "notifBodyShake": "计时器已结束。要关闭闹钟,请摇晃设备。",
     "notifBodyReminder": "闹钟正在响铃。打开应用关闭闹钟。",
-    "notifBodyReminder2": "闹钟还在响。我已经快撑不住了"
+    "notifBodyReminder2": "闹钟还在响。我已经快撑不住了。😂",
+    "notifBodyReminder3": "真的是最后一次了... 请赶紧关掉。😭"
   },
   "alarm": {
     "timerExpired": "时间到",

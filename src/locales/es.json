@@ -18,7 +18,8 @@
     "notifBodyTap": "Temporizador terminado. Para detener la alarma, pulsa el botón.",
     "notifBodyShake": "Temporizador terminado. Para detener la alarma, agita el dispositivo.",
     "notifBodyReminder": "La alarma está sonando. Abre la app para apagarla.",
-    "notifBodyReminder2": "La alarma sigue sonando. Ya no puedo seguir mucho más"
+    "notifBodyReminder2": "La alarma sigue sonando. Ya no puedo seguir mucho más. 😂",
+    "notifBodyReminder3": "¡Esta es realmente la última! Por favor apágala. 😭"
   },
   "alarm": {
     "timerExpired": "TIEMPO AGOTADO",

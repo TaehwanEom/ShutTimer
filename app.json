@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shuttimer.app",
-      "buildNumber": "23",
+      "buildNumber": "24",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },

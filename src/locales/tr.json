@@ -18,7 +18,8 @@
     "notifBodyTap": "Zamanlayıcı bitti. Alarmı kapatmak için düğmeye basın.",
     "notifBodyShake": "Zamanlayıcı bitti. Alarmı kapatmak için cihazı sallayın.",
     "notifBodyReminder": "Alarm çalıyor. Kapatmak için uygulamayı açın.",
-    "notifBodyReminder2": "Alarm hâlâ çalıyor. Artık daha fazla çalamayacağım"
+    "notifBodyReminder2": "Alarm hâlâ çalıyor. Artık daha fazla çalamayacağım. 😂",
+    "notifBodyReminder3": "Bu gerçekten son... lütfen kapatın. 😭"
   },
   "alarm": {
     "timerExpired": "SÜRE DOLDU",

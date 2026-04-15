@@ -18,7 +18,8 @@
     "notifBodyTap": "Timer ended. To dismiss the alarm, tap the button.",
     "notifBodyShake": "Timer ended. To dismiss the alarm, shake your device.",
     "notifBodyReminder": "Alarm is ringing. Open the app to dismiss.",
-    "notifBodyReminder2": "The alarm is still ringing. I can't keep ringing much longer"
+    "notifBodyReminder2": "The alarm is still ringing. I can't keep ringing much longer. 😂",
+    "notifBodyReminder3": "This is really the last one... please turn it off. 😭"
   },
   "alarm": {
     "timerExpired": "TIMER EXPIRED",

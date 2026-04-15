@@ -18,7 +18,8 @@
     "notifBodyTap": "Timer scaduto. Per fermare la sveglia, premi il pulsante.",
     "notifBodyShake": "Timer scaduto. Per fermare la sveglia, scuoti il dispositivo.",
     "notifBodyReminder": "La sveglia sta suonando. Apri l'app per disattivarla.",
-    "notifBodyReminder2": "La sveglia suona ancora. Non riesco più a suonare a lungo"
+    "notifBodyReminder2": "La sveglia suona ancora. Non riesco più a suonare a lungo. 😂",
+    "notifBodyReminder3": "Questa è davvero l'ultima... per favore spegnila. 😭"
   },
   "alarm": {
     "timerExpired": "TEMPO SCADUTO",

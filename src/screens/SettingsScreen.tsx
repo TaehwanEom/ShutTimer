@@ -8,7 +8,8 @@ import {
   Switch,
   ScrollView,
   Modal,
-  Alert,
+  // @preserve IAP — Alert는 purchase 섹션에서만 사용. Phase 2+ 복원용.
+  // Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,7 +22,6 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
 import { useTranslation } from 'react-i18next';
 import AdBanner from '../components/AdBanner';
-import { Logger } from '../utils/logger';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 import { getLocales } from 'expo-localization';
@@ -476,31 +476,6 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={styles.comingSoonText}>{t('settings.comingSoon')}</Text>
             </View>
           </View>
-        </View>
-
-        {/* 디버그 — 빌드 18 임시. 원인 파악 후 제거 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>디버그</Text>
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={async () => {
-              const logs = await Logger.getLogs();
-              const text = logs.slice(0, 50).map(l =>
-                `[${l.timestamp.slice(11, 19)}] [${l.tag}] ${l.message}`
-              ).join('\n');
-              Alert.alert('알림 로그 (최근 50)', text || '(로그 없음)', [
-                { text: '지우기', onPress: () => { Logger.clearLogs(); } },
-                { text: '닫기' },
-              ]);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>알림 로그 보기</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-          </TouchableOpacity>
         </View>
       </ScrollView>
 

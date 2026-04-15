@@ -332,7 +332,6 @@ export default function HomeScreen({ navigation }: Props) {
         title: t('running.notifTitle'),
         body: t('running.notifBody'),
         sound: alarmEnabled ? pushSound : false,
-        interruptionLevel: 'timeSensitive',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

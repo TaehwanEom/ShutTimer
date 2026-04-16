@@ -223,7 +223,8 @@
         "react-native-vision-camera",
         {
           "cameraPermissionText": "사물을 인식하여 타이머를 종료합니다.",
-          "enableFrameProcessors": true
+          "enableFrameProcessors": true,
+          "enableLocation": false
         }
       ]
     ],

@@ -1,4 +1,5 @@
-import { loadTensorflowModel, TensorflowModel } from 'react-native-fast-tflite';
+import { loadTensorflowModel } from 'react-native-fast-tflite';
+import type { TfliteModel } from 'react-native-fast-tflite/lib/typescript/specs/Tflite.nitro';
 import * as ImageManipulator from 'expo-image-manipulator';
 import jpeg from 'jpeg-js';
 
@@ -6,14 +7,15 @@ import jpeg from 'jpeg-js';
 const INPUT_SIZE = 224;
 const EMBEDDING_DIM = 1280;
 
-let model: TensorflowModel | null = null;
-let loadPromise: Promise<TensorflowModel> | null = null;
+let model: TfliteModel | null = null;
+let loadPromise: Promise<TfliteModel> | null = null;
 
-export async function loadEmbeddingModel(): Promise<TensorflowModel> {
+export async function loadEmbeddingModel(): Promise<TfliteModel> {
   if (model) return model;
   if (!loadPromise) {
     loadPromise = loadTensorflowModel(
-      require('../../assets/models/mobilenet_v3_large.tflite')
+      require('../../assets/models/mobilenet_v3_large.tflite'),
+      []
     );
   }
   model = await loadPromise;
@@ -64,8 +66,8 @@ async function imageUriToFloat32(imageUri: string): Promise<Float32Array> {
 export async function extractEmbedding(imageUri: string): Promise<Float32Array> {
   const m = await loadEmbeddingModel();
   const input = await imageUriToFloat32(imageUri);
-  const outputs = await m.run([input]);
-  const embedding = outputs[0] as Float32Array;
+  const outputs = await m.run([input.buffer as ArrayBuffer]);
+  const embedding = new Float32Array(outputs[0]);
   if (embedding.length !== EMBEDDING_DIM) {
     throw new Error(`Expected ${EMBEDDING_DIM}d embedding, got ${embedding.length}d`);
   }

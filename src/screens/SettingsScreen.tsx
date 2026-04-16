@@ -477,6 +477,22 @@ export default function SettingsScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+
+        {/* @v1.5-poc — Phase A 검증 후 제거 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DEBUG (v1.5 PoC)</Text>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={() => navigation.navigate('PoCPhotoValidation')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="science" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>사진 인식 PoC</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* 사운드 선택 모달 */}

@@ -65,6 +65,8 @@ import AddTimerScreen from './src/screens/AddTimerScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
+// @v1.5-poc — Phase A 검증 후 제거
+import PoCPhotoValidationScreen from './src/screens/PoCPhotoValidationScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
@@ -83,6 +85,8 @@ export type RootStackParamList = {
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
   History: undefined;
   Notice: undefined;
+  // @v1.5-poc — Phase A 검증 후 제거
+  PoCPhotoValidation: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -227,6 +231,8 @@ function AppNavigator() {
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
+        {/* @v1.5-poc — Phase A 검증 후 제거 */}
+        <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </>

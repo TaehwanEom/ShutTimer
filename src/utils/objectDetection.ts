@@ -76,19 +76,41 @@ async function imageUriToFloat32(imageUri: string): Promise<Float32Array> {
   return float32;
 }
 
-export async function detectObjects(imageUri: string): Promise<Detection[]> {
+export type RawDebug = {
+  outputCount: number;
+  totalElements: number;
+  elementsPerRow: number;
+  rows: number[][];
+};
+
+export async function detectObjects(imageUri: string): Promise<{ detections: Detection[]; debug: RawDebug }> {
   const m = await loadDetectionModel();
   const input = await imageUriToFloat32(imageUri);
   const outputs = await m.run([input.buffer as ArrayBuffer]);
 
-  // YOLOv10n TFLite output: [1, 300, 6]
-  // 300 detections × [x1, y1, x2, y2, confidence, class_id]
-  // NMS-free: 중복 없음, 후처리 불필요
   const rawOutput = new Float32Array(outputs[0]);
-  const detections: Detection[] = [];
+  const totalElements = rawOutput.length;
 
+  // raw 출력 첫 5행 (6값씩) 디버그용 저장
+  const debug: RawDebug = {
+    outputCount: outputs.length,
+    totalElements,
+    elementsPerRow: totalElements >= 1800 ? 6 : totalElements / MAX_DETECTIONS,
+    rows: [],
+  };
+  const stride = debug.elementsPerRow;
+  for (let i = 0; i < 5; i++) {
+    const row: number[] = [];
+    for (let j = 0; j < Math.min(stride, 10); j++) {
+      row.push(rawOutput[i * stride + j]);
+    }
+    debug.rows.push(row);
+  }
+
+  // 파싱 (현재 가정: [x1,y1,x2,y2,conf,classId] — 디버그 후 수정)
+  const detections: Detection[] = [];
   for (let i = 0; i < MAX_DETECTIONS; i++) {
-    const offset = i * 6;
+    const offset = i * stride;
     const x1 = rawOutput[offset];
     const y1 = rawOutput[offset + 1];
     const x2 = rawOutput[offset + 2];
@@ -107,7 +129,7 @@ export async function detectObjects(imageUri: string): Promise<Detection[]> {
   }
 
   detections.sort((a, b) => b.confidence - a.confidence);
-  return detections.slice(0, 10);
+  return { detections: detections.slice(0, 10), debug };
 }
 
 export const MISSION_COCO_LABELS: Record<string, string[]> = {

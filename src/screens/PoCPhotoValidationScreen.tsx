@@ -21,6 +21,7 @@ import {
   detectObjects,
   loadDetectionModel,
   type Detection,
+  type RawDebug,
 } from '../utils/objectDetection';
 import { Logger } from '../utils/logger';
 
@@ -39,6 +40,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rawDebug, setRawDebug] = useState<RawDebug | null>(null);
 
   useEffect(() => {
     loadDetectionModel()
@@ -74,9 +76,10 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         return;
       }
       const t0 = Date.now();
-      const results = await detectObjects(photo.uri);
+      const { detections: results, debug } = await detectObjects(photo.uri);
       setInferenceMs(Date.now() - t0);
       setDetections(results);
+      setRawDebug(debug);
       setCameraOpen(false);
     } catch (e: any) {
       Logger.error('PoC', `detect failed: ${e?.message ?? e}`);
@@ -179,9 +182,25 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           </View>
         )}
 
+        {rawDebug && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>RAW 출력 디버그</Text>
+            <View style={styles.resultBox}>
+              <Text style={styles.resultLabel}>
+                outputs: {rawDebug.outputCount}개 / total: {rawDebug.totalElements} / stride: {rawDebug.elementsPerRow}
+              </Text>
+              {rawDebug.rows.map((row, i) => (
+                <Text key={i} style={[styles.resultLabel, { fontSize: 11, fontFamily: 'Courier' }]}>
+                  [{i}] {row.map(v => v.toFixed(2)).join(', ')}
+                </Text>
+              ))}
+            </View>
+          </View>
+        )}
+
         <TouchableOpacity
           style={[styles.secondaryBtn, busy && styles.btnDisabled]}
-          onPress={() => { setDetections([]); setInferenceMs(null); setError(null); }}
+          onPress={() => { setDetections([]); setInferenceMs(null); setError(null); setRawDebug(null); }}
           disabled={busy}
         >
           <MaterialIcons name="refresh" size={20} color={colors.onBackground} />

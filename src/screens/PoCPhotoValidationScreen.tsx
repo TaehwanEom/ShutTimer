@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -47,6 +48,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('register');
   const [embedDim, setEmbedDim] = useState<number | null>(null);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadEmbeddingModel()
@@ -118,8 +120,15 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
       const result = await captureAndExtract();
       if (!result) return;
       if (mode === 'register') {
-        setRegistered((prev) => [...prev, result.embedding]);
-        setRegisteredUris((prev) => [...prev, result.uri]);
+        if (editIndex !== null) {
+          setRegistered((prev) => prev.map((v, i) => i === editIndex ? result.embedding : v));
+          setRegisteredUris((prev) => prev.map((v, i) => i === editIndex ? result.uri : v));
+          setEditIndex(null);
+          setScores(null);
+        } else {
+          setRegistered((prev) => [...prev, result.embedding]);
+          setRegisteredUris((prev) => [...prev, result.uri]);
+        }
       } else {
         const query = result.embedding;
         const newScores = registered.map((r) => cosineSimilarity(query, r));
@@ -142,6 +151,15 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const closeCamera = () => {
     if (busy) return;
     setCameraOpen(false);
+    setEditIndex(null);
+  };
+
+  const onSlotPress = (index: number) => {
+    if (!registeredUris[index]) return;
+    if (busy || !modelReady) return;
+    setEditIndex(index);
+    setMode('register');
+    setCameraOpen(true);
   };
 
   const maxScore = scores ? Math.max(...scores) : null;
@@ -179,11 +197,22 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           <Text style={styles.sectionTitle}>등록 ({registered.length}/3)</Text>
           <View style={styles.slotRow}>
             {[0, 1, 2].map((i) => (
-              <View key={i} style={styles.slot}>
+              <TouchableOpacity
+                key={i}
+                style={styles.slot}
+                onPress={() => onSlotPress(i)}
+                disabled={!registeredUris[i] || busy}
+                activeOpacity={0.7}
+              >
                 {registeredUris[i] ? (
                   <View style={styles.slotFilled}>
-                    <MaterialIcons name="check-circle" size={32} color={colors.primary} />
-                    <Text style={styles.slotNum}>{i + 1}</Text>
+                    <Image
+                      source={{ uri: registeredUris[i] }}
+                      style={styles.slotImage}
+                    />
+                    <View style={styles.slotEditBadge}>
+                      <MaterialIcons name="edit" size={12} color="#fff" />
+                    </View>
                   </View>
                 ) : (
                   <View style={styles.slotEmpty}>
@@ -192,7 +221,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
                     </Text>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -299,34 +328,44 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
       <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>
         <View style={styles.cameraContainer}>
           {permission?.granted ? (
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back">
-              <SafeAreaView style={styles.cameraOverlay}>
+            <SafeAreaView style={styles.cameraOverlay}>
+              <TouchableOpacity
+                style={styles.cameraCloseBtn}
+                onPress={closeCamera}
+                disabled={busy}
+              >
+                <MaterialIcons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+
+              <View style={styles.cameraPreviewArea}>
+                <CameraView
+                  ref={cameraRef}
+                  style={{ width: '100%', aspectRatio: 4 / 3 }}
+                  facing="back"
+                />
+              </View>
+
+              <View style={styles.cameraBottom}>
+                <Text style={styles.cameraModeText}>
+                  {mode === 'compare'
+                    ? '비교용 촬영'
+                    : editIndex !== null
+                      ? `${editIndex + 1}번 재촬영`
+                      : `${nextSlot}번 등록`}
+                </Text>
                 <TouchableOpacity
-                  style={styles.cameraCloseBtn}
-                  onPress={closeCamera}
+                  style={[styles.shutterBtn, busy && styles.btnDisabled]}
+                  onPress={onCapture}
                   disabled={busy}
                 >
-                  <MaterialIcons name="close" size={28} color="#fff" />
+                  {busy ? (
+                    <ActivityIndicator color={colors.primary} size="large" />
+                  ) : (
+                    <View style={styles.shutterInner} />
+                  )}
                 </TouchableOpacity>
-
-                <View style={styles.cameraBottom}>
-                  <Text style={styles.cameraModeText}>
-                    {mode === 'register' ? `${nextSlot}번 등록` : '비교용 촬영'}
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.shutterBtn, busy && styles.btnDisabled]}
-                    onPress={onCapture}
-                    disabled={busy}
-                  >
-                    {busy ? (
-                      <ActivityIndicator color={colors.primary} size="large" />
-                    ) : (
-                      <View style={styles.shutterInner} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </SafeAreaView>
-            </CameraView>
+              </View>
+            </SafeAreaView>
           ) : (
             <View style={styles.permissionDenied}>
               <Text style={{ color: '#fff' }}>카메라 권한이 필요합니다.</Text>
@@ -394,6 +433,22 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.outlineVariant,
       borderStyle: 'dashed',
     },
+    slotImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 12,
+    },
+    slotEditBadge: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     slotNum: { fontSize: 22, fontWeight: '800', color: colors.onBackground },
     primaryBtn: {
       flexDirection: 'row',
@@ -459,6 +514,11 @@ const makeStyles = (colors: ThemeColors) =>
     },
     cameraContainer: { flex: 1, backgroundColor: '#000' },
     cameraOverlay: { flex: 1, justifyContent: 'space-between' },
+    cameraPreviewArea: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     cameraCloseBtn: {
       position: 'absolute',
       top: 16,

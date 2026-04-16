@@ -218,6 +218,13 @@
         {
           "userTrackingPermission": "이 식별자는 맞춤형 광고 제공에 사용됩니다."
         }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "사물을 인식하여 타이머를 종료합니다.",
+          "enableFrameProcessors": true
+        }
       ]
     ],
     "web": {

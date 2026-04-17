@@ -226,6 +226,12 @@
           "enableFrameProcessors": true,
           "enableLocation": false
         }
+      ],
+      [
+        "react-native-fast-tflite",
+        {
+          "enableCoreMLDelegate": true
+        }
       ]
     ],
     "web": {

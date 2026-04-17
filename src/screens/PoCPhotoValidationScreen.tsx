@@ -13,7 +13,6 @@ import {
   AppState,
   Animated,
   Dimensions,
-  Platform,
 } from 'react-native';
 import {
   Camera,
@@ -68,7 +67,9 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const device = useCameraDevice('back');
   const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
-    Platform.OS === 'ios' ? ['core-ml'] : ['android-gpu']
+    // YOLOv10 일부 ops가 GPU delegate 미호환 가능성 → 일단 CPU(XNNPACK)로 시작
+    // 작동 확인 후 'core-ml' / 'android-gpu'로 최적화 (app.json 플러그인은 등록됨)
+    []
   );
   const model = plugin.state === 'loaded' ? plugin.model : undefined;
   const { resize } = useResizePlugin();
@@ -249,7 +250,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           />
           <Text style={styles.statusText}>
             {modelReady
-              ? `모델 준비 완료 (YOLOv10n + ${Platform.OS === 'ios' ? 'CoreML' : 'GPU'})`
+              ? `모델 준비 완료 (YOLOv10n CPU)`
               : `모델 로드 중... (${plugin.state})`}
           </Text>
         </View>

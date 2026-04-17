@@ -1,6 +1,6 @@
 // @v1.5-poc — YOLOv10n Object Detection 스파이크 검증 화면. PASS 후 제거.
 // Phase 1: VisionCamera Frame Processor + Metal/core-ml GPU Delegate
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   useFrameProcessor,
 } from 'react-native-vision-camera';
 import { useTensorflowModel } from 'react-native-fast-tflite';
+import { NitroModules } from 'react-native-nitro-modules';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -68,10 +69,16 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
     // YOLOv10 일부 ops가 GPU delegate 미호환 가능성 → 일단 CPU(XNNPACK)로 시작
-    // 작동 확인 후 'core-ml' / 'android-gpu'로 최적화 (app.json 플러그인은 등록됨)
     []
   );
   const model = plugin.state === 'loaded' ? plugin.model : undefined;
+  // 공식 필수 패턴: TfliteModel은 Nitro HybridObject(jsi::NativeState).
+  // VisionCamera v4 worklet runtime은 NativeState 직접 접근 불가 → box/unbox 필수.
+  // (v5에서 해소 예정)
+  const boxedModel = useMemo(
+    () => (model != null ? NitroModules.box(model) : undefined),
+    [model]
+  );
   const { resize } = useResizePlugin();
 
   const [selectedMission, setSelectedMission] = useState(POC_MISSIONS[0]);
@@ -150,29 +157,31 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     triggerDetectionSequence(match);
   }, []);
 
-  // Frame Processor (Worklet)
+  // Frame Processor (Worklet) — 공식 패턴: boxedModel.unbox() 내부 사용 필수
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (matched.value) return;
-    if (model == null) return;
+    if (boxedModel == null) return;
 
     const now = Date.now();
     if (now - lastRun.value < THROTTLE_MS) return;
     lastRun.value = now;
 
     try {
+      const tflite = boxedModel.unbox();
+
       const resized = resize(frame, {
         scale: { width: 640, height: 640 },
         pixelFormat: 'rgb',
         dataType: 'float32',
       });
 
-      // fast-tflite 공식 패턴: TypedArray가 공유 버퍼일 수 있으므로 slice로 안전 추출
+      // TypedArray가 공유 버퍼일 수 있으므로 slice로 안전 추출
       const inputBuffer = resized.buffer.slice(
         resized.byteOffset,
         resized.byteOffset + resized.byteLength
       ) as ArrayBuffer;
-      const outputs = model.runSync([inputBuffer]);
+      const outputs = tflite.runSync([inputBuffer]);
       const output = new Float32Array(outputs[0]);
       const match = parseYolov10Output(output, targetLabelsSV.value, TARGET_CONFIDENCE);
 
@@ -183,7 +192,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     } catch (e) {
       // worklet 에러는 조용히 무시 (다음 프레임에 재시도)
     }
-  }, [model, resize, onMatchJS]);
+  }, [boxedModel, resize, onMatchJS]);
 
   const startScan = () => {
     setError(null);

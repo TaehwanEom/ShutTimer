@@ -1,4 +1,5 @@
 // @v1.5-poc — YOLOv10n Object Detection 스파이크 검증 화면. PASS 후 제거.
+// Phase 1: VisionCamera Frame Processor + Metal/core-ml GPU Delegate
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -9,90 +10,219 @@ import {
   Alert,
   ScrollView,
   Modal,
-  ActivityIndicator,
+  AppState,
+  Animated,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
+import { useTensorflowModel } from 'react-native-fast-tflite';
+import { useResizePlugin } from 'vision-camera-resize-plugin';
+import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import {
-  detectObjects,
-  loadDetectionModel,
+  parseYolov10Output,
+  MISSION_COCO_LABELS,
   type Detection,
-  type RawDebug,
 } from '../utils/objectDetection';
-import { Logger } from '../utils/logger';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PoCPhotoValidation'>;
 };
 
+// PoC 미션 선택지 (MISSION_COCO_LABELS에서 대표 6개)
+const POC_MISSIONS: { id: string; name: string; labels: string[] }[] = [
+  { id: 'tv', name: 'TV', labels: MISSION_COCO_LABELS['tv'] },
+  { id: 'local-cafe', name: '컵', labels: MISSION_COCO_LABELS['local-cafe'] },
+  { id: 'menu-book', name: '책', labels: MISSION_COCO_LABELS['menu-book'] },
+  { id: 'computer', name: '노트북', labels: MISSION_COCO_LABELS['computer'] },
+  { id: 'phone-android', name: '폰', labels: MISSION_COCO_LABELS['phone-android'] },
+  { id: 'pets', name: '반려동물', labels: MISSION_COCO_LABELS['pets'] },
+];
+
+const TARGET_CONFIDENCE = 0.4;
+const THROTTLE_MS = 800;
+const BLINK_ON_MS = 100;
+const BLINK_OFF_MS = 80;
+const BLINK_COUNT = 2;
+const FEEDBACK_DELAY_MS = 300;
+const COMPLETE_ANIM_MS = 1000;
+
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const CENTER_SIZE = SCREEN_W;
+const TB_OFFSET = (SCREEN_H - CENTER_SIZE) / 2;
+
 export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
-  const cameraRef = useRef<CameraView>(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [modelReady, setModelReady] = useState(false);
-  const [detections, setDetections] = useState<Detection[]>([]);
-  const [inferenceMs, setInferenceMs] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
+  const model = useTensorflowModel(
+    require('../../assets/models/yolov10n_float16.tflite'),
+    Platform.OS === 'ios' ? ['core-ml'] : ['android-gpu']
+  );
+  const { resize } = useResizePlugin();
+
+  const [selectedMission, setSelectedMission] = useState(POC_MISSIONS[0]);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [lastMatch, setLastMatch] = useState<Detection | null>(null);
+  const [completed, setCompleted] = useState<Detection | null>(null);
+  const [scanPhase, setScanPhase] = useState<'scanning' | 'detected' | 'filling'>('scanning');
   const [error, setError] = useState<string | null>(null);
-  const [rawDebug, setRawDebug] = useState<RawDebug | null>(null);
 
-  useEffect(() => {
-    loadDetectionModel()
-      .then(() => setModelReady(true))
-      .catch((e) => {
-        Alert.alert('모델 로드 실패', String(e?.message ?? e), [
-          { text: '확인', onPress: () => navigation.goBack() },
-        ]);
-      });
-  }, [navigation]);
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const blinkAnim = useRef(new Animated.Value(0)).current;
 
+  // Worklet 공유 상태
+  const matched = useSharedValue(false);
+  const lastRun = useSharedValue(0);
+  const targetLabelsSV = useSharedValue<string[]>(POC_MISSIONS[0].labels);
+
+  // 미션 변경 시 SharedValue 동기화
   useEffect(() => {
-    if (!permission) return;
-    if (!permission.granted) {
-      requestPermission().then((result) => {
-        if (!result.granted) {
+    targetLabelsSV.value = selectedMission.labels;
+  }, [selectedMission, targetLabelsSV]);
+
+  // 카메라 권한
+  useEffect(() => {
+    if (!hasPermission) {
+      requestPermission().then((granted) => {
+        if (!granted) {
           Alert.alert('카메라 권한 필요', '검증을 위해 카메라 권한이 필요합니다.', [
             { text: '확인', onPress: () => navigation.goBack() },
           ]);
         }
       });
     }
-  }, [permission, requestPermission, navigation]);
+  }, [hasPermission, requestPermission, navigation]);
 
-  const onCapture = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.7 });
-      if (!photo?.uri) {
-        setError('촬영 실패');
-        return;
-      }
-      const t0 = Date.now();
-      const { detections: results, debug } = await detectObjects(photo.uri);
-      setInferenceMs(Date.now() - t0);
-      setDetections(results);
-      setRawDebug(debug);
-      setCameraOpen(false);
-    } catch (e: any) {
-      Logger.error('PoC', `detect failed: ${e?.message ?? e}`);
-      setError(String(e?.message ?? e));
-    } finally {
-      setBusy(false);
+  // 모델 로드 상태
+  useEffect(() => {
+    if (model.state === 'error') {
+      Alert.alert('모델 로드 실패', String(model.error), [
+        { text: '확인', onPress: () => navigation.goBack() },
+      ]);
     }
+  }, [model.state, model, navigation]);
+
+  // 감지 시퀀스 (JS 스레드)
+  const triggerDetectionSequence = (match: Detection) => {
+    setLastMatch(match);
+    setScanPhase('detected');
+
+    const blinkSeq: Animated.CompositeAnimation[] = [];
+    for (let i = 0; i < BLINK_COUNT; i++) {
+      blinkSeq.push(
+        Animated.timing(blinkAnim, { toValue: 1, duration: BLINK_ON_MS, useNativeDriver: false }),
+        Animated.timing(blinkAnim, { toValue: 0, duration: BLINK_OFF_MS, useNativeDriver: false }),
+      );
+    }
+
+    Animated.sequence([
+      ...blinkSeq,
+      Animated.delay(FEEDBACK_DELAY_MS),
+    ]).start(() => {
+      setScanPhase('filling');
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: COMPLETE_ANIM_MS,
+        useNativeDriver: false,
+      }).start(() => {
+        setCompleted(match);
+        setCameraOpen(false);
+      });
+    });
+  };
+
+  // Worklet → JS 브릿지
+  const onMatchJS = useRunOnJS((match: Detection) => {
+    triggerDetectionSequence(match);
+  }, []);
+
+  // Frame Processor (Worklet)
+  const frameProcessor = useFrameProcessor((frame) => {
+    'worklet';
+    if (matched.value) return;
+    if (model.state !== 'loaded') return;
+
+    const now = Date.now();
+    if (now - lastRun.value < THROTTLE_MS) return;
+    lastRun.value = now;
+
+    try {
+      const resized = resize(frame, {
+        scale: { width: 640, height: 640 },
+        pixelFormat: 'rgb',
+        dataType: 'float32',
+      });
+
+      const outputs = model.model.runSync([resized.buffer as ArrayBuffer]);
+      const output = new Float32Array(outputs[0]);
+      const match = parseYolov10Output(output, targetLabelsSV.value, TARGET_CONFIDENCE);
+
+      if (match) {
+        matched.value = true;
+        onMatchJS(match);
+      }
+    } catch (e) {
+      // worklet 에러는 조용히 무시 (다음 프레임에 재시도)
+    }
+  }, [model, resize, onMatchJS]);
+
+  const startScan = () => {
+    setError(null);
+    setLastMatch(null);
+    setCompleted(null);
+    setScanPhase('scanning');
+    progressAnim.setValue(0);
+    blinkAnim.setValue(0);
+    matched.value = false;
+    lastRun.value = 0;
+    setCameraOpen(true);
   };
 
   const closeCamera = () => {
-    if (busy) return;
+    matched.value = true; // worklet 중단
     setCameraOpen(false);
   };
+
+  // 언마운트 cleanup
+  useEffect(() => {
+    return () => {
+      matched.value = true;
+    };
+  }, [matched]);
+
+  // AppState background → 중단
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        matched.value = true;
+        setCameraOpen(false);
+      }
+    });
+    return () => sub.remove();
+  }, [matched]);
+
+  const fillHeight = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+  const fillOpacity = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.55],
+  });
+
+  const modelReady = model.state === 'loaded';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -100,35 +230,64 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color={colors.onBackground} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>PoC: YOLOv10 감지</Text>
+        <Text style={styles.headerTitle}>PoC: YOLOv10 Frame Scan</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.statusBanner,
-            modelReady ? styles.statusOk : styles.statusLoading,
-          ]}
-        >
+        <View style={[styles.statusBanner, modelReady ? styles.statusOk : styles.statusLoading]}>
           <MaterialIcons
             name={modelReady ? 'check-circle' : 'hourglass-empty'}
             size={20}
             color="#fff"
           />
           <Text style={styles.statusText}>
-            {modelReady ? '모델 준비 완료 (YOLOv10n)' : '모델 로드 중...'}
+            {modelReady
+              ? `모델 준비 완료 (YOLOv10n + ${Platform.OS === 'ios' ? 'CoreML' : 'GPU'})`
+              : `모델 로드 중... (${model.state})`}
           </Text>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>미션 선택</Text>
+          <View style={styles.missionGrid}>
+            {POC_MISSIONS.map((m) => (
+              <TouchableOpacity
+                key={m.id}
+                style={[
+                  styles.missionBtn,
+                  selectedMission.id === m.id && styles.missionBtnActive,
+                  cameraOpen && styles.btnDisabled,
+                ]}
+                onPress={() => setSelectedMission(m)}
+                disabled={cameraOpen}
+              >
+                <Text style={[
+                  styles.missionBtnText,
+                  selectedMission.id === m.id && styles.missionBtnTextActive,
+                ]}>
+                  {m.name}
+                </Text>
+                <Text style={styles.missionBtnLabels}>{m.labels.join(', ')}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <TouchableOpacity
-          style={[styles.primaryBtn, (busy || !modelReady) && styles.btnDisabled]}
-          onPress={() => setCameraOpen(true)}
-          disabled={busy || !modelReady}
+          style={[styles.primaryBtn, !modelReady && styles.btnDisabled]}
+          onPress={startScan}
+          disabled={!modelReady || !device}
         >
-          <MaterialIcons name="photo-camera" size={22} color="#fff" />
-          <Text style={styles.primaryBtnText}>촬영하여 감지</Text>
+          <MaterialIcons name="qr-code-scanner" size={22} color="#fff" />
+          <Text style={styles.primaryBtnText}>{selectedMission.name} 스캔 시작</Text>
         </TouchableOpacity>
+
+        {!device && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>카메라 기기를 찾을 수 없습니다.</Text>
+          </View>
+        )}
 
         {error && (
           <View style={styles.errorBox}>
@@ -136,113 +295,90 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           </View>
         )}
 
-        {detections.length > 0 && (
+        {completed && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>감지 결과 ({detections.length}건)</Text>
-            <View style={styles.resultBox}>
-              {detections.map((d, i) => (
-                <View key={i} style={styles.resultRow}>
-                  <Text style={styles.resultLabel}>{d.label}</Text>
-                  <Text style={[
-                    styles.resultValue,
-                    d.confidence >= 0.7 && { color: '#16a34a', fontWeight: '800' },
-                    d.confidence >= 0.5 && d.confidence < 0.7 && { color: '#ca8a04' },
-                  ]}>
-                    {d.confidence.toFixed(3)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {detections.length === 0 && inferenceMs !== null && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>감지 결과</Text>
-            <View style={styles.resultBox}>
-              <Text style={styles.resultLabel}>감지된 사물 없음</Text>
-            </View>
-          </View>
-        )}
-
-        {inferenceMs !== null && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>성능</Text>
-            <View style={styles.resultBox}>
+            <Text style={styles.sectionTitle}>✅ 스캔 완료</Text>
+            <View style={[styles.resultBox, { backgroundColor: '#dcfce7' }]}>
               <View style={styles.resultRow}>
-                <Text style={styles.resultLabel}>추론 시간</Text>
-                <Text style={[
-                  styles.resultValue,
-                  inferenceMs <= 500 ? { color: '#16a34a' } : { color: '#dc2626' },
-                ]}>
-                  {inferenceMs}ms
+                <Text style={[styles.resultLabel, { color: '#166534' }]}>{completed.label}</Text>
+                <Text style={[styles.resultValue, { color: '#16a34a', fontWeight: '800' }]}>
+                  {completed.confidence.toFixed(3)}
                 </Text>
               </View>
             </View>
           </View>
         )}
-
-        {rawDebug && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>RAW 출력 디버그</Text>
-            <View style={styles.resultBox}>
-              <Text style={styles.resultLabel}>
-                outputs: {rawDebug.outputCount}개 / total: {rawDebug.totalElements} / stride: {rawDebug.elementsPerRow}
-              </Text>
-              {rawDebug.rows.map((row, i) => (
-                <Text key={i} style={[styles.resultLabel, { fontSize: 11, fontFamily: 'Courier' }]}>
-                  [{i}] {row.map(v => v.toFixed(2)).join(', ')}
-                </Text>
-              ))}
-            </View>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.secondaryBtn, busy && styles.btnDisabled]}
-          onPress={() => { setDetections([]); setInferenceMs(null); setError(null); setRawDebug(null); }}
-          disabled={busy}
-        >
-          <MaterialIcons name="refresh" size={20} color={colors.onBackground} />
-          <Text style={styles.secondaryBtnText}>초기화</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>
         <View style={styles.cameraContainer}>
-          {permission?.granted ? (
-            <SafeAreaView style={styles.cameraOverlay}>
-              <TouchableOpacity
-                style={styles.cameraCloseBtn}
-                onPress={closeCamera}
-                disabled={busy}
+          {device && hasPermission ? (
+            <>
+              {/* 풀 카메라 (VisionCamera) */}
+              <Camera
+                style={StyleSheet.absoluteFill}
+                device={device}
+                isActive={cameraOpen}
+                frameProcessor={frameProcessor}
+                photo={false}
+                video={false}
+              />
+
+              {/* 상단 어둠 */}
+              <View pointerEvents="none" style={[styles.dimOverlay, { top: 0, height: TB_OFFSET }]} />
+              {/* 하단 어둠 */}
+              <View pointerEvents="none" style={[styles.dimOverlay, { bottom: 0, height: TB_OFFSET }]} />
+
+              {/* 중앙 1:1 영역 */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: TB_OFFSET,
+                  left: 0,
+                  width: CENTER_SIZE,
+                  height: CENTER_SIZE,
+                  overflow: 'hidden',
+                }}
               >
-                <MaterialIcons name="close" size={28} color="#fff" />
-              </TouchableOpacity>
-
-              <View style={styles.cameraPreviewArea}>
-                <CameraView
-                  ref={cameraRef}
-                  style={{ width: '100%', aspectRatio: 4 / 3 }}
-                  facing="back"
-                />
+                <Animated.View style={[StyleSheet.absoluteFill, {
+                  backgroundColor: '#32CD32',
+                  opacity: blinkAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
+                }]} />
+                <Animated.View style={[styles.centerFill, { height: fillHeight, opacity: fillOpacity }]} />
+                <View style={styles.crosshairWrap}>
+                  <View style={styles.crosshairH} />
+                  <View style={styles.crosshairV} />
+                </View>
               </View>
 
-              <View style={styles.cameraBottom}>
-                <Text style={styles.cameraModeText}>사물을 비추고 촬영</Text>
-                <TouchableOpacity
-                  style={[styles.shutterBtn, busy && styles.btnDisabled]}
-                  onPress={onCapture}
-                  disabled={busy}
-                >
-                  {busy ? (
-                    <ActivityIndicator color="#bc000a" size="large" />
-                  ) : (
-                    <View style={styles.shutterInner} />
-                  )}
+              {/* 상단 X 버튼 */}
+              <SafeAreaView style={styles.cameraTopSafe}>
+                <TouchableOpacity style={styles.cameraCloseBtn} onPress={closeCamera}>
+                  <MaterialIcons name="close" size={28} color="#fff" />
                 </TouchableOpacity>
-              </View>
-            </SafeAreaView>
+              </SafeAreaView>
+
+              {/* 하단 상태 */}
+              <SafeAreaView style={styles.cameraBottomSafe}>
+                <View style={styles.scanResultBox}>
+                  {scanPhase === 'scanning' && (
+                    <>
+                      <Text style={styles.scanResultLabel}>{selectedMission.name} 스캔 중</Text>
+                      <Text style={[styles.scanResultConf, { color: '#aaa' }]}>감지 중...</Text>
+                    </>
+                  )}
+                  {scanPhase === 'detected' && (
+                    <Text style={styles.scanResultLabel}>
+                      {selectedMission.name}가 감지되었습니다. 스캔합니다
+                    </Text>
+                  )}
+                  {scanPhase === 'filling' && (
+                    <AnimatedProgressBigText anim={progressAnim} />
+                  )}
+                </View>
+              </SafeAreaView>
+            </>
           ) : (
             <View style={styles.permissionDenied}>
               <Text style={{ color: '#fff' }}>카메라 권한이 필요합니다.</Text>
@@ -251,6 +387,19 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         </View>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+function AnimatedProgressBigText({ anim }: { anim: Animated.Value }) {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const id = anim.addListener(({ value }) => setPct(Math.round(value * 100)));
+    return () => anim.removeListener(id);
+  }, [anim]);
+  return (
+    <Text style={{ color: '#32CD32', fontSize: 32, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+      {pct}%
+    </Text>
   );
 }
 
@@ -277,20 +426,24 @@ const makeStyles = (colors: ThemeColors) =>
     sectionTitle: {
       fontSize: 11, fontWeight: '800', color: colors.secondary, letterSpacing: 1.5,
     },
+    missionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    missionBtn: {
+      paddingHorizontal: 14, paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceContainerLow,
+      minWidth: '30%',
+    },
+    missionBtnActive: { backgroundColor: colors.primary },
+    missionBtnText: { fontSize: 14, fontWeight: '700', color: colors.onBackground },
+    missionBtnTextActive: { color: '#fff' },
+    missionBtnLabels: { fontSize: 10, color: colors.secondary, marginTop: 2 },
     primaryBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary,
     },
     primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-    secondaryBtn: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surfaceContainerLow,
-    },
-    secondaryBtnText: { color: colors.onBackground, fontSize: 14, fontWeight: '600' },
     btnDisabled: { opacity: 0.4 },
-    errorBox: {
-      padding: 16, borderRadius: 12, backgroundColor: '#fef2f2',
-    },
+    errorBox: { padding: 16, borderRadius: 12, backgroundColor: '#fef2f2' },
     errorText: { color: '#dc2626', fontSize: 13 },
     resultBox: {
       padding: 16, borderRadius: 12, backgroundColor: colors.surfaceContainerLow, gap: 10,
@@ -298,33 +451,47 @@ const makeStyles = (colors: ThemeColors) =>
     resultRow: {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     },
-    resultLabel: {
-      fontSize: 15, color: colors.onBackground, fontWeight: '600',
-    },
-    resultValue: {
-      fontSize: 15, color: colors.secondary, fontVariant: ['tabular-nums'],
-    },
+    resultLabel: { fontSize: 15, color: colors.onBackground, fontWeight: '600' },
+    resultValue: { fontSize: 15, color: colors.secondary, fontVariant: ['tabular-nums'] },
     cameraContainer: { flex: 1, backgroundColor: '#000' },
-    cameraOverlay: { flex: 1, justifyContent: 'space-between' },
-    cameraPreviewArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    cameraTopSafe: {
+      position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+    },
+    cameraBottomSafe: {
+      position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
+      alignItems: 'center', paddingBottom: 16,
+    },
     cameraCloseBtn: {
-      position: 'absolute', top: 16, left: 16, zIndex: 10,
+      margin: 16,
       width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)',
       alignItems: 'center', justifyContent: 'center',
     },
-    cameraBottom: {
-      marginTop: 'auto', alignItems: 'center', gap: 16, paddingBottom: 32,
+    dimOverlay: {
+      position: 'absolute', left: 0, right: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)',
     },
-    cameraModeText: {
-      color: '#fff', fontSize: 14, fontWeight: '700',
-      backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 16, paddingVertical: 8,
-      borderRadius: 20,
+    centerFill: {
+      position: 'absolute', top: 0, left: 0, right: 0,
+      backgroundColor: '#32CD32',
     },
-    shutterBtn: {
-      width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff',
-      borderWidth: 4, borderColor: 'rgba(255,255,255,0.5)',
-      alignItems: 'center', justifyContent: 'center',
+    crosshairWrap: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff' },
+    crosshairH: {
+      position: 'absolute', width: 24, height: 2, backgroundColor: '#B8E986',
+    },
+    crosshairV: {
+      position: 'absolute', width: 2, height: 24, backgroundColor: '#B8E986',
+    },
     permissionDenied: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scanResultBox: {
+      paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16,
+      backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', gap: 4,
+      minWidth: 220,
+    },
+    scanResultLabel: { color: '#fff', fontSize: 16, fontWeight: '800' },
+    scanResultConf: { color: '#B8E986', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    scanResultMs: { color: '#888', fontSize: 11, fontVariant: ['tabular-nums'] },
   });

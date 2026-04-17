@@ -4,7 +4,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import jpeg from 'jpeg-js';
 
 const INPUT_SIZE = 640;
-const CONFIDENCE_THRESHOLD = 0.5;
+const CONFIDENCE_THRESHOLD = 0.1;
 const MAX_DETECTIONS = 300;
 
 let model: TfliteModel | null = null;
@@ -28,8 +28,8 @@ export type Detection = {
   bbox: [number, number, number, number];
 };
 
-// COCO 80 classes
-const COCO_CLASSES = [
+// COCO 80 classes — worklet에서도 참조 가능하도록 export
+export const COCO_CLASSES: readonly string[] = [
   'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck',
   'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
   'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra',
@@ -99,7 +99,7 @@ export async function detectObjects(imageUri: string): Promise<{ detections: Det
     rows: [],
   };
   const stride = debug.elementsPerRow;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 20; i++) {
     const row: number[] = [];
     for (let j = 0; j < Math.min(stride, 10); j++) {
       row.push(rawOutput[i * stride + j]);
@@ -130,6 +130,44 @@ export async function detectObjects(imageUri: string): Promise<{ detections: Det
 
   detections.sort((a, b) => b.confidence - a.confidence);
   return { detections: detections.slice(0, 10), debug };
+}
+
+// VisionCamera Frame Processor Worklet용 파싱 함수
+// YOLOv10n TFLite 출력 [1, 300, 6] → 타겟 매치 1개 (상위 confidence) 반환
+export function parseYolov10Output(
+  output: Float32Array,
+  targetLabels: string[],
+  minConfidence: number = 0.4
+): Detection | null {
+  'worklet';
+  let best: Detection | null = null;
+  const total = output.length;
+  const stride = 6;
+  const rows = Math.floor(total / stride);
+
+  for (let i = 0; i < rows; i++) {
+    const off = i * stride;
+    const confidence = output[off + 4];
+    if (confidence < minConfidence) continue;
+    const classId = Math.round(output[off + 5]);
+    if (classId < 0 || classId >= COCO_CLASSES.length) continue;
+    const label = COCO_CLASSES[classId];
+    if (!targetLabels.includes(label)) continue;
+
+    if (!best || confidence > best.confidence) {
+      const x1 = output[off];
+      const y1 = output[off + 1];
+      const x2 = output[off + 2];
+      const y2 = output[off + 3];
+      best = {
+        label,
+        confidence,
+        bbox: [x1, y1, x2 - x1, y2 - y1],
+      };
+    }
+  }
+
+  return best;
 }
 
 export const MISSION_COCO_LABELS: Record<string, string[]> = {

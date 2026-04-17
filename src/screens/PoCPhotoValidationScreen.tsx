@@ -66,10 +66,11 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const styles = makeStyles(colors);
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
-  const model = useTensorflowModel(
+  const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
     Platform.OS === 'ios' ? ['core-ml'] : ['android-gpu']
   );
+  const model = plugin.state === 'loaded' ? plugin.model : undefined;
   const { resize } = useResizePlugin();
 
   const [selectedMission, setSelectedMission] = useState(POC_MISSIONS[0]);
@@ -107,12 +108,12 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
 
   // 모델 로드 상태
   useEffect(() => {
-    if (model.state === 'error') {
-      Alert.alert('모델 로드 실패', String(model.error), [
+    if (plugin.state === 'error') {
+      Alert.alert('모델 로드 실패', String(plugin.error), [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     }
-  }, [model.state, model, navigation]);
+  }, [plugin, navigation]);
 
   // 감지 시퀀스 (JS 스레드)
   const triggerDetectionSequence = (match: Detection) => {
@@ -152,7 +153,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (matched.value) return;
-    if (model.state !== 'loaded') return;
+    if (model == null) return;
 
     const now = Date.now();
     if (now - lastRun.value < THROTTLE_MS) return;
@@ -165,7 +166,12 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         dataType: 'float32',
       });
 
-      const outputs = model.model.runSync([resized.buffer as ArrayBuffer]);
+      // fast-tflite 공식 패턴: TypedArray가 공유 버퍼일 수 있으므로 slice로 안전 추출
+      const inputBuffer = resized.buffer.slice(
+        resized.byteOffset,
+        resized.byteOffset + resized.byteLength
+      ) as ArrayBuffer;
+      const outputs = model.runSync([inputBuffer]);
       const output = new Float32Array(outputs[0]);
       const match = parseYolov10Output(output, targetLabelsSV.value, TARGET_CONFIDENCE);
 
@@ -222,7 +228,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     outputRange: [0.3, 0.55],
   });
 
-  const modelReady = model.state === 'loaded';
+  const modelReady = model != null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -244,7 +250,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           <Text style={styles.statusText}>
             {modelReady
               ? `모델 준비 완료 (YOLOv10n + ${Platform.OS === 'ios' ? 'CoreML' : 'GPU'})`
-              : `모델 로드 중... (${model.state})`}
+              : `모델 로드 중... (${plugin.state})`}
           </Text>
         </View>
 

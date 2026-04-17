@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Props {
@@ -64,6 +64,18 @@ export default class ErrorBoundary extends React.Component<Props, State> {
     });
   };
 
+  private handleShare = async () => {
+    const timestamp = new Date().toISOString();
+    const message = `[ShutTimer 오류 리포트 ${timestamp}]\n\n` +
+      `에러: ${this.state.error?.toString() ?? 'unknown'}\n\n` +
+      `스택:\n${this.state.errorInfo?.componentStack ?? ''}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // 공유 취소 등은 무시
+    }
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -73,19 +85,26 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
             <ScrollView style={styles.errorBox}>
               <Text style={styles.errorTitle}>에러 메시지:</Text>
-              <Text style={styles.errorText}>
+              <Text selectable style={styles.errorText}>
                 {this.state.error?.toString()}
               </Text>
 
               <Text style={styles.stackTitle}>스택 트레이스:</Text>
-              <Text style={styles.stackText}>
+              <Text selectable style={styles.stackText}>
                 {this.state.errorInfo?.componentStack}
               </Text>
             </ScrollView>
 
             <Text style={styles.instruction}>
-              이 화면의 스크린샷을 찍어 개발자에게 보내주세요.
+              아래 "공유" 버튼으로 개발자에게 에러 전체 전송 가능
             </Text>
+
+            <TouchableOpacity
+              style={[styles.button, styles.shareButton]}
+              onPress={this.handleShare}
+            >
+              <Text style={styles.buttonText}>에러 공유 / 복사</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.button}
@@ -169,6 +188,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
+  },
+  shareButton: {
+    backgroundColor: '#1e88e5',
   },
   buttonText: {
     fontSize: 16,

@@ -68,20 +68,20 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const device = useCameraDevice('back');
   // 화각 확대 체감 완화: device.formats 중 fieldOfView 최대 포맷 수동 선택
   // (VisionCamera 기본 4:3 포맷이 센서 일부만 사용 — Issue #1981 저자 권장 패턴)
-  // 안전망 4중 필터:
+  // 목표: 알라미급 FOV (울트라와이드 108-120° 수준) 근접
+  // 안전망 3중 필터:
   //  1. fieldOfView 값 존재 (Issue #3505 버전 간 차이 방어)
   //  2. videoStabilizationModes 'off' 지원 (Camera prop 유효성 보장)
   //  3. 해상도 ≥ 640 (Frame Processor resize 640×640 upscale 방지 → YOLO 품질)
-  //  4. fieldOfView < 100° (울트라와이드 포맷 배제 — 와이드 69-79°, 울트라와이드 108-120°.
-  //     COCO 훈련 데이터는 일반 화각 → 어안 왜곡 이미지에서 감지 정확도 저하)
   //  → 필터로 전부 걸러지면 undefined → VisionCamera 자동 기본 포맷 fallback
+  // 주의: 이전에 배제했던 울트라와이드 포맷 허용 — 어안 왜곡으로 YOLO 정확도 저하 가능성
+  //       감지 정확도는 실기기 회귀 테스트로 확인 필요 (저하 시 필터 재추가 또는 Step 3 재검토)
   const format = useMemo(() => {
     if (!device) return undefined;
     const candidates = device.formats
       .filter((f) => f.fieldOfView != null)
       .filter((f) => f.videoStabilizationModes.includes('off'))
       .filter((f) => f.videoWidth >= 640 && f.videoHeight >= 640)
-      .filter((f) => f.fieldOfView < 100)
       .sort((a, b) => b.fieldOfView - a.fieldOfView);
     return candidates[0];
   }, [device]);

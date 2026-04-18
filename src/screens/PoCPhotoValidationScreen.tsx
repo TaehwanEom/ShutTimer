@@ -330,12 +330,13 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         <View style={styles.cameraContainer}>
           {device && hasPermission ? (
             <>
-              {/* 풀 카메라 (VisionCamera) */}
+              {/* 풀 카메라 (VisionCamera) — contain: 센서 원본 화각 유지, 확대 체감 제거 */}
               <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
                 isActive={cameraOpen}
                 frameProcessor={frameProcessor}
+                resizeMode="contain"
                 photo={false}
                 video={false}
               />

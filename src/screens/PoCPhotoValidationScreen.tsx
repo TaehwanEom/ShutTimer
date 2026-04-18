@@ -17,7 +17,6 @@ import {
 import {
   Camera,
   useCameraDevice,
-  useCameraFormat,
   useCameraPermission,
   useFrameProcessor,
 } from 'react-native-vision-camera';
@@ -62,20 +61,41 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CENTER_SIZE = SCREEN_W;
 const TB_OFFSET = (SCREEN_H - CENTER_SIZE) / 2;
 
-// 카메라 포맷 선택용 화면 비율 (portrait 고정 전제: app.json orientation=portrait)
-// 공식 가이드: videoAspectRatio = screen.height / screen.width → 센서 크롭 최소화
-const _screen = Dimensions.get('screen');
-const CAMERA_VIDEO_ASPECT_RATIO = _screen.height / _screen.width;
-
 export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
-  // Stage A: 스크린 비율에 맞는 포맷 선택 → 센서 크롭 최소화로 FOV 복원
-  const format = useCameraFormat(device, [
-    { videoAspectRatio: CAMERA_VIDEO_ASPECT_RATIO },
-  ]);
+  // 화각 확대 체감 완화: device.formats 중 fieldOfView 최대 포맷 수동 선택
+  // (VisionCamera 기본 4:3 포맷이 센서 일부만 사용 — Issue #1981 저자 권장 패턴)
+  // 안전망 4중 필터:
+  //  1. fieldOfView 값 존재 (Issue #3505 버전 간 차이 방어)
+  //  2. videoStabilizationModes 'off' 지원 (Camera prop 유효성 보장)
+  //  3. 해상도 ≥ 640 (Frame Processor resize 640×640 upscale 방지 → YOLO 품질)
+  //  4. fieldOfView < 100° (울트라와이드 포맷 배제 — 와이드 69-79°, 울트라와이드 108-120°.
+  //     COCO 훈련 데이터는 일반 화각 → 어안 왜곡 이미지에서 감지 정확도 저하)
+  //  → 필터로 전부 걸러지면 undefined → VisionCamera 자동 기본 포맷 fallback
+  const format = useMemo(() => {
+    if (!device) return undefined;
+    const candidates = device.formats
+      .filter((f) => f.fieldOfView != null)
+      .filter((f) => f.videoStabilizationModes.includes('off'))
+      .filter((f) => f.videoWidth >= 640 && f.videoHeight >= 640)
+      .filter((f) => f.fieldOfView < 100)
+      .sort((a, b) => b.fieldOfView - a.fieldOfView);
+    return candidates[0];
+  }, [device]);
+  // 실측 로그 (스파이크 중 FOV/해상도 확인용)
+  useEffect(() => {
+    if (format) {
+      console.log('[Camera] format selected', {
+        w: format.videoWidth,
+        h: format.videoHeight,
+        fov: format.fieldOfView,
+        maxFps: format.maxFps,
+      });
+    }
+  }, [format]);
   const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
     // YOLOv10 일부 ops가 GPU delegate 미호환 가능성 → 일단 CPU(XNNPACK)로 시작
@@ -187,11 +207,16 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     try {
       const tflite = boxedModel.unbox();
 
+      const t0 = Date.now();
       const resized = resize(frame, {
         scale: { width: 640, height: 640 },
         pixelFormat: 'rgb',
         dataType: 'float32',
       });
+      const resizeMs = Date.now() - t0;
+      if (resizeMs > 50) {
+        console.log('[FrameProcessor] resize ms', resizeMs);
+      }
 
       // TypedArray가 공유 버퍼일 수 있으므로 slice로 안전 추출
       const inputBuffer = resized.buffer.slice(
@@ -348,14 +373,17 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         <View style={styles.cameraContainer}>
           {device && hasPermission ? (
             <>
-              {/* 풀 카메라 (VisionCamera) — contain: 센서 원본 화각 유지, 확대 체감 제거 */}
-              {/* format: 스크린 비율에 맞는 포맷 선택 → 센서 크롭 최소화 (undefined 시 VisionCamera 자동 선택) */}
+              {/* 풀 카메라 (VisionCamera) */}
+              {/* - resizeMode="contain": 센서 원본 화각 유지 */}
+              {/* - format: device.formats 중 fieldOfView 최대 수동 선택 (센서 활용 최대) */}
+              {/* - videoStabilizationMode="off": iOS OIS/EIS crop 10% 회복 (Apple 공식) */}
               <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
                 isActive={cameraOpen}
                 frameProcessor={frameProcessor}
                 resizeMode="contain"
+                videoStabilizationMode="off"
                 photo={false}
                 video={false}
                 {...(format ? { format } : {})}

@@ -17,6 +17,7 @@ import {
 import {
   Camera,
   useCameraDevice,
+  useCameraFormat,
   useCameraPermission,
   useFrameProcessor,
 } from 'react-native-vision-camera';
@@ -61,11 +62,20 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CENTER_SIZE = SCREEN_W;
 const TB_OFFSET = (SCREEN_H - CENTER_SIZE) / 2;
 
+// 카메라 포맷 선택용 화면 비율 (portrait 고정 전제: app.json orientation=portrait)
+// 공식 가이드: videoAspectRatio = screen.height / screen.width → 센서 크롭 최소화
+const _screen = Dimensions.get('screen');
+const CAMERA_VIDEO_ASPECT_RATIO = _screen.height / _screen.width;
+
 export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
+  // Stage A: 스크린 비율에 맞는 포맷 선택 → 센서 크롭 최소화로 FOV 복원
+  const format = useCameraFormat(device, [
+    { videoAspectRatio: CAMERA_VIDEO_ASPECT_RATIO },
+  ]);
   const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
     // YOLOv10 일부 ops가 GPU delegate 미호환 가능성 → 일단 CPU(XNNPACK)로 시작
@@ -95,6 +105,8 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const matched = useSharedValue(false);
   const lastRun = useSharedValue(0);
   const targetLabelsSV = useSharedValue<string[]>(POC_MISSIONS[0].labels);
+  // Stage A 실측용: 첫 프레임 1회만 크기 로깅
+  const frameLogged = useSharedValue(false);
 
   // 미션 변경 시 SharedValue 동기화
   useEffect(() => {
@@ -163,6 +175,11 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     if (matched.value) return;
     if (boxedModel == null) return;
 
+    if (!frameLogged.value) {
+      console.log('[FrameProcessor] frame', frame.width, 'x', frame.height);
+      frameLogged.value = true;
+    }
+
     const now = Date.now();
     if (now - lastRun.value < THROTTLE_MS) return;
     lastRun.value = now;
@@ -203,6 +220,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     blinkAnim.setValue(0);
     matched.value = false;
     lastRun.value = 0;
+    frameLogged.value = false;
     setCameraOpen(true);
   };
 
@@ -331,6 +349,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           {device && hasPermission ? (
             <>
               {/* 풀 카메라 (VisionCamera) — contain: 센서 원본 화각 유지, 확대 체감 제거 */}
+              {/* format: 스크린 비율에 맞는 포맷 선택 → 센서 크롭 최소화 (undefined 시 VisionCamera 자동 선택) */}
               <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
@@ -339,6 +358,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
                 resizeMode="contain"
                 photo={false}
                 video={false}
+                {...(format ? { format } : {})}
               />
 
               {/* 상단 어둠 */}

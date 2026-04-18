@@ -6,7 +6,11 @@ export const SETTINGS_KEY = {
   PRIMARY_COLOR: 'shutimer_primary_color',
   DIAL_TYPE: 'shutimer_dial_type',
   ALARM_ENABLED: 'shutimer_alarm_enabled',
+  MISSION_DURATION: 'shutimer_mission_duration',
 } as const;
+
+export const MISSION_DURATION_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
+export type MissionDuration = typeof MISSION_DURATION_OPTIONS[number];
 
 export type DialType = 'classic' | 'digital';
 
@@ -29,4 +33,5 @@ export const DEFAULT_SETTINGS = {
   alarmEnabled: true,
   vibrationEnabled: true,
   darkMode: false,
+  missionDuration: 30 as MissionDuration,
 };

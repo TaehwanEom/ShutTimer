@@ -22,6 +22,10 @@
     "notifBodyReminder3": "本当に最後です... 早く消してください。😭"
   },
   "alarm": {
+    "reshuffle": "再抽選",
+    "retrying": "再試行",
+    "missionNotFound": "見つかりませんでした",
+    "missionRetryHint": "{{mission}}をもう一度探してください",
     "timerExpired": "時間終了",
     "takePhoto": "写真を撮ってアラームを止めてください",
     "cameraRequired": "カメラが必要",
@@ -94,6 +98,9 @@
     "vibration": "バイブレーション",
     "alarmSound": "アラーム音",
     "soundSelect": "サウンド選択",
+    "missionDuration": "ミッションタイマー",
+    "missionDurationDesc": "ミッション対象を探す制限時間",
+    "secondsUnit": "秒",
     "screen": "画面",
     "darkMode": "ダークモード",
     "purchase": "購入",

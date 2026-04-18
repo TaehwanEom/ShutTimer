@@ -17,7 +17,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
-import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, COLOR_PRESETS } from '../constants/settings';
+import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, COLOR_PRESETS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
 import { useTranslation } from 'react-i18next';
@@ -173,6 +173,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const [soundModalVisible, setSoundModalVisible] = useState(false);
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
   const [langModalVisible, setLangModalVisible] = useState(false);
+  const [missionDuration, setMissionDuration] = useState<MissionDuration>(DEFAULT_SETTINGS.missionDuration);
+  const [missionDurationModalVisible, setMissionDurationModalVisible] = useState(false);
   const previewSoundRef = React.useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -180,17 +182,24 @@ export default function SettingsScreen({ navigation }: Props) {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED]).then(pairs => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
       const lang = pairs[2][1];
       const sound = pairs[3][1];
       const alarm = pairs[4][1];
+      const duration = pairs[5][1];
       if (method) setDismissMethod(method);
       if (alarm !== null) setAlarmEnabled(alarm === 'true');
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
       if (lang) setSelectedLang(lang);
       if (sound) setSelectedSoundId(sound);
+      if (duration !== null) {
+        const n = parseInt(duration, 10);
+        if ((MISSION_DURATION_OPTIONS as readonly number[]).includes(n)) {
+          setMissionDuration(n as MissionDuration);
+        }
+      }
     });
   }, []);
 
@@ -233,6 +242,12 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleVibration = (value: boolean) => {
     setVibrationEnabled(value);
     AsyncStorage.setItem(SETTINGS_KEY.VIBRATION_ENABLED, String(value));
+  };
+
+  const handleMissionDuration = (value: MissionDuration) => {
+    setMissionDuration(value);
+    AsyncStorage.setItem(SETTINGS_KEY.MISSION_DURATION, String(value));
+    setMissionDurationModalVisible(false);
   };
 
   const handleLanguage = (langCode: string | null) => {
@@ -365,6 +380,23 @@ export default function SettingsScreen({ navigation }: Props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.secondary }}>
                 {(() => { const s = ALARM_SOUNDS.find(s => s.id === selectedSoundId); if (!s) return selectedSoundId; const num = s.id.split('_')[1]; return `${t(s.id.startsWith('alarm_') ? 'sounds.alarm' : 'sounds.ringtone')} ${num}`; })()}
+              </Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 미션 타이머 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.missionDuration')}</Text>
+          <TouchableOpacity style={styles.toggleRow} onPress={() => setMissionDurationModalVisible(true)}>
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="timer" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>{t('settings.missionDuration')}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.secondary }}>
+                {missionDuration}{t('settings.secondsUnit', { defaultValue: '초' })}
               </Text>
               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
             </View>
@@ -580,6 +612,33 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      {/* 미션 타이머 선택 모달 */}
+      <Modal visible={missionDurationModalVisible} transparent animationType="slide" onRequestClose={() => setMissionDurationModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setMissionDurationModalVisible(false)} />
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20, paddingBottom: 48, maxHeight: '70%' }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onBackground, paddingHorizontal: 24, marginBottom: 4 }}>{t('settings.missionDuration')}</Text>
+            <Text style={{ fontSize: 12, color: colors.secondary, paddingHorizontal: 24, marginBottom: 12 }}>{t('settings.missionDurationDesc')}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {MISSION_DURATION_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.toggleRow, { marginHorizontal: 16, marginBottom: 6 }, missionDuration === opt && styles.optionRowSelected]}
+                  onPress={() => handleMissionDuration(opt)}
+                >
+                  <View style={styles.toggleLeft}>
+                    <MaterialIcons name="timer" size={22} color={missionDuration === opt ? colors.primary : colors.onBackground} />
+                    <Text style={[styles.toggleLabel, missionDuration === opt && { color: colors.primary }]}>{opt}{t('settings.secondsUnit', { defaultValue: '초' })}</Text>
+                  </View>
+                  {missionDuration === opt && <MaterialIcons name="check-circle" size={22} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       <AdBanner />
     </SafeAreaView>
   );

@@ -1,6 +1,7 @@
 // @v1.5-poc — YOLOv10n Object Detection 스파이크 검증 화면. PASS 후 제거.
 // Phase 1: VisionCamera Frame Processor + Metal/core-ml GPU Delegate
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+// Stream 1: 미션 타이머 설정 + 랜덤 미션 + 다시 뽑기 + 2회 시도 + 3프레임 연속 매칭
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Camera,
   useCameraDevice,
@@ -25,10 +27,12 @@ import { NitroModules } from 'react-native-nitro-modules';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
+import { SETTINGS_KEY, DEFAULT_SETTINGS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
 import {
   parseYolov10Output,
   MISSION_COCO_LABELS,
@@ -39,15 +43,10 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'PoCPhotoValidation'>;
 };
 
-// PoC 미션 선택지 (MISSION_COCO_LABELS에서 대표 6개)
-const POC_MISSIONS: { id: string; name: string; labels: string[] }[] = [
-  { id: 'tv', name: 'TV', labels: MISSION_COCO_LABELS['tv'] },
-  { id: 'local-cafe', name: '컵', labels: MISSION_COCO_LABELS['local-cafe'] },
-  { id: 'menu-book', name: '책', labels: MISSION_COCO_LABELS['menu-book'] },
-  { id: 'computer', name: '노트북', labels: MISSION_COCO_LABELS['computer'] },
-  { id: 'phone-android', name: '폰', labels: MISSION_COCO_LABELS['phone-android'] },
-  { id: 'pets', name: '반려동물', labels: MISSION_COCO_LABELS['pets'] },
-];
+// 미션 풀 — MISSION_COCO_LABELS 24개 키에서 camera-alt 제외 = 23개
+const MISSION_POOL: string[] = Object.keys(MISSION_COCO_LABELS).filter(
+  (k) => k !== 'camera-alt' && MISSION_COCO_LABELS[k].length > 0
+);
 
 const TARGET_CONFIDENCE = 0.4;
 const THROTTLE_MS = 800;
@@ -56,24 +55,26 @@ const BLINK_OFF_MS = 80;
 const BLINK_COUNT = 2;
 const FEEDBACK_DELAY_MS = 300;
 const COMPLETE_ANIM_MS = 1000;
+const HITS_REQUIRED = 3; // 3프레임 연속 매칭 (인증 엄밀성 B)
+const RETRY_BANNER_MS = 1000; // 재시도 배너 1초
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CENTER_SIZE = SCREEN_W;
 const TB_OFFSET = (SCREEN_H - CENTER_SIZE) / 2;
 
+function pickRandom<T>(arr: T[], exclude?: T): T {
+  const pool = exclude != null ? arr.filter((x) => x !== exclude) : arr;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export default function PoCPhotoValidationScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
   // 화각 확대 체감 완화: device.formats 중 fieldOfView ≤ 70° 범위에서 최대값 선택
   // (실기기 튜닝 결과: 70°가 자연스러운 wide-angle — 울트라와이드는 어안 왜곡 유발)
-  // 안전망:
-  //  1. fieldOfView 값 존재 (Issue #3505 버전 간 차이 방어)
-  //  2. videoStabilizationModes 'off' 지원 (Camera prop 유효성 보장)
-  //  3. 해상도 ≥ 640 (Frame Processor resize 640×640 upscale 방지)
-  //  4. fieldOfView ≤ 70° (wide-angle 유지, 울트라와이드 배제)
-  // 전부 걸러지면 undefined → VisionCamera 자동 기본 포맷
   const FOV_MAX = 70;
   const format = useMemo(() => {
     if (!device) return undefined;
@@ -85,7 +86,6 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
       .sort((a, b) => b.fieldOfView - a.fieldOfView);
     return candidates[0];
   }, [device]);
-  // 실측 로그 (스파이크 중 FOV/해상도 확인용)
   useEffect(() => {
     if (format) {
       console.log('[Camera] format selected', {
@@ -98,25 +98,50 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   }, [format]);
   const plugin = useTensorflowModel(
     require('../../assets/models/yolov10n_float16.tflite'),
-    // YOLOv10 일부 ops가 GPU delegate 미호환 가능성 → 일단 CPU(XNNPACK)로 시작
     []
   );
   const model = plugin.state === 'loaded' ? plugin.model : undefined;
   // 공식 필수 패턴: TfliteModel은 Nitro HybridObject(jsi::NativeState).
   // VisionCamera v4 worklet runtime은 NativeState 직접 접근 불가 → box/unbox 필수.
-  // (v5에서 해소 예정)
   const boxedModel = useMemo(
     () => (model != null ? NitroModules.box(model) : undefined),
     [model]
   );
   const { resize } = useResizePlugin();
 
-  const [selectedMission, setSelectedMission] = useState(POC_MISSIONS[0]);
+  // 미션 타이머 설정값 (AsyncStorage)
+  const [missionDuration, setMissionDuration] = useState<MissionDuration>(DEFAULT_SETTINGS.missionDuration);
+  const missionDurationRef = useRef<number>(DEFAULT_SETTINGS.missionDuration);
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY.MISSION_DURATION).then((v) => {
+      const n = v != null ? parseInt(v, 10) : NaN;
+      const valid = (MISSION_DURATION_OPTIONS as readonly number[]).includes(n)
+        ? (n as MissionDuration)
+        : DEFAULT_SETTINGS.missionDuration;
+      setMissionDuration(valid);
+      missionDurationRef.current = valid;
+    });
+  }, []);
+
+  // 미션 상태
+  const [currentMission, setCurrentMission] = useState<string>(() => pickRandom(MISSION_POOL));
   const [cameraOpen, setCameraOpen] = useState(false);
   const [lastMatch, setLastMatch] = useState<Detection | null>(null);
   const [completed, setCompleted] = useState<Detection | null>(null);
   const [scanPhase, setScanPhase] = useState<'scanning' | 'detected' | 'filling'>('scanning');
   const [error, setError] = useState<string | null>(null);
+  const [attemptCount, setAttemptCount] = useState<1 | 2>(1);
+  const [remainingMs, setRemainingMs] = useState<number>(DEFAULT_SETTINGS.missionDuration * 1000);
+  const [isRetryBannerVisible, setIsRetryBannerVisible] = useState(false);
+
+  // 현재 미션 ref (worklet 타이밍 이슈 회피)
+  const currentMissionRef = useRef(currentMission);
+  useEffect(() => {
+    currentMissionRef.current = currentMission;
+  }, [currentMission]);
+
+  // 재시도 배너 타이머 ref (useEffect cleanup으로 인한 setTimeout 취소 버그 방지)
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const blinkAnim = useRef(new Animated.Value(0)).current;
@@ -124,14 +149,14 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   // Worklet 공유 상태
   const matched = useSharedValue(false);
   const lastRun = useSharedValue(0);
-  const targetLabelsSV = useSharedValue<string[]>(POC_MISSIONS[0].labels);
-  // Stage A 실측용: 첫 프레임 1회만 크기 로깅
+  const targetLabelsSV = useSharedValue<string[]>(MISSION_COCO_LABELS[currentMission] ?? []);
+  const consecutiveHits = useSharedValue(0);
   const frameLogged = useSharedValue(false);
 
   // 미션 변경 시 SharedValue 동기화
   useEffect(() => {
-    targetLabelsSV.value = selectedMission.labels;
-  }, [selectedMission, targetLabelsSV]);
+    targetLabelsSV.value = MISSION_COCO_LABELS[currentMission] ?? [];
+  }, [currentMission, targetLabelsSV]);
 
   // 카메라 권한
   useEffect(() => {
@@ -155,8 +180,8 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     }
   }, [plugin, navigation]);
 
-  // 감지 시퀀스 (JS 스레드)
-  const triggerDetectionSequence = (match: Detection) => {
+  // 감지 시퀀스 (JS 스레드) — 기존 PoC 로직 유지
+  const triggerDetectionSequence = useCallback((match: Detection) => {
     setLastMatch(match);
     setScanPhase('detected');
 
@@ -182,14 +207,14 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         setCameraOpen(false);
       });
     });
-  };
+  }, [blinkAnim, progressAnim]);
 
   // Worklet → JS 브릿지
   const onMatchJS = useRunOnJS((match: Detection) => {
     triggerDetectionSequence(match);
-  }, []);
+  }, [triggerDetectionSequence]);
 
-  // Frame Processor (Worklet) — 공식 패턴: boxedModel.unbox() 내부 사용 필수
+  // Frame Processor (Worklet) — 3프레임 연속 매칭 시 통과
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
     if (matched.value) return;
@@ -218,7 +243,6 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         console.log('[FrameProcessor] resize ms', resizeMs);
       }
 
-      // TypedArray가 공유 버퍼일 수 있으므로 slice로 안전 추출
       const inputBuffer = resized.buffer.slice(
         resized.byteOffset,
         resized.byteOffset + resized.byteLength
@@ -228,13 +252,77 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
       const match = parseYolov10Output(output, targetLabelsSV.value, TARGET_CONFIDENCE);
 
       if (match) {
-        matched.value = true;
-        onMatchJS(match);
+        consecutiveHits.value += 1;
+        if (consecutiveHits.value >= HITS_REQUIRED) {
+          matched.value = true;
+          onMatchJS(match);
+        }
+      } else {
+        consecutiveHits.value = 0;
       }
     } catch (e) {
       // worklet 에러는 조용히 무시 (다음 프레임에 재시도)
     }
   }, [boxedModel, resize, onMatchJS]);
+
+  // 카운트다운 (1초 간격)
+  useEffect(() => {
+    if (!cameraOpen) return;
+    if (isRetryBannerVisible) return; // 재시도 배너 표시 중엔 타이머 정지
+    if (matched.value) return;
+
+    const id = setInterval(() => {
+      setRemainingMs((prev) => Math.max(0, prev - 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [cameraOpen, isRetryBannerVisible, matched]);
+
+  // 만료 처리 (cleanup에서 setTimeout 취소하지 않음 — useRef로 관리)
+  useEffect(() => {
+    if (!cameraOpen) return;
+    if (isRetryBannerVisible) return; // 배너 표시 중 재진입 방지
+    if (remainingMs > 0) return;
+    if (matched.value) return;
+
+    if (attemptCount === 1) {
+      // 1회차 만료 → 재시도 배너 1초 → 2회차 시작 (미션 유지, 카운트다운 리셋)
+      setIsRetryBannerVisible(true);
+      retryTimeoutRef.current = setTimeout(() => {
+        consecutiveHits.value = 0;
+        matched.value = false;
+        setRemainingMs(missionDurationRef.current * 1000);
+        setAttemptCount(2);
+        setIsRetryBannerVisible(false);
+        retryTimeoutRef.current = null;
+      }, RETRY_BANNER_MS);
+      // cleanup 없음 — state 변경으로 인한 재실행 시 timeout 취소 금지
+    } else {
+      // 2회차 만료 → 실패 시뮬레이션 (PoC)
+      Alert.alert(
+        '2회차 실패',
+        '실제 빌드에서는 광고 + 실패 화면',
+        [{ text: '확인', onPress: () => setCameraOpen(false) }]
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remainingMs, cameraOpen, isRetryBannerVisible, attemptCount]);
+
+  // 언마운트/카메라 닫힘 시 타이머 정리
+  useEffect(() => {
+    if (!cameraOpen && retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  }, [cameraOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const startScan = () => {
     setError(null);
@@ -246,13 +334,27 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     matched.value = false;
     lastRun.value = 0;
     frameLogged.value = false;
+    consecutiveHits.value = 0;
+    // 스캔 시작 시 새 랜덤 미션 선택
+    const initialMission = pickRandom(MISSION_POOL);
+    setCurrentMission(initialMission);
+    targetLabelsSV.value = MISSION_COCO_LABELS[initialMission] ?? [];
+    setAttemptCount(1);
+    setRemainingMs(missionDurationRef.current * 1000);
+    setIsRetryBannerVisible(false);
     setCameraOpen(true);
   };
 
-  const closeCamera = () => {
-    matched.value = true; // worklet 중단
-    setCameraOpen(false);
-  };
+  // 다시 뽑기 — 바로 이전 미션 제외한 22개 중 랜덤
+  // carousel 리셋: currentMission, consecutiveHits, matched만. remainingMs/attemptCount는 유지.
+  const reshuffleMission = useCallback(() => {
+    if (isRetryBannerVisible) return; // 배너 표시 중엔 비활성
+    const next = pickRandom(MISSION_POOL, currentMissionRef.current);
+    setCurrentMission(next);
+    targetLabelsSV.value = MISSION_COCO_LABELS[next] ?? [];
+    consecutiveHits.value = 0;
+    matched.value = false;
+  }, [isRetryBannerVisible, consecutiveHits, matched, targetLabelsSV]);
 
   // 언마운트 cleanup
   useEffect(() => {
@@ -282,6 +384,8 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   });
 
   const modelReady = model != null;
+  const missionLabel = t(`icons.${currentMission}`, { defaultValue: currentMission });
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -302,34 +406,19 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           />
           <Text style={styles.statusText}>
             {modelReady
-              ? `모델 준비 완료 (YOLOv10n CPU)`
+              ? `모델 준비 완료 (YOLOv10n CPU) · 미션 타이머 ${missionDuration}초`
               : `모델 로드 중... (${plugin.state})`}
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>미션 선택</Text>
-          <View style={styles.missionGrid}>
-            {POC_MISSIONS.map((m) => (
-              <TouchableOpacity
-                key={m.id}
-                style={[
-                  styles.missionBtn,
-                  selectedMission.id === m.id && styles.missionBtnActive,
-                  cameraOpen && styles.btnDisabled,
-                ]}
-                onPress={() => setSelectedMission(m)}
-                disabled={cameraOpen}
-              >
-                <Text style={[
-                  styles.missionBtnText,
-                  selectedMission.id === m.id && styles.missionBtnTextActive,
-                ]}>
-                  {m.name}
-                </Text>
-                <Text style={styles.missionBtnLabels}>{m.labels.join(', ')}</Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={styles.sectionTitle}>다음 미션 (랜덤)</Text>
+          <View style={styles.currentMissionBox}>
+            <MaterialIcons name={currentMission as any} size={48} color={colors.primary} />
+            <Text style={styles.currentMissionName}>{missionLabel}</Text>
+            <Text style={styles.currentMissionLabels}>
+              {(MISSION_COCO_LABELS[currentMission] ?? []).join(', ')}
+            </Text>
           </View>
         </View>
 
@@ -339,7 +428,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
           disabled={!modelReady || !device}
         >
           <MaterialIcons name="qr-code-scanner" size={22} color="#fff" />
-          <Text style={styles.primaryBtnText}>{selectedMission.name} 스캔 시작</Text>
+          <Text style={styles.primaryBtnText}>스캔 시작</Text>
         </TouchableOpacity>
 
         {!device && (
@@ -369,14 +458,10 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      <Modal visible={cameraOpen} animationType="slide" onRequestClose={closeCamera}>
+      <Modal visible={cameraOpen} animationType="slide">
         <View style={styles.cameraContainer}>
           {device && hasPermission ? (
             <>
-              {/* 풀 카메라 (VisionCamera) */}
-              {/* - resizeMode="contain": 센서 원본 화각 유지 */}
-              {/* - format: device.formats 중 fieldOfView 최대 수동 선택 (센서 활용 최대) */}
-              {/* - videoStabilizationMode="off": iOS OIS/EIS crop 10% 회복 (Apple 공식) */}
               <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
@@ -417,25 +502,51 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              {/* 상단 X 버튼 */}
+              {/* 상단: 미션 아이콘 + 이름 + 다시 뽑기 */}
               <SafeAreaView style={styles.cameraTopSafe}>
-                <TouchableOpacity style={styles.cameraCloseBtn} onPress={closeCamera}>
-                  <MaterialIcons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
+                <View style={styles.missionHeader}>
+                  <MaterialIcons name={currentMission as any} size={36} color="#fff" />
+                  <Text style={styles.missionTitle}>{missionLabel}</Text>
+                  <TouchableOpacity
+                    style={[styles.reshuffleBtn, isRetryBannerVisible && styles.btnDisabled]}
+                    onPress={reshuffleMission}
+                    disabled={isRetryBannerVisible}
+                  >
+                    <MaterialIcons name="shuffle" size={18} color="#fff" />
+                    <Text style={styles.reshuffleBtnText}>{t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}</Text>
+                  </TouchableOpacity>
+                </View>
               </SafeAreaView>
 
-              {/* 하단 상태 */}
+              {/* 재시도 배너 (중앙 상단 오버레이) */}
+              {isRetryBannerVisible && (
+                <View style={styles.retryBanner} pointerEvents="none">
+                  <Text style={styles.retryBannerTitle}>
+                    {t('alarm.retrying', { defaultValue: '재시도' })}
+                  </Text>
+                  <Text style={styles.retryBannerSub}>
+                    {t('alarm.missionRetryHint', {
+                      mission: missionLabel,
+                      defaultValue: `${missionLabel}을 다시 찾아주세요`,
+                    })}
+                  </Text>
+                </View>
+              )}
+
+              {/* 하단 상태 — 카운트다운 + 스캔 단계 */}
               <SafeAreaView style={styles.cameraBottomSafe}>
                 <View style={styles.scanResultBox}>
                   {scanPhase === 'scanning' && (
                     <>
-                      <Text style={styles.scanResultLabel}>{selectedMission.name} 스캔 중</Text>
-                      <Text style={[styles.scanResultConf, { color: '#aaa' }]}>감지 중...</Text>
+                      <Text style={styles.scanResultLabel}>
+                        {missionLabel} · {attemptCount}/2
+                      </Text>
+                      <Text style={styles.scanCountdown}>{remainingSeconds}초</Text>
                     </>
                   )}
                   {scanPhase === 'detected' && (
                     <Text style={styles.scanResultLabel}>
-                      {selectedMission.name}가 감지되었습니다. 스캔합니다
+                      {missionLabel} 감지됨
                     </Text>
                   )}
                   {scanPhase === 'filling' && (
@@ -491,17 +602,17 @@ const makeStyles = (colors: ThemeColors) =>
     sectionTitle: {
       fontSize: 11, fontWeight: '800', color: colors.secondary, letterSpacing: 1.5,
     },
-    missionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    missionBtn: {
-      paddingHorizontal: 14, paddingVertical: 10,
-      borderRadius: 12,
+    currentMissionBox: {
+      padding: 20, borderRadius: 16,
       backgroundColor: colors.surfaceContainerLow,
-      minWidth: '30%',
+      alignItems: 'center', gap: 8,
     },
-    missionBtnActive: { backgroundColor: colors.primary },
-    missionBtnText: { fontSize: 14, fontWeight: '700', color: colors.onBackground },
-    missionBtnTextActive: { color: '#fff' },
-    missionBtnLabels: { fontSize: 10, color: colors.secondary, marginTop: 2 },
+    currentMissionName: {
+      fontSize: 20, fontWeight: '800', color: colors.onBackground,
+    },
+    currentMissionLabels: {
+      fontSize: 12, color: colors.secondary,
+    },
     primaryBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary,
@@ -522,14 +633,27 @@ const makeStyles = (colors: ThemeColors) =>
     cameraTopSafe: {
       position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
     },
+    missionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      gap: 12,
+    },
+    missionTitle: {
+      color: '#fff', fontSize: 20, fontWeight: '800', flex: 1, marginLeft: 8,
+    },
+    reshuffleBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      paddingHorizontal: 12, paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.18)',
+    },
+    reshuffleBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
     cameraBottomSafe: {
       position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
       alignItems: 'center', paddingBottom: 16,
-    },
-    cameraCloseBtn: {
-      margin: 16,
-      width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)',
-      alignItems: 'center', justifyContent: 'center',
     },
     dimOverlay: {
       position: 'absolute', left: 0, right: 0,
@@ -557,6 +681,24 @@ const makeStyles = (colors: ThemeColors) =>
       minWidth: 220,
     },
     scanResultLabel: { color: '#fff', fontSize: 16, fontWeight: '800' },
-    scanResultConf: { color: '#B8E986', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-    scanResultMs: { color: '#888', fontSize: 11, fontVariant: ['tabular-nums'] },
+    scanCountdown: {
+      color: '#B8E986', fontSize: 28, fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    retryBanner: {
+      position: 'absolute',
+      top: TB_OFFSET + CENTER_SIZE * 0.25,
+      left: 24, right: 24,
+      paddingVertical: 16, paddingHorizontal: 20,
+      borderRadius: 16,
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      alignItems: 'center', gap: 6,
+      zIndex: 20,
+    },
+    retryBannerTitle: {
+      color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: 0.5,
+    },
+    retryBannerSub: {
+      color: '#ddd', fontSize: 13, fontWeight: '600', textAlign: 'center',
+    },
   });

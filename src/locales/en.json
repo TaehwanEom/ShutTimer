@@ -22,6 +22,10 @@
     "notifBodyReminder3": "This is really the last one... please turn it off. 😭"
   },
   "alarm": {
+    "reshuffle": "Shuffle",
+    "retrying": "Retry",
+    "missionNotFound": "Not found",
+    "missionRetryHint": "Find {{mission}} again",
     "timerExpired": "TIMER EXPIRED",
     "takePhoto": "Take a photo to stop the alarm",
     "cameraRequired": "CAMERA REQUIRED",
@@ -94,6 +98,9 @@
     "vibration": "Vibration",
     "alarmSound": "Alarm Sound",
     "soundSelect": "Select Sound",
+    "missionDuration": "Mission Timer",
+    "missionDurationDesc": "Time given to find the mission object",
+    "secondsUnit": "s",
     "screen": "Display",
     "darkMode": "Dark Mode",
     "purchase": "Purchase",

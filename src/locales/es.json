@@ -22,6 +22,10 @@
     "notifBodyReminder3": "¡Esta es realmente la última! Por favor apágala. 😭"
   },
   "alarm": {
+    "reshuffle": "Reordenar",
+    "retrying": "Reintentar",
+    "missionNotFound": "No encontrado",
+    "missionRetryHint": "Encuentra {{mission}} de nuevo",
     "timerExpired": "TIEMPO AGOTADO",
     "takePhoto": "Toma una foto para detener la alarma",
     "cameraRequired": "CÁMARA REQUERIDA",
@@ -94,6 +98,9 @@
     "vibration": "Vibración",
     "alarmSound": "Sonido de alarma",
     "soundSelect": "Seleccionar sonido",
+    "missionDuration": "Temporizador de misión",
+    "missionDurationDesc": "Tiempo para encontrar el objeto de la misión",
+    "secondsUnit": "s",
     "screen": "Pantalla",
     "darkMode": "Modo oscuro",
     "purchase": "Compra",

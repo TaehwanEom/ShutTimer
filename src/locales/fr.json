@@ -22,6 +22,10 @@
     "notifBodyReminder3": "C'est vraiment la dernière... veuillez l'éteindre. 😭"
   },
   "alarm": {
+    "reshuffle": "Mélanger",
+    "retrying": "Réessayer",
+    "missionNotFound": "Non trouvé",
+    "missionRetryHint": "Retrouvez {{mission}}",
     "timerExpired": "TEMPS ÉCOULÉ",
     "takePhoto": "Prenez une photo pour arrêter l'alarme",
     "cameraRequired": "CAMÉRA REQUISE",
@@ -94,6 +98,9 @@
     "vibration": "Vibration",
     "alarmSound": "Son d'alarme",
     "soundSelect": "Choisir le son",
+    "missionDuration": "Minuteur de mission",
+    "missionDurationDesc": "Temps alloué pour trouver l'objet de la mission",
+    "secondsUnit": "s",
     "screen": "Affichage",
     "darkMode": "Mode sombre",
     "purchase": "Achat",

@@ -65,7 +65,8 @@ import AddTimerScreen from './src/screens/AddTimerScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
-// @v1.5-poc — Phase A 검증 후 제거
+import MissionSelectScreen from './src/screens/MissionSelectScreen';
+// @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 production 빌드에서 자동 배제 (dead code elimination). 삭제 금지.
 import PoCPhotoValidationScreen from './src/screens/PoCPhotoValidationScreen';
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -85,7 +86,8 @@ export type RootStackParamList = {
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
   History: undefined;
   Notice: undefined;
-  // @v1.5-poc — Phase A 검증 후 제거
+  MissionSelect: undefined;
+  // @v1.5-poc — 영구 유지. __DEV__ 가드로 production 빌드 런타임에서 접근 차단.
   PoCPhotoValidation: undefined;
 };
 
@@ -231,8 +233,11 @@ function AppNavigator() {
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
-        {/* @v1.5-poc — Phase A 검증 후 제거 */}
-        <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />
+        <Stack.Screen name="MissionSelect" component={MissionSelectScreen} />
+        {/* @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 프로덕션 빌드에서 자동 제외. 삭제 금지. */}
+        {__DEV__ && (
+          <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
     </>

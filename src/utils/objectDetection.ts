@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { loadTensorflowModel } from 'react-native-fast-tflite';
 import type { TfliteModel } from 'react-native-fast-tflite/lib/typescript/specs/Tflite.nitro';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -14,8 +15,8 @@ export async function loadDetectionModel(): Promise<TfliteModel> {
   if (model) return model;
   if (!loadPromise) {
     loadPromise = loadTensorflowModel(
-      require('../../assets/models/yolov10n_float16.tflite'),
-      []
+      require('../../assets/models/yolov10s_float16.tflite'),
+      Platform.OS === 'ios' ? ['core-ml'] : []
     );
   }
   model = await loadPromise;
@@ -170,29 +171,60 @@ export function parseYolov10Output(
   return best;
 }
 
-export const MISSION_COCO_LABELS: Record<string, string[]> = {
-  'tv': ['tv', 'laptop'],
-  'bathtub': ['sink', 'toilet'],
-  'menu-book': ['book'],
-  'school': ['book', 'laptop'],
-  'toys': ['teddy bear', 'sports ball'],
-  'sports-esports': ['remote', 'cell phone'],
-  'outdoor-grill': ['oven', 'microwave', 'knife'],
-  'fitness-center': ['sports ball', 'bench'],
-  'directions-run': ['person'],
-  'self-improvement': ['person'],
-  'music-note': ['keyboard'],
-  'brush': ['scissors'],
-  'pets': ['dog', 'cat', 'bird'],
-  'local-cafe': ['cup', 'bowl'],
-  'restaurant': ['fork', 'knife', 'spoon', 'bowl'],
-  'shopping-cart': ['handbag', 'backpack', 'suitcase'],
-  'work': ['laptop', 'keyboard', 'mouse'],
-  'computer': ['laptop', 'keyboard', 'mouse'],
-  'phone-android': ['cell phone'],
-  'camera-alt': [],
-  'directions-bike': ['bicycle'],
-  'spa': ['sink', 'toilet'],
-  'nightlight': ['bed'],
-  'clean-hands': ['sink'],
+// MISSION_COCO_LABELS moved to ../constants/missionIcons.ts — 71 1:1 mission pool.
+
+// @v1.5-diag — 진단용: target 외 라벨도 포함해 최상위 3개 detection 반환.
+// 실기기 1회 스캔 후 콘솔 출력으로 실패 유형(미감지/confidence 미달/오분류/연속프레임 미충족) 구분.
+// 정규 경로(parseYolov10Output) 외에 PoC frameProcessor에서만 호출. 검증 완료 후 제거 가능.
+export type Diag = {
+  total: number;
+  topLabels: [string, string, string];
+  topConfs: [number, number, number];
+  targetMatches: number;
+  targetBestConf: number; // target 라벨의 원시 최대 conf (minConf 필터 적용 전)
 };
+
+export function diagnoseYolov10Output(
+  output: Float32Array,
+  targetLabels: string[],
+  minConf: number = 0.1
+): Diag {
+  'worklet';
+  const stride = 6;
+  const rows = Math.floor(output.length / stride);
+  let t1c = 0, t1l = '';
+  let t2c = 0, t2l = '';
+  let t3c = 0, t3l = '';
+  let targetMatches = 0;
+  let targetBestConf = 0;
+  for (let i = 0; i < rows; i++) {
+    const off = i * stride;
+    const conf = output[off + 4];
+    const cid = Math.round(output[off + 5]);
+    if (cid < 0 || cid >= COCO_CLASSES.length) continue;
+    const label = COCO_CLASSES[cid];
+    // target 라벨은 minConf 무시하고 원시 best conf 기록
+    if (targetLabels.includes(label)) {
+      if (conf > targetBestConf) targetBestConf = conf;
+      if (conf >= minConf) targetMatches += 1;
+    }
+    if (conf < minConf) continue;
+    if (conf > t1c) {
+      t3c = t2c; t3l = t2l;
+      t2c = t1c; t2l = t1l;
+      t1c = conf; t1l = label;
+    } else if (conf > t2c) {
+      t3c = t2c; t3l = t2l;
+      t2c = conf; t2l = label;
+    } else if (conf > t3c) {
+      t3c = conf; t3l = label;
+    }
+  }
+  return {
+    total: rows,
+    topLabels: [t1l, t2l, t3l],
+    topConfs: [t1c, t2c, t3c],
+    targetMatches,
+    targetBestConf,
+  };
+}

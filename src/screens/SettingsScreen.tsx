@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, COLOR_PRESETS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
+import { MISSION_POOL } from '../constants/missionIcons';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
 import { useTranslation } from 'react-i18next';
@@ -175,11 +177,37 @@ export default function SettingsScreen({ navigation }: Props) {
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [missionDuration, setMissionDuration] = useState<MissionDuration>(DEFAULT_SETTINGS.missionDuration);
   const [missionDurationModalVisible, setMissionDurationModalVisible] = useState(false);
+  const [selectedMissionsCount, setSelectedMissionsCount] = useState<number>(MISSION_POOL.length);
   const previewSoundRef = React.useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
   }, []);
+
+  // 미션 선택 카운트 — 화면 포커스 시 재로드 (MissionSelectScreen 다녀오면 최신값 반영)
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(SETTINGS_KEY.SELECTED_MISSIONS).then((raw) => {
+        if (!raw) {
+          setSelectedMissionsCount(MISSION_POOL.length);
+          return;
+        }
+        try {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const valid = arr.filter(
+              (k: unknown): k is string => typeof k === 'string' && MISSION_POOL.includes(k)
+            );
+            setSelectedMissionsCount(valid.length >= 1 ? valid.length : MISSION_POOL.length);
+          } else {
+            setSelectedMissionsCount(MISSION_POOL.length);
+          }
+        } catch {
+          setSelectedMissionsCount(MISSION_POOL.length);
+        }
+      });
+    }, [])
+  );
 
   useEffect(() => {
     AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION]).then(pairs => {
@@ -386,7 +414,7 @@ export default function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* 미션 타이머 */}
+        {/* 미션 타이머 + 미션 선택 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('settings.missionDuration')}</Text>
           <TouchableOpacity style={styles.toggleRow} onPress={() => setMissionDurationModalVisible(true)}>
@@ -397,6 +425,19 @@ export default function SettingsScreen({ navigation }: Props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.secondary }}>
                 {missionDuration}{t('settings.secondsUnit', { defaultValue: '초' })}
+              </Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.toggleRow} onPress={() => navigation.navigate('MissionSelect')}>
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="grid-view" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>{t('settings.missionSelect')}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.secondary }}>
+                {selectedMissionsCount} / {MISSION_POOL.length}
               </Text>
               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
             </View>
@@ -510,21 +551,23 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* @v1.5-poc — Phase A 검증 후 제거 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>DEBUG (v1.5 PoC)</Text>
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={() => navigation.navigate('PoCPhotoValidation')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="science" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>사진 인식 PoC</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-          </TouchableOpacity>
-        </View>
+        {/* @v1.5-poc — __DEV__ 가드. production 빌드에선 자동 배제 (dead code elimination). */}
+        {__DEV__ && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>DEBUG (v1.5 PoC)</Text>
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={() => navigation.navigate('PoCPhotoValidation')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.toggleLeft}>
+                <MaterialIcons name="science" size={22} color={colors.onBackground} />
+                <Text style={styles.toggleLabel}>사진 인식 PoC</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* 사운드 선택 모달 */}

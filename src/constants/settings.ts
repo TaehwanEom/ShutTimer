@@ -7,7 +7,10 @@ export const SETTINGS_KEY = {
   DIAL_TYPE: 'shutimer_dial_type',
   ALARM_ENABLED: 'shutimer_alarm_enabled',
   MISSION_DURATION: 'shutimer_mission_duration',
+  SELECTED_MISSIONS: 'shutimer_selected_missions',
 } as const;
+
+export const MIN_SELECTED_MISSIONS = 1;
 
 export const MISSION_DURATION_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
 export type MissionDuration = typeof MISSION_DURATION_OPTIONS[number];

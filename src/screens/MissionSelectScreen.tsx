@@ -1,0 +1,368 @@
+// @v1.5 — 미션 선택 화면 (사용자가 알람 미션 풀 커스터마이즈)
+// 알라미 유사 3열 그리드. i18n 14개 언어 지원.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  Image,
+  Alert,
+  Dimensions,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
+import { RootStackParamList } from '../../App';
+import { SETTINGS_KEY, MIN_SELECTED_MISSIONS } from '../constants/settings';
+import {
+  MISSION_POOL,
+  MISSION_EMOJI,
+  MISSION_LABEL,
+  MISSION_CATEGORIES,
+} from '../constants/missionIcons';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/theme';
+
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'MissionSelect'>;
+};
+
+const SCREEN_W = Dimensions.get('window').width;
+const GRID_PADDING_H = 16;
+const GRID_GAP = 8;
+const COL_COUNT = 3;
+const CARD_W = Math.floor((SCREEN_W - GRID_PADDING_H * 2 - GRID_GAP * (COL_COUNT - 1)) / COL_COUNT);
+const CARD_H = Math.floor(CARD_W * 1.15);
+const EMOJI_SIZE = Math.floor(CARD_W * 0.65);
+
+// 테마 무관 고정: iOS 표준 액션 컬러 (선택/비활성 표시)
+const ACCENT = '#0a84ff';
+
+export default function MissionSelectScreen({ navigation }: Props) {
+  const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(MISSION_POOL));
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY.SELECTED_MISSIONS).then((raw) => {
+      if (raw) {
+        try {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const valid = arr.filter(
+              (k): k is string => typeof k === 'string' && MISSION_POOL.includes(k)
+            );
+            if (valid.length >= MIN_SELECTED_MISSIONS) {
+              setSelected(new Set(valid));
+            }
+          }
+        } catch {}
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  const selectedCount = selected.size;
+  const allSelected = selectedCount === MISSION_POOL.length;
+
+  const toggleOne = useCallback((key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => (prev.size === MISSION_POOL.length ? new Set() : new Set(MISSION_POOL)));
+  }, []);
+
+  const toggleCategory = useCallback((keys: string[]) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      const allIn = keys.every((k) => next.has(k));
+      if (allIn) keys.forEach((k) => next.delete(k));
+      else keys.forEach((k) => next.add(k));
+      return next;
+    });
+  }, []);
+
+  const handleConfirm = useCallback(async () => {
+    if (selected.size < MIN_SELECTED_MISSIONS) {
+      Alert.alert(
+        t('missionSelect.minWarningTitle'),
+        t('missionSelect.minWarningBody', { n: MIN_SELECTED_MISSIONS })
+      );
+      return;
+    }
+    try {
+      await AsyncStorage.setItem(
+        SETTINGS_KEY.SELECTED_MISSIONS,
+        JSON.stringify(Array.from(selected))
+      );
+    } catch {}
+    navigation.goBack();
+  }, [selected, navigation, t]);
+
+  const handleCancel = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
+  const confirmEnabled = selected.size >= MIN_SELECTED_MISSIONS;
+
+  if (!loaded) {
+    return <SafeAreaView style={styles.container} />;
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleCancel} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Text style={styles.headerAction}>{t('missionSelect.cancel')}</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('missionSelect.title')}</Text>
+        <TouchableOpacity
+          onPress={handleConfirm}
+          disabled={!confirmEnabled}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={[styles.headerAction, !confirmEnabled && styles.headerActionDisabled]}>{t('missionSelect.confirm')}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 전체 토글 + 카운트 */}
+      <TouchableOpacity style={styles.allToggleRow} onPress={toggleAll} activeOpacity={0.7}>
+        <Checkbox checked={allSelected} partial={!allSelected && selectedCount > 0} isDark={isDark} colors={colors} />
+        <Text style={styles.allToggleLabel}>{t('missionSelect.all')} ({MISSION_POOL.length})</Text>
+        <Text style={styles.countText}>
+          {t('missionSelect.selectedFmt', { n: selectedCount, total: MISSION_POOL.length })}
+        </Text>
+      </TouchableOpacity>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {MISSION_CATEGORIES.map((cat) => {
+          const allInCat = cat.keys.every((k) => selected.has(k));
+          const anyInCat = cat.keys.some((k) => selected.has(k));
+          return (
+            <View key={cat.id} style={styles.categoryBlock}>
+              <TouchableOpacity
+                style={styles.categoryHeader}
+                onPress={() => toggleCategory(cat.keys)}
+                activeOpacity={0.7}
+              >
+                <Checkbox
+                  checked={allInCat}
+                  partial={!allInCat && anyInCat}
+                  size={18}
+                  isDark={isDark}
+                  colors={colors}
+                />
+                <Text style={styles.categoryTitle}>
+                  {t(`missionCategories.${cat.id}`, { defaultValue: cat.label })} ({cat.keys.length})
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.grid}>
+                {cat.keys.map((k) => {
+                  const isSelected = selected.has(k);
+                  const emoji = MISSION_EMOJI[k];
+                  const label = t(`missions.${k}`, { defaultValue: MISSION_LABEL[k] ?? k });
+                  return (
+                    <TouchableOpacity
+                      key={k}
+                      style={styles.card}
+                      onPress={() => toggleOne(k)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.cardCheckbox}>
+                        <Checkbox checked={isSelected} isDark={isDark} colors={colors} />
+                      </View>
+                      {emoji ? (
+                        <Image source={emoji} style={styles.cardEmoji} resizeMode="contain" />
+                      ) : (
+                        <View style={styles.cardEmoji} />
+                      )}
+                      <Text style={styles.cardLabel} numberOfLines={1}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// 체크박스 — 테마 대응
+function Checkbox({
+  checked,
+  partial,
+  size = 16,
+  isDark,
+  colors,
+}: {
+  checked: boolean;
+  partial?: boolean;
+  size?: number;
+  isDark: boolean;
+  colors: ThemeColors;
+}) {
+  const borderColor = checked || partial ? ACCENT : isDark ? '#3a3a3c' : '#c7c7cc';
+  const bgColor = checked
+    ? ACCENT
+    : partial
+    ? `${ACCENT}33`
+    : isDark
+    ? '#1c1c1e'
+    : '#ffffff';
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 3,
+        borderWidth: 1,
+        borderColor,
+        backgroundColor: bgColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {checked && (
+        <View
+          style={{
+            width: Math.floor(size * 0.3),
+            height: Math.floor(size * 0.5),
+            borderRightWidth: 2,
+            borderBottomWidth: 2,
+            borderColor: '#fff',
+            transform: [{ rotate: '45deg' }, { translateY: -1 }],
+          }}
+        />
+      )}
+      {partial && !checked && (
+        <View
+          style={{
+            width: Math.floor(size * 0.55),
+            height: 2,
+            backgroundColor: ACCENT,
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+const makeStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: isDark ? '#2c2c2e' : '#e5e5ea',
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.onBackground,
+    },
+    headerAction: {
+      fontSize: 16,
+      color: ACCENT,
+      fontWeight: '500',
+      minWidth: 40,
+    },
+    headerActionDisabled: {
+      opacity: 0.35,
+    },
+    allToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: isDark ? '#2c2c2e' : '#e5e5ea',
+    },
+    allToggleLabel: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.onBackground,
+      flex: 1,
+    },
+    countText: {
+      fontSize: 13,
+      color: colors.secondary,
+      fontWeight: '500',
+    },
+    scrollContent: {
+      paddingBottom: 32,
+    },
+    categoryBlock: {
+      paddingHorizontal: GRID_PADDING_H,
+      paddingTop: 20,
+      paddingBottom: 4,
+    },
+    categoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+      paddingLeft: 4,
+    },
+    categoryTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.secondary,
+      letterSpacing: 0.2,
+    },
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: GRID_GAP,
+    },
+    card: {
+      width: CARD_W,
+      height: CARD_H,
+      backgroundColor: colors.surfaceContainerLow,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 8,
+    },
+    cardCheckbox: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+    },
+    cardEmoji: {
+      width: EMOJI_SIZE,
+      height: EMOJI_SIZE,
+      marginBottom: 6,
+    },
+    cardLabel: {
+      fontSize: 10.5,
+      color: colors.onBackground,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+  });

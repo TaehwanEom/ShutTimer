@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import { SETTINGS_KEY, MIN_SELECTED_MISSIONS } from '../constants/settings';
@@ -68,9 +69,6 @@ export default function MissionSelectScreen({ navigation }: Props) {
     });
   }, []);
 
-  const selectedCount = selected.size;
-  const allSelected = selectedCount === MISSION_POOL.length;
-
   const toggleOne = useCallback((key: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -78,10 +76,6 @@ export default function MissionSelectScreen({ navigation }: Props) {
       else next.add(key);
       return next;
     });
-  }, []);
-
-  const toggleAll = useCallback(() => {
-    setSelected((prev) => (prev.size === MISSION_POOL.length ? new Set() : new Set(MISSION_POOL)));
   }, []);
 
   const toggleCategory = useCallback((keys: string[]) => {
@@ -94,28 +88,29 @@ export default function MissionSelectScreen({ navigation }: Props) {
     });
   }, []);
 
-  const handleConfirm = useCallback(async () => {
-    if (selected.size < MIN_SELECTED_MISSIONS) {
-      Alert.alert(
-        t('missionSelect.minWarningTitle'),
-        t('missionSelect.minWarningBody', { n: MIN_SELECTED_MISSIONS })
-      );
-      return;
-    }
-    try {
-      await AsyncStorage.setItem(
-        SETTINGS_KEY.SELECTED_MISSIONS,
-        JSON.stringify(Array.from(selected))
-      );
-    } catch {}
-    navigation.goBack();
-  }, [selected, navigation, t]);
-
-  const handleCancel = useCallback(() => {
+  // 뒤로가기 진입점 (헤더 화살표 탭). 실 검증·저장은 beforeRemove에서 단일 처리.
+  const handleBack = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
-  const confirmEnabled = selected.size >= MIN_SELECTED_MISSIONS;
+  // iOS 스와이프 백 / Android 시스템 백 / 헤더 화살표 — 모두 동일 경로 (자동 저장 + 최소 검증)
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e) => {
+      if (selected.size < MIN_SELECTED_MISSIONS) {
+        e.preventDefault();
+        Alert.alert(
+          t('missionSelect.minWarningTitle'),
+          t('missionSelect.minWarningBody', { n: MIN_SELECTED_MISSIONS })
+        );
+        return;
+      }
+      AsyncStorage.setItem(
+        SETTINGS_KEY.SELECTED_MISSIONS,
+        JSON.stringify(Array.from(selected))
+      ).catch(() => {});
+    });
+    return unsub;
+  }, [navigation, selected, t]);
 
   if (!loaded) {
     return <SafeAreaView style={styles.container} />;
@@ -125,32 +120,19 @@ export default function MissionSelectScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-          <Text style={styles.headerAction}>{t('missionSelect.cancel')}</Text>
+        <TouchableOpacity
+          onPress={handleBack}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.backBtn}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('missionSelect.title')}</Text>
-        <TouchableOpacity
-          onPress={handleConfirm}
-          disabled={!confirmEnabled}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={[styles.headerAction, !confirmEnabled && styles.headerActionDisabled]}>{t('missionSelect.confirm')}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRightSpacer} />
       </View>
-
-      {/* 전체 토글 + 카운트 */}
-      <TouchableOpacity style={styles.allToggleRow} onPress={toggleAll} activeOpacity={0.7}>
-        <Checkbox checked={allSelected} partial={!allSelected && selectedCount > 0} isDark={isDark} colors={colors} />
-        <Text style={styles.allToggleLabel}>{t('missionSelect.all')} ({MISSION_POOL.length})</Text>
-        <Text style={styles.countText}>
-          {t('missionSelect.selectedFmt', { n: selectedCount, total: MISSION_POOL.length })}
-        </Text>
-      </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {MISSION_CATEGORIES.map((cat) => {
-          const allInCat = cat.keys.every((k) => selected.has(k));
-          const anyInCat = cat.keys.some((k) => selected.has(k));
           return (
             <View key={cat.id} style={styles.categoryBlock}>
               <TouchableOpacity
@@ -158,13 +140,6 @@ export default function MissionSelectScreen({ navigation }: Props) {
                 onPress={() => toggleCategory(cat.keys)}
                 activeOpacity={0.7}
               >
-                <Checkbox
-                  checked={allInCat}
-                  partial={!allInCat && anyInCat}
-                  size={18}
-                  isDark={isDark}
-                  colors={colors}
-                />
                 <Text style={styles.categoryTitle}>
                   {t(`missionCategories.${cat.id}`, { defaultValue: cat.label })} ({cat.keys.length})
                 </Text>
@@ -285,34 +260,13 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '700',
       color: colors.onBackground,
     },
-    headerAction: {
-      fontSize: 16,
-      color: ACCENT,
-      fontWeight: '500',
-      minWidth: 40,
+    backBtn: {
+      padding: 8,
+      borderRadius: 50,
+      width: 40,
     },
-    headerActionDisabled: {
-      opacity: 0.35,
-    },
-    allToggleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      gap: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: isDark ? '#2c2c2e' : '#e5e5ea',
-    },
-    allToggleLabel: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.onBackground,
-      flex: 1,
-    },
-    countText: {
-      fontSize: 13,
-      color: colors.secondary,
-      fontWeight: '500',
+    headerRightSpacer: {
+      width: 40,
     },
     scrollContent: {
       paddingBottom: 32,

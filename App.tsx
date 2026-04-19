@@ -66,8 +66,10 @@ import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
 import MissionSelectScreen from './src/screens/MissionSelectScreen';
-// @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 production 빌드에서 자동 배제 (dead code elimination). 삭제 금지.
-import PoCPhotoValidationScreen from './src/screens/PoCPhotoValidationScreen';
+// @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
+const PoCPhotoValidationScreen = __DEV__
+  ? require('./src/screens/PoCPhotoValidationScreen').default
+  : null;
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)

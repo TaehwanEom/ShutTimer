@@ -191,7 +191,6 @@ export default function RunningScreen({ navigation, route }: Props) {
           body,
           sound,
           interruptionLevel: 'timeSensitive',
-          threadIdentifier: 'shuttimer-alarm',
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

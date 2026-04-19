@@ -33,6 +33,7 @@ const persistAll = () => {
 };
 
 const record = (level: 'info' | 'warn' | 'error', tag: string, message: string) => {
+  if (!__DEV__) return;
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,

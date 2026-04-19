@@ -17,6 +17,40 @@
 
 ---
 
+## 외부 패키지/네이티브 의존성 사용 원칙 [Critical]
+
+**배경:** 반복된 빌드 실패 (v1.5 스파이크 2026-04-17):
+- `react-native-fast-tflite` v3 API 추측 구현 → 크래시
+- `react-native-worklets-core` babel plugin 요구사항 미확인 → 빌드 실패
+- `react-native-fast-tflite` CoreML delegate의 Expo config plugin 요구사항 누락 → 런타임 실패
+- `vision-camera-resize-plugin` 공식 `buffer.slice()` 패턴 미준수 → 잠재 버그
+
+**원칙 (예외 없음):**
+
+1. **공식 패키지 API 사용 시 → 반드시 공식 README/문서 확인 후 코드 작성**
+   - node_modules/{패키지}/README.md 직접 읽기
+   - 공식 예제 코드 그대로 모사 (추측으로 변형 금지)
+
+2. **추측으로 코드 작성 금지**
+   - 타입 정의(.d.ts)만 보고 코드 작성 금지
+   - 실제 사용 예제 확인 필수
+
+3. **네이티브 의존성 추가 시 → Expo config plugin 요구사항 여부 확인 필수**
+   - `npm install` 외 추가 설정 필요 여부 확인
+   - app.json `plugins` 배열에 등록 필요 여부 확인
+   - CoreML/GPU delegate 등 특수 기능은 별도 설정 요구 가능성
+
+4. **빌드 관련 설정 (Podfile, babel 등) → 공식 설치 가이드 전체 읽고 반영**
+   - README의 "Installation" 섹션 끝까지 읽기
+   - babel.config.js plugin 요구사항 확인
+   - Podfile 커스텀 변수 (`$EnableCoreMLDelegate` 등) 확인
+
+**위반 시 결과:** 빌드 실패 → 재빌드 → 디버깅 반복으로 사용자 시간 낭비.
+
+**Critical 판정:** 이 원칙 위반은 "추측 기반 수정" 금지 규칙 위반과 동일. 반복 발생 시 즉시 작업 중단.
+
+---
+
 ## 강제 워크플로우 (5단계 — 순서 건너뛰기 금지)
 
 ### Step 1: 영향 범위 분석

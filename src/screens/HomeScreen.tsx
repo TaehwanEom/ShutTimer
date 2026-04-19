@@ -338,6 +338,9 @@ export default function HomeScreen({ navigation }: Props) {
     }
     notificationIdsRef.current = [];
 
+    // 타이머 활성 플래그 (foreground 이중 재생 방지 — App.tsx NotifHandler 경로)
+    AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
+
     // 사운드 + 사용자 설정
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
     const pushSound = soundId.startsWith('ringtone_')
@@ -384,6 +387,8 @@ export default function HomeScreen({ navigation }: Props) {
     // 메모리 배열 + 시스템 예약 양쪽 모두 정리 (cold start 복원 후 메모리 배열이 비어있어도 안전)
     await Notifications.cancelAllScheduledNotificationsAsync();
     notificationIdsRef.current = [];
+    // 타이머 플래그 해제 (pair with scheduleAlarm)
+    AsyncStorage.removeItem('isTimerActive').catch(() => {});
   };
 
   // --- 타이머 시작 ---
@@ -477,6 +482,8 @@ export default function HomeScreen({ navigation }: Props) {
         remainingSecondsRef.current = remaining;
         setRemainingSeconds(remaining);
         setIsRunning(true);
+        // 예약 알림은 이미 iOS 네이티브 레이어에 남아있음. 플래그만 재설정 (foreground suppress)
+        AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
       } else {
         // 알람 시간 지났음 → 세션 기록 + AlarmScreen
         saveSession(t.totalSeconds, t.missionIcon ?? 'timer');

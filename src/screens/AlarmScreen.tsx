@@ -122,7 +122,11 @@ export default function AlarmScreen({ navigation }: Props) {
   // const { isAdFree } = usePurchase();
   // v1.5: VisionCamera 기반
   const { hasPermission: hasCameraPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('back');
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
+  const device = useCameraDevice(cameraPosition);
+  const toggleCamera = useCallback(() => {
+    setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
+  }, []);
 
   // v1.5 카메라 format (fieldOfView ≤ 70, stabilization off, 해상도 ≥ 640)
   const FOV_MAX = 70;
@@ -990,17 +994,30 @@ export default function AlarmScreen({ navigation }: Props) {
             )}
           </View>
 
-          {/* 다시 뽑기 — 카메라 박스 바로 아래에 밀착 */}
-          <TouchableOpacity
-            onPress={reshuffleMission}
-            disabled={isRetryBannerVisible || isShuffling}
-            style={[{ alignItems: 'center', gap: 4, paddingVertical: 10, marginTop: 8 }, (isRetryBannerVisible || isShuffling) && { opacity: 0.4 }]}
-          >
-            <MaterialIcons name="shuffle" size={26} color="#fff" style={{ opacity: 0.9 }} />
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
-              {t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}
-            </Text>
-          </TouchableOpacity>
+          {/* 다시 뽑기 + 카메라 전환 — 카메라 박스 바로 아래에 가로 배치 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, marginTop: 8 }}>
+            <TouchableOpacity
+              onPress={reshuffleMission}
+              disabled={isRetryBannerVisible || isShuffling}
+              style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, (isRetryBannerVisible || isShuffling) && { opacity: 0.4 }]}
+            >
+              <MaterialIcons name="shuffle" size={26} color="#fff" style={{ opacity: 0.9 }} />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
+                {t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={toggleCamera}
+              disabled={isShuffling}
+              style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, isShuffling && { opacity: 0.4 }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialIcons name="flip-camera-ios" size={26} color="#fff" style={{ opacity: 0.9 }} />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
+                {t('alarm.flipCamera', { defaultValue: '카메라 전환' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
         </View>
 

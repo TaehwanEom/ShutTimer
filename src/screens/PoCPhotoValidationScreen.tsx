@@ -76,7 +76,11 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice('back');
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
+  const device = useCameraDevice(cameraPosition);
+  const toggleCamera = useCallback(() => {
+    setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
+  }, []);
 
   const FOV_MAX = 70;
   const format = useMemo(() => {
@@ -716,6 +720,14 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
                     <MaterialIcons name="shuffle" size={18} color="#fff" />
                     <Text style={styles.reshuffleBtnText}>{t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.flipBtn, isShuffling && styles.btnDisabled]}
+                    onPress={toggleCamera}
+                    disabled={isShuffling}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons name="flip-camera-ios" size={20} color="#fff" />
+                  </TouchableOpacity>
                 </View>
               </SafeAreaView>
 
@@ -927,6 +939,11 @@ const makeStyles = (colors: ThemeColors) =>
       backgroundColor: 'rgba(255,255,255,0.18)',
     },
     reshuffleBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    flipBtn: {
+      width: 36, height: 36, borderRadius: 18,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.18)',
+    },
     cameraBottomSafe: {
       position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
       alignItems: 'center', paddingBottom: 16,

@@ -20,8 +20,9 @@
         "com.apple.developer.usernotifications.time-sensitive": true
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "사진을 스캔하여 타이머를 종료합니다.",
-        "NSLocationWhenInUseUsageDescription": "Location is used to provide more relevant ads. You can deny without affecting app functionality.",
+        "NSCameraUsageDescription": "Scan a photo to dismiss the timer.",
+        "NSLocationWhenInUseUsageDescription": "Used to provide more relevant ads. Denying does not affect app functionality.",
+        "NSMotionUsageDescription": "Used to detect shake gesture to dismiss the alarm.",
         "UIBackgroundModes": [
           "audio"
         ],
@@ -193,7 +194,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "사진을 스캔하여 타이머를 종료합니다.",
+          "cameraPermission": "Scan a photo to dismiss the timer.",
           "microphonePermission": false
         }
       ],
@@ -217,13 +218,13 @@
       [
         "expo-tracking-transparency",
         {
-          "userTrackingPermission": "이 식별자는 맞춤형 광고 제공에 사용됩니다."
+          "userTrackingPermission": "This identifier is used to provide personalized ads."
         }
       ],
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "사진을 스캔하여 타이머를 종료합니다.",
+          "cameraPermissionText": "Scan a photo to dismiss the timer.",
           "enableFrameProcessors": true,
           "enableLocation": false
         }
@@ -233,7 +234,8 @@
         {
           "enableCoreMLDelegate": true
         }
-      ]
+      ],
+      "./plugins/withInfoPlistLocalizations.js"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

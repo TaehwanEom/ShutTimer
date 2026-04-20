@@ -194,7 +194,14 @@
     "monthStats": "Statistik {{month}}",
     "totalTime": "Total bulan ini",
     "activeDays": "Hari aktif",
-    "daysFmt": "{{days}} hari"
+    "daysFmt": "{{days}} hari",
+    "statsTotalTime": "Total Waktu",
+    "statsTopMission": "Misi Terpopuler",
+    "statsStreak": "Hari Berturut",
+    "hoursMinutes": "{{hours}}j {{minutes}}m",
+    "minutesOnly": "{{minutes}}m",
+    "streakDays": "{{days}} hari berturut",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "Pembaruan diperlukan",

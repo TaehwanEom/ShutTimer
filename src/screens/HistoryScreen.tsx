@@ -104,8 +104,17 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 14, marginTop: 16, opacity: 0.6,
   },
   statsRow: { flexDirection: 'row', marginHorizontal: 16, marginTop: 8, gap: 10 },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: 16,
+    marginTop: 8,
+    gap: 10,
+  },
   statCard: {
-    flex: 1, padding: 16, borderRadius: 14,
+    flexBasis: '48%',
+    flexGrow: 1,
+    padding: 16, borderRadius: 14,
     backgroundColor: colors.surfaceContainerLow,
     alignItems: 'center', gap: 4,
   },
@@ -184,11 +193,68 @@ export default function HistoryScreen({ navigation }: Props) {
   const selectedKey = toKey(year, month, selectedDay);
   const sessions = sessionsByDate[selectedKey] ?? [];
 
-  // 이번 달 통계
+  // 이번 달 통계 (4개 카드: 총 시간 / 최다 미션 / 연속일 / 활동 일수)
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const monthEntries = Object.entries(sessionsByDate).filter(([k]) => k.startsWith(monthPrefix));
   const totalMinutes = monthEntries.reduce((acc, [, v]) => acc + v.reduce((s, x) => s + x.minutes, 0), 0);
   const activeDays = monthEntries.length;
+
+  // 최다 미션 (월 내, 사용 시간 합계 기준)
+  const topMission = useMemo(() => {
+    const byIcon: Record<string, number> = {};
+    for (const [, sessions] of monthEntries) {
+      for (const s of sessions) {
+        byIcon[s.icon] = (byIcon[s.icon] || 0) + s.minutes;
+      }
+    }
+    let maxIcon = '';
+    let maxMinutes = 0;
+    for (const [icon, minutes] of Object.entries(byIcon)) {
+      if (minutes > maxMinutes) {
+        maxIcon = icon;
+        maxMinutes = minutes;
+      }
+    }
+    return maxMinutes > 0 ? { icon: maxIcon, minutes: maxMinutes } : null;
+  }, [monthEntries]);
+
+  // 연속 사용일 (오늘 기준 전체, 캘린더 월 무관)
+  // - 오늘 세션 있음: 오늘부터 역순
+  // - 오늘 세션 없고 어제 있음: 어제부터 역순 (grace day, 동기부여 UX)
+  // - 둘 다 없음: 0
+  const streakDays = useMemo(() => {
+    const todayDate = new Date();
+    const todayKey = toKey(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+    let cursor = new Date(todayDate);
+    if (!sessionsByDate[todayKey]) {
+      cursor.setDate(cursor.getDate() - 1);
+      const yesterdayKey = toKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      if (!sessionsByDate[yesterdayKey]) return 0;
+    }
+    let count = 0;
+    while (true) {
+      const key = toKey(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      if (sessionsByDate[key]) {
+        count++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [sessionsByDate]);
+
+  // 시간 포맷 헬퍼 (60분 이상이면 시:분, 미만이면 분만)
+  const formatTime = useCallback((minutes: number) => {
+    if (minutes >= 60) {
+      return t('history.hoursMinutes', {
+        hours: Math.floor(minutes / 60),
+        minutes: minutes % 60,
+        defaultValue: `${Math.floor(minutes / 60)}시간 ${minutes % 60}분`,
+      });
+    }
+    return t('history.minutesOnly', { minutes, defaultValue: `${minutes}분` });
+  }, [t]);
 
   const goPrevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -293,20 +359,41 @@ export default function HistoryScreen({ navigation }: Props) {
           ))
         )}
 
-        {/* 이번 달 통계 */}
+        {/* 이번 달 통계 — 4개 카드 (2x2 그리드) */}
         <View style={styles.divider} />
         <Text style={styles.sectionLabel}>{t('history.monthStats', { month: monthName })}</Text>
-        <View style={styles.statsRow}>
+        <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {totalMinutes >= 60
-                ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
-                : `${totalMinutes}m`}
+            <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+              {totalMinutes > 0 ? formatTime(totalMinutes) : t('history.empty', { defaultValue: '-' })}
             </Text>
-            <Text style={styles.statLabel}>{t('history.totalTime')}</Text>
+            <Text style={styles.statLabel}>{t('history.statsTotalTime', { defaultValue: '총 사용 시간' })}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{t('history.daysFmt', { days: activeDays })}</Text>
+            {topMission ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialIcons name={topMission.icon as any} size={20} color={colors.primary} />
+                <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {topMission.icon === 'timer' ? t('history.timer') : t(`icons.${topMission.icon}`)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.statValue}>{t('history.empty', { defaultValue: '-' })}</Text>
+            )}
+            <Text style={styles.statLabel}>{t('history.statsTopMission', { defaultValue: '최다 사용 미션' })}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+              {streakDays > 0
+                ? t('history.streakDays', { days: streakDays, defaultValue: `${streakDays}일 연속` })
+                : t('history.empty', { defaultValue: '-' })}
+            </Text>
+            <Text style={styles.statLabel}>{t('history.statsStreak', { defaultValue: '연속 사용일' })}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+              {t('history.daysFmt', { days: activeDays })}
+            </Text>
             <Text style={styles.statLabel}>{t('history.activeDays')}</Text>
           </View>
         </View>

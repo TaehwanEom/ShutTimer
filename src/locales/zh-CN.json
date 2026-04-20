@@ -194,7 +194,14 @@
     "monthStats": "{{month}}统计",
     "totalTime": "本月总时长",
     "activeDays": "活跃天数",
-    "daysFmt": "{{days}}天"
+    "daysFmt": "{{days}}天",
+    "statsTotalTime": "总时间",
+    "statsTopMission": "最常用任务",
+    "statsStreak": "连续天数",
+    "hoursMinutes": "{{hours}}小时{{minutes}}分钟",
+    "minutesOnly": "{{minutes}}分钟",
+    "streakDays": "连续{{days}}天",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "需要更新",

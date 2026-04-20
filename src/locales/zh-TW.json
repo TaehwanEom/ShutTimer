@@ -194,7 +194,14 @@
     "monthStats": "{{month}}統計",
     "totalTime": "本月總時長",
     "activeDays": "活躍天數",
-    "daysFmt": "{{days}}天"
+    "daysFmt": "{{days}}天",
+    "statsTotalTime": "總時間",
+    "statsTopMission": "最常用任務",
+    "statsStreak": "連續天數",
+    "hoursMinutes": "{{hours}}小時{{minutes}}分鐘",
+    "minutesOnly": "{{minutes}}分鐘",
+    "streakDays": "連續{{days}}天",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "需要更新",

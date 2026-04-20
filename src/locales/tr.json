@@ -194,7 +194,14 @@
     "monthStats": "{{month}} İstatistikleri",
     "totalTime": "Aylık toplam",
     "activeDays": "Aktif günler",
-    "daysFmt": "{{days}} gün"
+    "daysFmt": "{{days}} gün",
+    "statsTotalTime": "Toplam Süre",
+    "statsTopMission": "En Çok Kullanılan",
+    "statsStreak": "Üst Üste Gün",
+    "hoursMinutes": "{{hours}}sa {{minutes}}dk",
+    "minutesOnly": "{{minutes}}dk",
+    "streakDays": "{{days}} gün üst üste",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "Güncelleme gerekli",

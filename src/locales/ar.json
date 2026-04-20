@@ -194,7 +194,14 @@
     "monthStats": "إحصائيات {{month}}",
     "totalTime": "إجمالي الشهر",
     "activeDays": "الأيام النشطة",
-    "daysFmt": "{{days}} يوم"
+    "daysFmt": "{{days}} يوم",
+    "statsTotalTime": "الوقت الإجمالي",
+    "statsTopMission": "المهمة الأكثر استخدامًا",
+    "statsStreak": "أيام متتالية",
+    "hoursMinutes": "{{hours}}س {{minutes}}د",
+    "minutesOnly": "{{minutes}}د",
+    "streakDays": "{{days}} يوم متتالي",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "التحديث مطلوب",

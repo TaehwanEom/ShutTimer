@@ -194,7 +194,14 @@
     "monthStats": "สถิติ {{month}}",
     "totalTime": "รวมเดือนนี้",
     "activeDays": "วันที่ใช้งาน",
-    "daysFmt": "{{days}} วัน"
+    "daysFmt": "{{days}} วัน",
+    "statsTotalTime": "เวลาทั้งหมด",
+    "statsTopMission": "ภารกิจที่ใช้บ่อยที่สุด",
+    "statsStreak": "วันต่อเนื่อง",
+    "hoursMinutes": "{{hours}}ชม {{minutes}}นาที",
+    "minutesOnly": "{{minutes}}นาที",
+    "streakDays": "{{days}} วันต่อเนื่อง",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "ต้องอัปเดต",

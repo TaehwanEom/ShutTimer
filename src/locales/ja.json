@@ -194,7 +194,14 @@
     "monthStats": "{{month}}の統計",
     "totalTime": "今月の合計",
     "activeDays": "活動日数",
-    "daysFmt": "{{days}}日"
+    "daysFmt": "{{days}}日",
+    "statsTotalTime": "合計時間",
+    "statsTopMission": "よく使うミッション",
+    "statsStreak": "連続日数",
+    "hoursMinutes": "{{hours}}時間{{minutes}}分",
+    "minutesOnly": "{{minutes}}分",
+    "streakDays": "{{days}}日連続",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "アップデートが必要です",

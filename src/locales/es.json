@@ -194,7 +194,14 @@
     "monthStats": "Estadísticas de {{month}}",
     "totalTime": "Total del mes",
     "activeDays": "Días activos",
-    "daysFmt": "{{days}} días"
+    "daysFmt": "{{days}} días",
+    "statsTotalTime": "Tiempo total",
+    "statsTopMission": "Misión más usada",
+    "statsStreak": "Racha",
+    "hoursMinutes": "{{hours}}h {{minutes}}min",
+    "minutesOnly": "{{minutes}}min",
+    "streakDays": "{{days}} días seguidos",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "Actualización necesaria",

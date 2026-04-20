@@ -194,7 +194,14 @@
     "monthStats": "{{month}} 통계",
     "totalTime": "이번 달 총 시간",
     "activeDays": "활동한 날",
-    "daysFmt": "{{days}}일"
+    "daysFmt": "{{days}}일",
+    "statsTotalTime": "총 사용 시간",
+    "statsTopMission": "최다 사용 미션",
+    "statsStreak": "연속 사용일",
+    "hoursMinutes": "{{hours}}시간 {{minutes}}분",
+    "minutesOnly": "{{minutes}}분",
+    "streakDays": "{{days}}일 연속",
+    "empty": "-"
   },
   "forceUpdate": {
     "title": "업데이트 필요",

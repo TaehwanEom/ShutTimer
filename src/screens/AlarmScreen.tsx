@@ -55,7 +55,7 @@ if (!isExpoGo) {
     try {
       const attStatus = await AsyncStorage.getItem('attStatus');
       const npa = attStatus === 'granted' ? false : true;
-      const { InterstitialAd, TestIds } = require('react-native-google-mobile-ads');
+      const { InterstitialAd } = require('react-native-google-mobile-ads');
       const INTERSTITIAL_UNIT_ID = Platform.select({
         ios: 'ca-app-pub-3043284478228309/6510839159',
         android: 'ca-app-pub-3043284478228309/6667370376',
@@ -124,8 +124,20 @@ export default function AlarmScreen({ navigation }: Props) {
   const { hasPermission: hasCameraPermission, requestPermission } = useCameraPermission();
   const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
   const device = useCameraDevice(cameraPosition);
+  // 카메라 전환 중 frame processor + tflite race 방지: isActive 일시 차단 + onStarted 동기화
+  const [isFlipping, setIsFlipping] = useState(false);
+  const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleCamera = useCallback(() => {
+    if (isFlipping) return;
+    setIsFlipping(true);
     setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
+    if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
+    flipTimeoutRef.current = setTimeout(() => setIsFlipping(false), 1000);
+  }, [isFlipping]);
+  useEffect(() => {
+    return () => {
+      if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
+    };
   }, []);
 
   // v1.5 카메라 format (fieldOfView ≤ 70, stabilization off, 해상도 ≥ 640)
@@ -878,12 +890,16 @@ export default function AlarmScreen({ navigation }: Props) {
                 <Camera
                   style={StyleSheet.absoluteFill}
                   device={device}
-                  isActive={resultState === 'idle'}
+                  isActive={resultState === 'idle' && !isFlipping}
                   frameProcessor={frameProcessor}
                   resizeMode="cover"
                   videoStabilizationMode="off"
                   photo={false}
                   video={false}
+                  onStarted={() => {
+                    if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
+                    setIsFlipping(false);
+                  }}
                   {...(format ? { format } : {})}
                 />
                 {/* 감지 성공 피드백 — 연두 깜빡 (전면) */}

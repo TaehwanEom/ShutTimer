@@ -326,7 +326,18 @@ export default function HomeScreen({ navigation }: Props) {
       AsyncStorage.getItem(MISSIONS_STORAGE_KEY).then(value => {
         const list: Mission[] = value ? JSON.parse(value) : MISSIONS;
         setMissionList(list);
-        setSelectedIndex(prev => prev >= list.length ? -1 : prev);
+        // 선택된 favorite의 defaultMinutes가 편집됐으면 다이얼 표시 값도 갱신
+        setSelectedIndex(prev => {
+          const newIdx = prev >= list.length ? -1 : prev;
+          if (newIdx >= 0) {
+            const m = list[newIdx];
+            if (m?.defaultMinutes != null) {
+              setSelectedMinutes(m.defaultMinutes);
+              setSelectedSeconds(0);
+            }
+          }
+          return newIdx;
+        });
       });
     }, [])
   );

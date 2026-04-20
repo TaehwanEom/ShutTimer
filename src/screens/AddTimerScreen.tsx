@@ -8,6 +8,8 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  Animated,
+  PanResponder,
 } from 'react-native';
 
 const ICONS_PER_PAGE = 8;
@@ -18,6 +20,7 @@ import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import { MISSIONS, MISSIONS_STORAGE_KEY, ICON_OPTIONS, Mission } from '../constants/missions';
+import { SETTINGS_KEY, DialType } from '../constants/settings';
 import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -182,7 +185,50 @@ export default function AddTimerScreen({ navigation, route }: Props) {
 
   const editId = route?.params?.editId;
   const isEdit = !!editId;
-  const dialType = route?.params?.dialType ?? 'classic';
+
+  // 다이얼/디지털 스와이프 — Home과 동일 패턴 (AsyncStorage 동기화)
+  const DIAL_TYPES: DialType[] = ['classic', 'digital'];
+  const [dialType, setDialType] = useState<DialType>(
+    (route?.params?.dialType as DialType | undefined) ?? 'classic'
+  );
+  const dialSlide = useRef(new Animated.Value(0)).current;
+  const DIAL_SIZE = 350;
+
+  // 마운트 시 AsyncStorage에서 마지막 사용 dial 읽기 (Home과 동기화)
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY.DIAL_TYPE).then((v) => {
+      if (v === 'classic' || v === 'digital') setDialType(v);
+    });
+  }, []);
+
+  // AddTimer의 dial 선택은 화면 내 미리보기 전용 — Home의 dial 상태에 영향 X
+  // (저장 시 AsyncStorage 갱신 안 함. 마운트 시 읽기만.)
+  const switchDial = (direction: 'left' | 'right') => {
+    const idx = DIAL_TYPES.indexOf(dialType);
+    const next = direction === 'left'
+      ? DIAL_TYPES[(idx + 1) % DIAL_TYPES.length]
+      : DIAL_TYPES[(idx - 1 + DIAL_TYPES.length) % DIAL_TYPES.length];
+    const outTo = direction === 'left' ? -DIAL_SIZE : DIAL_SIZE;
+    const inFrom = direction === 'left' ? DIAL_SIZE : -DIAL_SIZE;
+    Animated.timing(dialSlide, { toValue: outTo, duration: 180, useNativeDriver: true }).start(() => {
+      setDialType(next);
+      dialSlide.setValue(inFrom);
+      Animated.timing(dialSlide, { toValue: 0, duration: 220, useNativeDriver: true }).start();
+    });
+  };
+
+  const switchDialRef = useRef(switchDial);
+  switchDialRef.current = switchDial;
+
+  const swipeResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dy) < 40,
+      onPanResponderRelease: (_, g) => {
+        if (g.dx > 50) switchDialRef.current('right');
+        else if (g.dx < -50) switchDialRef.current('left');
+      },
+    })
+  ).current;
 
   const [selectedMinutes, setSelectedMinutes] = useState(route?.params?.editMinutes ?? 60);
   const [scrollEnabled, setScrollEnabled] = useState(true);
@@ -229,27 +275,51 @@ export default function AddTimerScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView scrollEnabled={scrollEnabled} showsVerticalScrollIndicator={false}>
-        {/* Dial */}
-        <View style={styles.dialSection}>
-          {dialType === 'digital' ? (
-            <TimerDigital
-              progress={selectedMinutes / 60}
-              timeText={`${String(selectedMinutes).padStart(2, '0')}:00`}
-              subText={t('addTimer.minutes')}
-              onSeek={(m, s) => { setSelectedMinutes(m); }}
-              onSeekStart={() => setScrollEnabled(false)}
-              onSeekEnd={() => setScrollEnabled(true)}
-            />
-          ) : (
-            <TimerDial
-              progress={selectedMinutes / 60}
-              timeText={`${selectedMinutes}:00`}
-              subText={t('addTimer.minutes')}
-              onSeek={(m) => setSelectedMinutes(m)}
-              onSeekStart={() => setScrollEnabled(false)}
-              onSeekEnd={() => setScrollEnabled(true)}
-            />
-          )}
+        {/* Dial — Home과 동일 스와이프 패턴 (좌우 화살표 + 점 인디케이터) */}
+        <View style={styles.dialSection} {...swipeResponder.panHandlers}>
+          <Animated.View style={{ transform: [{ translateX: dialSlide }], overflow: 'visible' }}>
+            {dialType === 'classic' && (
+              <TimerDial
+                progress={selectedMinutes / 60}
+                timeText={`${selectedMinutes}:00`}
+                subText={t('addTimer.minutes')}
+                onSeek={(m) => setSelectedMinutes(m)}
+                onSeekStart={() => setScrollEnabled(false)}
+                onSeekEnd={() => setScrollEnabled(true)}
+              />
+            )}
+            {dialType === 'digital' && (
+              <TimerDigital
+                progress={selectedMinutes / 60}
+                timeText={`${String(selectedMinutes).padStart(2, '0')}:00`}
+                subText={t('addTimer.minutes')}
+                onSeek={(m) => { setSelectedMinutes(m); }}
+                onSeekStart={() => setScrollEnabled(false)}
+                onSeekEnd={() => setScrollEnabled(true)}
+              />
+            )}
+          </Animated.View>
+
+          {/* 다이얼 전환 버튼 + 점 인디케이터 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+            <TouchableOpacity onPress={() => switchDial('right')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+              {DIAL_TYPES.map((dt) => (
+                <View
+                  key={dt}
+                  style={{
+                    width: 7, height: 7, borderRadius: 4,
+                    backgroundColor: dialType === dt ? colors.primary : colors.outlineVariant,
+                  }}
+                />
+              ))}
+            </View>
+            <TouchableOpacity onPress={() => switchDial('left')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 타이머 종류 */}

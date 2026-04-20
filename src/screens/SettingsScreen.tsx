@@ -234,6 +234,19 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleDismissMethod = (value: DismissMethod) => {
     setDismissMethod(value);
     AsyncStorage.setItem(SETTINGS_KEY.DISMISS_METHOD, value);
+    // 흔들기 선택 시 동작 권한 popup 트리거.
+    // iOS CMMotionManager는 권한 함수로 popup 안 뜨고 실 데이터 액세스로만 발화.
+    // requestPermissionsAsync는 iOS에서 default granted 반환만 함 (expo GitHub #30571).
+    // 해결: addListener 잠깐 등록 → 100ms 후 해제 → iOS 자동 popup.
+    if (value === 'shake') {
+      try {
+        const { Accelerometer } = require('expo-sensors');
+        const sub = Accelerometer.addListener(() => {});
+        setTimeout(() => sub.remove(), 100);
+      } catch (e) {
+        // expo-sensors 미지원 환경 무시
+      }
+    }
   };
 
   const stopPreview = () => {

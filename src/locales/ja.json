@@ -211,5 +211,35 @@
   "notices": {
     "title": "お知らせ",
     "empty": "お知らせはありません"
+  },
+  "onboarding": {
+    "greeting": "こんにちは。",
+    "welcomeTitle": "ShutTimerへ\nようこそ",
+    "feature1Title": "タイマーとアラーム",
+    "feature1Body": "お好みの時間を設定して\n自分だけのルーチンを作成",
+    "feature2Title": "写真スキャンでタイマー終了",
+    "feature2Body": "カメラで対象をスキャンすると\nタイマーが終了します。",
+    "feature3Title": "多様な終了方法",
+    "cardCameraLabel": "写真スキャン",
+    "cardCameraDesc": "カメラで対象をスキャンして終了",
+    "cardShakeLabel": "振る",
+    "cardShakeDesc": "端末を振って終了",
+    "cardTapLabel": "タップ",
+    "cardTapDesc": "ボタンを押して終了",
+    "permissionAttTitle": "パーソナライズ広告で無料維持",
+    "permissionAttBody": "より関連性の高い広告のため\nトラッキング許可が必要です。\n拒否してもアプリは動作します。",
+    "permissionAttButton": "続ける",
+    "permissionLocationTitle": "地域広告でより良い体験",
+    "permissionLocationBody": "位置情報によりより適切な\n広告を提供します。\n拒否してもアプリは動作します。",
+    "permissionLocationButton": "続ける",
+    "permissionNotifTitle": "タイマー終了通知",
+    "permissionNotifBody": "ロック画面でタイマー終了を\n受け取るには通知許可が必要です。\nルーチンに必須です。",
+    "permissionNotifButton": "続ける",
+    "readyTitle": "準備完了！",
+    "readyBody": "今すぐShutTimerを使いましょう",
+    "start": "始める",
+    "tooltipPlay": "再生ボタンを長押しするとタイマーを停止できます",
+    "tooltipFav": "お気に入りを長押しすると編集できます",
+    "confirm": "確認"
   }
 }

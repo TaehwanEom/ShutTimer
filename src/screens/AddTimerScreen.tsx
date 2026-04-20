@@ -268,7 +268,7 @@ export default function AddTimerScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.onBackground} />
+          <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEdit ? t('addTimer.editTitle') : t('addTimer.addTitle')}</Text>
         <View style={{ width: 40 }} />

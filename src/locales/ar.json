@@ -211,5 +211,35 @@
   "notices": {
     "title": "إشعارات",
     "empty": "لا توجد إشعارات"
+  },
+  "onboarding": {
+    "greeting": "مرحبا.",
+    "welcomeTitle": "مرحبا بك في\nShutTimer",
+    "feature1Title": "المؤقت والمنبه",
+    "feature1Body": "اضبط الوقت الذي تريده\nوأنشئ روتينك الخاص",
+    "feature2Title": "إيقاف المؤقت بمسح الصورة",
+    "feature2Body": "امسح جسما بالكاميرا\nلإيقاف المؤقت.",
+    "feature3Title": "طرق إيقاف متنوعة",
+    "cardCameraLabel": "مسح الصورة",
+    "cardCameraDesc": "امسح جسما بالكاميرا للإيقاف",
+    "cardShakeLabel": "هز",
+    "cardShakeDesc": "هز الجهاز للإيقاف",
+    "cardTapLabel": "نقر",
+    "cardTapDesc": "اضغط الزر للإيقاف",
+    "permissionAttTitle": "مجاني مع الإعلانات الشخصية",
+    "permissionAttBody": "نحتاج إذن التتبع\nلإعلانات أكثر ملاءمة.\nالتطبيق يعمل إن رفضت.",
+    "permissionAttButton": "متابعة",
+    "permissionLocationTitle": "تجربة أفضل مع إعلانات محلية",
+    "permissionLocationBody": "الموقع يوفر إعلانات\nأكثر ملاءمة.\nالتطبيق يعمل إن رفضت.",
+    "permissionLocationButton": "متابعة",
+    "permissionNotifTitle": "إشعار انتهاء المؤقت",
+    "permissionNotifBody": "الإشعارات ضرورية\nلتلقي تنبيهات المؤقت على شاشة القفل.\nضرورية للروتينات.",
+    "permissionNotifButton": "متابعة",
+    "readyTitle": "جاهز!",
+    "readyBody": "استخدم ShutTimer الآن",
+    "start": "ابدأ",
+    "tooltipPlay": "اضغط مطولا على زر التشغيل لإيقاف المؤقت",
+    "tooltipFav": "اضغط مطولا على المفضلة للتعديل",
+    "confirm": "تأكيد"
   }
 }

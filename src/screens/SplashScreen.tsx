@@ -4,6 +4,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import * as ExpoSplashScreen from 'expo-splash-screen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MISSIONS_STORAGE_KEY } from '../constants/missions';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
@@ -21,8 +23,23 @@ export default function SplashScreen({ navigation }: Props) {
       useNativeDriver: true,
     }).start();
 
-    const timer = setTimeout(() => {
-      navigation.replace('Home');
+    // 첫 실행 vs 기존 사용자 분기 → Onboarding or Home
+    // 기준:
+    //  - onboardingCompleted='true' → Home (이미 온보딩 완료)
+    //  - attStatus 또는 missions 데이터 존재 → Home (v1.5 이전 기존 사용자, 권한 응답 이력 있음)
+    //  - 둘 다 없음 → Onboarding (첫 설치)
+    const timer = setTimeout(async () => {
+      try {
+        const [onboarded, attStatus, missions] = await Promise.all([
+          AsyncStorage.getItem('onboardingCompleted'),
+          AsyncStorage.getItem('attStatus'),
+          AsyncStorage.getItem(MISSIONS_STORAGE_KEY),
+        ]);
+        const isExistingUser = onboarded === 'true' || attStatus !== null || missions !== null;
+        navigation.replace(isExistingUser ? 'Home' : 'Onboarding');
+      } catch {
+        navigation.replace('Home');
+      }
     }, 1500);
 
     return () => clearTimeout(timer);

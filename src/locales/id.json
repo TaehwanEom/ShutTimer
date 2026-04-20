@@ -211,5 +211,35 @@
   "notices": {
     "title": "Pemberitahuan",
     "empty": "Tidak ada pemberitahuan"
+  },
+  "onboarding": {
+    "greeting": "Halo.",
+    "welcomeTitle": "Selamat datang di\nShutTimer",
+    "feature1Title": "Timer & Alarm",
+    "feature1Body": "Atur waktu yang Anda inginkan\ndan buat rutinitas sendiri",
+    "feature2Title": "Hentikan timer dengan foto",
+    "feature2Body": "Pindai objek dengan kamera\nuntuk menghentikan timer.",
+    "feature3Title": "Berbagai cara mengakhiri",
+    "cardCameraLabel": "Pindai foto",
+    "cardCameraDesc": "Pindai objek untuk berhenti",
+    "cardShakeLabel": "Goyang",
+    "cardShakeDesc": "Goyangkan perangkat untuk berhenti",
+    "cardTapLabel": "Ketuk",
+    "cardTapDesc": "Tekan tombol untuk berhenti",
+    "permissionAttTitle": "Gratis dengan iklan personalisasi",
+    "permissionAttBody": "Kami butuh izin pelacakan\nuntuk iklan yang lebih relevan.\nAplikasi tetap bekerja jika ditolak.",
+    "permissionAttButton": "Lanjut",
+    "permissionLocationTitle": "Pengalaman lebih baik dengan iklan lokal",
+    "permissionLocationBody": "Informasi lokasi memberikan iklan\nyang lebih relevan.\nAplikasi tetap bekerja jika ditolak.",
+    "permissionLocationButton": "Lanjut",
+    "permissionNotifTitle": "Notifikasi timer berakhir",
+    "permissionNotifBody": "Notifikasi dibutuhkan\nuntuk menerima peringatan di layar kunci.\nPenting untuk rutinitas.",
+    "permissionNotifButton": "Lanjut",
+    "readyTitle": "Siap!",
+    "readyBody": "Gunakan ShutTimer sekarang",
+    "start": "Mulai",
+    "tooltipPlay": "Tekan lama tombol play untuk menghentikan timer",
+    "tooltipFav": "Tekan lama favorit untuk mengedit",
+    "confirm": "Konfirmasi"
   }
 }

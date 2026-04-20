@@ -211,5 +211,35 @@
   "notices": {
     "title": "Mitteilungen",
     "empty": "Keine Mitteilungen"
+  },
+  "onboarding": {
+    "greeting": "Hallo.",
+    "welcomeTitle": "Willkommen bei\nShutTimer",
+    "feature1Title": "Timer & Wecker",
+    "feature1Body": "Stelle deine Zeit ein und\nerstelle deine eigene Routine",
+    "feature2Title": "Timer mit Foto-Scan beenden",
+    "feature2Body": "Scanne ein Objekt mit der Kamera,\num den Timer zu beenden.",
+    "feature3Title": "Verschiedene Beenden-Arten",
+    "cardCameraLabel": "Foto-Scan",
+    "cardCameraDesc": "Objekt scannen zum Beenden",
+    "cardShakeLabel": "Schütteln",
+    "cardShakeDesc": "Gerät schütteln zum Beenden",
+    "cardTapLabel": "Tippen",
+    "cardTapDesc": "Taste drücken zum Beenden",
+    "permissionAttTitle": "Kostenlos mit personalisierter Werbung",
+    "permissionAttBody": "Wir benötigen Tracking-Erlaubnis\nfür relevantere Werbung.\nDie App funktioniert auch ohne.",
+    "permissionAttButton": "Weiter",
+    "permissionLocationTitle": "Bessere Erfahrung mit lokaler Werbung",
+    "permissionLocationBody": "Standortinfos bieten relevantere\nWerbung.\nDie App funktioniert auch ohne.",
+    "permissionLocationButton": "Weiter",
+    "permissionNotifTitle": "Timer-Ende Benachrichtigung",
+    "permissionNotifBody": "Benachrichtigungen sind nötig,\num Timer-Ende auf Sperrbildschirm zu erhalten.\nWichtig für Routinen.",
+    "permissionNotifButton": "Weiter",
+    "readyTitle": "Bereit!",
+    "readyBody": "Nutze jetzt ShutTimer",
+    "start": "Loslegen",
+    "tooltipPlay": "Play-Taste lange drücken, um Timer zu stoppen",
+    "tooltipFav": "Favoriten lange drücken zum Bearbeiten",
+    "confirm": "Bestätigen"
   }
 }

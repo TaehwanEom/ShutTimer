@@ -413,6 +413,7 @@ export default function HomeScreen({ navigation }: Props) {
     setIsRunning(true);
     setIsPaused(false);
     isPausedRef.current = false;
+    // @v1.5 — 알림 권한은 Onboarding이 처리. 미응답 사용자 대비 fallback (이미 응답 시 no-op)
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
     // 영속화 (cold start 복원용)

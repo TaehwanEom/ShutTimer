@@ -509,7 +509,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.onBackground} />
+          <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>PoC: YOLOv10 Frame Scan</Text>
         <View style={{ width: 40 }} />

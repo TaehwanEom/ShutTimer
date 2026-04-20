@@ -211,5 +211,35 @@
   "notices": {
     "title": "通知",
     "empty": "目前沒有通知"
+  },
+  "onboarding": {
+    "greeting": "你好。",
+    "welcomeTitle": "歡迎使用\nShutTimer",
+    "feature1Title": "計時器與鬧鐘",
+    "feature1Body": "設定您想要的時間\n打造專屬日程",
+    "feature2Title": "拍照掃描結束計時器",
+    "feature2Body": "用相機掃描物體\n計時器便會結束。",
+    "feature3Title": "多種結束方式",
+    "cardCameraLabel": "拍照掃描",
+    "cardCameraDesc": "用相機掃描物體結束",
+    "cardShakeLabel": "搖晃",
+    "cardShakeDesc": "搖晃裝置結束",
+    "cardTapLabel": "點擊",
+    "cardTapDesc": "按按鈕結束",
+    "permissionAttTitle": "個人化廣告保持免費",
+    "permissionAttBody": "為展示更相關的廣告\n需要追蹤權限。\n拒絕也不影響使用。",
+    "permissionAttButton": "繼續",
+    "permissionLocationTitle": "地區廣告帶來更佳體驗",
+    "permissionLocationBody": "根據位置資訊提供\n更相關的廣告。\n拒絕也不影響使用。",
+    "permissionLocationButton": "繼續",
+    "permissionNotifTitle": "計時器結束通知",
+    "permissionNotifBody": "在鎖定畫面獲取計時器結束提醒\n需要通知權限。\n日程進行必需。",
+    "permissionNotifButton": "繼續",
+    "readyTitle": "準備完成！",
+    "readyBody": "現在開始使用 ShutTimer",
+    "start": "開始",
+    "tooltipPlay": "長按播放按鈕可以停止計時器",
+    "tooltipFav": "長按收藏可以編輯",
+    "confirm": "確認"
   }
 }

@@ -125,7 +125,7 @@ export default function MissionSelectScreen({ navigation }: Props) {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           style={styles.backBtn}
         >
-          <MaterialIcons name="arrow-back" size={24} color={colors.onBackground} />
+          <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('missionSelect.title')}</Text>
         <View style={styles.headerRightSpacer} />

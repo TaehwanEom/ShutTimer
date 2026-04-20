@@ -211,5 +211,35 @@
   "notices": {
     "title": "Avisos",
     "empty": "No hay avisos"
+  },
+  "onboarding": {
+    "greeting": "Hola.",
+    "welcomeTitle": "Bienvenido a\nShutTimer",
+    "feature1Title": "Temporizador y alarma",
+    "feature1Body": "Configura tu tiempo y\ncrea tu propia rutina",
+    "feature2Title": "Detén el temporizador con foto",
+    "feature2Body": "Escanea un objeto con la cámara\npara detener el temporizador.",
+    "feature3Title": "Múltiples formas de terminar",
+    "cardCameraLabel": "Escaneo de foto",
+    "cardCameraDesc": "Escanea un objeto para detener",
+    "cardShakeLabel": "Agitar",
+    "cardShakeDesc": "Agita el dispositivo para detener",
+    "cardTapLabel": "Tocar",
+    "cardTapDesc": "Presiona el botón para detener",
+    "permissionAttTitle": "Gratis con anuncios personalizados",
+    "permissionAttBody": "Necesitamos permiso de rastreo\npara anuncios más relevantes.\nLa app funciona si lo rechazas.",
+    "permissionAttButton": "Continuar",
+    "permissionLocationTitle": "Mejor experiencia con anuncios locales",
+    "permissionLocationBody": "La ubicación ofrece anuncios\nmás relevantes.\nLa app funciona si lo rechazas.",
+    "permissionLocationButton": "Continuar",
+    "permissionNotifTitle": "Notificación de fin del temporizador",
+    "permissionNotifBody": "Se necesitan notificaciones\npara recibir alertas en pantalla bloqueada.\nEsencial para rutinas.",
+    "permissionNotifButton": "Continuar",
+    "readyTitle": "¡Todo listo!",
+    "readyBody": "Ahora usa ShutTimer",
+    "start": "Empezar",
+    "tooltipPlay": "Mantén pulsado el botón de reproducción para detener",
+    "tooltipFav": "Mantén pulsado un favorito para editarlo",
+    "confirm": "Confirmar"
   }
 }

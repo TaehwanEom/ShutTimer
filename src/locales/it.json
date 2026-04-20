@@ -211,5 +211,35 @@
   "notices": {
     "title": "Avvisi",
     "empty": "Nessun avviso"
+  },
+  "onboarding": {
+    "greeting": "Ciao.",
+    "welcomeTitle": "Benvenuto su\nShutTimer",
+    "feature1Title": "Timer e sveglia",
+    "feature1Body": "Imposta il tempo e\ncrea la tua routine",
+    "feature2Title": "Ferma il timer con foto",
+    "feature2Body": "Scansiona un oggetto con la fotocamera\nper fermare il timer.",
+    "feature3Title": "Vari modi per fermare",
+    "cardCameraLabel": "Scansione foto",
+    "cardCameraDesc": "Scansiona un oggetto per fermare",
+    "cardShakeLabel": "Scuoti",
+    "cardShakeDesc": "Scuoti il dispositivo per fermare",
+    "cardTapLabel": "Tocca",
+    "cardTapDesc": "Premi il pulsante per fermare",
+    "permissionAttTitle": "Gratis con annunci personalizzati",
+    "permissionAttBody": "Serve il permesso di tracciamento\nper annunci più pertinenti.\nL'app funziona anche senza.",
+    "permissionAttButton": "Continua",
+    "permissionLocationTitle": "Migliore esperienza con annunci locali",
+    "permissionLocationBody": "La posizione offre annunci\npiù pertinenti.\nL'app funziona anche senza.",
+    "permissionLocationButton": "Continua",
+    "permissionNotifTitle": "Notifica fine timer",
+    "permissionNotifBody": "Le notifiche servono\nper ricevere avvisi sullo schermo bloccato.\nEssenziale per le routine.",
+    "permissionNotifButton": "Continua",
+    "readyTitle": "Tutto pronto!",
+    "readyBody": "Ora usa ShutTimer",
+    "start": "Inizia",
+    "tooltipPlay": "Premi a lungo il pulsante play per fermare il timer",
+    "tooltipFav": "Premi a lungo un preferito per modificarlo",
+    "confirm": "Conferma"
   }
 }

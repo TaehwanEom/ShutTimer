@@ -211,5 +211,35 @@
   "notices": {
     "title": "Bildirimler",
     "empty": "Bildirim yok"
+  },
+  "onboarding": {
+    "greeting": "Merhaba.",
+    "welcomeTitle": "ShutTimer'a\nHoş geldiniz",
+    "feature1Title": "Zamanlayıcı ve Alarm",
+    "feature1Body": "İstediğin süreyi ayarla ve\nkendi rutinini oluştur",
+    "feature2Title": "Fotoğraf taramayla zamanlayıcıyı durdur",
+    "feature2Body": "Kamerayla bir nesneyi tara,\nzamanlayıcı duracak.",
+    "feature3Title": "Çeşitli durdurma yolları",
+    "cardCameraLabel": "Fotoğraf tarama",
+    "cardCameraDesc": "Kamerayla nesneyi tarayarak durdur",
+    "cardShakeLabel": "Salla",
+    "cardShakeDesc": "Cihazı sallayarak durdur",
+    "cardTapLabel": "Dokun",
+    "cardTapDesc": "Düğmeye basarak durdur",
+    "permissionAttTitle": "Kişiselleştirilmiş reklamlarla ücretsiz",
+    "permissionAttBody": "Daha alakalı reklamlar için\ntakip izni gerekiyor.\nReddetsen de uygulama çalışır.",
+    "permissionAttButton": "Devam",
+    "permissionLocationTitle": "Yerel reklamlarla daha iyi deneyim",
+    "permissionLocationBody": "Konum bilgisi daha alakalı\nreklamlar sunar.\nReddetsen de uygulama çalışır.",
+    "permissionLocationButton": "Devam",
+    "permissionNotifTitle": "Zamanlayıcı bitiş bildirimi",
+    "permissionNotifBody": "Kilit ekranında zamanlayıcı\nuyarıları için bildirim izni gerekiyor.\nRutinler için gerekli.",
+    "permissionNotifButton": "Devam",
+    "readyTitle": "Hazır!",
+    "readyBody": "Şimdi ShutTimer'ı kullan",
+    "start": "Başla",
+    "tooltipPlay": "Oynat düğmesini uzun basarak zamanlayıcıyı durdur",
+    "tooltipFav": "Bir favoriyi uzun basarak düzenle",
+    "confirm": "Onayla"
   }
 }

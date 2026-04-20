@@ -211,5 +211,35 @@
   "notices": {
     "title": "การแจ้งเตือน",
     "empty": "ไม่มีการแจ้งเตือน"
+  },
+  "onboarding": {
+    "greeting": "สวัสดี.",
+    "welcomeTitle": "ยินดีต้อนรับสู่\nShutTimer",
+    "feature1Title": "ตัวจับเวลาและปลุก",
+    "feature1Body": "ตั้งเวลาที่คุณต้องการ\nและสร้างกิจวัตรของคุณเอง",
+    "feature2Title": "หยุดตัวจับเวลาด้วยการสแกนภาพ",
+    "feature2Body": "สแกนวัตถุด้วยกล้อง\nเพื่อหยุดตัวจับเวลา",
+    "feature3Title": "วิธีหยุดหลากหลาย",
+    "cardCameraLabel": "สแกนภาพ",
+    "cardCameraDesc": "สแกนวัตถุเพื่อหยุด",
+    "cardShakeLabel": "เขย่า",
+    "cardShakeDesc": "เขย่าอุปกรณ์เพื่อหยุด",
+    "cardTapLabel": "แตะ",
+    "cardTapDesc": "กดปุ่มเพื่อหยุด",
+    "permissionAttTitle": "ฟรีด้วยโฆษณาเฉพาะบุคคล",
+    "permissionAttBody": "ต้องการสิทธิ์การติดตาม\nเพื่อโฆษณาที่เกี่ยวข้องมากขึ้น\nแอปทำงานได้หากปฏิเสธ",
+    "permissionAttButton": "ดำเนินการต่อ",
+    "permissionLocationTitle": "ประสบการณ์ที่ดีขึ้นด้วยโฆษณาท้องถิ่น",
+    "permissionLocationBody": "ข้อมูลตำแหน่งให้โฆษณา\nที่เกี่ยวข้องมากขึ้น\nแอปทำงานได้หากปฏิเสธ",
+    "permissionLocationButton": "ดำเนินการต่อ",
+    "permissionNotifTitle": "การแจ้งเตือนตัวจับเวลาสิ้นสุด",
+    "permissionNotifBody": "ต้องการการแจ้งเตือน\nเพื่อรับการเตือนบนหน้าจอล็อก\nจำเป็นสำหรับกิจวัตร",
+    "permissionNotifButton": "ดำเนินการต่อ",
+    "readyTitle": "พร้อมแล้ว!",
+    "readyBody": "ใช้ ShutTimer เลย",
+    "start": "เริ่ม",
+    "tooltipPlay": "กดปุ่มเล่นค้างไว้เพื่อหยุดตัวจับเวลา",
+    "tooltipFav": "กดรายการโปรดค้างไว้เพื่อแก้ไข",
+    "confirm": "ยืนยัน"
   }
 }

@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SETTINGS_KEY } from './src/constants/settings';
+import { MISSIONS_STORAGE_KEY } from './src/constants/missions';
 import { preloadDismissMethod } from './src/utils/settingsCache';
 import { Logger } from './src/utils/logger';
 import ErrorBoundary from './src/components/ErrorBoundary';
@@ -62,6 +63,7 @@ import RunningScreen from './src/screens/RunningScreen';
 import AlarmScreen from './src/screens/AlarmScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import EditMissionsScreen from './src/screens/EditMissionsScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import AddTimerScreen from './src/screens/AddTimerScreen';
 import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -81,6 +83,7 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 
 export type RootStackParamList = {
   Splash: undefined;
+  Onboarding: undefined;
   Home: undefined;
   Running: { mission: Mission | null; minutes: number };
   Alarm: { missionId?: string; missionIcon?: string } | undefined;
@@ -131,6 +134,7 @@ function AppNavigator() {
   }, []);
 
   // ATT 요청 + 진단 로그: iOS 14.5+ 에서 추적 허가 요청 후 AsyncStorage에 저장 (AdMob npa 판단에 활용)
+  // @v1.5 — 신규 사용자(Onboarding 대상)는 Onboarding이 권한 처리. 여기선 기존 사용자만 대상.
   useEffect(() => {
     const run = async () => {
       try {
@@ -150,6 +154,19 @@ function AppNavigator() {
 
         if (isExpoGoLocal) { await appendLog('Skip: isExpoGo'); return; }
         if (Platform.OS !== 'ios') { await appendLog('Skip: not iOS'); return; }
+
+        // @v1.5 — Onboarding이 권한 담당하는 신규 사용자는 여기서 자동 요청 스킵
+        // (Splash가 onboardingCompleted/attStatus/missions 기준으로 신규/기존 분기와 동일 판정)
+        const [onboarded, attStored, missionsStored] = await Promise.all([
+          AsyncStorage.getItem('onboardingCompleted'),
+          AsyncStorage.getItem('attStatus'),
+          AsyncStorage.getItem(MISSIONS_STORAGE_KEY),
+        ]);
+        const isNewUser = onboarded !== 'true' && attStored === null && missionsStored === null;
+        if (isNewUser) {
+          await appendLog('Skip: new user — Onboarding will handle permissions');
+          return;
+        }
 
         const callATT = async () => {
           try {
@@ -250,6 +267,7 @@ function AppNavigator() {
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Running" component={RunningScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Alarm" component={AlarmScreen} options={{ gestureEnabled: false }} />

@@ -211,5 +211,35 @@
   "notices": {
     "title": "Avisos",
     "empty": "Nenhum aviso"
+  },
+  "onboarding": {
+    "greeting": "Olá.",
+    "welcomeTitle": "Bem-vindo ao\nShutTimer",
+    "feature1Title": "Cronômetro e alarme",
+    "feature1Body": "Defina seu tempo e\ncrie sua própria rotina",
+    "feature2Title": "Pare o cronômetro com foto",
+    "feature2Body": "Escaneie um objeto com a câmera\npara parar o cronômetro.",
+    "feature3Title": "Vários modos de parar",
+    "cardCameraLabel": "Escaneio",
+    "cardCameraDesc": "Escaneie um objeto para parar",
+    "cardShakeLabel": "Agitar",
+    "cardShakeDesc": "Agite o aparelho para parar",
+    "cardTapLabel": "Toque",
+    "cardTapDesc": "Pressione o botão para parar",
+    "permissionAttTitle": "Grátis com anúncios personalizados",
+    "permissionAttBody": "Precisamos da permissão de rastreamento\npara anúncios mais relevantes.\nO app funciona sem isso.",
+    "permissionAttButton": "Continuar",
+    "permissionLocationTitle": "Melhor experiência com anúncios locais",
+    "permissionLocationBody": "A localização oferece anúncios\nmais relevantes.\nO app funciona sem isso.",
+    "permissionLocationButton": "Continuar",
+    "permissionNotifTitle": "Notificação de fim",
+    "permissionNotifBody": "Notificações são necessárias\npara receber alertas na tela bloqueada.\nEssencial para rotinas.",
+    "permissionNotifButton": "Continuar",
+    "readyTitle": "Tudo pronto!",
+    "readyBody": "Agora use o ShutTimer",
+    "start": "Começar",
+    "tooltipPlay": "Mantenha pressionado o botão para parar o cronômetro",
+    "tooltipFav": "Mantenha pressionado um favorito para editar",
+    "confirm": "Confirmar"
   }
 }

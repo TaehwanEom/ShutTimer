@@ -22,7 +22,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
-import Svg, { Circle } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
@@ -31,15 +30,12 @@ import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
-import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from 'react-native-vision-camera';
-import { useTensorflowModel } from 'react-native-fast-tflite';
-import { NitroModules } from 'react-native-nitro-modules';
-import { useResizePlugin } from 'vision-camera-resize-plugin';
-import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
-import { parseYolov10Output, type Detection } from '../utils/objectDetection';
+import { useSharedValue } from 'react-native-worklets-core';
+import { type Detection } from '../utils/objectDetection';
 import { getCachedDismissMethod } from '../utils/settingsCache';
+// @v1.5 Phase A — 카메라 모드 child. shake/tap 시 useTensorflowModel + Camera 마운트 스킵.
+import AlarmCameraMode from './AlarmCameraMode';
 import { MISSION_EMOJI, MISSION_POOL, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
-import { Image } from 'react-native';
 // import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
@@ -87,8 +83,7 @@ type AfterAdAction = 'result' | 'home';
 
 // v1.5 Frame Processor 상수 (PoC와 동일)
 const TARGET_CONFIDENCE = 0.4;
-const THROTTLE_MS = 800;
-const HITS_REQUIRED = 3;
+// @v1.5 Phase A — THROTTLE_MS, HITS_REQUIRED는 AlarmCameraMode child로 이동 (frame processor 전용)
 const RETRY_BANNER_MS = 1000;
 // v1.5 감지 성공 피드백 애니메이션 (PoC와 동일)
 const BLINK_ON_MS = 100;
@@ -121,50 +116,8 @@ export default function AlarmScreen({ navigation }: Props) {
   const { t } = useTranslation();
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree } = usePurchase();
-  // v1.5: VisionCamera 기반
-  const { hasPermission: hasCameraPermission, requestPermission } = useCameraPermission();
-  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
-  const device = useCameraDevice(cameraPosition);
-  // 카메라 전환 중 frame processor + tflite race 방지: isActive 일시 차단 + onStarted 동기화
-  const [isFlipping, setIsFlipping] = useState(false);
-  const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toggleCamera = useCallback(() => {
-    if (isFlipping) return;
-    setIsFlipping(true);
-    setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
-    if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
-    flipTimeoutRef.current = setTimeout(() => setIsFlipping(false), 1000);
-  }, [isFlipping]);
-  useEffect(() => {
-    return () => {
-      if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
-    };
-  }, []);
-
-  // v1.5 카메라 format (fieldOfView ≤ 70, stabilization off, 해상도 ≥ 640)
-  const FOV_MAX = 70;
-  const format = useMemo(() => {
-    if (!device) return undefined;
-    const candidates = device.formats
-      .filter((f) => f.fieldOfView != null)
-      .filter((f) => f.videoStabilizationModes.includes('off'))
-      .filter((f) => f.videoWidth >= 640 && f.videoHeight >= 640)
-      .filter((f) => f.fieldOfView <= FOV_MAX)
-      .sort((a, b) => b.fieldOfView - a.fieldOfView);
-    return candidates[0] ?? device.formats[0];
-  }, [device]);
-
-  // v1.5 YOLOv10 모델 + box/unbox
-  const plugin = useTensorflowModel(
-    require('../../assets/models/yolov10s_float16.tflite'),
-    Platform.OS === 'ios' ? ['core-ml'] : []
-  );
-  const model = plugin.state === 'loaded' ? plugin.model : undefined;
-  const boxedModel = useMemo(
-    () => (model != null ? NitroModules.box(model) : undefined),
-    [model]
-  );
-  const { resize } = useResizePlugin();
+  // @v1.5 Phase A — 카메라/tflite 관련 hook은 AlarmCameraMode child로 이동
+  // (shake/tap 모드에서 useTensorflowModel 15MB 로드 + Camera 마운트 스킵 → JS thread 부하 제거)
 
   // v1.5 미션 상태
   const [selectedMissions, setSelectedMissions] = useState<string[]>(MISSION_POOL);
@@ -646,45 +599,8 @@ export default function AlarmScreen({ navigation }: Props) {
     });
   }, [enterResult, successBlink, successFill]);
 
-  const onMatchJS = useRunOnJS((match: Detection) => {
-    triggerDetectionSequence(match);
-  }, [triggerDetectionSequence]);
-
-  const frameProcessor = useFrameProcessor((frame) => {
-    'worklet';
-    if (matched.value) return;
-    if (isShufflingSV.value) return;
-    if (boxedModel == null) return;
-    const now = Date.now();
-    if (now - lastRun.value < THROTTLE_MS) return;
-    lastRun.value = now;
-    try {
-      const tflite = boxedModel.unbox();
-      const resized = resize(frame, {
-        scale: { width: 640, height: 640 },
-        pixelFormat: 'rgb',
-        dataType: 'float32',
-      });
-      const inputBuffer = resized.buffer.slice(
-        resized.byteOffset,
-        resized.byteOffset + resized.byteLength
-      ) as ArrayBuffer;
-      const outputs = tflite.runSync([inputBuffer]);
-      const output = new Float32Array(outputs[0]);
-      const match = parseYolov10Output(output, targetLabelsSV.value, thresholdSV.value);
-      if (match) {
-        consecutiveHits.value += 1;
-        if (consecutiveHits.value >= HITS_REQUIRED) {
-          matched.value = true;
-          onMatchJS(match);
-        }
-      } else {
-        consecutiveHits.value = 0;
-      }
-    } catch (e) {
-      // worklet 에러는 다음 프레임에서 재시도
-    }
-  }, [boxedModel, resize, onMatchJS]);
+  // @v1.5 Phase A — onMatchJS + frameProcessor + Camera 컴포넌트는 AlarmCameraMode child로 이동
+  // 부모는 SharedValue를 소유하고 child에 props로 전달 (단일 참조 + worklet 동작 보장)
 
   // 미션 변경 시 SharedValue 동기화 (타겟 라벨 + 임계값)
   useEffect(() => {
@@ -788,13 +704,10 @@ export default function AlarmScreen({ navigation }: Props) {
   }, [clearShuffle]);
 
   // 스캔 라인 왕복 애니메이션 (카메라 모드 — 다시뽑기·재시도 중에도 지속, 감지 성공 시만 정지)
+  // @v1.5 Phase A — hasCameraPermission/device 체크는 child에서 처리. 부모는 scan line 값만 관리.
   useEffect(() => {
     if (dismissMethod !== 'camera') return;
-    const active =
-      resultState === 'idle' &&
-      !successAnimating &&
-      hasCameraPermission &&
-      device != null;
+    const active = resultState === 'idle' && !successAnimating;
     if (!active) {
       scanLine.stopAnimation(() => scanLine.setValue(0));
       return;
@@ -807,7 +720,7 @@ export default function AlarmScreen({ navigation }: Props) {
     );
     anim.start();
     return () => anim.stop();
-  }, [dismissMethod, resultState, successAnimating, hasCameraPermission, device, scanLine]);
+  }, [dismissMethod, resultState, successAnimating, scanLine]);
 
   // 남은 5초 이하 경고 깜빡 loop
   useEffect(() => {
@@ -888,158 +801,38 @@ export default function AlarmScreen({ navigation }: Props) {
         </View>
 
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 }}>
-          {/* 카메라 박스 */}
-          <View style={{ width: boxWidth, height: boxHeight, borderRadius: 16, overflow: 'hidden', backgroundColor: '#111' }}>
-            {hasCameraPermission && device ? (
-              <>
-                <Camera
-                  style={StyleSheet.absoluteFill}
-                  device={device}
-                  isActive={resultState === 'idle' && !isFlipping}
-                  frameProcessor={frameProcessor}
-                  resizeMode="cover"
-                  videoStabilizationMode="off"
-                  photo={false}
-                  video={false}
-                  onStarted={() => {
-                    if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
-                    setIsFlipping(false);
-                  }}
-                  {...(format ? { format } : {})}
-                />
-                {/* 감지 성공 피드백 — 연두 깜빡 (전면) */}
-                <Animated.View pointerEvents="none" style={[
-                  StyleSheet.absoluteFill,
-                  {
-                    backgroundColor: '#32CD32',
-                    opacity: successBlink.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
-                  },
-                ]} />
-                {/* 감지 성공 피드백 — 연두 채움 (top → bottom) */}
-                <Animated.View pointerEvents="none" style={{
-                  position: 'absolute', top: 0, left: 0, right: 0,
-                  backgroundColor: '#32CD32',
-                  height: successFill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                  opacity: successFill.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.55] }),
-                }} />
-                {/* 박스 상단 어둠 + 이모지 + 풀 문장 (슬롯머신 중엔 이모지만 일정 리듬 순환, 텍스트 숨김) */}
-                <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingVertical: 16, paddingHorizontal: 12, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', gap: 8 }}>
-                  <View style={{ width: 60, height: 60, position: 'relative' }}>
-                    {/* 최종 이미지: 항상 mount → 디코딩 선행. 슬롯머신 중엔 opacity 0 */}
-                    {currentEmoji ? (
-                      <Image
-                        source={currentEmoji}
-                        style={{ position: 'absolute', top: 0, left: 0, width: 60, height: 60, opacity: isShuffling ? 0 : 1 }}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <View style={{ opacity: isShuffling ? 0 : 1 }}>
-                        <MaterialIcons name={currentMission as React.ComponentProps<typeof MaterialIcons>['name']} size={54} color="#fff" />
-                      </View>
-                    )}
-                    {/* 슬롯머신 이미지들: 같은 컨테이너에 pre-mount, idx만 opacity 1 */}
-                    {isShuffling && shuffledList.map((k, i) => (
-                      <Image
-                        key={k}
-                        source={MISSION_EMOJI[k]}
-                        style={{ position: 'absolute', top: 0, left: 0, width: 60, height: 60, opacity: i === shuffleIdx ? 1 : 0 }}
-                        resizeMode="contain"
-                      />
-                    ))}
-                  </View>
-                  <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', minHeight: 20, textAlign: 'center' }}>
-                    {isShuffling ? '' : missionSentence}
-                  </Text>
-                </View>
-                {/* 박스 하단 어둠 + 남은 초 (5초 이하는 빨강 깜빡) */}
-                <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Animated.Text style={{
-                    color: isDanger ? '#ff3b30' : '#fff',
-                    fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'],
-                    opacity: isDanger ? dangerBlink.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] }) : 1,
-                  }}>
-                    {remainingSeconds}{t('settings.secondsUnit', { defaultValue: '초' })}
-                  </Animated.Text>
-                </View>
-                {/* 스캔 라인 — 오버레이 제외 가시 영역 내 왕복 (연두 글로우). 감지 성공 시 숨김 */}
-                <View pointerEvents="none" style={{ position: 'absolute', top: 120, bottom: 50, left: 0, right: 0, overflow: 'hidden', opacity: successAnimating ? 0 : 1 }}>
-                  <Animated.View style={{
-                    position: 'absolute',
-                    top: 0, left: 0, right: 0,
-                    height: 2,
-                    backgroundColor: '#B8E986',
-                    transform: [{
-                      translateY: scanLine.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, Math.max(0, boxHeight - 120 - 50 - 2)],
-                      }),
-                    }],
-                    // iOS 글로우
-                    shadowColor: '#B8E986',
-                    shadowOpacity: 0.9,
-                    shadowRadius: 12,
-                    shadowOffset: { width: 0, height: 0 },
-                    // Android 글로우 근사 (shadow 제어 어려움 → 엘리베이션 대신 아래 확장 View로 발광감)
-                    elevation: 8,
-                  }}>
-                    <View style={{ position: 'absolute', top: -8, left: 0, right: 0, height: 18, backgroundColor: '#B8E986', opacity: 0.25 }} />
-                  </Animated.View>
-                </View>
-                {/* 중앙 크로스헤어 — 원(반지름 22) + 십자(18px) */}
-                <View pointerEvents="none" style={{ position: 'absolute', top: 120, bottom: 50, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }}>
-                  <Svg width={48} height={48} style={{ position: 'absolute' }}>
-                    <Circle cx={24} cy={24} r={22} stroke="#B8E986" strokeWidth={2} fill="none" />
-                  </Svg>
-                  <View style={{ width: 18, height: 2, backgroundColor: '#B8E986', position: 'absolute' }} />
-                  <View style={{ width: 2, height: 18, backgroundColor: '#B8E986', position: 'absolute' }} />
-                </View>
-                {/* 재시도 배너 */}
-                {isRetryBannerVisible && (
-                  <View style={{ position: 'absolute', top: '35%', left: 12, right: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', gap: 4 }} pointerEvents="none">
-                    <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>
-                      {t('alarm.retrying', { defaultValue: '재시도' })}
-                    </Text>
-                    <Text style={{ color: '#ddd', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-                      {t('alarm.missionRetryHint', { mission: missionLabel, defaultValue: `${missionLabel}을 다시 찾아주세요` })}
-                    </Text>
-                  </View>
-                )}
-              </>
-            ) : (
-              <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
-                <Text style={{ color: '#fff', fontSize: 14, marginBottom: 12, textAlign: 'center' }}>{t('alarm.takePhoto')}</Text>
-                <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-                  <Text style={styles.permissionButtonText}>{t('alarm.allowCamera')}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-
-          {/* 다시 뽑기 + 카메라 전환 — 카메라 박스 바로 아래에 가로 배치 */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, marginTop: 8 }}>
-            <TouchableOpacity
-              onPress={reshuffleMission}
-              disabled={isRetryBannerVisible || isShuffling}
-              style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, (isRetryBannerVisible || isShuffling) && { opacity: 0.4 }]}
-            >
-              <MaterialIcons name="shuffle" size={26} color="#fff" style={{ opacity: 0.9 }} />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
-                {t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={toggleCamera}
-              disabled={isShuffling}
-              style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, isShuffling && { opacity: 0.4 }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialIcons name="flip-camera-ios" size={26} color="#fff" style={{ opacity: 0.9 }} />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
-                {t('alarm.flipCamera', { defaultValue: '카메라 전환' })}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
+          {/* @v1.5 Phase A — 카메라 + tflite + flip + reshuffle UI는 child로 이동 */}
+          <AlarmCameraMode
+            matched={matched}
+            lastRun={lastRun}
+            targetLabelsSV={targetLabelsSV}
+            thresholdSV={thresholdSV}
+            consecutiveHits={consecutiveHits}
+            isShufflingSV={isShufflingSV}
+            currentMission={currentMission}
+            currentEmoji={currentEmoji}
+            missionLabel={missionLabel}
+            missionSentence={missionSentence}
+            isShuffling={isShuffling}
+            shuffledList={shuffledList}
+            shuffleIdx={shuffleIdx}
+            isRetryBannerVisible={isRetryBannerVisible}
+            successAnimating={successAnimating}
+            resultState={resultState}
+            isDanger={isDanger}
+            remainingSeconds={remainingSeconds}
+            successBlink={successBlink}
+            successFill={successFill}
+            scanLine={scanLine}
+            dangerBlink={dangerBlink}
+            boxWidth={boxWidth}
+            boxHeight={boxHeight}
+            onMatchDetected={triggerDetectionSequence}
+            onReshuffle={reshuffleMission}
+            t={t}
+            permissionButtonStyle={styles.permissionButton}
+            permissionButtonTextStyle={styles.permissionButtonText}
+          />
         </View>
 
         <AdBanner />

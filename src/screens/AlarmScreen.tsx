@@ -37,6 +37,7 @@ import { NitroModules } from 'react-native-nitro-modules';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { useRunOnJS, useSharedValue } from 'react-native-worklets-core';
 import { parseYolov10Output, type Detection } from '../utils/objectDetection';
+import { getCachedDismissMethod } from '../utils/settingsCache';
 import { MISSION_EMOJI, MISSION_POOL, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
 import { Image } from 'react-native';
 // import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
@@ -210,7 +211,11 @@ export default function AlarmScreen({ navigation }: Props) {
   // const cameraRef = useRef<CameraView>(null);
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
+  // App.tsx에서 사전 로드한 dismissMethod 사용 (AsyncStorage 비동기 지연 제거).
+  // 캐시 미적중 시 default fallback. settingsLoaded 후 useEffect에서 정확값으로 갱신.
+  const [dismissMethod, setDismissMethod] = useState<DismissMethod>(
+    getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod
+  );
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
   const soundRef = useRef<Audio.Sound | null>(null);
   // @preserve v1-camera — v1 실패 횟수 카운터. v1.5에서 2회 attempt로 대체.

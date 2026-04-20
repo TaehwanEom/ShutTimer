@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SETTINGS_KEY } from './src/constants/settings';
+import { preloadDismissMethod } from './src/utils/settingsCache';
 import { Logger } from './src/utils/logger';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
@@ -99,10 +100,12 @@ function AppNavigator() {
   const { isDark } = useTheme();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
-  // 앱 시작 시 stale 플래그 초기화 (killed 후 콜드 스타트 대비)
+  // 앱 시작 시 stale 플래그 초기화 (killed 후 콜드 스타트 대비) + 설정 사전 로드
   useEffect(() => {
     AsyncStorage.removeItem('isTimerActive').catch(() => {});
     AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+    // dismissMethod 사전 로드 → AlarmScreen 마운트 시 즉시 사용 (흔들기 애니메이션 지연 제거)
+    preloadDismissMethod();
   }, []);
 
   // AdMob 초기화: isExpoGo 분기로 Expo Go 호환

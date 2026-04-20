@@ -29,6 +29,7 @@ import AdBanner from '../components/AdBanner';
 import { getLocales } from 'expo-localization';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
+import { setCachedDismissMethod } from '../utils/settingsCache';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
@@ -234,6 +235,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleDismissMethod = (value: DismissMethod) => {
     setDismissMethod(value);
     AsyncStorage.setItem(SETTINGS_KEY.DISMISS_METHOD, value);
+    // 사전 로드 캐시 즉시 동기화 (다음 AlarmScreen 마운트 시 정확한 초기값 사용)
+    setCachedDismissMethod(value);
     // 흔들기 선택 시 동작 권한 popup 트리거.
     // iOS CMMotionManager는 권한 함수로 popup 안 뜨고 실 데이터 액세스로만 발화.
     // requestPermissionsAsync는 iOS에서 default granted 반환만 함 (expo GitHub #30571).

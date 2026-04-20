@@ -20,7 +20,7 @@
         "com.apple.developer.usernotifications.time-sensitive": true
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "사진을 찍어 타이머를 종료합니다.",
+        "NSCameraUsageDescription": "사진을 스캔하여 타이머를 종료합니다.",
         "UIBackgroundModes": [
           "audio"
         ],
@@ -192,7 +192,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "사진을 찍어 타이머를 종료합니다.",
+          "cameraPermission": "사진을 스캔하여 타이머를 종료합니다.",
           "microphonePermission": false
         }
       ],
@@ -222,7 +222,7 @@
       [
         "react-native-vision-camera",
         {
-          "cameraPermissionText": "사물을 인식하여 타이머를 종료합니다.",
+          "cameraPermissionText": "사진을 스캔하여 타이머를 종료합니다.",
           "enableFrameProcessors": true,
           "enableLocation": false
         }

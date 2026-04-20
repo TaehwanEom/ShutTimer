@@ -38,7 +38,7 @@ export default function AdBanner() {
   if (isExpoGo) return null;
 
   try {
-    const { BannerAd, BannerAdSize, TestIds } = require('react-native-google-mobile-ads');
+    const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
     const BANNER_UNIT_ID = Platform.select({
       ios: 'ca-app-pub-3043284478228309/4187716112',
       android: 'ca-app-pub-3043284478228309/6158631734',

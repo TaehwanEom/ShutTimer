@@ -18,7 +18,7 @@ export type MissionDuration = typeof MISSION_DURATION_OPTIONS[number];
 export type DialType = 'classic' | 'digital';
 
 export const COLOR_PRESETS = [
-  { id: 'red', color: '#bc000a' },
+  { id: 'red', color: '#ff2424' },
   { id: 'orange', color: '#be3816' },
   { id: 'pink', color: '#c2185b' },
   { id: 'green', color: '#00796b' },

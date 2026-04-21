@@ -432,7 +432,7 @@ export default function OnboardingScreen({ navigation }: Props) {
               <View key={idx} style={styles.slide}>
                 {/* 로고 — 부드럽게 fade-in (사이즈 +5px) */}
                 <Animated.View style={{ marginBottom: 24, opacity: welcomeLogoOpacity }}>
-                  <MaterialIcons name="alarm" size={61} color="#dc3535" />
+                  <MaterialIcons name="alarm" size={61} color="#ff2424" />
                 </Animated.View>
                 {/* 텍스트 — 줄별 좌→우 reveal */}
                 <View style={{ alignItems: 'center' }}>

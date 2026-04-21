@@ -13,7 +13,7 @@ export type ThemeColors = {
 };
 
 export const lightColors: ThemeColors = {
-  primary: '#bc000a',
+  primary: '#ff2424',
   background: '#f9f9fe',
   surfaceContainerLow: '#f3f3f8',
   surfaceContainerLowest: '#ffffff',
@@ -27,7 +27,7 @@ export const lightColors: ThemeColors = {
 };
 
 export const darkColors: ThemeColors = {
-  primary: '#bc000a',
+  primary: '#ff2424',
   background: '#111318',
   surfaceContainerLow: '#1d2024',
   surfaceContainerLowest: '#282c31',

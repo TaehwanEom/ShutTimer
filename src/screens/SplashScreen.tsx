@@ -49,7 +49,7 @@ export default function SplashScreen({ navigation }: Props) {
     <View style={styles.container}>
       <Animated.View style={[styles.center, { opacity: fadeAnim }]}>
         <View style={styles.titleRow}>
-          <MaterialIcons name="alarm" size={36} color="#dc3535" />
+          <MaterialIcons name="alarm" size={36} color="#ff2424" />
           <Text style={styles.title}>ShutTimer</Text>
         </View>
       </Animated.View>

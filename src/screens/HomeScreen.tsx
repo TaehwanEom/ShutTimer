@@ -35,9 +35,12 @@ type Props = {
 };
 
 // 진행 중인 타이머 영속화 (cold start 복원용)
+// v1.5: endAt/pausedAt 추가 (timestamp 기반 카운트다운). 구버전 호환: endAt 없으면 startedAt+totalSeconds로 계산.
 type ActiveTimer = {
   startedAt: number;
   totalSeconds: number;
+  endAt?: number;           // ms 기준 종료 시점 (신규)
+  pausedAt?: number | null; // pause 진입 시점, 없으면 running (신규)
   missionId: string | null;
   missionIcon: string | null;
 };
@@ -314,8 +317,10 @@ export default function HomeScreen({ navigation }: Props) {
   const totalSecondsRef = useRef(0);
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
-  const backgroundedAt = useRef<number | null>(null);
   const notificationIdsRef = useRef<string[]>([]);
+  // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
+  const endAtRef = useRef<number>(0);
+  const pausedAtRef = useRef<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -407,8 +412,11 @@ export default function HomeScreen({ navigation }: Props) {
     const total = selectedMinutes * 60 + selectedSeconds;
     if (total <= 0) return;
     const mission = missionList[selectedIndex] ?? null;
+    const now = Date.now();
     totalSecondsRef.current = total;
     remainingSecondsRef.current = total;
+    endAtRef.current = now + total * 1000;
+    pausedAtRef.current = null;
     setRemainingSeconds(total);
     setIsRunning(true);
     setIsPaused(false);
@@ -418,23 +426,28 @@ export default function HomeScreen({ navigation }: Props) {
     scheduleAlarm(total);
     // 영속화 (cold start 복원용)
     AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({
-      startedAt: Date.now(),
+      startedAt: now,
       totalSeconds: total,
+      endAt: endAtRef.current,
+      pausedAt: null,
       missionId: mission?.id ?? null,
       missionIcon: mission?.icon ?? null,
     } satisfies ActiveTimer)).catch(() => {});
   };
 
-  // --- interval ---
+  // --- interval (v1.5 timestamp 기반) ---
+  // endAtRef 기준으로 남은 시간 계산. pause/play 연타해도 실시간 정확히 반영.
   useEffect(() => {
     if (!isRunning || isPaused) return;
 
-    const id = setInterval(() => {
-      const next = Math.max(0, remainingSecondsRef.current - 1);
+    const tick = () => {
+      const remainingMs = endAtRef.current - Date.now();
+      const next = Math.max(0, Math.ceil(remainingMs / 1000));
       remainingSecondsRef.current = next;
       setRemainingSeconds(next);
-    }, 1000);
-
+    };
+    tick(); // 즉시 1회 갱신 (pause/resume 직후 UI 즉각 반영)
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [isRunning, isPaused]);
 
@@ -486,11 +499,29 @@ export default function HomeScreen({ navigation }: Props) {
         AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
         return;
       }
-      const elapsed = Math.floor((Date.now() - t.startedAt) / 1000);
-      const remaining = t.totalSeconds - elapsed;
+      // v1.5 timestamp 기반 복원. endAt 없으면 구버전 스키마 → fallback 변환.
+      const endAt = t.endAt ?? (t.startedAt + t.totalSeconds * 1000);
+      const pausedAt = t.pausedAt ?? null;
+      const now = Date.now();
+      totalSecondsRef.current = t.totalSeconds;
+      endAtRef.current = endAt;
+      pausedAtRef.current = pausedAt;
+
+      if (pausedAt !== null) {
+        // Pause 상태 복원 — 알람 재예약 X (이미 cancelAlarms됨)
+        const remaining = Math.max(0, Math.ceil((endAt - pausedAt) / 1000));
+        remainingSecondsRef.current = remaining;
+        setRemainingSeconds(remaining);
+        setIsRunning(true);
+        setIsPaused(true);
+        isPausedRef.current = true;
+        AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
+        return;
+      }
+
+      const remaining = Math.ceil((endAt - now) / 1000);
       if (remaining > 0) {
         // 타이머 진행 중 → UI 복원
-        totalSecondsRef.current = t.totalSeconds;
         remainingSecondsRef.current = remaining;
         setRemainingSeconds(remaining);
         setIsRunning(true);
@@ -508,36 +539,53 @@ export default function HomeScreen({ navigation }: Props) {
     }).catch(() => {});
   }, []);
 
-  // --- AppState ---
+  // --- AppState (v1.5 — endAt 기반이라 수동 차감 불필요) ---
+  // background→active 복귀 시 tick이 자동으로 endAt 기준 remaining 재계산함.
+  // 즉시 UI 갱신 위해 resume 직후 1회 강제 tick만 수행.
   useEffect(() => {
     if (!isRunning) return;
-
     const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'background' || nextState === 'inactive') {
-        backgroundedAt.current = Date.now();
-      } else if (nextState === 'active') {
-        if (isPausedRef.current || backgroundedAt.current === null) return;
-        const elapsed = Math.floor((Date.now() - backgroundedAt.current) / 1000);
-        backgroundedAt.current = null;
-        const newVal = Math.max(0, remainingSecondsRef.current - elapsed);
-        remainingSecondsRef.current = newVal;
-        setRemainingSeconds(newVal);
+      if (nextState === 'active' && !isPausedRef.current) {
+        const remainingMs = endAtRef.current - Date.now();
+        const next = Math.max(0, Math.ceil(remainingMs / 1000));
+        remainingSecondsRef.current = next;
+        setRemainingSeconds(next);
       }
     });
-
     return () => subscription.remove();
   }, [isRunning]);
 
-  // --- 일시정지/재개 ---
+  // --- 일시정지/재개 (v1.5 timestamp 기반) ---
   const handlePauseResume = () => {
     const next = !isPausedRef.current;
     isPausedRef.current = next;
     setIsPaused(next);
+    const now = Date.now();
     if (next) {
+      // pause: pause 시점 저장 + 알람 취소
+      pausedAtRef.current = now;
       cancelAlarms();
     } else {
-      scheduleAlarm(remainingSecondsRef.current);
+      // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
+      const pauseDuration = now - (pausedAtRef.current ?? now);
+      endAtRef.current += pauseDuration;
+      pausedAtRef.current = null;
+      const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      scheduleAlarm(remainingSecs);
     }
+    // AsyncStorage 업데이트 (cold start 복원용)
+    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const t: ActiveTimer = JSON.parse(raw);
+        const updated: ActiveTimer = {
+          ...t,
+          endAt: endAtRef.current,
+          pausedAt: pausedAtRef.current,
+        };
+        AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated)).catch(() => {});
+      } catch {}
+    }).catch(() => {});
   };
 
   // --- 취소 ---
@@ -547,6 +595,8 @@ export default function HomeScreen({ navigation }: Props) {
     setIsRunning(false);
     setIsPaused(false);
     isPausedRef.current = false;
+    endAtRef.current = 0;
+    pausedAtRef.current = null;
   };
 
   // --- 길게 누르기 게이지 ---

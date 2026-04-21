@@ -670,9 +670,11 @@ export default function AlarmScreen({ navigation }: Props) {
     if (isRetryBannerVisible) return;
     if (shuffleIntervalRef.current || shuffleTimeoutRef.current) return;
 
-    // 1) worklet 스캔 일시 차단 (matched는 성공 신호 전용이므로 건드리지 않음)
+    // 1) worklet 스캔 일시 차단 + 이전 match 잔여 완전 리셋 (reshuffle 후 즉시 성공 버그 방지)
     isShufflingSV.value = true;
     consecutiveHits.value = 0;
+    matched.value = false;
+    lastRun.value = Date.now();
 
     // 2) 최종 미션 즉시 확정
     const final = pickRandomMission(currentMissionRef.current);
@@ -691,7 +693,7 @@ export default function AlarmScreen({ navigation }: Props) {
       setShuffleIdx((i) => (i + 1) % shuffled.length);
     }, 60);
 
-    // 4) 1.2초 후 종료
+    // 4) 1.2초 후 종료 — 해제 직전에도 리셋 재적용 (해제 직후 즉시 성공 방지)
     shuffleTimeoutRef.current = setTimeout(() => {
       if (shuffleIntervalRef.current) {
         clearInterval(shuffleIntervalRef.current);
@@ -701,6 +703,9 @@ export default function AlarmScreen({ navigation }: Props) {
       setShuffledList([]);
       setShuffleIdx(0);
       setIsShuffling(false);
+      consecutiveHits.value = 0;
+      matched.value = false;
+      lastRun.value = Date.now();
       isShufflingSV.value = false;
     }, 1200);
     // eslint-disable-next-line react-hooks/exhaustive-deps

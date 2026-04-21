@@ -24,7 +24,7 @@ import {
 import { useTensorflowModel } from 'react-native-fast-tflite';
 import { NitroModules } from 'react-native-nitro-modules';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
-import { useRunOnJS, type ISharedValue } from 'react-native-worklets-core';
+import { useRunOnJS, useSharedValue, type ISharedValue } from 'react-native-worklets-core';
 import { parseYolov10Output, type Detection } from '../utils/objectDetection';
 import { MISSION_EMOJI } from '../constants/missionIcons';
 
@@ -100,21 +100,29 @@ export default function AlarmCameraMode(props: Props) {
   const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
   const device = useCameraDevice(cameraPosition);
 
-  // 카메라 전환 race 방지 — ref로 동기 차단 (state는 stale closure 위험)
+  // 카메라 전환 race 방지 — JS ref + worklet SharedValue 이중 가드
+  // worklet in-flight frame이 old device로 처리하다 vision-camera AVCaptureSession
+  // 재초기화와 충돌해 crash 발생 (known issue #1925, #2657, #3606)
   const [isFlipping, setIsFlipping] = useState(false);
   const isFlippingRef = useRef(false);
+  const isFlippingSV = useSharedValue(false);
   const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleCamera = useCallback(() => {
     if (isFlippingRef.current) return;
     isFlippingRef.current = true;
+    isFlippingSV.value = true; // worklet 즉시 차단
     setIsFlipping(true);
-    setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
+    // 다음 tick에 device 교체 → in-flight frame drain 확보
+    requestAnimationFrame(() => {
+      setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
+    });
     if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
     flipTimeoutRef.current = setTimeout(() => {
       isFlippingRef.current = false;
+      isFlippingSV.value = false;
       setIsFlipping(false);
-    }, 1000);
-  }, []);
+    }, 1200);
+  }, [isFlippingSV]);
   useEffect(() => {
     return () => {
       if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
@@ -122,6 +130,14 @@ export default function AlarmCameraMode(props: Props) {
   }, []);
 
   // Format 선택 (FOV ≤ 70, stab off, ≥640)
+  // @v1.5-thermal — 발열 개선용 필터/정렬. 회귀 시 [PREVIOUS CODE] 주석 블록으로 복구.
+  // [PREVIOUS CODE]:
+  //   const candidates = device.formats
+  //     .filter((f) => f.fieldOfView != null)
+  //     .filter((f) => f.videoStabilizationModes.includes('off'))
+  //     .filter((f) => f.videoWidth >= 640 && f.videoHeight >= 640)
+  //     .filter((f) => f.fieldOfView <= FOV_MAX)
+  //     .sort((a, b) => b.fieldOfView - a.fieldOfView);
   const format = useMemo(() => {
     if (!device) return undefined;
     const candidates = device.formats
@@ -129,7 +145,8 @@ export default function AlarmCameraMode(props: Props) {
       .filter((f) => f.videoStabilizationModes.includes('off'))
       .filter((f) => f.videoWidth >= 640 && f.videoHeight >= 640)
       .filter((f) => f.fieldOfView <= FOV_MAX)
-      .sort((a, b) => b.fieldOfView - a.fieldOfView);
+      .filter((f) => f.maxFps >= 15 && f.minFps <= 15) // v1.5-thermal: 15fps 지원 format 우선
+      .sort((a, b) => a.maxFps - b.maxFps || b.fieldOfView - a.fieldOfView); // v1.5-thermal: 저fps 우선, 동률 시 광각 우선
     return candidates[0] ?? device.formats[0];
   }, [device]);
 
@@ -153,6 +170,7 @@ export default function AlarmCameraMode(props: Props) {
   // Frame processor (worklet)
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
+    if (isFlippingSV.value) return; // 카메라 전환 중 in-flight frame 차단
     if (matched.value) return;
     if (isShufflingSV.value) return;
     if (boxedModel == null) return;
@@ -198,6 +216,7 @@ export default function AlarmCameraMode(props: Props) {
               device={device}
               isActive={resultState === 'idle' && !isFlipping}
               frameProcessor={frameProcessor}
+              fps={15} /* @v1.5-thermal — 30→15fps ISP 파이프라인 제한. 회귀 시 제거. */
               resizeMode="cover"
               videoStabilizationMode="off"
               photo={false}
@@ -208,6 +227,7 @@ export default function AlarmCameraMode(props: Props) {
                   flipTimeoutRef.current = null;
                 }
                 isFlippingRef.current = false;
+                isFlippingSV.value = false;
                 setIsFlipping(false);
               }}
               {...(format ? { format } : {})}

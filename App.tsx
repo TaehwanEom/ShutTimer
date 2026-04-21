@@ -229,17 +229,27 @@ function AppNavigator() {
     run();
   }, []);
 
-  // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도)
+  // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도) + 이중 가드 (시나리오 A 방어)
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(() => {
+    const subscription = Notifications.addNotificationReceivedListener(async () => {
+      if (!navigationRef.current?.isReady()) return;
+      const route = navigationRef.current?.getCurrentRoute()?.name;
+      if (route === 'Alarm') return;
+      const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
+      if (isAlarmActive === 'true') return;
       navigationRef.current?.navigate('Alarm');
     });
     return () => subscription.remove();
   }, []);
 
-  // 알림 탭 시 AlarmScreen 이동
+  // 알림 탭 시 AlarmScreen 이동 + 이중 가드
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(async () => {
+      if (!navigationRef.current?.isReady()) return;
+      const route = navigationRef.current?.getCurrentRoute()?.name;
+      if (route === 'Alarm') return;
+      const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
+      if (isAlarmActive === 'true') return;
       navigationRef.current?.navigate('Alarm');
     });
     return () => subscription.remove();

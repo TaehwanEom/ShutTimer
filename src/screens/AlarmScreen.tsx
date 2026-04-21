@@ -205,16 +205,23 @@ export default function AlarmScreen({ navigation }: Props) {
   const afterAdActionRef = useRef<AfterAdAction>('home');
   const handleAfterAdRef = useRef<() => void>(() => {});
 
-  const stopAudioAndVibration = useCallback(() => {
+  const stopAudioAndVibration = useCallback(async () => {
     Vibration.cancel();
-    Notifications.cancelAllScheduledNotificationsAsync();
-    soundRef.current?.stopAsync().catch(() => {});
-    soundRef.current?.unloadAsync().catch(() => {});
+    // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
+    await Promise.all([
+      Notifications.cancelAllScheduledNotificationsAsync().catch(() => {}),
+      Notifications.dismissAllNotificationsAsync().catch(() => {}),
+    ]);
+    // AlarmScreen 비활성 플래그 먼저 제거 (App.tsx listener가 즉시 navigate 차단 해제)
+    await AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+    const s = soundRef.current;
     soundRef.current = null;
+    if (s) {
+      await s.stopAsync().catch(() => {});
+      await s.unloadAsync().catch(() => {});
+    }
     accelSubRef.current?.remove();
     accelSubRef.current = null;
-    // AlarmScreen 비활성: 다른 알림 음소거 해제
-    AsyncStorage.removeItem('isAlarmActive').catch(() => {});
   }, []);
 
   // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
@@ -272,10 +279,11 @@ export default function AlarmScreen({ navigation }: Props) {
    *  adLoadedRef.current 체크 앞에 `!isAdFree &&` 가드 추가.
    * ═══════════════════════════════════════════════════════════
    */
-  const enterResult = useCallback((result: 'success' | 'fail') => {
+  const enterResult = useCallback(async (result: 'success' | 'fail') => {
     if (resultEnteredRef.current) return;
     resultEnteredRef.current = true;
-    stopAudioAndVibration();
+    // cancel/dismiss/sound stop 완료 후 광고/네비게이션 진행 (race 방지)
+    await stopAudioAndVibration();
     pendingResultRef.current = result;
     afterAdActionRef.current = dismissMethod === 'camera' ? 'result' : 'home';
     if (adLoadedRef.current && interstitial) {
@@ -285,9 +293,9 @@ export default function AlarmScreen({ navigation }: Props) {
     }
   }, [stopAudioAndVibration, dismissMethod, handleAfterAd]);
 
-  const autoDismissNoResult = useCallback(() => {
+  const autoDismissNoResult = useCallback(async () => {
     if (dismissedRef.current) return;
-    stopAudioAndVibration();
+    await stopAudioAndVibration();
     afterAdActionRef.current = 'home';
     if (adLoadedRef.current && interstitial) {
       interstitial.show().catch(goHome);

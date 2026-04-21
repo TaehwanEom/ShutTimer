@@ -100,16 +100,21 @@ export default function AlarmCameraMode(props: Props) {
   const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
   const device = useCameraDevice(cameraPosition);
 
-  // 카메라 전환 race 방지
+  // 카메라 전환 race 방지 — ref로 동기 차단 (state는 stale closure 위험)
   const [isFlipping, setIsFlipping] = useState(false);
+  const isFlippingRef = useRef(false);
   const flipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleCamera = useCallback(() => {
-    if (isFlipping) return;
+    if (isFlippingRef.current) return;
+    isFlippingRef.current = true;
     setIsFlipping(true);
     setCameraPosition((p) => (p === 'back' ? 'front' : 'back'));
     if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
-    flipTimeoutRef.current = setTimeout(() => setIsFlipping(false), 1000);
-  }, [isFlipping]);
+    flipTimeoutRef.current = setTimeout(() => {
+      isFlippingRef.current = false;
+      setIsFlipping(false);
+    }, 1000);
+  }, []);
   useEffect(() => {
     return () => {
       if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
@@ -198,7 +203,11 @@ export default function AlarmCameraMode(props: Props) {
               photo={false}
               video={false}
               onStarted={() => {
-                if (flipTimeoutRef.current) clearTimeout(flipTimeoutRef.current);
+                if (flipTimeoutRef.current) {
+                  clearTimeout(flipTimeoutRef.current);
+                  flipTimeoutRef.current = null;
+                }
+                isFlippingRef.current = false;
                 setIsFlipping(false);
               }}
               {...(format ? { format } : {})}
@@ -321,8 +330,8 @@ export default function AlarmCameraMode(props: Props) {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={toggleCamera}
-          disabled={isShuffling}
-          style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, isShuffling && { opacity: 0.4 }]}
+          disabled={isShuffling || isFlipping}
+          style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, (isShuffling || isFlipping) && { opacity: 0.4 }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <MaterialIcons name="flip-camera-ios" size={26} color="#fff" style={{ opacity: 0.9 }} />

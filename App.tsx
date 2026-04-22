@@ -191,34 +191,14 @@ function AppNavigator() {
           }
         };
 
-        // 위치 권한 요청 — ATT 응답 직후 1회만 (AdMob 위치 기반 광고 활성)
-        const callLocation = async () => {
-          try {
-            const asked = await AsyncStorage.getItem('locationAsked');
-            if (asked === 'true') {
-              await appendLog('Location: already asked, skip');
-              return;
-            }
-            await AsyncStorage.setItem('locationAsked', 'true');
-            const Location = require('expo-location');
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            await AsyncStorage.setItem('locationStatus', status);
-            await appendLog(`Location request result=${status}`);
-          } catch (e: any) {
-            await appendLog(`ERROR in callLocation: ${e?.message || e}`);
-          }
-        };
-
         if (AppState.currentState === 'active') {
           await callATT();
-          await callLocation();
         } else {
           await appendLog(`AppState=${AppState.currentState}, waiting for active`);
           const sub = AppState.addEventListener('change', async (s) => {
             if (s === 'active') {
               sub.remove();
               await callATT();
-              await callLocation();
             }
           });
         }

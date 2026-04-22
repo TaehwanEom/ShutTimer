@@ -1,5 +1,5 @@
 // @v1.5 — 첫 실행 온보딩 화면
-// 흐름: Welcome → 기능 소개 3개 → 권한 priming 3개 (ATT/위치/알림) → 시작하기
+// 흐름: Welcome → 기능 소개 3개 → 권한 priming 2개 (ATT/알림) → 시작하기
 // 권한 priming 패턴: 자체 설명 화면 → "허용" 버튼 → iOS native popup
 // AsyncStorage 'onboardingCompleted' = 'true' 저장 후 Home으로 이동
 
@@ -32,7 +32,7 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
 };
 
-type PermissionType = 'att' | 'location' | 'notification' | 'camera';
+type PermissionType = 'att' | 'notification' | 'camera';
 
 type Card = { icon: string; label: string; description: string };
 
@@ -119,14 +119,6 @@ export default function OnboardingScreen({ navigation }: Props) {
       title: t('onboarding.permissionAttTitle', { defaultValue: '맞춤형 광고로 무료 유지' }),
       body: t('onboarding.permissionAttBody', { defaultValue: '더 적합한 광고를 위해\n추적 권한이 필요합니다.\n거부해도 앱은 정상 작동합니다.' }),
       buttonLabel: t('onboarding.permissionAttButton', { defaultValue: '계속' }),
-    },
-    {
-      kind: 'permission',
-      permission: 'location',
-      icon: 'place',
-      title: t('onboarding.permissionLocationTitle', { defaultValue: '지역 광고로 더 나은 경험' }),
-      body: t('onboarding.permissionLocationBody', { defaultValue: '위치 정보로 더 적합한\n광고를 제공합니다.\n거부해도 앱은 정상 작동합니다.' }),
-      buttonLabel: t('onboarding.permissionLocationButton', { defaultValue: '계속' }),
     },
     {
       kind: 'permission',
@@ -290,11 +282,6 @@ export default function OnboardingScreen({ navigation }: Props) {
         } else {
           await AsyncStorage.setItem('attStatus', current.status);
         }
-      } else if (permission === 'location') {
-        const Location = require('expo-location');
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        await AsyncStorage.setItem('locationStatus', status);
-        await AsyncStorage.setItem('locationAsked', 'true');
       } else if (permission === 'notification') {
         await Notifications.requestPermissionsAsync();
         await AsyncStorage.setItem('notificationsAsked', 'true');

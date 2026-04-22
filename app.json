@@ -15,13 +15,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shuttimer.app",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },
       "infoPlist": {
         "NSCameraUsageDescription": "Scan a photo to dismiss the timer.",
-        "NSLocationWhenInUseUsageDescription": "Used to provide more relevant ads. Denying does not affect app functionality.",
         "NSMotionUsageDescription": "Used to detect shake gesture to dismiss the alarm.",
         "UIBackgroundModes": [
           "audio"

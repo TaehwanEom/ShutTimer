@@ -341,26 +341,7 @@ export default function HistoryScreen({ navigation }: Props) {
 
         <View style={styles.divider} />
 
-        {/* 선택된 날 세션 */}
-        <Text style={styles.sectionLabel}>{dateLabel}</Text>
-        {sessions.length === 0 ? (
-          <Text style={styles.noSession}>{t('history.noSessions')}</Text>
-        ) : (
-          sessions.map((s) => (
-            <View key={s.id} style={styles.sessionCard}>
-              <View style={styles.sessionIconWrap}>
-                <MaterialIcons name={s.icon as any} size={20} color={colors.primary} />
-              </View>
-              <Text style={styles.sessionLabel}>
-                {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`)}
-              </Text>
-              <Text style={styles.sessionMinutes}>{t('history.minutesFmt', { min: s.minutes })}</Text>
-            </View>
-          ))
-        )}
-
         {/* 이번 달 통계 — 4개 카드 (2x2 그리드) */}
-        <View style={styles.divider} />
         <Text style={styles.sectionLabel}>{t('history.monthStats', { month: monthName })}</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
@@ -397,6 +378,26 @@ export default function HistoryScreen({ navigation }: Props) {
             <Text style={styles.statLabel}>{t('history.activeDays')}</Text>
           </View>
         </View>
+
+        <View style={styles.divider} />
+
+        {/* 선택된 날 세션 */}
+        <Text style={styles.sectionLabel}>{dateLabel}</Text>
+        {sessions.length === 0 ? (
+          <Text style={styles.noSession}>{t('history.noSessions')}</Text>
+        ) : (
+          sessions.map((s) => (
+            <View key={s.id} style={styles.sessionCard}>
+              <View style={styles.sessionIconWrap}>
+                <MaterialIcons name={s.icon as any} size={20} color={colors.primary} />
+              </View>
+              <Text style={styles.sessionLabel}>
+                {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`)}
+              </Text>
+              <Text style={styles.sessionMinutes}>{t('history.minutesFmt', { min: s.minutes })}</Text>
+            </View>
+          ))
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

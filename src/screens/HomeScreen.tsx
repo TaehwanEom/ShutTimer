@@ -373,20 +373,21 @@ export default function HomeScreen({ navigation }: Props) {
       : method === 'shake' ? 'running.notifBodyShake'
       : 'running.notifBodyCamera';
 
-    // 3단계 알람 (30초 사운드 × 3, 60초 간격)
-    const stages: { offset: number; bodyKey: string }[] = [
-      { offset: 0,   bodyKey: firstBodyKey },
-      { offset: 60,  bodyKey: 'running.notifBodyReminder2' },
-      { offset: 120, bodyKey: 'running.notifBodyReminder3' },
+    // 3단계 알람 (첫 번째만 사운드, 2/3번째는 배너만 — v1.5: 미션 종료 후에도 iOS 시스템 사운드가
+    // 이미 발화된 상태면 dismissAllNotificationsAsync로 중단 불가하므로 애초에 2/3번째는 sound:false)
+    const stages: { offset: number; bodyKey: string; withSound: boolean }[] = [
+      { offset: 0,   bodyKey: firstBodyKey,                  withSound: true },
+      { offset: 60,  bodyKey: 'running.notifBodyReminder2',  withSound: false },
+      { offset: 120, bodyKey: 'running.notifBodyReminder3',  withSound: false },
     ];
 
     const ids: string[] = [];
-    for (const { offset, bodyKey } of stages) {
+    for (const { offset, bodyKey, withSound } of stages) {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: t('running.notifTitle'),
           body: t(bodyKey),
-          sound,
+          sound: withSound ? sound : false,
           interruptionLevel: 'active',
         },
         trigger: {

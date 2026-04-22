@@ -43,6 +43,23 @@ import AdBanner from '../components/AdBanner';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
 
+// v1.5: 알람 Audio 경로 진단 로그. Logger는 __DEV__ 가드라 프로덕션 미기록 → AsyncStorage 직접 기록.
+// 재현 시 설정 화면의 로그 뷰어(또는 수동 AsyncStorage 조회)로 조회 가능.
+const ALARM_AUDIO_LOG_KEY = 'alarm_audio_log';
+const ALARM_AUDIO_LOG_MAX = 100;
+const appendAlarmAudioLog = async (msg: string) => {
+  try {
+    const prev = await AsyncStorage.getItem(ALARM_AUDIO_LOG_KEY);
+    const arr = prev ? JSON.parse(prev) : [];
+    arr.push(`${new Date().toISOString()} ${msg}`);
+    if (arr.length > ALARM_AUDIO_LOG_MAX) arr.splice(0, arr.length - ALARM_AUDIO_LOG_MAX);
+    await AsyncStorage.setItem(ALARM_AUDIO_LOG_KEY, JSON.stringify(arr));
+  } catch {
+    // AsyncStorage 실패 무시 (로그 누락보다 런타임 안정성 우선)
+  }
+  if (__DEV__) console.warn(`[AlarmAudio] ${msg}`);
+};
+
 // PROD IDs kept for restoration after verification build
 // iOS: ca-app-pub-3043284478228309/6510839159
 // Android: ca-app-pub-3043284478228309/6667370376
@@ -417,10 +434,10 @@ export default function AlarmScreen({ navigation }: Props) {
             return;
           }
           soundRef.current = sound;
-          sound.playAsync();
+          sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
           // isAlarmActive 플래그는 마운트 시 상단 useEffect에서 이미 설정됨 (중복 설정 제거)
-        }).catch(() => {});
-      });
+        }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
+      }).catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
     });
 
     return () => {
@@ -429,14 +446,34 @@ export default function AlarmScreen({ navigation }: Props) {
     };
   }, []);
 
-  // 진동 + 백그라운드 복귀 시 재시작 (결과 화면에선 중단)
+  // 진동 + AppState 복귀 시 재시작 + Audio 인터럽션 복구
+  // v1.5: AppState 콜백에 resultEnteredRef/dismissedRef 가드 (광고 쇼 중 inactive→active 전환으로 인한 재시작 방지)
+  //       Audio 복구는 vibrationEnabled와 독립 (진동 OFF 유저도 AVAudioSession 인터럽션 후 재생 재개)
+  //       expo-av는 InterruptionTypeEnded 자동 처리 안 하므로 수동으로 setAudioModeAsync → playAsync 체인
   useEffect(() => {
-    if (!vibrationEnabled || resultState !== 'idle') return;
-    Vibration.vibrate(VIBRATION_PATTERN, true);
+    if (resultState !== 'idle') return;
+
+    if (vibrationEnabled) {
+      Vibration.vibrate(VIBRATION_PATTERN, true);
+    }
 
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
+      if (resultEnteredRef.current || dismissedRef.current) return;
+      if (state !== 'active') return;
+
+      if (vibrationEnabled) {
         Vibration.vibrate(VIBRATION_PATTERN, true);
+      }
+
+      const s = soundRef.current;
+      if (s) {
+        s.getStatusAsync().then((status: any) => {
+          if (status?.isLoaded && !status.isPlaying) {
+            Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true })
+              .then(() => s.playAsync())
+              .catch((e: any) => appendAlarmAudioLog(`resume: ${e?.message || e}`));
+          }
+        }).catch((e: any) => appendAlarmAudioLog(`getStatusAsync: ${e?.message || e}`));
       }
     });
 

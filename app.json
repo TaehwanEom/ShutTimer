@@ -13,9 +13,9 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.shuttimer.app",
-      "buildNumber": "28",
+      "buildNumber": "29",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true
       },

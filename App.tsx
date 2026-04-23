@@ -22,20 +22,23 @@ Notifications.setNotificationHandler({
     let alarmEnabledRaw: string | null = null;
     let isAlarmActive: string | null = null;
     let isTimerActive: string | null = null;
+    let isRoutineActive: string | null = null;
 
     Logger.info('NotifHandler', `ENTER appState=${appState}`);
 
     try {
       phase = 'reading_storage';
-      [alarmEnabledRaw, isAlarmActive, isTimerActive] = await Promise.all([
+      [alarmEnabledRaw, isAlarmActive, isTimerActive, isRoutineActive] = await Promise.all([
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
         AsyncStorage.getItem('isAlarmActive'),
         AsyncStorage.getItem('isTimerActive'),
+        AsyncStorage.getItem('isRoutineActive'),
       ]);
       phase = 'computing';
 
       const alarmEnabled = alarmEnabledRaw !== 'false';
-      const suppress = (isAlarmActive === 'true' || isTimerActive === 'true') && appState === 'active';
+      // v1.6: 루틴 실행 중 포그라운드 상태면 다른 루틴/타이머 알림 suppress (중복 발화 방지)
+      const suppress = (isAlarmActive === 'true' || isTimerActive === 'true' || isRoutineActive === 'true') && appState === 'active';
 
       const result = suppress || !alarmEnabled
         ? { shouldPlaySound: false, shouldShowBanner: false, shouldShowList: false, shouldSetBadge: false }
@@ -43,7 +46,7 @@ Notifications.setNotificationHandler({
 
       Logger.info(
         'NotifHandler',
-        `OK raw=${alarmEnabledRaw} alarm=${isAlarmActive} timer=${isTimerActive} suppress=${suppress} enabled=${alarmEnabled} → sound=${result.shouldPlaySound}`
+        `OK raw=${alarmEnabledRaw} alarm=${isAlarmActive} timer=${isTimerActive} routine=${isRoutineActive} suppress=${suppress} enabled=${alarmEnabled} → sound=${result.shouldPlaySound}`
       );
       return result;
     } catch (e) {
@@ -69,6 +72,11 @@ import SplashScreen from './src/screens/SplashScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import NoticeScreen from './src/screens/NoticeScreen';
 import MissionSelectScreen from './src/screens/MissionSelectScreen';
+import RoutineListScreen from './src/screens/RoutineListScreen';
+import RoutineEditScreen from './src/screens/RoutineEditScreen';
+import RoutineRunScreen from './src/screens/RoutineRunScreen';
+import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
+import { syncRollingSchedule } from './src/utils/routineScheduler';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
   ? require('./src/screens/PoCPhotoValidationScreen').default
@@ -93,6 +101,11 @@ export type RootStackParamList = {
   History: undefined;
   Notice: undefined;
   MissionSelect: undefined;
+  // @v1.6 루틴 기능
+  RoutineList: undefined;
+  RoutineEdit: { routineId?: string } | undefined;
+  RoutineRun: { routineId: string };
+  RoutineAlarm: { routineId: string };
   // @v1.5-poc — 영구 유지. __DEV__ 가드로 production 빌드 런타임에서 접근 차단.
   PoCPhotoValidation: undefined;
 };
@@ -222,12 +235,28 @@ function AppNavigator() {
     return () => subscription.remove();
   }, []);
 
-  // 알림 탭 시 AlarmScreen 이동 + 이중 가드
+  // 알림 탭 시 적절한 화면으로 이동
+  // v1.6: 루틴 알림 분기 — data.type으로 routine_prealert / routine_chain / (기본: Alarm) 구분
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(async () => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
       if (!navigationRef.current?.isReady()) return;
-      const route = navigationRef.current?.getCurrentRoute()?.name;
-      if (route === 'Alarm') return;
+      const data = (response?.notification?.request?.content?.data ?? {}) as any;
+      const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
+
+      if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
+        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineRun' || currentRoute === 'RoutineAlarm') return;
+        navigationRef.current?.navigate('RoutineList');
+        return;
+      }
+      if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
+        // 자동 진행 체인 — 이미 RoutineRun에 있으면 AppState 복귀 시 endAt 기준 자동 전환됨
+        if (currentRoute === 'RoutineRun') return;
+        navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
+        return;
+      }
+
+      // 기본 알람 경로
+      if (currentRoute === 'Alarm') return;
       const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
       if (isAlarmActive === 'true') return;
       navigationRef.current?.navigate('Alarm');
@@ -235,17 +264,32 @@ function AppNavigator() {
     return () => subscription.remove();
   }, []);
 
-  // 콜드 스타트: 알림 탭으로 앱 진입 시 AlarmScreen 이동
+  // 콜드 스타트: 알림 탭으로 앱 진입 시 적절한 화면 이동
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync()
       .then(response => {
-        if (response) {
-          navigationRef.current?.navigate('Alarm');
+        if (!response) return;
+        const data = (response?.notification?.request?.content?.data ?? {}) as any;
+        if (data?.type === 'routine_prealert') {
+          navigationRef.current?.navigate('RoutineList');
+          return;
         }
+        if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
+          navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
+          return;
+        }
+        navigationRef.current?.navigate('Alarm');
       })
       .catch(e => {
         Logger.warn('AppNavigator', `Failed to get last notification response: ${e}`);
       });
+  }, []);
+
+  // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화
+  useEffect(() => {
+    syncRollingSchedule().catch((e) => {
+      Logger.warn('AppNavigator', `syncRollingSchedule failed: ${e}`);
+    });
   }, []);
 
   return (
@@ -267,6 +311,10 @@ function AppNavigator() {
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
         <Stack.Screen name="MissionSelect" component={MissionSelectScreen} />
+        <Stack.Screen name="RoutineList" component={RoutineListScreen} />
+        <Stack.Screen name="RoutineEdit" component={RoutineEditScreen} />
+        <Stack.Screen name="RoutineRun" component={RoutineRunScreen} options={{ gestureEnabled: false }} />
+        <Stack.Screen name="RoutineAlarm" component={RoutineAlarmScreen} options={{ gestureEnabled: false }} />
         {/* @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 프로덕션 빌드에서 자동 제외. 삭제 금지. */}
         {__DEV__ && (
           <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />

@@ -707,6 +707,9 @@ export default function HomeScreen({ navigation }: Props) {
               </View>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('RoutineList')}>
+            <MaterialIcons name="repeat" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
             <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
           </TouchableOpacity>

@@ -29,7 +29,6 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
-import * as Haptics from 'expo-haptics';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
@@ -119,7 +118,6 @@ function pickInitialRandomMission(): string {
 const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT_REQUIRED = 3;
 const SHAKE_COOLDOWN_MS = 500;
-const VIBRATION_PATTERN = [0, 500, 300, 500, 300, 500];
 // v1.5: camera 미션은 사용자 설정 타이머 × 2회로 관리되므로 제거. tap/shake만 기존 5분 유지.
 const AUTO_DISMISS_MS: Record<string, number> = {
   tap: 5 * 60 * 1000,
@@ -190,8 +188,8 @@ export default function AlarmScreen({ navigation }: Props) {
   );
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
   const soundRef = useRef<Audio.Sound | null>(null);
-  // v1.5: iOS 벨 모드에서 RN Vibration API는 pattern/repeat 미지원 → Haptics를 interval로 반복 호출
-  const hapticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // v1.5: iOS Vibration API는 pattern/repeat 미지원 → 인자 없는 Vibration.vibrate()를 interval로 반복 호출
+  const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // @preserve v1-camera — v1 실패 횟수 카운터. v1.5에서 2회 attempt로 대체.
   // const [failCount, setFailCount] = useState(0);
   // const [failMessage, setFailMessage] = useState(false);
@@ -228,10 +226,10 @@ export default function AlarmScreen({ navigation }: Props) {
 
   const stopAudioAndVibration = useCallback(async () => {
     Vibration.cancel();
-    // v1.5: iOS Haptics interval도 함께 정리 (dismiss 시 진동 재시작 방지)
-    if (hapticIntervalRef.current) {
-      clearInterval(hapticIntervalRef.current);
-      hapticIntervalRef.current = null;
+    // v1.5: Vibration interval도 함께 정리 (dismiss 시 진동 재시작 방지)
+    if (vibrationIntervalRef.current) {
+      clearInterval(vibrationIntervalRef.current);
+      vibrationIntervalRef.current = null;
     }
     // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
     await Promise.all([
@@ -498,32 +496,27 @@ export default function AlarmScreen({ navigation }: Props) {
   // v1.5: AppState 콜백에 resultEnteredRef/dismissedRef 가드 (광고 쇼 중 inactive→active 전환으로 인한 재시작 방지)
   //       Audio 복구는 vibrationEnabled와 독립 (진동 OFF 유저도 AVAudioSession 인터럽션 후 재생 재개)
   //       expo-av는 InterruptionTypeEnded 자동 처리 안 하므로 수동으로 setAudioModeAsync → playAsync 체인
-  //       iOS: RN Vibration.vibrate는 pattern/repeat 미지원이라 벨 모드에서 제대로 진동 안 됨 → Haptics를 interval로 반복
-  //       Android: 기존 Vibration.vibrate(PATTERN, true) 정상 동작 유지
+  //       iOS/Android 공통: Vibration.vibrate() 인자 없이 호출 → 기본 진동 모터 1회. setInterval 1000ms로 반복 (지속 진동 체감)
   useEffect(() => {
     if (resultState !== 'idle') return;
 
     const startVibe = () => {
       if (!vibrationEnabled) return;
-      if (Platform.OS === 'ios') {
-        // 중복 방지: 기존 interval 먼저 clear
-        if (hapticIntervalRef.current) {
-          clearInterval(hapticIntervalRef.current);
-          hapticIntervalRef.current = null;
-        }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-        hapticIntervalRef.current = setInterval(() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-        }, 1000);
-      } else {
-        Vibration.vibrate(VIBRATION_PATTERN, true);
+      // 중복 방지: 기존 interval 먼저 clear
+      if (vibrationIntervalRef.current) {
+        clearInterval(vibrationIntervalRef.current);
+        vibrationIntervalRef.current = null;
       }
+      Vibration.vibrate();
+      vibrationIntervalRef.current = setInterval(() => {
+        Vibration.vibrate();
+      }, 1000);
     };
 
     const stopVibe = () => {
-      if (hapticIntervalRef.current) {
-        clearInterval(hapticIntervalRef.current);
-        hapticIntervalRef.current = null;
+      if (vibrationIntervalRef.current) {
+        clearInterval(vibrationIntervalRef.current);
+        vibrationIntervalRef.current = null;
       }
       Vibration.cancel();
     };

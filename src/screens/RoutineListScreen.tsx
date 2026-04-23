@@ -25,7 +25,7 @@ import {
   deleteRoutine,
   totalRoutineMinutes,
 } from '../constants/routines';
-import { cancelRoutinePrealerts } from '../utils/routineScheduler';
+import { cancelRoutinePrealerts, loadScheduleStatus, ScheduleStatus } from '../utils/routineScheduler';
 import AdBanner from '../components/AdBanner';
 
 type Props = {
@@ -39,10 +39,12 @@ export default function RoutineListScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const styles = makeStyles(colors);
   const [routines, setRoutines] = useState<Routine[]>([]);
+  const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       loadRoutines().then(setRoutines);
+      loadScheduleStatus().then(setScheduleStatus);
     }, [])
   );
 
@@ -112,6 +114,24 @@ export default function RoutineListScreen({ navigation }: Props) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Phase 2: 한계 초과 배너 */}
+        {scheduleStatus?.overflow && (
+          <View style={styles.warningBanner}>
+            <MaterialIcons name="warning-amber" size={20} color={colors.error} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.warningTitle}>
+                {t('routine.scheduleOverflowTitle', { defaultValue: '일부 루틴 알림 예약 실패' })}
+              </Text>
+              <Text style={styles.warningBody}>
+                {t('routine.scheduleOverflowBody', {
+                  defaultValue: `${scheduleStatus.skippedRoutineIds.length}개 루틴이 시스템 한계로 예약되지 않았습니다. 사용하지 않는 루틴을 삭제하세요.`,
+                  count: scheduleStatus.skippedRoutineIds.length,
+                })}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {routines.length === 0 ? (
           <View style={styles.emptyBox}>
             <MaterialIcons name="playlist-add" size={48} color={colors.secondary} />
@@ -238,5 +258,27 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 13,
     color: colors.primary,
     fontWeight: '700',
+  },
+  warningBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLow,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  warningTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.error,
+  },
+  warningBody: {
+    marginTop: 2,
+    fontSize: 12,
+    color: colors.onBackground,
+    lineHeight: 17,
   },
 });

@@ -12,7 +12,19 @@ import {
   SCHEDULED_ROUTINE_NOTIFS_KEY,
   IOS_NOTIFICATION_SAFE_CAP,
   loadRoutines,
+  nextOccurrenceTime,
 } from '../constants/routines';
+
+// Phase 2: 한계 초과 감지 시 RoutineListScreen 상단 배너 노출용 상태
+export const ROUTINE_SCHEDULE_STATUS_KEY = 'shuttimer_routine_schedule_status';
+
+export type ScheduleStatus = {
+  overflow: boolean;
+  skippedRoutineIds: string[];
+  totalAttempted: number;
+  totalScheduled: number;
+  lastSyncedAt: number;
+};
 import { SETTINGS_KEY } from '../constants/settings';
 
 /**
@@ -177,9 +189,8 @@ export async function cancelRoutinePrealerts(routineId: string): Promise<void> {
 
 /**
  * 앱 기동 시 호출. 전체 루틴 예약 재확인.
- * CALENDAR + repeats 방식이라 rolling 재동기화는 불필요하지만,
- * 루틴 추가/편집/삭제 누락 시나리오 대비 1회 재예약.
- * 64개 상한 초과 시 앞쪽 루틴 우선 예약 (Phase 2에서 우선순위 로직 강화).
+ * Phase 2: 다가오는 예약 시각 기준 정렬 — 가까운 루틴부터 예약.
+ * 64개 상한 초과 시 건너뛴 루틴 id 를 ScheduleStatus 에 저장 → RoutineListScreen 배너 노출.
  */
 export async function syncRollingSchedule(): Promise<void> {
   const routines = await loadRoutines();
@@ -194,12 +205,49 @@ export async function syncRollingSchedule(): Promise<void> {
   }
   await saveNotifRecords([]);
 
+  // Phase 2 A: 다가오는 예약 시각 기준 정렬
+  const now = new Date();
+  const sorted = scheduledRoutines
+    .map(r => ({ r, nextAt: nextOccurrenceTime(r, now) }))
+    .filter((x): x is { r: Routine; nextAt: number } => x.nextAt !== null)
+    .sort((a, b) => a.nextAt - b.nextAt)
+    .map(x => x.r);
+
   // 합계 상한 체크하며 재예약
   let totalScheduled = 0;
-  for (const r of scheduledRoutines) {
-    if (totalScheduled >= IOS_NOTIFICATION_SAFE_CAP) break;
+  const skipped: string[] = [];
+  for (const r of sorted) {
+    if (totalScheduled >= IOS_NOTIFICATION_SAFE_CAP) {
+      skipped.push(r.id);
+      continue;
+    }
     const ids = await scheduleRoutinePrealerts(r);
+    if (ids.length === 0 && r.schedule) {
+      // schedule 있는데 예약 실패 — 권한 거부 등
+      skipped.push(r.id);
+    }
     totalScheduled += ids.length;
+  }
+
+  // Phase 2 B: 한계 초과 상태 저장 (RoutineListScreen 배너 노출용)
+  const status: ScheduleStatus = {
+    overflow: skipped.length > 0,
+    skippedRoutineIds: skipped,
+    totalAttempted: sorted.length,
+    totalScheduled,
+    lastSyncedAt: Date.now(),
+  };
+  await AsyncStorage.setItem(ROUTINE_SCHEDULE_STATUS_KEY, JSON.stringify(status));
+}
+
+/** RoutineListScreen 상단 배너 노출용 — 마지막 sync 상태 조회. */
+export async function loadScheduleStatus(): Promise<ScheduleStatus | null> {
+  try {
+    const raw = await AsyncStorage.getItem(ROUTINE_SCHEDULE_STATUS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
 }
 

@@ -19,6 +19,7 @@ import {
   Linking,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -175,6 +176,24 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     navigation.goBack();
   }, [editingId, name, missions, loopCount, scheduleEnabled, days, timeHour, timeMinute, autoAdvance, dismissMethod, navigation, t]);
 
+  // Phase 2 C: Android 12+ SCHEDULE_EXACT_ALARM 설정 화면 직접 호출.
+  // Android 13+ USE_EXACT_ALARM 자동 부여라 대부분의 기기는 여기 올 필요 없음.
+  const openExactAlarmSettings = async () => {
+    if (Platform.OS !== 'android') {
+      Linking.openSettings().catch(() => {});
+      return;
+    }
+    try {
+      await IntentLauncher.startActivityAsync(
+        'android.settings.REQUEST_SCHEDULE_EXACT_ALARM_PERMISSION',
+        { data: 'package:com.shuttimer.app' }
+      );
+    } catch {
+      // intent 실패 시 앱 설정 화면 fallback
+      Linking.openSettings().catch(() => {});
+    }
+  };
+
   const maybeShowExactAlarmNotice = async () => {
     try {
       const shown = await AsyncStorage.getItem('routine_exact_alarm_notice_shown');
@@ -187,7 +206,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           { text: t('routine.exactAlarmLater', { defaultValue: '나중에' }), style: 'cancel' },
           {
             text: t('routine.exactAlarmOpenSettings', { defaultValue: '설정 열기' }),
-            onPress: () => Linking.openSettings().catch(() => {}),
+            onPress: () => openExactAlarmSettings(),
           },
         ]
       );

@@ -159,3 +159,31 @@ export function routineProgress(r: Routine, ar: ActiveRoutine): number {
   const done = (ar.currentLoop - 1) * r.missions.length + ar.currentStepIndex;
   return Math.min(1, Math.max(0, done / Math.max(1, total)));
 }
+
+/**
+ * 루틴의 "다음 예약 발화 시각" (시작 5분 전 기준이 아니라 루틴 시작 시각 기준) 계산.
+ * schedule 없으면 null.
+ * 정렬/우선순위 결정용.
+ */
+export function nextOccurrenceTime(r: Routine, now: Date = new Date()): number | null {
+  if (!r.schedule) return null;
+  const [hStr, mStr] = r.schedule.time.split(':');
+  const hour = parseInt(hStr, 10);
+  const minute = parseInt(mStr, 10);
+  if (isNaN(hour) || isNaN(minute)) return null;
+
+  const effectiveDays = r.schedule.days.length === 0
+    ? [0, 1, 2, 3, 4, 5, 6]
+    : r.schedule.days;
+
+  // 오늘부터 최대 7일 탐색 (주 1회 반복이므로 7일 안에 반드시 있음)
+  for (let offset = 0; offset < 8; offset++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + offset);
+    d.setHours(hour, minute, 0, 0);
+    if (!effectiveDays.includes(d.getDay())) continue;
+    if (d.getTime() <= now.getTime()) continue;
+    return d.getTime();
+  }
+  return null;
+}

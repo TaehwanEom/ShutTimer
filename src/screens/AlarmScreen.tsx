@@ -16,7 +16,7 @@ import {
 // import { CameraView, useCameraPermissions } from 'expo-camera';
 // import ImageLabeling from '@react-native-ml-kit/image-labeling';
 import { Accelerometer } from 'expo-sensors';
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +29,8 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
+import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -188,6 +190,8 @@ export default function AlarmScreen({ navigation }: Props) {
   );
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
   const soundRef = useRef<Audio.Sound | null>(null);
+  // v1.5: iOS 벨 모드에서 RN Vibration API는 pattern/repeat 미지원 → Haptics를 interval로 반복 호출
+  const hapticIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // @preserve v1-camera — v1 실패 횟수 카운터. v1.5에서 2회 attempt로 대체.
   // const [failCount, setFailCount] = useState(0);
   // const [failMessage, setFailMessage] = useState(false);
@@ -224,6 +228,11 @@ export default function AlarmScreen({ navigation }: Props) {
 
   const stopAudioAndVibration = useCallback(async () => {
     Vibration.cancel();
+    // v1.5: iOS Haptics interval도 함께 정리 (dismiss 시 진동 재시작 방지)
+    if (hapticIntervalRef.current) {
+      clearInterval(hapticIntervalRef.current);
+      hapticIntervalRef.current = null;
+    }
     // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
     await Promise.all([
       Notifications.cancelAllScheduledNotificationsAsync().catch(() => {}),
@@ -421,24 +430,63 @@ export default function AlarmScreen({ navigation }: Props) {
         } catch {}
       }
       setSettingsLoaded(true);
+    });
+  }, []);
 
+  // v1.5: 알람 사운드 재생을 별도 useEffect로 분리. 설정 로드(multiGet+미션 파싱) 대기 제거로 딜레이 단축.
+  //       HomeScreen.scheduleAlarm이 preloadAlarmSound를 호출했으면 consumeAlarmSound()로 즉시 playAsync.
+  //       preload 실패/콜드스타트 시 createAsync fallback.
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
+      AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
+    ]).then(([soundIdRaw, alarmRaw]) => {
+      const alarmEnabled = alarmRaw !== 'false';
       if (!alarmEnabled) return;
+      const soundId = soundIdRaw ?? DEFAULT_SOUND_ID;
 
-      // 알람 사운드 재생
-      const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
-      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true }).then(() => {
+      // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
+      const runFallback = () => {
+        const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
         Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
-          // 로드 완료 시점에 이미 dismiss/결과 진입됐으면 재생하지 않고 언로드
           if (resultEnteredRef.current || dismissedRef.current) {
             sound.unloadAsync().catch(() => {});
             return;
           }
           soundRef.current = sound;
           sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
-          // isAlarmActive 플래그는 마운트 시 상단 useEffect에서 이미 설정됨 (중복 설정 제거)
         }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
-      }).catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
-    });
+      };
+
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
+        .then(() => {
+          const preloaded = consumeAlarmSound();
+          if (!preloaded) {
+            runFallback();
+            return;
+          }
+          // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
+          preloaded.getStatusAsync().then((status: any) => {
+            if (resultEnteredRef.current || dismissedRef.current) {
+              preloaded.unloadAsync().catch(() => {});
+              return;
+            }
+            if (status?.isLoaded) {
+              soundRef.current = preloaded;
+              preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
+            } else {
+              appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
+              preloaded.unloadAsync().catch(() => {});
+              runFallback();
+            }
+          }).catch((e: any) => {
+            appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
+            preloaded.unloadAsync().catch(() => {});
+            runFallback();
+          });
+        })
+        .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
+    }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
 
     return () => {
       soundRef.current?.stopAsync().catch(() => {});
@@ -450,26 +498,49 @@ export default function AlarmScreen({ navigation }: Props) {
   // v1.5: AppState 콜백에 resultEnteredRef/dismissedRef 가드 (광고 쇼 중 inactive→active 전환으로 인한 재시작 방지)
   //       Audio 복구는 vibrationEnabled와 독립 (진동 OFF 유저도 AVAudioSession 인터럽션 후 재생 재개)
   //       expo-av는 InterruptionTypeEnded 자동 처리 안 하므로 수동으로 setAudioModeAsync → playAsync 체인
+  //       iOS: RN Vibration.vibrate는 pattern/repeat 미지원이라 벨 모드에서 제대로 진동 안 됨 → Haptics를 interval로 반복
+  //       Android: 기존 Vibration.vibrate(PATTERN, true) 정상 동작 유지
   useEffect(() => {
     if (resultState !== 'idle') return;
 
-    if (vibrationEnabled) {
-      Vibration.vibrate(VIBRATION_PATTERN, true);
-    }
+    const startVibe = () => {
+      if (!vibrationEnabled) return;
+      if (Platform.OS === 'ios') {
+        // 중복 방지: 기존 interval 먼저 clear
+        if (hapticIntervalRef.current) {
+          clearInterval(hapticIntervalRef.current);
+          hapticIntervalRef.current = null;
+        }
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        hapticIntervalRef.current = setInterval(() => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        }, 1000);
+      } else {
+        Vibration.vibrate(VIBRATION_PATTERN, true);
+      }
+    };
+
+    const stopVibe = () => {
+      if (hapticIntervalRef.current) {
+        clearInterval(hapticIntervalRef.current);
+        hapticIntervalRef.current = null;
+      }
+      Vibration.cancel();
+    };
+
+    startVibe();
 
     const sub = AppState.addEventListener('change', (state) => {
       if (resultEnteredRef.current || dismissedRef.current) return;
       if (state !== 'active') return;
 
-      if (vibrationEnabled) {
-        Vibration.vibrate(VIBRATION_PATTERN, true);
-      }
+      startVibe();
 
       const s = soundRef.current;
       if (s) {
         s.getStatusAsync().then((status: any) => {
           if (status?.isLoaded && !status.isPlaying) {
-            Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true })
+            Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
               .then(() => s.playAsync())
               .catch((e: any) => appendAlarmAudioLog(`resume: ${e?.message || e}`));
           }
@@ -478,7 +549,7 @@ export default function AlarmScreen({ navigation }: Props) {
     });
 
     return () => {
-      Vibration.cancel();
+      stopVibe();
       sub.remove();
     };
   }, [vibrationEnabled, resultState]);

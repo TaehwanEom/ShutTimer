@@ -28,6 +28,8 @@ import TimerDigital from '../components/TimerDigital';
 import AdBanner from '../components/AdBanner';
 import { SETTINGS_KEY, DialType } from '../constants/settings';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import { preloadAlarmSound, clearPreloadedSound } from '../utils/alarmSoundPreload';
 import { useTranslation } from 'react-i18next';
 
 type Props = {
@@ -366,6 +368,14 @@ export default function HomeScreen({ navigation }: Props) {
     const alarmEnabled = alarmEnabledRaw !== 'false';
     const sound = alarmEnabled ? pushSound : false;
 
+    // v1.5: 알람 사운드 Pre-load (AlarmScreen 마운트 시 playAsync 즉시 호출 가능 → 딜레이 단축)
+    // alarmEnabled=false이면 스킵. 기존 preload는 모듈 내부에서 clear 후 재생성.
+    if (alarmEnabled) {
+      const effectiveId = soundId ?? DEFAULT_SOUND_ID;
+      const soundItem = ALARM_SOUNDS.find(s => s.id === effectiveId) ?? ALARM_SOUNDS[0];
+      preloadAlarmSound(soundItem.source).catch(() => {});
+    }
+
     // 종료 방식별 첫 본문
     const method = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
     const firstBodyKey =
@@ -400,12 +410,17 @@ export default function HomeScreen({ navigation }: Props) {
     notificationIdsRef.current = ids;
   };
 
-  const cancelAlarms = async () => {
+  const cancelAlarms = async (opts?: { keepPreload?: boolean }) => {
     // 메모리 배열 + 시스템 예약 양쪽 모두 정리 (cold start 복원 후 메모리 배열이 비어있어도 안전)
     await Notifications.cancelAllScheduledNotificationsAsync();
     notificationIdsRef.current = [];
     // 타이머 플래그 해제 (pair with scheduleAlarm)
     AsyncStorage.removeItem('isTimerActive').catch(() => {});
+    // v1.5: preload된 사운드 메모리 해제 (메모리 누수 방지).
+    //       단 타이머 자연 종료 → AlarmScreen 진입 경로는 preload 유지 필요 (keepPreload: true).
+    if (!opts?.keepPreload) {
+      clearPreloadedSound().catch(() => {});
+    }
   };
 
   // --- 타이머 시작 ---
@@ -483,7 +498,8 @@ export default function HomeScreen({ navigation }: Props) {
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
       AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
-      cancelAlarms().then(() => {
+      // v1.5: 타이머 자연 종료 → AlarmScreen 진입. preload된 사운드를 AlarmScreen이 consume하도록 유지.
+      cancelAlarms({ keepPreload: true }).then(() => {
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }

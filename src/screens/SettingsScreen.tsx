@@ -30,6 +30,7 @@ import { getLocales } from 'expo-localization';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
 import { setCachedDismissMethod } from '../utils/settingsCache';
+import { clearPreloadedSound } from '../utils/alarmSoundPreload';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
@@ -266,6 +267,9 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleSoundSelect = (soundId: string) => {
     setSelectedSoundId(soundId);
     AsyncStorage.setItem(SETTINGS_KEY.ALARM_SOUND, soundId);
+    // v1.5: preload는 이전 사운드로 로드된 상태 → AlarmScreen에서 최신 선택을 반영하도록 무효화.
+    //       HomeScreen이 다음 scheduleAlarm에서 새 사운드로 다시 preload함.
+    clearPreloadedSound().catch(() => {});
   };
 
   const handlePreview = async (soundId: string) => {

@@ -6,6 +6,7 @@
 
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import i18n from '../i18n';
 import {
   Routine,
   ROUTINE_PREALERT_MINUTES,
@@ -14,6 +15,7 @@ import {
   loadRoutines,
   nextOccurrenceTime,
 } from '../constants/routines';
+import { SETTINGS_KEY } from '../constants/settings';
 
 // Phase 2: 한계 초과 감지 시 RoutineListScreen 상단 배너 노출용 상태
 export const ROUTINE_SCHEDULE_STATUS_KEY = 'shuttimer_routine_schedule_status';
@@ -25,7 +27,6 @@ export type ScheduleStatus = {
   totalScheduled: number;
   lastSyncedAt: number;
 };
-import { SETTINGS_KEY } from '../constants/settings';
 
 /**
  * 사용자 설정 기준 푸시 사운드 파일명 반환.
@@ -149,8 +150,8 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: routine.name,
-          body: 'routine.prealertBody', // i18n 키 — 수신자에서 치환
-          data: data as any,
+          body: i18n.t('routine.prealertBody', { defaultValue: '곧 루틴이 시작됩니다' }),
+          data: { ...data },
           sound,
           interruptionLevel: 'active',
         },
@@ -159,7 +160,7 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
           weekday,
           hour: alertTime.hour,
           minute: alertTime.minute,
-        } as any,
+        },
       });
       ids.push(id);
     } catch {
@@ -276,9 +277,9 @@ export async function scheduleRoutineChain(
     const sound = await resolveSound();
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'routine.chainTitle',
-        body: 'routine.chainBody',
-        data: data as any,
+        title: i18n.t('routine.chainTitle', { defaultValue: '다음 미션' }),
+        body: i18n.t('routine.chainBody', { defaultValue: '다음 미션이 시작됩니다' }),
+        data: { ...data },
         sound,
         interruptionLevel: 'active',
       },
@@ -295,5 +296,48 @@ export async function scheduleRoutineChain(
 
 /** 체인 알림 취소 (루틴 일시정지/종료 시) */
 export async function cancelRoutineChain(notifId: string): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
+}
+
+// ─── F4: 확인 후 진행 모드 배경 알림 (미션 종료 시점 RoutineAlarm 유도) ─
+
+/**
+ * 확인 후 진행 모드에서 미션 종료 시점에 발화할 DATE trigger 알림 예약.
+ * 앱이 배경/kill 상태여도 알림으로 사용자에게 미션 종료 알림.
+ * 발화 시 data.type === 'routine_confirm_prompt' → App.tsx handler가 RoutineAlarm 이동.
+ */
+export async function scheduleRoutineConfirmPrompt(
+  routineId: string,
+  fireAt: Date
+): Promise<string | null> {
+  if (fireAt.getTime() <= Date.now()) return null;
+  try {
+    const data = {
+      type: 'routine_confirm_prompt' as const,
+      routineId,
+      scheduledFor: fireAt.getTime(),
+    };
+    const sound = await resolveSound();
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: i18n.t('routine.confirmPromptTitle', { defaultValue: '미션 완료' }),
+        body: i18n.t('routine.confirmPromptBody', { defaultValue: '다음 미션을 시작하려면 앱을 여세요' }),
+        data: { ...data },
+        sound,
+        interruptionLevel: 'active',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: fireAt,
+      },
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** 확인 후 진행 프롬프트 알림 취소 (사용자 dismiss 시) */
+export async function cancelRoutineConfirmPrompt(notifId: string): Promise<void> {
   await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
 }

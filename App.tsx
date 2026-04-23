@@ -77,6 +77,7 @@ import RoutineEditScreen from './src/screens/RoutineEditScreen';
 import RoutineRunScreen from './src/screens/RoutineRunScreen';
 import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
+import { restoreRoutineState } from './src/utils/routineController';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
   ? require('./src/screens/PoCPhotoValidationScreen').default
@@ -120,6 +121,8 @@ function AppNavigator() {
   useEffect(() => {
     AsyncStorage.removeItem('isTimerActive').catch(() => {});
     AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+    // v1.6: 루틴 활성 플래그도 stale 방지 (kill 후 재시작 시 단일 타이머 알림 suppress 차단 방지)
+    AsyncStorage.removeItem('isRoutineActive').catch(() => {});
     // dismissMethod 사전 로드 → AlarmScreen 마운트 시 즉시 사용 (흔들기 애니메이션 지연 제거)
     preloadDismissMethod();
   }, []);
@@ -254,6 +257,12 @@ function AppNavigator() {
         navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
         return;
       }
+      if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
+        // v1.6: 확인 후 진행 모드 배경 알림 — 탭 시 RoutineAlarm 이동
+        if (currentRoute === 'RoutineAlarm') return;
+        navigationRef.current?.navigate('RoutineAlarm', { routineId: data.routineId });
+        return;
+      }
 
       // 기본 알람 경로
       if (currentRoute === 'Alarm') return;
@@ -278,6 +287,10 @@ function AppNavigator() {
           navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
           return;
         }
+        if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
+          navigationRef.current?.navigate('RoutineAlarm', { routineId: data.routineId });
+          return;
+        }
         navigationRef.current?.navigate('Alarm');
       })
       .catch(e => {
@@ -285,11 +298,25 @@ function AppNavigator() {
       });
   }, []);
 
-  // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화
+  // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화 + ActiveRoutine 자동 복원
   useEffect(() => {
     syncRollingSchedule().catch((e) => {
       Logger.warn('AppNavigator', `syncRollingSchedule failed: ${e}`);
     });
+    // 콜드 스타트 복원 — 약간 지연 후 navigationRef 준비되면 분기
+    const timer = setTimeout(() => {
+      restoreRoutineState()
+        .then((res) => {
+          if (!navigationRef.current?.isReady()) return;
+          if (res.kind === 'run') {
+            navigationRef.current?.navigate('RoutineRun', { routineId: res.routineId });
+          } else if (res.kind === 'alarm') {
+            navigationRef.current?.navigate('RoutineAlarm', { routineId: res.routineId });
+          }
+        })
+        .catch((e) => Logger.warn('AppNavigator', `restoreRoutineState failed: ${e}`));
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   return (

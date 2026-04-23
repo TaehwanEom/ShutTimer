@@ -332,13 +332,18 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {/* 진행 방식 */}
+        {/* 진행 방식 — F6: 라벨 고정. Switch ON=자동 진행, OFF=확인 후 진행 */}
         <View style={styles.switchRow}>
-          <Text style={styles.sectionLabel}>
-            {autoAdvance
-              ? t('routine.fieldAutoAdvanceOn', { defaultValue: '자동 진행' })
-              : t('routine.fieldAutoAdvanceOff', { defaultValue: '확인 후 진행' })}
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionLabel}>
+              {t('routine.fieldAutoAdvance', { defaultValue: '자동 진행' })}
+            </Text>
+            <Text style={styles.switchHint}>
+              {autoAdvance
+                ? t('routine.autoAdvanceHintOn', { defaultValue: '미션 시간 종료 후 다음 미션 자동 시작' })
+                : t('routine.autoAdvanceHintOff', { defaultValue: '미션마다 알람 후 사용자 확인' })}
+            </Text>
+          </View>
           <Switch value={autoAdvance} onValueChange={setAutoAdvance} />
         </View>
 
@@ -390,10 +395,12 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
                   {t('routine.restLabel', { defaultValue: '휴식' })}
                 </Text>
               </TouchableOpacity>
-              {/* 미션 풀 */}
+              {/* 미션 풀 — F11: missionRow와 동일한 wrap 스타일 */}
               {MISSION_POOL.map((key) => (
                 <TouchableOpacity key={key} style={styles.pickerRow} onPress={() => pickMission(key)}>
-                  <Image source={MISSION_EMOJI[key]} style={styles.pickerRowEmoji} resizeMode="contain" />
+                  <View style={styles.missionIconWrap}>
+                    <Image source={MISSION_EMOJI[key]} style={styles.missionEmoji} resizeMode="contain" />
+                  </View>
                   <Text style={styles.pickerRowText}>{MISSION_LABEL[key] ?? key}</Text>
                 </TouchableOpacity>
               ))}
@@ -538,6 +545,14 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingRight: 16,
+  },
+  switchHint: {
+    fontSize: 12,
+    color: colors.secondary,
+    opacity: 0.8,
+    marginHorizontal: 16,
+    marginTop: -6,
+    marginBottom: 8,
   },
   daysRow: {
     flexDirection: 'row',

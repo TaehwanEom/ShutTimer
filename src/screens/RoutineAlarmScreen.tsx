@@ -1,8 +1,6 @@
-// v1.6: 루틴 "확인 후 진행" 모드의 알람 화면.
-// - 탭 또는 흔들기로 dismiss (스캔 미션 제외)
-// - dismiss 후 "다음 미션 시작" 버튼 표시 → 탭 → RoutineRun 복귀하여 다음 미션 진행
-// - 사운드/진동 (AlarmScreen 패턴 단순화)
-// - 24시간 데드라인 도달 시 자동 중단
+// v1.6 리팩토링: 상태 전환은 routineController 위임.
+// 이 스크린은 사운드/진동 + tap/shake dismiss UI + 사용자 "다음 미션" 버튼만 담당.
+// 배경 알림으로 직접 진입한 경우 controller.completeCurrentMission()으로 세션 기록 등 자동 처리.
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -14,7 +12,6 @@ import {
   Vibration,
   AppState,
   BackHandler,
-  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,9 +28,12 @@ import {
   ActiveRoutine,
   loadRoutines,
   loadActiveRoutine,
-  saveActiveRoutine,
-  clearActiveRoutine,
 } from '../constants/routines';
+import {
+  completeCurrentMission,
+  confirmAndAdvance,
+  stopRoutine,
+} from '../utils/routineController';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { MISSION_LABEL } from '../constants/missionIcons';
 import { SETTINGS_KEY } from '../constants/settings';
@@ -44,7 +44,6 @@ type Props = {
 };
 
 const REST_KEY = 'rest';
-const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
 const SHAKE_THRESHOLD = 2.5;
 const SHAKE_COOLDOWN_MS = 400;
 const SHAKE_COUNT_REQUIRED = 2;
@@ -63,29 +62,39 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const lastShakeTimeRef = useRef(0);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
 
-  // ─── 마운트: 루틴 + ActiveRoutine 로드 + 사운드/진동 시작 ────
+  // ─── 마운트: 배경 경로 여부 감지하여 세션 기록 보완 ────
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
       const list = await loadRoutines();
       const target = list.find(r => r.id === route.params.routineId);
-      const existing = await loadActiveRoutine();
+      let existing = await loadActiveRoutine();
       if (!target || !existing || cancelled) {
         navigation.goBack();
         return;
       }
+
+      // 배경 알림으로 직접 진입한 경로면 awaitingConfirm=false 상태.
+      // controller.completeCurrentMission()이 세션 기록 + awaitingConfirm=true 저장.
+      if (!existing.awaitingConfirm) {
+        const res = await completeCurrentMission();
+        if (res && res.kind === 'end') {
+          // 이론상 autoAdvance=false + 모든 미션 종료 → confirmAndAdvance에서 end 처리하지만
+          // 안전장치로 여기서도 Home 복귀
+          navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          return;
+        }
+        existing = await loadActiveRoutine();
+        if (!existing) {
+          navigation.goBack();
+          return;
+        }
+      }
+
       setRoutine(target);
       setAr(existing);
 
-      // 24시간 데드라인 체크
-      if (Date.now() > existing.deadlineAt) {
-        await clearActiveRoutine();
-        await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-        return;
-      }
-
-      // 사운드 재생
+      // 사운드/진동 시작
       const [soundId, alarmRaw, vibRaw] = await Promise.all([
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
@@ -114,7 +123,6 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
           .catch(() => {});
       }
 
-      // 진동
       if (vibrationEnabled) {
         Vibration.vibrate();
         vibrationIntervalRef.current = setInterval(() => Vibration.vibrate(), 1000);
@@ -136,7 +144,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── 흔들기 감지 (dismissMethod === 'shake'일 때만) ─────
+  // ─── 흔들기 감지 ─────────────────────────────────────────
   useEffect(() => {
     if (!routine || dismissed || routine.dismissMethod !== 'shake') return;
     shakeCountRef.current = 0;
@@ -163,27 +171,53 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
 
   // ─── 뒤로가기 차단 ───────────────────────────────────────
   useEffect(() => {
-    const handler = () => true; // 기본 뒤로가기 차단 (사용자 응답 대기)
+    const handler = () => true;
     const sub = BackHandler.addEventListener('hardwareBackPress', handler);
     return () => sub.remove();
   }, []);
 
-  // ─── AppState 복귀 시 24시간 데드라인 재체크 ────────────
+  // ─── AppState 복귀: 24시간 데드라인 재체크 + Audio/Vibration 재시작 ────
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state !== 'active' || !ar) return;
       if (Date.now() > ar.deadlineAt) {
-        await clearActiveRoutine();
-        await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
+        await stopRoutine();
         stopAudio();
         stopVibe();
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+        return;
+      }
+      if (dismissed || !routine) return;
+
+      // 진동 재시작
+      const vibRaw = await AsyncStorage.getItem(SETTINGS_KEY.VIBRATION_ENABLED);
+      const vibrationEnabled = vibRaw !== 'false';
+      if (vibrationEnabled) {
+        if (vibrationIntervalRef.current) clearInterval(vibrationIntervalRef.current);
+        Vibration.vibrate();
+        vibrationIntervalRef.current = setInterval(() => Vibration.vibrate(), 1000);
+      }
+
+      // Audio 재시작
+      const s = soundRef.current;
+      if (s) {
+        s.getStatusAsync().then((status: any) => {
+          if (status?.isLoaded && !status.isPlaying) {
+            Audio.setAudioModeAsync({
+              playsInSilentModeIOS: true,
+              staysActiveInBackground: true,
+              interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+            })
+              .then(() => s.playAsync())
+              .catch(() => {});
+          }
+        }).catch(() => {});
       }
     });
     return () => sub.remove();
-  }, [ar, navigation]);
+  }, [ar, navigation, dismissed, routine]);
 
-  // ─── dismiss: 사운드/진동 정지 → 다음 미션 버튼 노출 ────
+  // ─── dismiss: 사운드/진동 정지 ───────────────────────────
   const handleDismiss = useCallback(() => {
     if (dismissed) return;
     setDismissed(true);
@@ -191,47 +225,28 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     stopVibe();
   }, [dismissed]);
 
-  // ─── "다음 미션 시작" → RoutineRun 복귀 ────────────────
+  // ─── "다음 미션 시작" → controller.confirmAndAdvance ──
   const handleStartNext = useCallback(async () => {
-    if (!routine || !ar) return;
-
-    let nextIdx = ar.currentStepIndex + 1;
-    let nextLoop = ar.currentLoop;
-    if (nextIdx >= routine.missions.length) {
-      nextLoop += 1;
-      nextIdx = 0;
-    }
-
-    // 전체 루틴 종료
-    if (nextLoop > routine.loopCount) {
-      await clearActiveRoutine();
-      await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
+    const res = await confirmAndAdvance();
+    if (!res) {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       return;
     }
-
-    // 다음 미션 준비
-    const step = routine.missions[nextIdx];
-    const now = Date.now();
-    const nextAr: ActiveRoutine = {
-      ...ar,
-      currentStepIndex: nextIdx,
-      currentLoop: nextLoop,
-      stepEndAt: now + step.durationMinutes * 60 * 1000,
-      pausedAt: null,
-      awaitingConfirm: false,
-    };
-    await saveActiveRoutine(nextAr);
+    if (res.kind === 'end') {
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      return;
+    }
+    // advance_auto (확인 후 진행도 다음 미션 준비는 auto와 동일한 구조)
     navigation.reset({
       index: 1,
       routes: [
         { name: 'Home' },
-        { name: 'RoutineRun', params: { routineId: routine.id } },
+        { name: 'RoutineRun', params: { routineId: res.routine.id } },
       ],
     });
-  }, [routine, ar, navigation]);
+  }, [navigation]);
 
-  // ─── 사운드/진동 정리 헬퍼 ───────────────────────────────
+  // ─── 정리 헬퍼 ───────────────────────────────────────────
   const stopAudio = () => {
     const s = soundRef.current;
     soundRef.current = null;
@@ -252,8 +267,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const handleStop = useCallback(async () => {
     stopAudio();
     stopVibe();
-    await clearActiveRoutine();
-    await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
+    await stopRoutine();
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation]);
 
@@ -275,7 +289,6 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       {!dismissed ? (
-        // dismiss 전: 대형 탭 영역 + 흔들기 안내
         <TouchableOpacity
           style={styles.dismissArea}
           activeOpacity={0.9}
@@ -292,7 +305,6 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
           </Text>
         </TouchableOpacity>
       ) : (
-        // dismiss 후: 다음 미션 안내 + 시작 버튼
         <View style={styles.resultBox}>
           <MaterialIcons name="check-circle" size={72} color={colors.primary} />
           {willEnd ? (

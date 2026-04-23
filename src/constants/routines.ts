@@ -2,6 +2,7 @@
 // 단일 타이머(ACTIVE_TIMER_KEY)와 상호 배타적으로 동작.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
 
 // ─── 타입 ────────────────────────────────────────────────────
 
@@ -158,6 +159,31 @@ export function routineProgress(r: Routine, ar: ActiveRoutine): number {
   const total = r.missions.length * Math.max(1, r.loopCount);
   const done = (ar.currentLoop - 1) * r.missions.length + ar.currentStepIndex;
   return Math.min(1, Math.max(0, done / Math.max(1, total)));
+}
+
+/**
+ * 미션 단위 세션 기록. 휴식은 기록 제외.
+ * RoutineRun(포그라운드) + RoutineAlarm(배경 알림 경로) 둘 다 호출.
+ * 중복 방지는 호출자 측 awaitingConfirm 플래그로 제어.
+ */
+export async function recordMissionSession(r: Routine, stepIdx: number): Promise<void> {
+  const step = r.missions[stepIdx];
+  if (!step || step.missionKey === 'rest') return;
+  try {
+    const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
+    const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    list.push({
+      id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      date,
+      icon: step.missionKey,
+      minutes: step.durationMinutes,
+    });
+    await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // 세션 저장 실패 무시 (기능 흐름 유지)
+  }
 }
 
 /**

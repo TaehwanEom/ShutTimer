@@ -940,8 +940,6 @@ export default function AlarmScreen({ navigation }: Props) {
             permissionButtonTextStyle={styles.permissionButtonText}
           />
         </View>
-
-        <AdBanner />
       </SafeAreaView>
     );
   }

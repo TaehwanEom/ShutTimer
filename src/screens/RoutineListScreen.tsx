@@ -1,9 +1,7 @@
-// @ts-nocheck — Phase 1+2 임시. Phase 3 RoutineListScreen 재작성 시 제거 필수.
-// v1.6: 루틴 목록 화면.
-// 카드 탭 → 즉시 실행 (RoutineRun). 길게 탭 → 편집/삭제 액션시트.
-// 우측 상단 + 버튼 → 신규 추가 (RoutineEdit).
+// v1.6 Phase 3: 루틴 목록 화면 재작성.
+// 카테고리별 섹션 그룹핑 + 카드 UI + 진행 중 배너 + PanResponder 스와이프 삭제 + 섹션별 편집 모드.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +10,9 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  Switch,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -22,11 +23,24 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import {
   Routine,
+  ActiveRoutine,
   loadRoutines,
   deleteRoutine,
-  totalRoutineMinutes,
+  upsertRoutine,
+  loadActiveRoutine,
 } from '../constants/routines';
-import { cancelRoutinePrealerts, loadScheduleStatus, ScheduleStatus } from '../utils/routineScheduler';
+import {
+  cancelRoutinePrealerts,
+  scheduleRoutinePrealerts,
+  loadScheduleStatus,
+  ScheduleStatus,
+} from '../utils/routineScheduler';
+import {
+  startRoutine,
+  pauseRoutine,
+  resumeRoutine,
+  stopRoutine,
+} from '../utils/routineController';
 import AdBanner from '../components/AdBanner';
 
 type Props = {
@@ -34,6 +48,340 @@ type Props = {
 };
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const SWIPE_THRESHOLD = 80;
+const SWIPE_MAX = 96;
+const EDIT_SLIDE_WIDTH = 56;
+
+// ─── 요일 압축 표시 ──────────────────────────────────────────
+
+function daysLabel(days: number[], t: (k: string, o?: any) => string): 'weekday' | 'weekend' | 'everyday' | number[] {
+  if (days.length === 0 || days.length === 7) return 'everyday';
+  const sorted = [...days].sort();
+  const weekday = [1, 2, 3, 4, 5];
+  const weekend = [0, 6];
+  const eq = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+  if (eq(sorted, weekday)) return 'weekday';
+  if (eq(sorted, weekend)) return 'weekend';
+  return sorted;
+}
+
+// ─── 시간 포맷: 24h → "오전/오후 H:MM" ──────────────────────
+
+function formatTimeKr(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return hhmm;
+  const ampm = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+}
+
+// ─── 카테고리 그룹핑 + 정렬 ─────────────────────────────────
+
+function groupByCategory(routines: Routine[], t: (k: string) => string): Array<{ category: string; items: Routine[] }> {
+  const map = new Map<string, Routine[]>();
+  for (const r of routines) {
+    const key = r.category || t('routine.uncategorized');
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(r);
+  }
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+  return Array.from(map.entries())
+    .sort((a, b) => collator.compare(a[0], b[0]))
+    .map(([category, items]) => ({ category, items }));
+}
+
+// ─── 진행 중 배너 ────────────────────────────────────────────
+
+type BannerProps = {
+  routine: Routine;
+  ar: ActiveRoutine;
+  colors: ThemeColors;
+  onPress: () => void;
+  onToggle: () => void;
+  onStop: () => void;
+};
+
+function ProgressBanner({ routine, ar, colors, onPress, onToggle, onStop }: BannerProps) {
+  const { t } = useTranslation();
+  const step = routine.steps[ar.currentStepIndex];
+  const [remainingSec, setRemainingSec] = useState(() => Math.max(0, Math.floor((ar.stepEndAt - Date.now()) / 1000)));
+
+  useEffect(() => {
+    if (ar.pausedAt !== null) {
+      setRemainingSec(Math.max(0, Math.floor((ar.stepEndAt - ar.pausedAt) / 1000)));
+      return;
+    }
+    const tick = () => setRemainingSec(Math.max(0, Math.floor((ar.stepEndAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [ar.stepEndAt, ar.pausedAt]);
+
+  const mm = Math.floor(remainingSec / 60);
+  const ss = remainingSec % 60;
+  const isPaused = ar.pausedAt !== null;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={{
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 12,
+        padding: 14,
+        borderRadius: 14,
+        backgroundColor: colors.primary,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.onPrimary, opacity: 0.85 }}>
+            {t('routine.bannerInProgress')} — {routine.name}
+          </Text>
+          <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '800', color: colors.onPrimary }} numberOfLines={1}>
+            {step?.name ?? ''} ({ar.currentStepIndex + 1}/{routine.steps.length}) · {t('routine.bannerRemaining')} {String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onToggle}
+          onLongPress={onStop}
+          delayLongPress={500}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: colors.onPrimary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <MaterialIcons
+            name={isPaused ? 'play-arrow' : 'pause'}
+            size={22}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── 루틴 카드 (PanResponder 스와이프 삭제 + 편집 모드 슬라이드) ─
+
+type CardProps = {
+  routine: Routine;
+  colors: ThemeColors;
+  isEditMode: boolean;
+  onPlayTap: () => void;
+  onPlayLongPress: () => void;
+  onToggleActive: (value: boolean) => void;
+  onDelete: () => void;
+  onEditPencil: () => void;
+};
+
+function RoutineCard({ routine, colors, isEditMode, onPlayTap, onPlayLongPress, onToggleActive, onDelete, onEditPencil }: CardProps) {
+  const { t } = useTranslation();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const swipeOffsetRef = useRef(0);
+  const editAnim = useRef(new Animated.Value(0)).current;
+
+  // 편집 모드 진입/해제 애니메이션 (좌→우 슬라이드로 편집 아이콘 노출)
+  useEffect(() => {
+    Animated.spring(editAnim, {
+      toValue: isEditMode ? 1 : 0,
+      useNativeDriver: true,
+      bounciness: 4,
+      speed: 14,
+    }).start();
+  }, [isEditMode, editAnim]);
+
+  // 편집 모드 중엔 스와이프 비활성
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, g) =>
+          !isEditMode && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+        onPanResponderGrant: () => {
+          translateX.stopAnimation();
+        },
+        onPanResponderMove: (_, g) => {
+          // 우→좌 스와이프만 허용 (음수). 상한 -SWIPE_MAX
+          const next = Math.max(-SWIPE_MAX, Math.min(0, g.dx));
+          translateX.setValue(next);
+          swipeOffsetRef.current = next;
+        },
+        onPanResponderRelease: (_, g) => {
+          if (-g.dx >= SWIPE_THRESHOLD) {
+            // 삭제 확인
+            Animated.spring(translateX, { toValue: -SWIPE_MAX, useNativeDriver: true, bounciness: 0 }).start();
+            Alert.alert(
+              t('routine.deleteConfirmTitle'),
+              t('routine.deleteConfirmBody'),
+              [
+                {
+                  text: t('common.cancel'),
+                  style: 'cancel',
+                  onPress: () => {
+                    Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+                  },
+                },
+                {
+                  text: t('routine.actionDelete'),
+                  style: 'destructive',
+                  onPress: () => {
+                    Animated.timing(translateX, { toValue: -500, duration: 220, useNativeDriver: true }).start(onDelete);
+                  },
+                },
+              ],
+              { cancelable: true, onDismiss: () => Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start() }
+            );
+          } else {
+            Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          }
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+        },
+      }),
+    [isEditMode, translateX, t, onDelete]
+  );
+
+  const editSlide = editAnim.interpolate({ inputRange: [0, 1], outputRange: [0, EDIT_SLIDE_WIDTH] });
+  const editIconOpacity = editAnim;
+
+  const firstStep = routine.steps[0];
+  const timeStr = firstStep ? formatTimeKr(firstStep.startTime) : '--:--';
+  const label = daysLabel(routine.schedule?.days ?? [], t);
+
+  return (
+    <View style={{ position: 'relative', marginHorizontal: 16, marginBottom: 10 }}>
+      {/* 삭제 아이콘 (뒤에 깔림, 스와이프 시 노출) */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: SWIPE_MAX,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.error,
+          borderRadius: 14,
+        }}
+      >
+        <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+      </View>
+
+      {/* 편집 연필 아이콘 (왼쪽, 편집 모드 진입 시 노출) */}
+      <Animated.View
+        pointerEvents={isEditMode ? 'auto' : 'none'}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: EDIT_SLIDE_WIDTH,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: editIconOpacity,
+        }}
+      >
+        <TouchableOpacity onPress={onEditPencil} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <MaterialIcons name="edit" size={22} color={colors.primary} />
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* 카드 본체 (스와이프 + 편집 슬라이드) */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          transform: [{ translateX: Animated.add(translateX, editSlide) }],
+          backgroundColor: colors.surfaceContainerLow,
+          borderRadius: 14,
+          padding: 14,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Text style={{ flex: 1, fontSize: 17, fontWeight: '800', color: colors.onBackground }}>{timeStr}</Text>
+
+          {/* 플레이 버튼: 탭=실행, 길게=정지 */}
+          <TouchableOpacity
+            onPress={onPlayTap}
+            onLongPress={onPlayLongPress}
+            delayLongPress={500}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.surfaceContainerLowest,
+            }}
+          >
+            <MaterialIcons name="play-arrow" size={22} color={colors.onBackground} />
+          </TouchableOpacity>
+
+          <Switch
+            value={routine.active}
+            onValueChange={onToggleActive}
+            trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+            thumbColor={colors.onPrimary}
+            style={{ transform: [{ scale: 0.8 }] }}
+          />
+        </View>
+
+        <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ fontSize: 13, color: colors.onBackground, fontWeight: '700' }}>{routine.name}</Text>
+          <View style={{ width: 8 }} />
+          <DaysRow label={label} colors={colors} />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+function DaysRow({ label, colors }: { label: ReturnType<typeof daysLabel>; colors: ThemeColors }) {
+  const { t } = useTranslation();
+  if (label === 'everyday') {
+    return <Text style={{ fontSize: 12, color: colors.secondary }}>{t('routine.daysEveryday')}</Text>;
+  }
+  if (label === 'weekday') {
+    return <Text style={{ fontSize: 12, color: colors.secondary }}>{t('routine.daysWeekday')}</Text>;
+  }
+  if (label === 'weekend') {
+    return <Text style={{ fontSize: 12, color: colors.secondary }}>{t('routine.daysWeekend')}</Text>;
+  }
+  // 개별 요일 나열
+  return (
+    <View style={{ flexDirection: 'row', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+      {[0, 1, 2, 3, 4, 5, 6].map(d => {
+        const active = label.includes(d);
+        return (
+          <Text
+            key={d}
+            style={{
+              fontSize: 12,
+              fontWeight: active ? '700' : '500',
+              color: active ? colors.onBackground : colors.secondary,
+              opacity: active ? 1 : 0.5,
+            }}
+          >
+            {t(`routine.weekday.${WEEKDAY_KEYS[d]}`)}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── 메인 스크린 ─────────────────────────────────────────────
 
 export default function RoutineListScreen({ navigation }: Props) {
   const { colors } = useTheme();
@@ -41,62 +389,144 @@ export default function RoutineListScreen({ navigation }: Props) {
   const styles = makeStyles(colors);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
+  const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
+  const [activeRoutineObj, setActiveRoutineObj] = useState<Routine | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+
+  const refreshAll = useCallback(async () => {
+    const list = await loadRoutines();
+    setRoutines(list);
+    const status = await loadScheduleStatus();
+    setScheduleStatus(status);
+    const ar = await loadActiveRoutine();
+    setActiveRoutine(ar);
+    if (ar) {
+      setActiveRoutineObj(list.find(r => r.id === ar.routineId) ?? null);
+    } else {
+      setActiveRoutineObj(null);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadRoutines().then(setRoutines);
-      loadScheduleStatus().then(setScheduleStatus);
-    }, [])
+      refreshAll();
+    }, [refreshAll])
   );
 
-  const handleRun = (routine: Routine) => {
+  // 진행 중 배너 표시 상태일 때만 1초 폴링 (ActiveRoutine 변동 감지)
+  useEffect(() => {
+    if (!activeRoutine) return;
+    const id = setInterval(async () => {
+      const ar = await loadActiveRoutine();
+      setActiveRoutine(ar);
+      if (!ar) setActiveRoutineObj(null);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [activeRoutine?.routineId]);
+
+  const grouped = useMemo(() => groupByCategory(routines, t), [routines, t]);
+
+  const handlePlay = async (routine: Routine) => {
+    const result = await startRoutine(routine.id);
+    if (result.kind === 'not_found') return;
+    if (result.kind === 'needs_timer_override') {
+      Alert.alert(
+        t('routine.timerConflictTitle'),
+        t('routine.timerConflictBody'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('routine.timerConflictProceed'),
+            onPress: async () => {
+              await startRoutine(routine.id, { overrideTimer: true });
+              await refreshAll();
+              navigation.navigate('RoutineRun', { routineId: routine.id });
+            },
+          },
+        ]
+      );
+      return;
+    }
+    if (result.kind === 'needs_override') {
+      Alert.alert(
+        t('routine.stopConfirmTitle'),
+        t('routine.stopConfirmBody'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('routine.stopConfirm'),
+            style: 'destructive',
+            onPress: async () => {
+              await startRoutine(routine.id, { overrideActive: true });
+              await refreshAll();
+              navigation.navigate('RoutineRun', { routineId: routine.id });
+            },
+          },
+        ]
+      );
+      return;
+    }
+    await refreshAll();
     navigation.navigate('RoutineRun', { routineId: routine.id });
   };
 
-  const handleLongPress = (routine: Routine) => {
+  const handleStop = () => {
     Alert.alert(
-      routine.name,
-      '',
+      t('routine.stopConfirmTitle'),
+      t('routine.stopConfirmBody'),
       [
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('routine.actionEdit', { defaultValue: '편집' }),
-          onPress: () => navigation.navigate('RoutineEdit', { routineId: routine.id }),
-        },
-        {
-          text: t('routine.actionDelete', { defaultValue: '삭제' }),
-          style: 'destructive',
-          onPress: () => confirmDelete(routine),
-        },
-        { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel' },
-      ],
-      { cancelable: true }
-    );
-  };
-
-  const confirmDelete = (routine: Routine) => {
-    Alert.alert(
-      t('routine.deleteConfirmTitle', { defaultValue: '루틴 삭제' }),
-      t('routine.deleteConfirmBody', { defaultValue: '이 루틴을 삭제하시겠어요?' }),
-      [
-        { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel' },
-        {
-          text: t('routine.actionDelete', { defaultValue: '삭제' }),
+          text: t('routine.stopConfirm'),
           style: 'destructive',
           onPress: async () => {
-            await cancelRoutinePrealerts(routine.id);
-            const next = await deleteRoutine(routine.id);
-            setRoutines(next);
+            await stopRoutine();
+            await refreshAll();
           },
         },
       ]
     );
   };
 
-  const formatDays = (days: number[]): string => {
-    if (days.length === 0 || days.length === 7) {
-      return t('routine.daysEveryday', { defaultValue: '매일' });
+  const handleBannerToggle = async () => {
+    if (!activeRoutine) return;
+    if (activeRoutine.pausedAt !== null) {
+      await resumeRoutine();
+    } else {
+      await pauseRoutine();
     }
-    return days.map(d => t(`routine.weekday.${WEEKDAY_KEYS[d]}`, { defaultValue: WEEKDAY_KEYS[d] })).join(', ');
+    await refreshAll();
+  };
+
+  const handleBannerPress = () => {
+    if (!activeRoutine) return;
+    navigation.navigate('RoutineRun', { routineId: activeRoutine.routineId });
+  };
+
+  const handleToggleActive = async (routine: Routine, value: boolean) => {
+    const updated: Routine = { ...routine, active: value };
+    await upsertRoutine(updated);
+    if (value && updated.schedule) {
+      await scheduleRoutinePrealerts(updated);
+    } else {
+      await cancelRoutinePrealerts(routine.id);
+    }
+    await refreshAll();
+  };
+
+  const handleDelete = async (routine: Routine) => {
+    await cancelRoutinePrealerts(routine.id);
+    await deleteRoutine(routine.id);
+    await refreshAll();
+  };
+
+  const handleEditPencil = (routine: Routine) => {
+    setEditingCategory(null);
+    navigation.navigate('RoutineEdit', { routineId: routine.id });
+  };
+
+  const toggleSectionEdit = (category: string) => {
+    setEditingCategory(prev => (prev === category ? null : category));
   };
 
   return (
@@ -105,7 +535,7 @@ export default function RoutineListScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
           <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('routine.listTitle', { defaultValue: '루틴' })}</Text>
+        <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => navigation.navigate('RoutineEdit', {})}
@@ -115,19 +545,28 @@ export default function RoutineListScreen({ navigation }: Props) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Phase 2: 한계 초과 배너 */}
+        {/* 진행 중 배너 */}
+        {activeRoutine && activeRoutineObj && (
+          <ProgressBanner
+            routine={activeRoutineObj}
+            ar={activeRoutine}
+            colors={colors}
+            onPress={handleBannerPress}
+            onToggle={handleBannerToggle}
+            onStop={handleStop}
+          />
+        )}
+
+        {/* 한계 초과 배너 */}
         {scheduleStatus?.overflow && (
           <View style={styles.warningBanner}>
             <MaterialIcons name="warning-amber" size={20} color={colors.error} />
             <View style={{ flex: 1 }}>
               <Text style={styles.warningTitle}>
-                {t('routine.scheduleOverflowTitle', { defaultValue: '일부 루틴 알림 예약 실패' })}
+                {t('routine.scheduleOverflowTitle')}
               </Text>
               <Text style={styles.warningBody}>
-                {t('routine.scheduleOverflowBody', {
-                  defaultValue: `${scheduleStatus.skippedRoutineIds.length}개 루틴이 시스템 한계로 예약되지 않았습니다. 사용하지 않는 루틴을 삭제하세요.`,
-                  count: scheduleStatus.skippedRoutineIds.length,
-                })}
+                {t('routine.scheduleOverflowBody', { count: scheduleStatus.skippedRoutineIds.length })}
               </Text>
             </View>
           </View>
@@ -136,40 +575,37 @@ export default function RoutineListScreen({ navigation }: Props) {
         {routines.length === 0 ? (
           <View style={styles.emptyBox}>
             <MaterialIcons name="playlist-add" size={48} color={colors.secondary} />
-            <Text style={styles.emptyText}>
-              {t('routine.emptyTitle', { defaultValue: '등록된 루틴이 없습니다' })}
-            </Text>
-            <Text style={styles.emptyHint}>
-              {t('routine.emptyHint', { defaultValue: '우측 상단 + 버튼으로 추가하세요' })}
-            </Text>
+            <Text style={styles.emptyText}>{t('routine.emptyTitle')}</Text>
+            <Text style={styles.emptyHint}>{t('routine.emptyHint')}</Text>
           </View>
         ) : (
-          routines.map((r) => (
-            <TouchableOpacity
-              key={r.id}
-              style={styles.card}
-              onPress={() => handleRun(r)}
-              onLongPress={() => handleLongPress(r)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHead}>
-                <Text style={styles.cardName} numberOfLines={1}>{r.name}</Text>
-                {r.loopCount > 1 && (
-                  <View style={styles.loopBadge}>
-                    <MaterialIcons name="loop" size={14} color={colors.onPrimary} />
-                    <Text style={styles.loopBadgeText}>{r.loopCount}</Text>
-                  </View>
-                )}
+          grouped.map(({ category, items }) => (
+            <View key={category} style={{ marginTop: 16 }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{category}</Text>
+                <TouchableOpacity
+                  onPress={() => toggleSectionEdit(category)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.sectionEditBtn}>
+                    {editingCategory === category ? t('routine.sectionDone') : t('routine.actionEdit')}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.cardMeta}>
-                {r.missions.length} {t('routine.missionsUnit', { defaultValue: '미션' })} · {totalRoutineMinutes(r)} {t('routine.minutesUnit', { defaultValue: '분' })}
-              </Text>
-              {r.schedule && (
-                <Text style={styles.cardSchedule}>
-                  {r.schedule.time} · {formatDays(r.schedule.days)}
-                </Text>
-              )}
-            </TouchableOpacity>
+              {items.map(r => (
+                <RoutineCard
+                  key={r.id}
+                  routine={r}
+                  colors={colors}
+                  isEditMode={editingCategory === category}
+                  onPlayTap={() => handlePlay(r)}
+                  onPlayLongPress={handleStop}
+                  onToggleActive={value => handleToggleActive(r, value)}
+                  onDelete={() => handleDelete(r)}
+                  onEditPencil={() => handleEditPencil(r)}
+                />
+              ))}
+            </View>
           ))
         )}
         <View style={{ height: 24 }} />
@@ -217,48 +653,23 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.secondary,
     opacity: 0.8,
   },
-  card: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  cardHead: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  cardName: {
-    flex: 1,
-    fontSize: 16,
+  sectionTitle: {
+    fontSize: 13,
     fontWeight: '800',
     color: colors.onBackground,
+    letterSpacing: -0.3,
   },
-  loopBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: colors.primary,
-  },
-  loopBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.onPrimary,
-  },
-  cardMeta: {
-    marginTop: 6,
+  sectionEditBtn: {
     fontSize: 13,
-    color: colors.secondary,
-  },
-  cardSchedule: {
-    marginTop: 4,
-    fontSize: 13,
-    color: colors.primary,
     fontWeight: '700',
+    color: colors.primary,
   },
   warningBanner: {
     marginHorizontal: 16,

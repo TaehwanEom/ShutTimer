@@ -269,6 +269,12 @@
     "missionsUnit": "미션",
     "minutesUnit": "분",
     "daysEveryday": "매일",
+    "daysWeekday": "주중",
+    "daysWeekend": "주말",
+    "sectionDone": "완료",
+    "bannerInProgress": "진행 중",
+    "bannerRemaining": "남은",
+    "uncategorized": "미분류",
     "weekday": {
       "sun": "일",
       "mon": "월",

@@ -4,6 +4,7 @@ import React, { useRef, useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -393,23 +394,25 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        {/*
-          ═══════════════════════════════════════════════════════════
-           @preserve IAP (PurchaseProvider 래퍼) — Phase 2+ 재활성화용
-           보존 결정일: 2026-04-14
-           비활성화 사유: 사업자등록 전까지 IAP 보류 (B안)
-           재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
-           ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
+        <SafeAreaProvider>
+          {/*
+            ═══════════════════════════════════════════════════════════
+             @preserve IAP (PurchaseProvider 래퍼) — Phase 2+ 재활성화용
+             보존 결정일: 2026-04-14
+             비활성화 사유: 사업자등록 전까지 IAP 보류 (B안)
+             재활성화 조건: 사업자등록 + ASC Paid Apps Agreement 활성화
+             ⚠️ 이 블록 삭제 금지. 주석 해제만으로 복원 가능해야 함.
 
-           @preserve-original:
-           <PurchaseProvider>
-             <ForceUpdate />
-             <AppNavigator />
-           </PurchaseProvider>
-          ═══════════════════════════════════════════════════════════
-        */}
-        <ForceUpdate />
-        <AppNavigator />
+             @preserve-original:
+             <PurchaseProvider>
+               <ForceUpdate />
+               <AppNavigator />
+             </PurchaseProvider>
+            ═══════════════════════════════════════════════════════════
+          */}
+          <ForceUpdate />
+          <AppNavigator />
+        </SafeAreaProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

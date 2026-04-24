@@ -302,6 +302,11 @@ export default function AlarmScreen({ navigation }: Props) {
     await stopAudioAndVibration();
     pendingResultRef.current = result;
     afterAdActionRef.current = dismissMethod === 'camera' ? 'result' : 'home';
+    // @v1.0.1 — 카메라 모드: 광고 show 전에 resultState 미리 세팅.
+    // 광고 오버레이 뒤에서 카메라가 unmount되어, 광고 닫힐 때 카메라가 순간 보이는 현상 방지.
+    if (dismissMethod === 'camera') {
+      setResultState(result);
+    }
     if (adLoadedRef.current && interstitial) {
       interstitial.show().catch(handleAfterAd);
     } else {

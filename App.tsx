@@ -77,6 +77,9 @@ import RoutineListScreen from './src/screens/RoutineListScreen';
 import RoutineEditScreen from './src/screens/RoutineEditScreen';
 import RoutineRunScreen from './src/screens/RoutineRunScreen';
 import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
+import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
+import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
+import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState } from './src/utils/routineController';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
@@ -105,9 +108,18 @@ export type RootStackParamList = {
   MissionSelect: undefined;
   // @v1.6 루틴 기능
   RoutineList: undefined;
-  RoutineEdit: { routineId?: string } | undefined;
+  RoutineEdit: {
+    routineId?: string;
+    // Phase 4: 하위 화면에서 merge:true 로 반환되는 값들 (useEffect로 소비 후 undefined 세팅)
+    selectedCategory?: string;
+    selectedDays?: number[];
+    selectedSound?: string;
+  } | undefined;
   RoutineRun: { routineId: string };
   RoutineAlarm: { routineId: string };
+  RoutineCategory: { current?: string } | undefined;
+  RoutineDays: { current?: number[] } | undefined;
+  RoutineSound: { current?: string } | undefined;
   // @v1.5-poc — 영구 유지. __DEV__ 가드로 production 빌드 런타임에서 접근 차단.
   PoCPhotoValidation: undefined;
 };
@@ -364,6 +376,9 @@ function AppNavigator() {
         <Stack.Screen name="RoutineEdit" component={RoutineEditScreen} />
         <Stack.Screen name="RoutineRun" component={RoutineRunScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="RoutineAlarm" component={RoutineAlarmScreen} options={{ gestureEnabled: false }} />
+        <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />
+        <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
+        <Stack.Screen name="RoutineSound" component={RoutineSoundScreen} />
         {/* @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 프로덕션 빌드에서 자동 제외. 삭제 금지. */}
         {__DEV__ && (
           <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />

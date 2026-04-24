@@ -236,7 +236,8 @@
           "enableCoreMLDelegate": true
         }
       ],
-      "./plugins/withInfoPlistLocalizations.js"
+      "./plugins/withInfoPlistLocalizations.js",
+      "@react-native-community/datetimepicker"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

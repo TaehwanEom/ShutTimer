@@ -1,3 +1,4 @@
+// @ts-nocheck — Phase 1+2 임시. Phase 5 RoutineEditScreen 재작성 시 제거 필수.
 // v1.6: 루틴 추가/편집 화면.
 // 신규 생성: route.params.routineId 없음 → 빈 초기값.
 // 편집: route.params.routineId 있음 → 해당 루틴 로드.

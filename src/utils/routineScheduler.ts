@@ -59,9 +59,8 @@ type ScheduledRoutineRecord = {
 type RoutineNotifData = {
   type: 'routine_prealert' | 'routine_chain';
   routineId: string;
-  /** 체인 알림 전용 — 다음 미션 index */
+  /** 체인 알림 전용 — 다음 step index */
   nextStepIndex?: number;
-  nextLoop?: number;
   scheduledFor?: number;
 };
 
@@ -116,8 +115,8 @@ function computeAlertTime(time: string): { hour: number; minute: number; dayOffs
  * @returns 예약된 알림 id 배열
  */
 export async function scheduleRoutinePrealerts(routine: Routine): Promise<string[]> {
-  // 예약 없는 수동 루틴 — 스킵
-  if (!routine.schedule) return [];
+  // 예약 없는 수동 루틴 또는 비활성 루틴 — 스킵
+  if (!routine.schedule || !routine.active) return [];
 
   // 기존 예약 정리
   const records = await loadNotifRecords();
@@ -128,7 +127,10 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
     }
   }
 
-  const alertTime = computeAlertTime(routine.schedule.time);
+  // 예약 발화 시각은 steps[0].startTime 기준
+  const firstStep = routine.steps[0];
+  if (!firstStep) return [];
+  const alertTime = computeAlertTime(firstStep.startTime);
   if (!alertTime) return [];
 
   const { days } = routine.schedule;
@@ -195,7 +197,7 @@ export async function cancelRoutinePrealerts(routineId: string): Promise<void> {
  */
 export async function syncRollingSchedule(): Promise<void> {
   const routines = await loadRoutines();
-  const scheduledRoutines = routines.filter(r => r.schedule);
+  const scheduledRoutines = routines.filter(r => r.schedule && r.active);
 
   // 기존 전부 cancel (단순 + 정확)
   const records = await loadNotifRecords();
@@ -261,7 +263,6 @@ export async function loadScheduleStatus(): Promise<ScheduleStatus | null> {
  */
 export async function scheduleRoutineChain(
   routineId: string,
-  nextLoop: number,
   nextStepIndex: number,
   fireAt: Date
 ): Promise<string | null> {
@@ -270,7 +271,6 @@ export async function scheduleRoutineChain(
     const data: RoutineNotifData = {
       type: 'routine_chain',
       routineId,
-      nextLoop,
       nextStepIndex,
       scheduledFor: fireAt.getTime(),
     };

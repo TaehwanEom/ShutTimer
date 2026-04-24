@@ -1,52 +1,57 @@
-// v1.6: 루틴 기능 타입 정의 + AsyncStorage 키 + CRUD 헬퍼.
+// v1.6 Phase 1: 루틴 데이터 모델 재정의 (steps 기반).
 // 단일 타이머(ACTIVE_TIMER_KEY)와 상호 배타적으로 동작.
+// v1.6 미출시로 기존 shuttimer_routines (missions 기반) 데이터는 유효성 검증에서 탈락 → 자동 삭제.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
 
 // ─── 타입 ────────────────────────────────────────────────────
 
-export type RoutineMission = {
-  /** missionIcons.ts의 MISSION_POOL 키 또는 'rest' 특수 키 (휴식 구간용) */
-  missionKey: string;
-  /** 미션 길이 (분 단위). 초 단위는 × 60 */
-  durationMinutes: number;
+export type RoutineStep = {
+  id: string;
+  name: string;
+  /** "HH:MM" 24h 포맷 */
+  startTime: string;
+  /** "HH:MM" 24h 포맷. startTime 보다 뒤 (자정 넘김 허용) */
+  endTime: string;
+  /** MISSION_POOL 키 또는 이모지/아이콘 식별자. 선택적. */
+  icon?: string;
 };
 
 export type RoutineSchedule = {
   /** 실행 요일. 0(일)~6(토). 빈 배열 = 매일 */
   days: number[];
-  /** "07:00" 형태 HH:MM */
-  time: string;
 };
 
 export type Routine = {
   id: string;
   name: string;
-  missions: RoutineMission[];
-  /** 전체 루틴 반복 횟수. 1 = 반복 없음, 2+ = N번 반복 */
-  loopCount: number;
-  /** 예약 없는 수동 실행 루틴 허용 — schedule 없으면 예약 알림 미예약 */
+  /** 카테고리 id (운동/공부/약복용 등 Phase 4 확정). 빈 문자열 허용 (미분류) */
+  category: string;
+  steps: RoutineStep[];
+  /** 예약 없는 수동 실행 루틴 허용. schedule 없거나 active=false면 예약 스킵. */
   schedule?: RoutineSchedule;
+  /** 알람 사운드 id (ALARM_SOUNDS.id) */
+  soundKey: string;
+  /** 스케줄 on/off 토글. false면 예약 등록 안 됨. */
+  active: boolean;
   /** true=자동 진행 / false=확인 후 진행 */
   autoAdvance: boolean;
-  /** 마지막 미션 완전 종료 시 알람 dismiss 방식. 루틴 단위. */
-  dismissMethod: 'tap' | 'shake';
   createdAt: number;
 };
 
 export type ActiveRoutine = {
   routineId: string;
-  currentLoop: number;        // 1-based (첫 세트 = 1)
-  currentStepIndex: number;   // 0-based
-  /** 현재 미션 종료 예정 timestamp. Bug 5 endAt 패턴 재활용. */
+  /** 0-based */
+  currentStepIndex: number;
+  /** 현재 step 종료 예정 timestamp. */
   stepEndAt: number;
   /** pause 시점 timestamp. null이면 진행 중. */
   pausedAt: number | null;
   startedAt: number;
-  /** I-1 "계속" 안전망 — 시작 후 24시간 경과 시 자동 중단 기준 */
+  /** 24시간 경과 시 자동 중단 기준 */
   deadlineAt: number;
-  /** 확인 후 진행 모드에서 미션 종료 후 사용자 확인 대기 상태 */
+  /** 확인 후 진행 모드에서 step 종료 후 사용자 확인 대기 상태 */
   awaitingConfirm: boolean;
 };
 
@@ -56,15 +61,30 @@ export const ROUTINES_KEY = 'shuttimer_routines';
 export const ACTIVE_ROUTINE_KEY = 'shuttimer_active_routine';
 export const SCHEDULED_ROUTINE_NOTIFS_KEY = 'shuttimer_routine_notifs';
 
-// 24시간 안전망 (I-1 무응답 "계속" 자동 중단 기준)
 export const ROUTINE_DEADLINE_MS = 24 * 60 * 60 * 1000;
-
-// 시작 5분 전 푸시 알림
 export const ROUTINE_PREALERT_MINUTES = 5;
-
-// iOS 로컬 알림 한계 (앱당 64개). 여유 10개 남기고 54개를 루틴용 상한으로 설정.
-// CALENDAR + repeats 방식으로 루틴당 최대 7개 (요일 수) 예약.
 export const IOS_NOTIFICATION_SAFE_CAP = 54;
+
+// ─── 시간 계산 헬퍼 ──────────────────────────────────────────
+
+/** "HH:MM" → 분 단위 (0~1439). invalid = null */
+export function parseHHMM(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+  return h * 60 + mm;
+}
+
+/** step duration (분). endTime < startTime 이면 자정 넘김으로 간주하여 +1440. */
+export function durationFromStep(step: RoutineStep): number {
+  const s = parseHHMM(step.startTime);
+  const e = parseHHMM(step.endTime);
+  if (s === null || e === null) return 0;
+  const diff = e - s;
+  return diff >= 0 ? diff : diff + 24 * 60;
+}
 
 // ─── CRUD ────────────────────────────────────────────────────
 
@@ -127,17 +147,31 @@ export async function clearActiveRoutine(): Promise<void> {
 }
 
 // ─── 유효성 검증 ─────────────────────────────────────────────
+// Phase 1: v1.6 미출시 → 기존 missions 기반 데이터는 이 검증에서 탈락 (자동 삭제).
+
+function isValidStep(s: any): s is RoutineStep {
+  return (
+    s &&
+    typeof s.id === 'string' &&
+    typeof s.name === 'string' &&
+    typeof s.startTime === 'string' &&
+    typeof s.endTime === 'string' &&
+    parseHHMM(s.startTime) !== null &&
+    parseHHMM(s.endTime) !== null
+  );
+}
 
 function isValidRoutine(r: any): r is Routine {
   return (
     r &&
     typeof r.id === 'string' &&
     typeof r.name === 'string' &&
-    Array.isArray(r.missions) &&
-    r.missions.every((m: any) => typeof m?.missionKey === 'string' && typeof m?.durationMinutes === 'number') &&
-    typeof r.loopCount === 'number' &&
+    typeof r.category === 'string' &&
+    Array.isArray(r.steps) &&
+    r.steps.every(isValidStep) &&
+    typeof r.soundKey === 'string' &&
+    typeof r.active === 'boolean' &&
     typeof r.autoAdvance === 'boolean' &&
-    (r.dismissMethod === 'tap' || r.dismissMethod === 'shake') &&
     typeof r.createdAt === 'number'
   );
 }
@@ -148,27 +182,29 @@ export function createRoutineId(): string {
   return `r_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** 루틴 총 소요시간 (분) — 루프 포함. 휴식 포함. */
+export function createStepId(): string {
+  return `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** 루틴 총 소요시간 (분) — 모든 step duration 합. */
 export function totalRoutineMinutes(r: Routine): number {
-  const perLoop = r.missions.reduce((acc, m) => acc + m.durationMinutes, 0);
-  return perLoop * Math.max(1, r.loopCount);
+  return r.steps.reduce((acc, s) => acc + durationFromStep(s), 0);
 }
 
 /** 진행률 0~1. ActiveRoutine 기반. */
 export function routineProgress(r: Routine, ar: ActiveRoutine): number {
-  const total = r.missions.length * Math.max(1, r.loopCount);
-  const done = (ar.currentLoop - 1) * r.missions.length + ar.currentStepIndex;
-  return Math.min(1, Math.max(0, done / Math.max(1, total)));
+  const total = Math.max(1, r.steps.length);
+  return Math.min(1, Math.max(0, ar.currentStepIndex / total));
 }
 
 /**
- * 미션 단위 세션 기록. 휴식은 기록 제외.
+ * step 단위 세션 기록. step.name 을 icon 필드에 그대로 저장 (B안).
  * RoutineRun(포그라운드) + RoutineAlarm(배경 알림 경로) 둘 다 호출.
  * 중복 방지는 호출자 측 awaitingConfirm 플래그로 제어.
  */
-export async function recordMissionSession(r: Routine, stepIdx: number): Promise<void> {
-  const step = r.missions[stepIdx];
-  if (!step || step.missionKey === 'rest') return;
+export async function recordStepSession(r: Routine, stepIdx: number): Promise<void> {
+  const step = r.steps[stepIdx];
+  if (!step) return;
   try {
     const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
@@ -177,32 +213,32 @@ export async function recordMissionSession(r: Routine, stepIdx: number): Promise
     list.push({
       id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       date,
-      icon: step.missionKey,
-      minutes: step.durationMinutes,
+      icon: step.name,
+      minutes: durationFromStep(step),
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {
-    // 세션 저장 실패 무시 (기능 흐름 유지)
+    // 세션 저장 실패 무시
   }
 }
 
 /**
- * 루틴의 "다음 예약 발화 시각" (시작 5분 전 기준이 아니라 루틴 시작 시각 기준) 계산.
- * schedule 없으면 null.
- * 정렬/우선순위 결정용.
+ * 루틴의 "다음 예약 발화 시각" 계산. 예약 발화 시각은 steps[0].startTime 기준.
+ * active=false 또는 schedule 없으면 null.
  */
 export function nextOccurrenceTime(r: Routine, now: Date = new Date()): number | null {
-  if (!r.schedule) return null;
-  const [hStr, mStr] = r.schedule.time.split(':');
-  const hour = parseInt(hStr, 10);
-  const minute = parseInt(mStr, 10);
-  if (isNaN(hour) || isNaN(minute)) return null;
+  if (!r.active || !r.schedule) return null;
+  const first = r.steps[0];
+  if (!first) return null;
+  const startMin = parseHHMM(first.startTime);
+  if (startMin === null) return null;
+  const hour = Math.floor(startMin / 60);
+  const minute = startMin % 60;
 
   const effectiveDays = r.schedule.days.length === 0
     ? [0, 1, 2, 3, 4, 5, 6]
     : r.schedule.days;
 
-  // 오늘부터 최대 7일 탐색 (주 1회 반복이므로 7일 안에 반드시 있음)
   for (let offset = 0; offset < 8; offset++) {
     const d = new Date(now);
     d.setDate(d.getDate() + offset);

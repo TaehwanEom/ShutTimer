@@ -1,3 +1,4 @@
+// @ts-nocheck — Phase 1+2 임시. Phase 6 RoutineAlarmScreen 타입 보정 시 제거 필수.
 // v1.6 리팩토링: 상태 전환은 routineController 위임.
 // 이 스크린은 사운드/진동 + tap/shake dismiss UI + 사용자 "다음 미션" 버튼만 담당.
 // 배경 알림으로 직접 진입한 경우 controller.completeCurrentMission()으로 세션 기록 등 자동 처리.

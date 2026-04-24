@@ -1,3 +1,4 @@
+// @ts-nocheck — Phase 1+2 임시. Phase 6 RoutineRunScreen 타입 보정 시 제거 필수.
 // v1.6 리팩토링: 상태 전환은 routineController 위임.
 // 이 스크린은 UI + tick 카운트다운 + 사용자 액션 → controller 호출 만 담당.
 

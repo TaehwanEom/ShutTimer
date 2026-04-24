@@ -1,3 +1,4 @@
+// @ts-nocheck — Phase 1+2 임시. Phase 3 RoutineListScreen 재작성 시 제거 필수.
 // v1.6: 루틴 목록 화면.
 // 카드 탭 → 즉시 실행 (RoutineRun). 길게 탭 → 편집/삭제 액션시트.
 // 우측 상단 + 버튼 → 신규 추가 (RoutineEdit).

@@ -8,6 +8,7 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SETTINGS_KEY } from './src/constants/settings';
 import { MISSIONS_STORAGE_KEY } from './src/constants/missions';
@@ -125,6 +126,27 @@ function AppNavigator() {
     AsyncStorage.removeItem('isRoutineActive').catch(() => {});
     // dismissMethod 사전 로드 → AlarmScreen 마운트 시 즉시 사용 (흔들기 애니메이션 지연 제거)
     preloadDismissMethod();
+  }, []);
+
+  // v1.6: 화면 켜짐 유지 — 설정 ON이면 앱 foreground 동안 화면 자동 잠금 차단.
+  // 초기 mount + AppState 'active' 복귀 시 재적용. 토글 즉시 반영은 SettingsScreen에서 직접 호출.
+  useEffect(() => {
+    const KEEP_AWAKE_TAG = 'ShutTimer_keepScreenOn';
+    const apply = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(SETTINGS_KEY.KEEP_SCREEN_ON);
+        if (raw === 'true') {
+          await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+        } else {
+          deactivateKeepAwake(KEEP_AWAKE_TAG);
+        }
+      } catch {}
+    };
+    apply();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') apply();
+    });
+    return () => sub.remove();
   }, []);
 
   // AdMob 초기화: isExpoGo 분기로 Expo Go 호환

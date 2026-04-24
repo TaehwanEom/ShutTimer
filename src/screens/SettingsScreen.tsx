@@ -22,6 +22,7 @@ import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, COLOR_PRESETS, MissionDu
 import { MISSION_POOL } from '../constants/missionIcons';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Audio } from 'expo-av';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useTranslation } from 'react-i18next';
 import AdBanner from '../components/AdBanner';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
@@ -180,6 +181,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [missionDuration, setMissionDuration] = useState<MissionDuration>(DEFAULT_SETTINGS.missionDuration);
   const [missionDurationModalVisible, setMissionDurationModalVisible] = useState(false);
   const [selectedMissionsCount, setSelectedMissionsCount] = useState<number>(MISSION_POOL.length);
+  const [keepScreenOn, setKeepScreenOn] = useState(DEFAULT_SETTINGS.keepScreenOn);
   const previewSoundRef = React.useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
@@ -212,13 +214,14 @@ export default function SettingsScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION]).then(pairs => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION, SETTINGS_KEY.KEEP_SCREEN_ON]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
       const lang = pairs[2][1];
       const sound = pairs[3][1];
       const alarm = pairs[4][1];
       const duration = pairs[5][1];
+      const keep = pairs[6][1];
       if (method) setDismissMethod(method);
       if (alarm !== null) setAlarmEnabled(alarm === 'true');
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
@@ -230,6 +233,7 @@ export default function SettingsScreen({ navigation }: Props) {
           setMissionDuration(n as MissionDuration);
         }
       }
+      if (keep !== null) setKeepScreenOn(keep === 'true');
     });
   }, []);
 
@@ -290,6 +294,16 @@ export default function SettingsScreen({ navigation }: Props) {
   const handleVibration = (value: boolean) => {
     setVibrationEnabled(value);
     AsyncStorage.setItem(SETTINGS_KEY.VIBRATION_ENABLED, String(value));
+  };
+
+  const handleKeepScreenOn = async (value: boolean) => {
+    setKeepScreenOn(value);
+    AsyncStorage.setItem(SETTINGS_KEY.KEEP_SCREEN_ON, String(value));
+    const KEEP_AWAKE_TAG = 'ShutTimer_keepScreenOn';
+    try {
+      if (value) await activateKeepAwakeAsync(KEEP_AWAKE_TAG);
+      else deactivateKeepAwake(KEEP_AWAKE_TAG);
+    } catch {}
   };
 
   const handleMissionDuration = (value: MissionDuration) => {
@@ -475,6 +489,19 @@ export default function SettingsScreen({ navigation }: Props) {
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
+              trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+              thumbColor={colors.onPrimary}
+              style={{ transform: [{ scale: 0.85 }] }}
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="stay-current-portrait" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>{t('settings.keepScreenOn')}</Text>
+            </View>
+            <Switch
+              value={keepScreenOn}
+              onValueChange={handleKeepScreenOn}
               trackColor={{ false: colors.outlineVariant, true: colors.primary }}
               thumbColor={colors.onPrimary}
               style={{ transform: [{ scale: 0.85 }] }}

@@ -8,6 +8,7 @@ export const SETTINGS_KEY = {
   ALARM_ENABLED: 'shutimer_alarm_enabled',
   MISSION_DURATION: 'shutimer_mission_duration',
   SELECTED_MISSIONS: 'shutimer_selected_missions',
+  KEEP_SCREEN_ON: 'shutimer_keep_screen_on',
 } as const;
 
 export const MIN_SELECTED_MISSIONS = 1;
@@ -37,4 +38,5 @@ export const DEFAULT_SETTINGS = {
   vibrationEnabled: true,
   darkMode: false,
   missionDuration: 30 as MissionDuration,
+  keepScreenOn: false,
 };

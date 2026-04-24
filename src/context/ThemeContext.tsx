@@ -26,7 +26,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.multiGet([SETTINGS_KEY.DARK_MODE, SETTINGS_KEY.PRIMARY_COLOR]).then(pairs => {
       if (pairs[0][1] !== null) setIsDark(pairs[0][1] === 'true');
-      if (pairs[1][1]) setPrimaryColorState(pairs[1][1]);
+      const savedColor = pairs[1][1];
+      if (savedColor === '#bc000a') {
+        setPrimaryColorState(lightColors.primary);
+        AsyncStorage.setItem(SETTINGS_KEY.PRIMARY_COLOR, lightColors.primary);
+      } else if (savedColor) {
+        setPrimaryColorState(savedColor);
+      }
     });
   }, []);
 

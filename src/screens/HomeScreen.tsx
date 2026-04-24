@@ -360,19 +360,22 @@ export default function HomeScreen({ navigation }: Props) {
     AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
 
     // 사운드 + 사용자 설정
-    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
-    const pushSound = soundId.startsWith('ringtone_')
-      ? 'notification_ringtone.wav'
-      : 'notification_alarm.wav';
+    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
+    const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
     const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+    const vibrationEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.VIBRATION_ENABLED);
     const alarmEnabled = alarmEnabledRaw !== 'false';
-    const sound = alarmEnabled ? pushSound : false;
+    const vibrationEnabled = vibrationEnabledRaw !== 'false';
+
+    // iOS 푸시는 사운드 없으면 진동도 안 옴. 알람 OFF + 진동 ON 케이스에서 무음 WAV로 진동만 유도.
+    // (iOS가 "사운드 있음"으로 인지하여 기본 햅틱 트리거 — 단 무음 모드에선 iOS 설정에 따라 동작 불확실)
+    const sound: string | false = alarmEnabled
+      ? soundItem.pushSound
+      : (vibrationEnabled ? 'notification_silent_vibe.wav' : false);
 
     // v1.5: 알람 사운드 Pre-load (AlarmScreen 마운트 시 playAsync 즉시 호출 가능 → 딜레이 단축)
     // alarmEnabled=false이면 스킵. 기존 preload는 모듈 내부에서 clear 후 재생성.
     if (alarmEnabled) {
-      const effectiveId = soundId ?? DEFAULT_SOUND_ID;
-      const soundItem = ALARM_SOUNDS.find(s => s.id === effectiveId) ?? ALARM_SOUNDS[0];
       preloadAlarmSound(soundItem.source).catch(() => {});
     }
 

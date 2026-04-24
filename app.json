@@ -191,7 +191,10 @@
             "./assets/sounds/notification_alarm.wav",
             "./assets/sounds/notification_ringtone.wav",
             "./assets/sounds/notification_alarm01.wav",
-            "./assets/sounds/notification_alarm02.wav"
+            "./assets/sounds/notification_alarm02.wav",
+            "./assets/sounds/alarm_02.wav",
+            "./assets/sounds/ringtone_12.wav",
+            "./assets/sounds/notification_silent_vibe.wav"
           ]
         }
       ],

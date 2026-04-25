@@ -314,6 +314,13 @@
     "exactAlarmBody": "정시에 알림을 받으려면 시스템 설정에서 \"알람 및 리마인더\" 권한을 허용해주세요. 권한이 없으면 알림이 최대 15분 지연될 수 있습니다.",
     "exactAlarmLater": "나중에",
     "exactAlarmOpenSettings": "설정 열기",
+    "endMethod": {
+      "tap": "탭",
+      "shake": "흔들기",
+      "camera": "카메라",
+      "auto": "자동"
+    },
+    "cameraScanHint": "대상을 찾아 사진 촬영 (임시: 탭하여 계속)",
     "scheduleOverflowTitle": "일부 루틴 알림 예약 실패",
     "scheduleOverflowBody": "{{count}}개 루틴이 시스템 한계로 예약되지 않았습니다. 사용하지 않는 루틴을 삭제하세요.",
     "edit": {
@@ -330,6 +337,7 @@
       "fieldDays": "반복",
       "fieldSound": "사운드",
       "fieldAutoAdvance": "루틴 자동 진행",
+      "fieldEndMethod": "종료 방식",
       "deleteRoutine": "루틴 삭제",
       "unselected": "미선택",
       "validationFailTitle": "저장 실패",

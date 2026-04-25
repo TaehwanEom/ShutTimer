@@ -1,6 +1,5 @@
-// @ts-nocheck — Phase 1+2 임시. Phase 6 RoutineRunScreen 타입 보정 시 제거 필수.
-// v1.6 리팩토링: 상태 전환은 routineController 위임.
-// 이 스크린은 UI + tick 카운트다운 + 사용자 액션 → controller 호출 만 담당.
+// v1.6 Phase 6: 신 데이터 모델 적용. 상태 전환은 routineController 위임.
+// UI + tick 카운트다운 + 사용자 액션 → controller 호출. 단일 순회 (loop 없음).
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -28,14 +27,11 @@ import {
   resumeRoutine,
   stopRoutine,
 } from '../utils/routineController';
-import { MISSION_LABEL } from '../constants/missionIcons';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineRun'>;
   route: RouteProp<RootStackParamList, 'RoutineRun'>;
 };
-
-const REST_KEY = 'rest';
 
 export default function RoutineRunScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
@@ -213,13 +209,11 @@ export default function RoutineRunScreen({ navigation, route }: Props) {
     return <SafeAreaView style={styles.container} />;
   }
 
-  const step = routine.missions[ar.currentStepIndex];
-  const missionLabel = step?.missionKey === REST_KEY
-    ? t('routine.restLabel', { defaultValue: '휴식' })
-    : MISSION_LABEL[step?.missionKey ?? ''] ?? step?.missionKey ?? '';
+  const step = routine.steps[ar.currentStepIndex];
+  const missionLabel = step?.name ?? '';
   const m = Math.floor(remainingSec / 60);
   const s = remainingSec % 60;
-  const hasNext = ar.currentStepIndex + 1 < routine.missions.length;
+  const hasNext = ar.currentStepIndex + 1 < routine.steps.length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -231,15 +225,9 @@ export default function RoutineRunScreen({ navigation, route }: Props) {
         <View style={styles.iconBtn} />
       </View>
 
-      {routine.loopCount > 1 && (
-        <Text style={styles.loopBadge}>
-          {ar.currentLoop} / {routine.loopCount} {t('routine.loopUnit', { defaultValue: '세트' })}
-        </Text>
-      )}
-
       <View style={styles.missionBox}>
         <Text style={styles.missionStepIdx}>
-          {ar.currentStepIndex + 1} / {routine.missions.length}
+          {ar.currentStepIndex + 1} / {routine.steps.length}
         </Text>
         <Text style={styles.missionName} numberOfLines={2}>{missionLabel}</Text>
       </View>
@@ -268,9 +256,7 @@ export default function RoutineRunScreen({ navigation, route }: Props) {
         <View style={styles.nextBox}>
           <Text style={styles.nextLabel}>{t('routine.nextMission', { defaultValue: '다음' })}</Text>
           <Text style={styles.nextName} numberOfLines={1}>
-            {routine.missions[ar.currentStepIndex + 1].missionKey === REST_KEY
-              ? t('routine.restLabel', { defaultValue: '휴식' })
-              : MISSION_LABEL[routine.missions[ar.currentStepIndex + 1].missionKey] ?? routine.missions[ar.currentStepIndex + 1].missionKey}
+            {routine.steps[ar.currentStepIndex + 1].name}
           </Text>
         </View>
       )}

@@ -66,13 +66,13 @@ function createFreshAr(r: Routine): ActiveRoutine {
   };
 }
 
-/** 현재 step 종료 시점에 발화할 배경 알림 예약. autoAdvance 따라 chain/confirmPrompt 분기. */
+/** 현재 step 종료 시점에 발화할 배경 알림 예약. endMethod === 'auto' 면 chain, 그 외엔 confirmPrompt 분기. */
 async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<void> {
   await cancelBackgroundNotif();
   if (ar.pausedAt !== null) return;
   const fireAt = new Date(ar.stepEndAt);
 
-  if (r.autoAdvance) {
+  if (r.endMethod === 'auto') {
     const nextIdx = ar.currentStepIndex + 1;
     // 마지막 step이면 체인 알림 없음 (advanceToNext 호출 안 됨)
     if (nextIdx < r.steps.length) {
@@ -184,12 +184,12 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
   const nextIdx = ar.currentStepIndex + 1;
   const isEnding = nextIdx >= routine.steps.length;
 
-  if (isEnding && routine.autoAdvance) {
+  if (isEnding && routine.endMethod === 'auto') {
     await fullCleanup();
     return { kind: 'end', routine };
   }
 
-  if (routine.autoAdvance) {
+  if (routine.endMethod === 'auto') {
     const nextStep = routine.steps[nextIdx];
     const durationMs = durationFromStep(nextStep) * 60 * 1000;
     const now = Date.now();

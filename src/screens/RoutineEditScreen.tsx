@@ -26,6 +26,7 @@ import { ThemeColors } from '../constants/theme';
 import {
   Routine,
   RoutineStep,
+  RoutineEndMethod,
   loadRoutines,
   upsertRoutine,
   deleteRoutine,
@@ -124,7 +125,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const [category, setCategory] = useState('');
   const [days, setDays] = useState<number[]>([]);
   const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
   const [steps, setSteps] = useState<LocalStep[]>(() => [
     { id: createStepId(), name: '', startTime: '', endTime: '', saved: false },
   ]);
@@ -159,7 +160,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       setCategory(target.category);
       setDays(target.schedule?.days ?? []);
       setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
-      setAutoAdvance(target.autoAdvance);
+      setEndMethod(target.endMethod);
       setSteps(
         target.steps.map(s => ({
           id: s.id,
@@ -348,7 +349,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       schedule: { days },
       soundKey,
       active: isEditMode ? originalActiveRef.current : true,
-      autoAdvance,
+      endMethod,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
     };
     await upsertRoutine(routine);
@@ -541,18 +542,32 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.settingRow}>
-          <Text style={styles.settingLabel}>{t('routine.edit.fieldAutoAdvance')}</Text>
-          <Switch
-            value={autoAdvance}
-            onValueChange={value => {
-              setAutoAdvance(value);
-              markDirty();
-            }}
-            trackColor={{ false: colors.outlineVariant, true: colors.primary }}
-            thumbColor={colors.onPrimary}
-            style={{ transform: [{ scale: 0.85 }] }}
-          />
+        <View style={styles.endMethodSection}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
+          <View style={styles.endMethodSegment}>
+            {(['tap', 'shake', 'camera', 'auto'] as const).map(opt => {
+              const selected = endMethod === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
+                  onPress={() => {
+                    setEndMethod(opt);
+                    markDirty();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.endMethodBtnText,
+                      selected && styles.endMethodBtnTextSelected,
+                    ]}
+                  >
+                    {t(`routine.endMethod.${opt}`)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* 삭제 (편집 모드만) */}
@@ -746,6 +761,39 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   settingValueUnset: {
     color: colors.secondary,
     opacity: 0.7,
+  },
+  endMethodSection: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLow,
+    marginBottom: 8,
+    gap: 10,
+  },
+  endMethodSegment: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  endMethodBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  endMethodBtnSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  endMethodBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.onBackground,
+  },
+  endMethodBtnTextSelected: {
+    color: colors.onPrimary,
   },
   deleteBtn: {
     flexDirection: 'row',

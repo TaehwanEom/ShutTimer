@@ -23,6 +23,9 @@ export type RoutineSchedule = {
   days: number[];
 };
 
+/** step 종료 방식. auto = 알람 없이 즉시 다음 step. 나머지 3종은 알람 출력 후 해당 방식으로 종료. */
+export type RoutineEndMethod = 'tap' | 'shake' | 'camera' | 'auto';
+
 export type Routine = {
   id: string;
   name: string;
@@ -35,8 +38,8 @@ export type Routine = {
   soundKey: string;
   /** 스케줄 on/off 토글. false면 예약 등록 안 됨. */
   active: boolean;
-  /** true=자동 진행 / false=확인 후 진행 */
-  autoAdvance: boolean;
+  /** step 종료 방식. autoAdvance/dismissMethod 통합. */
+  endMethod: RoutineEndMethod;
   createdAt: number;
 };
 
@@ -171,7 +174,7 @@ function isValidRoutine(r: any): r is Routine {
     r.steps.every(isValidStep) &&
     typeof r.soundKey === 'string' &&
     typeof r.active === 'boolean' &&
-    typeof r.autoAdvance === 'boolean' &&
+    (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera' || r.endMethod === 'auto') &&
     typeof r.createdAt === 'number'
   );
 }

@@ -1,7 +1,7 @@
-// @ts-nocheck — Phase 1+2 임시. Phase 6 RoutineAlarmScreen 타입 보정 시 제거 필수.
-// v1.6 리팩토링: 상태 전환은 routineController 위임.
-// 이 스크린은 사운드/진동 + tap/shake dismiss UI + 사용자 "다음 미션" 버튼만 담당.
+// v1.6 Phase 6: 신 데이터 모델 + endMethod 4분기 적용. 상태 전환은 routineController 위임.
+// 사운드/진동 + endMethod별 dismiss UI + "다음 step 시작" 버튼.
 // 배경 알림으로 직접 진입한 경우 controller.completeCurrentMission()으로 세션 기록 등 자동 처리.
+// camera 모드: 랜덤 MISSION_POOL 1개 노출 + 탭 dismiss (v1.5 AlarmCameraMode 통합은 Phase 6.5에서 별도).
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   Vibration,
   AppState,
   BackHandler,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,7 @@ import {
   ActiveRoutine,
   loadRoutines,
   loadActiveRoutine,
+  durationFromStep,
 } from '../constants/routines';
 import {
   completeCurrentMission,
@@ -36,7 +38,7 @@ import {
   stopRoutine,
 } from '../utils/routineController';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
-import { MISSION_LABEL } from '../constants/missionIcons';
+import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL } from '../constants/missionIcons';
 import { SETTINGS_KEY } from '../constants/settings';
 
 type Props = {
@@ -44,7 +46,6 @@ type Props = {
   route: RouteProp<RootStackParamList, 'RoutineAlarm'>;
 };
 
-const REST_KEY = 'rest';
 const SHAKE_THRESHOLD = 2.5;
 const SHAKE_COOLDOWN_MS = 400;
 const SHAKE_COUNT_REQUIRED = 2;
@@ -57,6 +58,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [ar, setAr] = useState<ActiveRoutine | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // camera 모드: 랜덤 MISSION_POOL 1개 — mount 시 한 번 픽
+  const [cameraMission, setCameraMission] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shakeCountRef = useRef(0);
@@ -94,6 +97,12 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
 
       setRoutine(target);
       setAr(existing);
+
+      // camera 모드면 랜덤 미션 픽 (1회)
+      if (target.endMethod === 'camera' && MISSION_POOL.length > 0) {
+        const pick = MISSION_POOL[Math.floor(Math.random() * MISSION_POOL.length)];
+        setCameraMission(pick);
+      }
 
       // 사운드/진동 시작
       const [soundId, alarmRaw, vibRaw] = await Promise.all([
@@ -145,9 +154,9 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── 흔들기 감지 ─────────────────────────────────────────
+  // ─── 흔들기 감지 (endMethod === 'shake' 만) ──────────────
   useEffect(() => {
-    if (!routine || dismissed || routine.dismissMethod !== 'shake') return;
+    if (!routine || dismissed || routine.endMethod !== 'shake') return;
     shakeCountRef.current = 0;
     lastShakeTimeRef.current = 0;
     Accelerometer.setUpdateInterval(100);
@@ -276,35 +285,62 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     return <SafeAreaView style={styles.container} />;
   }
 
-  const nextIdx = (ar.currentStepIndex + 1) % routine.missions.length;
-  const wouldAdvanceLoop = ar.currentStepIndex + 1 >= routine.missions.length;
-  const isLastLoop = ar.currentLoop >= routine.loopCount;
-  const willEnd = wouldAdvanceLoop && isLastLoop;
-  const nextStep = willEnd ? null : routine.missions[nextIdx];
-  const nextLabel = nextStep
-    ? (nextStep.missionKey === REST_KEY
-        ? t('routine.restLabel', { defaultValue: '휴식' })
-        : MISSION_LABEL[nextStep.missionKey] ?? nextStep.missionKey)
-    : '';
+  // 단일 순회: nextIdx >= steps.length 면 루틴 종료
+  const nextIdx = ar.currentStepIndex + 1;
+  const willEnd = nextIdx >= routine.steps.length;
+  const nextStep = willEnd ? null : routine.steps[nextIdx];
+  const nextLabel = nextStep ? nextStep.name : '';
+  const nextDurationMin = nextStep ? durationFromStep(nextStep) : 0;
+
+  // dismiss UI 분기
+  const renderDismissArea = () => {
+    if (routine.endMethod === 'tap') {
+      return (
+        <TouchableOpacity style={styles.dismissArea} activeOpacity={0.9} onPress={handleDismiss}>
+          <MaterialIcons name="alarm" size={96} color={colors.primary} />
+          <Text style={styles.completeText}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
+          <Text style={styles.dismissHint}>{t('routine.tapToDismiss', { defaultValue: '화면을 탭하여 계속' })}</Text>
+        </TouchableOpacity>
+      );
+    }
+    if (routine.endMethod === 'shake') {
+      return (
+        <View style={styles.dismissArea}>
+          <MaterialIcons name="alarm" size={96} color={colors.primary} />
+          <Text style={styles.completeText}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
+          <Text style={styles.dismissHint}>{t('routine.shakeToDismiss', { defaultValue: '흔들어서 계속' })}</Text>
+        </View>
+      );
+    }
+    if (routine.endMethod === 'camera' && cameraMission) {
+      // TODO Phase 6.5: AlarmCameraMode 통합으로 실제 사진 인식 dismiss로 교체.
+      // 현재는 랜덤 미션 표시 + 탭 dismiss (임시).
+      const emoji = MISSION_EMOJI[cameraMission];
+      const label = MISSION_LABEL[cameraMission] ?? cameraMission;
+      return (
+        <TouchableOpacity style={styles.dismissArea} activeOpacity={0.9} onPress={handleDismiss}>
+          {emoji && <Image source={emoji} style={styles.cameraEmoji} resizeMode="contain" />}
+          <Text style={styles.completeText}>{label}</Text>
+          <Text style={styles.dismissHint}>
+            {t('routine.cameraScanHint', { defaultValue: '대상을 찾아 사진 촬영 (임시: 탭하여 계속)' })}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+    // endMethod === 'auto' 는 이 화면 자체에 도달하지 않음 (controller가 직접 advance).
+    // 안전장치: tap 동작으로 fallback.
+    return (
+      <TouchableOpacity style={styles.dismissArea} activeOpacity={0.9} onPress={handleDismiss}>
+        <MaterialIcons name="alarm" size={96} color={colors.primary} />
+        <Text style={styles.completeText}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {!dismissed ? (
-        <TouchableOpacity
-          style={styles.dismissArea}
-          activeOpacity={0.9}
-          onPress={routine.dismissMethod === 'tap' ? handleDismiss : undefined}
-        >
-          <MaterialIcons name="alarm" size={96} color={colors.primary} />
-          <Text style={styles.completeText}>
-            {t('routine.missionComplete', { defaultValue: '미션 완료' })}
-          </Text>
-          <Text style={styles.dismissHint}>
-            {routine.dismissMethod === 'tap'
-              ? t('routine.tapToDismiss', { defaultValue: '화면을 탭하여 계속' })
-              : t('routine.shakeToDismiss', { defaultValue: '흔들어서 계속' })}
-          </Text>
-        </TouchableOpacity>
+        renderDismissArea()
       ) : (
         <View style={styles.resultBox}>
           <MaterialIcons name="check-circle" size={72} color={colors.primary} />
@@ -326,7 +362,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
               </Text>
               <Text style={styles.bigText}>{nextLabel}</Text>
               <Text style={styles.nextDuration}>
-                {nextStep?.durationMinutes ?? 0} {t('routine.minutesUnit', { defaultValue: '분' })}
+                {nextDurationMin} {t('routine.minutesUnit', { defaultValue: '분' })}
               </Text>
               <TouchableOpacity style={styles.primaryBtn} onPress={handleStartNext}>
                 <Text style={styles.primaryBtnText}>
@@ -363,6 +399,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 14,
     color: colors.secondary,
     opacity: 0.8,
+  },
+  cameraEmoji: {
+    width: 96,
+    height: 96,
   },
   resultBox: {
     flex: 1,

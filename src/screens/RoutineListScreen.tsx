@@ -139,7 +139,7 @@ function ProgressBanner({ routine, ar, colors, onPress, onToggle, onStop }: Bann
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: colors.onPrimary, opacity: 0.85 }}>
-            {t('routine.bannerInProgress')} — {routine.name}
+            {t('routine.bannerInProgress')}
           </Text>
           <Text style={{ marginTop: 4, fontSize: 14, fontWeight: '800', color: colors.onPrimary }} numberOfLines={1}>
             {step?.name ?? ''} ({ar.currentStepIndex + 1}/{routine.steps.length}) · {t('routine.bannerRemaining')} {String(mm).padStart(2, '0')}:{String(ss).padStart(2, '0')}
@@ -254,9 +254,15 @@ function RoutineCard({ routine, colors, isEditMode, onPlayTap, onPlayLongPress, 
   const editSlide = editAnim.interpolate({ inputRange: [0, 1], outputRange: [0, EDIT_SLIDE_WIDTH] });
   const editIconOpacity = editAnim;
 
-  const firstStep = routine.steps[0];
-  const timeStr = firstStep ? formatTimeKr(firstStep.startTime) : '--:--';
+  const timeStr = routine.schedule?.startTime ? formatTimeKr(routine.schedule.startTime) : '--:--';
   const label = daysLabel(routine.schedule?.days ?? [], t);
+  const stepSummary = (() => {
+    const names = routine.steps.map(s => s.name).filter(Boolean);
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} · ${names[1]}`;
+    return `${names[0]} 외 ${names.length - 1}개`;
+  })();
 
   return (
     <View style={{ position: 'relative', marginHorizontal: 16, marginBottom: 10 }}>
@@ -338,8 +344,12 @@ function RoutineCard({ routine, colors, isEditMode, onPlayTap, onPlayLongPress, 
         </View>
 
         <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ fontSize: 13, color: colors.onBackground, fontWeight: '700' }}>{routine.name}</Text>
-          <View style={{ width: 8 }} />
+          {!!stepSummary && (
+            <>
+              <Text style={{ fontSize: 13, color: colors.onBackground, fontWeight: '700' }} numberOfLines={1}>{stepSummary}</Text>
+              <View style={{ width: 8 }} />
+            </>
+          )}
           <DaysRow label={label} colors={colors} />
         </View>
       </Animated.View>

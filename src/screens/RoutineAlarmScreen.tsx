@@ -30,7 +30,6 @@ import {
   ActiveRoutine,
   loadRoutines,
   loadActiveRoutine,
-  durationFromStep,
 } from '../constants/routines';
 import {
   completeCurrentMission,
@@ -290,7 +289,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const willEnd = nextIdx >= routine.steps.length;
   const nextStep = willEnd ? null : routine.steps[nextIdx];
   const nextLabel = nextStep ? nextStep.name : '';
-  const nextDurationMin = nextStep ? durationFromStep(nextStep) : 0;
+  const nextDurationMin = nextStep ? Math.max(0, nextStep.durationMinutes) : 0;
 
   // dismiss UI 분기
   const renderDismissArea = () => {

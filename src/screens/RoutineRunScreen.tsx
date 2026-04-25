@@ -27,6 +27,7 @@ import {
   resumeRoutine,
   stopRoutine,
 } from '../utils/routineController';
+import { FIXED_CATEGORIES, loadCustomCategories, CategoryDef } from '../constants/categories';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineRun'>;
@@ -42,9 +43,15 @@ export default function RoutineRunScreen({ navigation, route }: Props) {
   const [ar, setAr] = useState<ActiveRoutine | null>(null);
   const [remainingSec, setRemainingSec] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [categoryCache, setCategoryCache] = useState<CategoryDef[]>([...FIXED_CATEGORIES]);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 미션 종료 중복 진입 가드
   const completingRef = useRef(false);
+
+  // 카테고리 라벨 캐시
+  useEffect(() => {
+    loadCustomCategories().then(custom => setCategoryCache([...FIXED_CATEGORIES, ...custom]));
+  }, []);
 
   // ─── 마운트: controller.startRoutine ─────────────────────
   useEffect(() => {
@@ -221,7 +228,13 @@ export default function RoutineRunScreen({ navigation, route }: Props) {
         <TouchableOpacity style={styles.iconBtn} onPress={handleStop}>
           <MaterialIcons name="close" size={28} color={colors.onBackground} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{routine.name}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {(() => {
+            const def = categoryCache.find(c => c.id === routine.category);
+            if (!def) return '';
+            return def.labelKey ? t(def.labelKey) : def.label ?? '';
+          })()}
+        </Text>
         <View style={styles.iconBtn} />
       </View>
 

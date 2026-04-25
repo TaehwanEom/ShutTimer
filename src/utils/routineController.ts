@@ -12,7 +12,6 @@ import {
   saveActiveRoutine,
   clearActiveRoutine,
   recordStepSession,
-  durationFromStep,
 } from '../constants/routines';
 import {
   scheduleRoutineChain,
@@ -54,7 +53,7 @@ export type RestoreResult =
 function createFreshAr(r: Routine): ActiveRoutine {
   const now = Date.now();
   const firstStep = r.steps[0];
-  const durationMs = firstStep ? durationFromStep(firstStep) * 60 * 1000 : 60 * 1000;
+  const durationMs = firstStep ? Math.max(0, firstStep.durationMinutes) * 60 * 1000 : 60 * 1000;
   return {
     routineId: r.id,
     currentStepIndex: 0,
@@ -191,7 +190,7 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
 
   if (routine.endMethod === 'auto') {
     const nextStep = routine.steps[nextIdx];
-    const durationMs = durationFromStep(nextStep) * 60 * 1000;
+    const durationMs = Math.max(0, nextStep.durationMinutes) * 60 * 1000;
     const now = Date.now();
     const nextAr: ActiveRoutine = {
       ...ar,
@@ -232,7 +231,7 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
   }
 
   const nextStep = routine.steps[nextIdx];
-  const durationMs = durationFromStep(nextStep) * 60 * 1000;
+  const durationMs = Math.max(0, nextStep.durationMinutes) * 60 * 1000;
   const now = Date.now();
   const nextAr: ActiveRoutine = {
     ...ar,

@@ -127,10 +127,8 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
     }
   }
 
-  // 예약 발화 시각은 steps[0].startTime 기준
-  const firstStep = routine.steps[0];
-  if (!firstStep) return [];
-  const alertTime = computeAlertTime(firstStep.startTime);
+  // 예약 발화 시각은 schedule.startTime 기준
+  const alertTime = computeAlertTime(routine.schedule.startTime);
   if (!alertTime) return [];
 
   const { days } = routine.schedule;
@@ -151,7 +149,7 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
       };
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: routine.name,
+          title: i18n.t('routine.prealertTitle', { defaultValue: '루틴 시작' }),
           body: i18n.t('routine.prealertBody', { defaultValue: '곧 루틴이 시작됩니다' }),
           data: { ...data },
           sound,

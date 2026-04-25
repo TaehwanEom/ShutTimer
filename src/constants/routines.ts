@@ -1,6 +1,7 @@
-// v1.6 Phase 1: 루틴 데이터 모델 재정의 (steps 기반).
-// 단일 타이머(ACTIVE_TIMER_KEY)와 상호 배타적으로 동작.
-// v1.6 미출시로 기존 shuttimer_routines (missions 기반) 데이터는 유효성 검증에서 탈락 → 자동 삭제.
+// v1.6 신 데이터 모델: 루틴 묶음 = 카테고리 + 시작시간 + 시퀀셜 step 들.
+// 각 step 은 이름 + duration(분). 첫 step 은 schedule.startTime 부터, 이후는 자동 누적 (시간 갭 무시).
+// Routine.name 제거 — 카테고리가 묶음 식별, step.name 이 작업 식별.
+// 단일 타이머(ACTIVE_TIMER_KEY)와 상호 배타.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
@@ -10,15 +11,15 @@ import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
 export type RoutineStep = {
   id: string;
   name: string;
-  /** "HH:MM" 24h 포맷 */
-  startTime: string;
-  /** "HH:MM" 24h 포맷. startTime 보다 뒤 (자정 넘김 허용) */
-  endTime: string;
+  /** 작업 길이 (분 단위). 0 이상. */
+  durationMinutes: number;
   /** MISSION_POOL 키 또는 이모지/아이콘 식별자. 선택적. */
   icon?: string;
 };
 
 export type RoutineSchedule = {
+  /** "HH:MM" 24h. 첫 step 시작 시각 (= 루틴 묶음 시작 시각). */
+  startTime: string;
   /** 실행 요일. 0(일)~6(토). 빈 배열 = 매일 */
   days: number[];
 };
@@ -28,8 +29,7 @@ export type RoutineEndMethod = 'tap' | 'shake' | 'camera' | 'auto';
 
 export type Routine = {
   id: string;
-  name: string;
-  /** 카테고리 id (운동/공부/약복용 등 Phase 4 확정). 빈 문자열 허용 (미분류) */
+  /** 카테고리 id (FIXED_CATEGORIES 또는 custom_xxx). 필수. */
   category: string;
   steps: RoutineStep[];
   /** 예약 없는 수동 실행 루틴 허용. schedule 없거나 active=false면 예약 스킵. */
@@ -38,7 +38,7 @@ export type Routine = {
   soundKey: string;
   /** 스케줄 on/off 토글. false면 예약 등록 안 됨. */
   active: boolean;
-  /** step 종료 방식. autoAdvance/dismissMethod 통합. */
+  /** step 종료 방식. */
   endMethod: RoutineEndMethod;
   createdAt: number;
 };
@@ -80,13 +80,12 @@ export function parseHHMM(s: string): number | null {
   return h * 60 + mm;
 }
 
-/** step duration (분). endTime < startTime 이면 자정 넘김으로 간주하여 +1440. */
-export function durationFromStep(step: RoutineStep): number {
-  const s = parseHHMM(step.startTime);
-  const e = parseHHMM(step.endTime);
-  if (s === null || e === null) return 0;
-  const diff = e - s;
-  return diff >= 0 ? diff : diff + 24 * 60;
+/** 분 단위 → "HH:MM" */
+export function formatHHMM(totalMin: number): string {
+  const m = ((totalMin % (24 * 60)) + 24 * 60) % (24 * 60);
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
 // ─── CRUD ────────────────────────────────────────────────────
@@ -150,17 +149,25 @@ export async function clearActiveRoutine(): Promise<void> {
 }
 
 // ─── 유효성 검증 ─────────────────────────────────────────────
-// Phase 1: v1.6 미출시 → 기존 missions 기반 데이터는 이 검증에서 탈락 (자동 삭제).
+// 신 모델: durationMinutes 기반. 기존 startTime/endTime 데이터는 자동 탈락.
 
 function isValidStep(s: any): s is RoutineStep {
   return (
     s &&
     typeof s.id === 'string' &&
     typeof s.name === 'string' &&
+    typeof s.durationMinutes === 'number' &&
+    s.durationMinutes >= 0
+  );
+}
+
+function isValidSchedule(s: any): s is RoutineSchedule {
+  return (
+    s &&
     typeof s.startTime === 'string' &&
-    typeof s.endTime === 'string' &&
     parseHHMM(s.startTime) !== null &&
-    parseHHMM(s.endTime) !== null
+    Array.isArray(s.days) &&
+    s.days.every((d: any) => typeof d === 'number' && d >= 0 && d <= 6)
   );
 }
 
@@ -168,10 +175,10 @@ function isValidRoutine(r: any): r is Routine {
   return (
     r &&
     typeof r.id === 'string' &&
-    typeof r.name === 'string' &&
     typeof r.category === 'string' &&
     Array.isArray(r.steps) &&
     r.steps.every(isValidStep) &&
+    (r.schedule === undefined || isValidSchedule(r.schedule)) &&
     typeof r.soundKey === 'string' &&
     typeof r.active === 'boolean' &&
     (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera' || r.endMethod === 'auto') &&
@@ -191,7 +198,7 @@ export function createStepId(): string {
 
 /** 루틴 총 소요시간 (분) — 모든 step duration 합. */
 export function totalRoutineMinutes(r: Routine): number {
-  return r.steps.reduce((acc, s) => acc + durationFromStep(s), 0);
+  return r.steps.reduce((acc, s) => acc + Math.max(0, s.durationMinutes), 0);
 }
 
 /** 진행률 0~1. ActiveRoutine 기반. */
@@ -201,8 +208,30 @@ export function routineProgress(r: Routine, ar: ActiveRoutine): number {
 }
 
 /**
+ * 특정 step 의 표시용 시작 시각 (분 단위, schedule.startTime 기준 누적).
+ * step[0] = schedule.startTime
+ * step[i] = schedule.startTime + sum(step[0..i-1].durationMinutes)
+ * schedule 없으면 null.
+ */
+export function stepStartMinutes(r: Routine, stepIdx: number): number | null {
+  if (!r.schedule) return null;
+  const base = parseHHMM(r.schedule.startTime);
+  if (base === null) return null;
+  let acc = base;
+  for (let i = 0; i < stepIdx && i < r.steps.length; i++) {
+    acc += Math.max(0, r.steps[i].durationMinutes);
+  }
+  return acc;
+}
+
+/** step 표시용 시작 시각 ("HH:MM"). schedule 없으면 null. */
+export function stepStartTimeStr(r: Routine, stepIdx: number): string | null {
+  const m = stepStartMinutes(r, stepIdx);
+  return m === null ? null : formatHHMM(m);
+}
+
+/**
  * step 단위 세션 기록. step.name 을 icon 필드에 그대로 저장 (B안).
- * RoutineRun(포그라운드) + RoutineAlarm(배경 알림 경로) 둘 다 호출.
  * 중복 방지는 호출자 측 awaitingConfirm 플래그로 제어.
  */
 export async function recordStepSession(r: Routine, stepIdx: number): Promise<void> {
@@ -217,7 +246,7 @@ export async function recordStepSession(r: Routine, stepIdx: number): Promise<vo
       id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       date,
       icon: step.name,
-      minutes: durationFromStep(step),
+      minutes: Math.max(0, step.durationMinutes),
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {
@@ -226,14 +255,12 @@ export async function recordStepSession(r: Routine, stepIdx: number): Promise<vo
 }
 
 /**
- * 루틴의 "다음 예약 발화 시각" 계산. 예약 발화 시각은 steps[0].startTime 기준.
+ * 루틴의 "다음 예약 발화 시각" 계산. schedule.startTime 기준.
  * active=false 또는 schedule 없으면 null.
  */
 export function nextOccurrenceTime(r: Routine, now: Date = new Date()): number | null {
   if (!r.active || !r.schedule) return null;
-  const first = r.steps[0];
-  if (!first) return null;
-  const startMin = parseHHMM(first.startTime);
+  const startMin = parseHHMM(r.schedule.startTime);
   if (startMin === null) return null;
   const hour = Math.floor(startMin / 60);
   const minute = startMin % 60;

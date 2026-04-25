@@ -1,12 +1,12 @@
 // v1.6: 루틴 알림 스케줄러.
-// (1) 시작 5분 전 푸시 알림 — iOS/Android CALENDAR trigger + repeats:true 로 요일별 1개씩만 예약.
-//     OS가 자동으로 매주 반복 발화 → rolling 동기화 불필요, 64개 한계 완화.
-// (2) 자동 진행 모드 백그라운드 체인 — 현재 미션 종료 시점 DATE trigger 1개만 예약.
-//     발화 시 handler에서 다음 체인 등록 (연쇄 방식).
+// (1) 시작 5분 전 푸시 알림 — iOS 26+ 면 AlarmKit (한도 없음), 그 외 expo-notifications WEEKLY (64 한계).
+// (2) 자동 진행 모드 백그라운드 체인 — DATE trigger 1개. AlarmKit/expo-notifications 모두 임시 1슬롯.
 
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import i18n from '../i18n';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
   Routine,
   ROUTINE_PREALERT_MINUTES,
@@ -16,6 +16,72 @@ import {
   nextOccurrenceTime,
 } from '../constants/routines';
 import { SETTINGS_KEY } from '../constants/settings';
+
+// ─── AlarmKit 가용성 ──────────────────────────────────────
+
+let _alarmKitAvailable: boolean | null = null;
+let _alarmKitAuthorized: boolean | null = null;
+
+function isAlarmKitAvailableSync(): boolean {
+  if (_alarmKitAvailable !== null) return _alarmKitAvailable;
+  if (Platform.OS !== 'ios') {
+    _alarmKitAvailable = false;
+    return false;
+  }
+  const ver = parseInt(String(Platform.Version), 10);
+  if (isNaN(ver) || ver < 26) {
+    _alarmKitAvailable = false;
+    return false;
+  }
+  try {
+    _alarmKitAvailable = AlarmkitBridge.isAvailable();
+  } catch {
+    _alarmKitAvailable = false;
+  }
+  return _alarmKitAvailable;
+}
+
+/** AlarmKit 사용 가능 + 권한 받음 → true. notDetermined 면 false (UI에서 명시 요청). */
+async function shouldUseAlarmKit(): Promise<boolean> {
+  if (!isAlarmKitAvailableSync()) return false;
+  if (_alarmKitAuthorized === true) return true;
+  if (_alarmKitAuthorized === false) return false;
+  try {
+    const state = await AlarmkitBridge.getAuthorizationState();
+    if (state === 'authorized') {
+      _alarmKitAuthorized = true;
+      return true;
+    }
+    if (state === 'denied' || state === 'unsupported') {
+      _alarmKitAuthorized = false;
+      return false;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** 사용자 액션 (첫 루틴 저장) 시점에 명시적으로 권한 요청. */
+export async function requestAlarmKitAuthorizationIfNeeded(): Promise<'authorized' | 'denied' | 'unavailable'> {
+  if (!isAlarmKitAvailableSync()) return 'unavailable';
+  try {
+    const current = await AlarmkitBridge.getAuthorizationState();
+    if (current === 'authorized') {
+      _alarmKitAuthorized = true;
+      return 'authorized';
+    }
+    if (current === 'denied') {
+      _alarmKitAuthorized = false;
+      return 'denied';
+    }
+    const state = await AlarmkitBridge.requestAuthorization();
+    _alarmKitAuthorized = state === 'authorized';
+    return state === 'authorized' ? 'authorized' : 'denied';
+  } catch {
+    return 'unavailable';
+  }
+}
 
 // Phase 2: 한계 초과 감지 시 RoutineListScreen 상단 배너 노출용 상태
 export const ROUTINE_SCHEDULE_STATUS_KEY = 'shuttimer_routine_schedule_status';
@@ -52,7 +118,10 @@ async function resolveSound(): Promise<string | false> {
 
 type ScheduledRoutineRecord = {
   routineId: string;
+  /** expo-notifications 폴백 경로 알림 id */
   notifIds: string[];
+  /** AlarmKit 경로 alarm UUID */
+  alarmKitIds?: string[];
   lastSyncedAt: number;
 };
 
@@ -115,19 +184,62 @@ function computeAlertTime(time: string): { hour: number; minute: number; dayOffs
  * @returns 예약된 알림 id 배열
  */
 export async function scheduleRoutinePrealerts(routine: Routine): Promise<string[]> {
-  // 예약 없는 수동 루틴 또는 비활성 루틴 — 스킵
   if (!routine.schedule || !routine.active) return [];
+  await cancelRoutinePrealerts(routine.id);
 
-  // 기존 예약 정리
-  const records = await loadNotifRecords();
-  const existing = records.find(r => r.routineId === routine.id);
-  if (existing) {
-    for (const id of existing.notifIds) {
-      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  const useAlarmKit = await shouldUseAlarmKit();
+  if (useAlarmKit) {
+    return scheduleViaAlarmKit(routine);
+  }
+  return scheduleViaExpoNotifications(routine);
+}
+
+/** AlarmKit 경로 — iOS 26+. 64 한도 없음. fixed-date 1회성이라 요일별 다음 발화 1개씩 등록. */
+async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
+  if (!routine.schedule) return [];
+  const alertTime = computeAlertTime(routine.schedule.startTime);
+  if (!alertTime) return [];
+
+  const effectiveDays = routine.schedule.days.length === 0
+    ? [0, 1, 2, 3, 4, 5, 6]
+    : routine.schedule.days;
+
+  const alarmIds: string[] = [];
+  const now = new Date();
+  const title = i18n.t('routine.prealertTitle', { defaultValue: '루틴 시작' });
+  const stopLabel = i18n.t('routine.prealertStop', { defaultValue: '확인' });
+
+  for (const day of effectiveDays) {
+    const fireDate = computeNextOccurrence(day, alertTime, now);
+    if (!fireDate) continue;
+    try {
+      const id = await AlarmkitBridge.scheduleAlarm({
+        routineId: routine.id,
+        title,
+        fireAt: fireDate.getTime(),
+        stopLabel,
+      });
+      alarmIds.push(id);
+    } catch {
+      // 등록 실패 무시
     }
   }
 
-  // 예약 발화 시각은 schedule.startTime 기준
+  const records = await loadNotifRecords();
+  const next = records.filter(r => r.routineId !== routine.id);
+  next.push({
+    routineId: routine.id,
+    notifIds: [],
+    alarmKitIds: alarmIds,
+    lastSyncedAt: Date.now(),
+  });
+  await saveNotifRecords(next);
+  return alarmIds;
+}
+
+/** expo-notifications WEEKLY 경로 — iOS 25 이하 / Android. 64 한도 적용. */
+async function scheduleViaExpoNotifications(routine: Routine): Promise<string[]> {
+  if (!routine.schedule) return [];
   const alertTime = computeAlertTime(routine.schedule.startTime);
   if (!alertTime) return [];
 
@@ -137,9 +249,7 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
   const sound = await resolveSound();
 
   for (const day of effectiveDays) {
-    // 자정 넘어 전날로 넘어간 경우 요일 오프셋 적용 (0-6)
     const alertDay = (day + alertTime.dayOffset + 7) % 7;
-    // expo-notifications WEEKLY: weekday = 1(Sunday) ~ 7(Saturday)
     const weekday = alertDay + 1;
 
     try {
@@ -168,20 +278,43 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
     }
   }
 
+  const records = await loadNotifRecords();
   const next = records.filter(r => r.routineId !== routine.id);
   next.push({ routineId: routine.id, notifIds: ids, lastSyncedAt: Date.now() });
   await saveNotifRecords(next);
-
   return ids;
 }
 
-/** 특정 루틴의 모든 예약 알림 취소 */
+/** 특정 요일 + alertTime 기준 다음 발화 Date (now 기준 향후). 못 찾으면 null. */
+function computeNextOccurrence(
+  targetWeekday: number,
+  alertTime: { hour: number; minute: number; dayOffset: number },
+  now: Date
+): Date | null {
+  const adjustedWeekday = (targetWeekday + alertTime.dayOffset + 7) % 7;
+  for (let offset = 0; offset < 8; offset++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + offset);
+    d.setHours(alertTime.hour, alertTime.minute, 0, 0);
+    if (d.getDay() !== adjustedWeekday) continue;
+    if (d.getTime() <= now.getTime()) continue;
+    return d;
+  }
+  return null;
+}
+
+/** 특정 루틴의 모든 예약 알림 취소 (legacy + alarmkit 양쪽). */
 export async function cancelRoutinePrealerts(routineId: string): Promise<void> {
   const records = await loadNotifRecords();
   const target = records.find(r => r.routineId === routineId);
   if (target) {
     for (const id of target.notifIds) {
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+    }
+    if (target.alarmKitIds) {
+      for (const id of target.alarmKitIds) {
+        await AlarmkitBridge.cancelAlarm(id).catch(() => {});
+      }
     }
   }
   const filtered = records.filter(r => r.routineId !== routineId);

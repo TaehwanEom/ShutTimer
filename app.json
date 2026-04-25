@@ -22,6 +22,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Scan a photo to dismiss the timer.",
         "NSMotionUsageDescription": "Used to detect shake gesture to dismiss the alarm.",
+        "NSAlarmKitUsageDescription": "정확한 시각에 루틴 알람을 발화하기 위해 AlarmKit 권한이 필요합니다.",
         "UIBackgroundModes": [
           "audio"
         ],

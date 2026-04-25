@@ -12,9 +12,6 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-// @preserve v1-camera — v1의 expo-camera / ML Kit 경로. v1.5 VisionCamera+YOLO로 전환됨. 복원 가능성 위해 import 주석 유지.
-// import { CameraView, useCameraPermissions } from 'expo-camera';
-// import ImageLabeling from '@react-native-ml-kit/image-labeling';
 import { Accelerometer } from 'expo-sensors';
 import { Audio, InterruptionModeIOS } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -91,11 +88,6 @@ type Props = {
 
 type ResultState = 'idle' | 'success' | 'fail';
 type AfterAdAction = 'result' | 'home';
-
-// @preserve v1-ml-kit — v1 ML Kit 기반 라벨 매핑. v1.5에서 MISSION_COCO_LABELS로 대체.
-// const MISSION_LABELS: Record<string, string[]> = { ... };
-// const VERIFIED_ICONS = ['tv', 'toys', 'clean-hands', 'pets', 'local-cafe'];
-// const RANDOM_TARGETS = VERIFIED_ICONS.map(icon => ({ ... }));
 
 // MISSION_POOL 은 ../constants/missionIcons 에서 import (Fluent Emoji 매핑 있는 미션만 — PoC와 동기화)
 

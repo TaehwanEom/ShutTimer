@@ -1,7 +1,7 @@
-// @ts-nocheck — Phase 1+2 임시. Phase 5 RoutineEditScreen 재작성 시 제거 필수.
-// v1.6: 루틴 추가/편집 화면.
-// 신규 생성: route.params.routineId 없음 → 빈 초기값.
-// 편집: route.params.routineId 있음 → 해당 루틴 로드.
+// v1.6 Phase 5: 루틴 추가/편집 화면 전면 재작성.
+// 신규: route.params.routineId 없음 → 빈 초기값 + 슬롯 1개 자동 추가.
+// 편집: route.params.routineId 있음 → 해당 루틴 로드, 모든 슬롯 saved=true.
+// 하위 화면(Category/Days/Sound)는 navigation.navigate(merge:true) + useEffect 흡수 패턴.
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -14,401 +14,568 @@ import {
   TextInput,
   Switch,
   Alert,
-  Modal,
-  Image,
-  Platform,
-  Linking,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import {
   Routine,
-  RoutineMission,
+  RoutineStep,
   loadRoutines,
   upsertRoutine,
+  deleteRoutine,
   createRoutineId,
+  createStepId,
 } from '../constants/routines';
-import { scheduleRoutinePrealerts, cancelRoutinePrealerts } from '../utils/routineScheduler';
-import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL } from '../constants/missionIcons';
+import {
+  scheduleRoutinePrealerts,
+  cancelRoutinePrealerts,
+} from '../utils/routineScheduler';
+import {
+  FIXED_CATEGORIES,
+  CategoryDef,
+  loadCustomCategories,
+} from '../constants/categories';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineEdit'>;
   route: RouteProp<RootStackParamList, 'RoutineEdit'>;
 };
 
+type LocalStep = {
+  id: string;
+  name: string;
+  startTime: string; // "" or "HH:MM"
+  endTime: string;
+  saved: boolean;
+};
+
+const STEP_NAME_MAX = 20;
+const ROUTINE_NAME_MAX = 30;
+const MAX_STEPS = 5;
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-const DEFAULT_MISSION_MINUTES = 5;
-const REST_MISSION_KEY = 'rest';
+
+// ─── 시간 헬퍼 ────────────────────────────────────────────
+
+function hhmmToDate(hhmm: string): Date {
+  const d = new Date();
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) {
+    d.setHours(7, 0, 0, 0);
+    return d;
+  }
+  const [hStr, mStr] = hhmm.split(':');
+  d.setHours(parseInt(hStr, 10) || 0, parseInt(mStr, 10) || 0, 0, 0);
+  return d;
+}
+
+function dateToHhmm(d: Date): string {
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatTimeKr(hhmm: string): string {
+  if (!hhmm) return '--:--';
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return '--:--';
+  const ampm = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+}
+
+// ─── 카테고리/요일/사운드 라벨 ───────────────────────────
+
+function formatDaysLabel(days: number[], t: (k: string) => string): string {
+  if (days.length === 0) return t('routine.edit.unselected');
+  if (days.length === 7) return t('routine.daysEveryday');
+  const sorted = [...days].sort();
+  const isWeekday = sorted.length === 5 && sorted.every((v, i) => v === [1, 2, 3, 4, 5][i]);
+  const isWeekend = sorted.length === 2 && sorted[0] === 0 && sorted[1] === 6;
+  if (isWeekday) return t('routine.daysWeekday');
+  if (isWeekend) return t('routine.daysWeekend');
+  return sorted.map(d => t(`routine.weekday.${WEEKDAY_KEYS[d]}`)).join(' ');
+}
+
+function formatSoundLabel(soundKey: string, t: (k: string) => string): string {
+  const item = ALARM_SOUNDS.find(s => s.id === soundKey);
+  if (!item) return t('routine.edit.unselected');
+  const num = item.id.split('_')[1] ?? '';
+  return item.id.startsWith('alarm_')
+    ? `${t('routine.sound.alarm')} ${num}`
+    : `${t('routine.sound.ringtone')} ${num}`;
+}
+
+// ─── 컴포넌트 ────────────────────────────────────────────
 
 export default function RoutineEditScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const styles = makeStyles(colors);
   const editingId = route.params?.routineId ?? null;
+  const isEditMode = editingId !== null;
 
   const [name, setName] = useState('');
-  const [missions, setMissions] = useState<RoutineMission[]>([]);
-  const [loopCount, setLoopCount] = useState(1);
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [category, setCategory] = useState('');
   const [days, setDays] = useState<number[]>([]);
-  const [timeHour, setTimeHour] = useState(7);
-  const [timeMinute, setTimeMinute] = useState(0);
+  const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [autoAdvance, setAutoAdvance] = useState(true);
-  const [dismissMethod, setDismissMethod] = useState<'tap' | 'shake'>('tap');
-  const [missionPickerOpen, setMissionPickerOpen] = useState(false);
-  const [editingMissionIndex, setEditingMissionIndex] = useState<number | null>(null);
-  // 편집 모드에서 기존 createdAt 유지용
-  const originalCreatedAtRef = useRef<number | null>(null);
+  const [steps, setSteps] = useState<LocalStep[]>(() => [
+    { id: createStepId(), name: '', startTime: '', endTime: '', saved: false },
+  ]);
+  const [dirty, setDirty] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<{ stepIndex: number; field: 'startTime' | 'endTime' } | null>(null);
+  const [categoryCache, setCategoryCache] = useState<CategoryDef[]>([...FIXED_CATEGORIES]);
 
-  // 편집 모드: 기존 루틴 로드
+  const originalCreatedAtRef = useRef<number | null>(null);
+  const originalActiveRef = useRef<boolean>(true);
+  const loadedRef = useRef(false);
+
+  const markDirty = () => setDirty(true);
+
+  // ─── 마운트: 편집 모드면 기존 루틴 로드 ─────────────
+
   useEffect(() => {
-    if (!editingId) return;
+    if (loadedRef.current) return;
+    if (!editingId) {
+      loadedRef.current = true;
+      return;
+    }
     loadRoutines().then(list => {
       const target = list.find(r => r.id === editingId);
-      if (!target) return;
-      originalCreatedAtRef.current = target.createdAt;
-      setName(target.name);
-      setMissions(target.missions);
-      setLoopCount(target.loopCount);
-      setAutoAdvance(target.autoAdvance);
-      setDismissMethod(target.dismissMethod);
-      if (target.schedule) {
-        setScheduleEnabled(true);
-        setDays(target.schedule.days);
-        const [h, m] = target.schedule.time.split(':');
-        setTimeHour(parseInt(h, 10) || 0);
-        setTimeMinute(parseInt(m, 10) || 0);
+      if (!target) {
+        loadedRef.current = true;
+        return;
       }
+      originalCreatedAtRef.current = target.createdAt;
+      originalActiveRef.current = target.active;
+      setName(target.name);
+      setCategory(target.category);
+      setDays(target.schedule?.days ?? []);
+      setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
+      setAutoAdvance(target.autoAdvance);
+      setSteps(
+        target.steps.map(s => ({
+          id: s.id,
+          name: s.name,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          saved: true,
+        }))
+      );
+      loadedRef.current = true;
     });
   }, [editingId]);
 
-  const toggleDay = (d: number) => {
-    setDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
-  };
+  // ─── 카테고리 캐시 (커스텀 추가 후 복귀 시 갱신) ────
 
-  const addMission = () => {
-    setEditingMissionIndex(missions.length);
-    setMissionPickerOpen(true);
-  };
+  useFocusEffect(
+    useCallback(() => {
+      loadCustomCategories().then(custom => {
+        setCategoryCache([...FIXED_CATEGORIES, ...custom]);
+      });
+    }, [])
+  );
 
-  const pickMission = (missionKey: string) => {
-    const next = [...missions];
-    if (editingMissionIndex !== null && editingMissionIndex < missions.length) {
-      next[editingMissionIndex] = { ...next[editingMissionIndex], missionKey };
-    } else {
-      next.push({ missionKey, durationMinutes: DEFAULT_MISSION_MINUTES });
+  // ─── 하위 화면 반환 흡수 (merge:true 패턴) ──────────
+
+  useEffect(() => {
+    const sel = route.params?.selectedCategory;
+    if (sel !== undefined) {
+      setCategory(sel);
+      markDirty();
+      navigation.setParams({ selectedCategory: undefined } as any);
     }
-    setMissions(next);
-    setMissionPickerOpen(false);
-    setEditingMissionIndex(null);
+  }, [route.params?.selectedCategory, navigation]);
+
+  useEffect(() => {
+    const sel = route.params?.selectedDays;
+    if (sel !== undefined) {
+      setDays(sel);
+      markDirty();
+      navigation.setParams({ selectedDays: undefined } as any);
+    }
+  }, [route.params?.selectedDays, navigation]);
+
+  useEffect(() => {
+    const sel = route.params?.selectedSound;
+    if (sel !== undefined) {
+      setSoundKey(sel);
+      markDirty();
+      navigation.setParams({ selectedSound: undefined } as any);
+    }
+  }, [route.params?.selectedSound, navigation]);
+
+  // ─── 슬롯 핸들러 ────────────────────────────────────
+
+  const handleAddStep = () => {
+    if (steps.length >= MAX_STEPS) return;
+    setSteps(prev => [
+      ...prev,
+      { id: createStepId(), name: '', startTime: '', endTime: '', saved: false },
+    ]);
+    markDirty();
   };
 
-  const adjustDuration = (idx: number, delta: number) => {
-    setMissions(prev => prev.map((m, i) =>
-      i === idx ? { ...m, durationMinutes: Math.max(1, m.durationMinutes + delta) } : m
-    ));
+  const updateStep = (idx: number, patch: Partial<LocalStep>) => {
+    setSteps(prev => {
+      const next = [...prev];
+      // 사용자가 필드 수정 시 saved=false로 되돌림 (재저장 유도)
+      next[idx] = { ...next[idx], ...patch, saved: patch.saved ?? false };
+      return next;
+    });
+    markDirty();
   };
 
-  const removeMission = (idx: number) => {
-    setMissions(prev => prev.filter((_, i) => i !== idx));
+  const handleStepNameChange = (idx: number, text: string) => {
+    updateStep(idx, { name: text });
   };
 
-  const adjustLoop = (delta: number) => {
-    setLoopCount(prev => Math.max(1, Math.min(99, prev + delta)));
+  const handleStepTimeTap = (idx: number, field: 'startTime' | 'endTime') => {
+    setPickerTarget({ stepIndex: idx, field });
+    setPickerVisible(true);
   };
 
-  const adjustHour = (delta: number) => {
-    setTimeHour(prev => (prev + delta + 24) % 24);
-  };
-  const adjustMinute = (delta: number) => {
-    setTimeMinute(prev => (prev + delta + 60) % 60);
-  };
-
-  const handleSave = useCallback(async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      Alert.alert(t('routine.validationNameEmpty', { defaultValue: '루틴 이름을 입력하세요' }));
+  const handlePickerConfirm = (date: Date) => {
+    if (!pickerTarget) {
+      setPickerVisible(false);
       return;
     }
-    if (missions.length === 0) {
-      Alert.alert(t('routine.validationMissionsEmpty', { defaultValue: '최소 1개 이상의 미션을 추가하세요' }));
+    const hhmm = dateToHhmm(date);
+    setSteps(prev => {
+      const next = [...prev];
+      const target = { ...next[pickerTarget.stepIndex] };
+      target[pickerTarget.field] = hhmm;
+      target.saved = false;
+      next[pickerTarget.stepIndex] = target;
+      return next;
+    });
+    markDirty();
+    setPickerVisible(false);
+    setPickerTarget(null);
+  };
+
+  const handlePickerCancel = () => {
+    setPickerVisible(false);
+    setPickerTarget(null);
+  };
+
+  const handleSlotSave = (idx: number) => {
+    const step = steps[idx];
+    if (!step.name.trim() || !step.startTime || !step.endTime) {
+      Alert.alert(
+        t('routine.edit.validationFailTitle'),
+        t('routine.edit.validationStepIncomplete', { n: idx + 1 })
+      );
       return;
     }
+    setSteps(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], saved: true };
+      // 다음 슬롯 startTime 자동 복사 (비어 있을 때만)
+      if (idx + 1 < next.length && !next[idx + 1].startTime) {
+        next[idx + 1] = { ...next[idx + 1], startTime: step.endTime };
+      }
+      return next;
+    });
+    markDirty();
+  };
 
-    const routine: Routine = {
-      id: editingId ?? createRoutineId(),
-      name: trimmed,
-      missions,
-      loopCount,
-      schedule: scheduleEnabled
-        ? {
-            days,
-            time: `${String(timeHour).padStart(2, '0')}:${String(timeMinute).padStart(2, '0')}`,
-          }
-        : undefined,
-      autoAdvance,
-      dismissMethod,
-      createdAt: editingId && originalCreatedAtRef.current !== null
-        ? originalCreatedAtRef.current
-        : Date.now(),
-    };
+  const handleDeleteStep = (idx: number) => {
+    if (steps.length <= 1) return;
+    setSteps(prev => prev.filter((_, i) => i !== idx));
+    markDirty();
+  };
 
-    await upsertRoutine(routine);
+  // ─── 헤더 액션 ──────────────────────────────────────
 
-    // 예약 갱신
-    if (editingId) {
-      await cancelRoutinePrealerts(editingId);
+  const handleClose = () => {
+    if (!dirty) {
+      navigation.goBack();
+      return;
     }
-    if (routine.schedule) {
-      await scheduleRoutinePrealerts(routine);
-      // Android 12+: 정확한 알림 권한 안내 (1회만). 사용자가 설정에서 허용해야 정시 발화 보장.
-      if (Platform.OS === 'android') {
-        await maybeShowExactAlarmNotice();
+    Alert.alert(
+      t('routine.edit.dirtyConfirmTitle'),
+      t('routine.edit.dirtyConfirmBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('routine.edit.dirtyConfirmExit'),
+          style: 'destructive',
+          onPress: () => navigation.goBack(),
+        },
+      ]
+    );
+  };
+
+  const validate = (): { ok: boolean; error?: string } => {
+    if (!name.trim()) return { ok: false, error: t('routine.edit.validationNameEmpty') };
+    if (!category) return { ok: false, error: t('routine.edit.validationCategoryEmpty') };
+    if (days.length === 0) return { ok: false, error: t('routine.edit.validationDaysEmpty') };
+    if (steps.length === 0) return { ok: false, error: t('routine.edit.validationStepsEmpty') };
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i];
+      if (!s.name.trim() || !s.startTime || !s.endTime) {
+        return { ok: false, error: t('routine.edit.validationStepIncomplete', { n: i + 1 }) };
       }
     }
+    return { ok: true };
+  };
 
-    navigation.goBack();
-  }, [editingId, name, missions, loopCount, scheduleEnabled, days, timeHour, timeMinute, autoAdvance, dismissMethod, navigation, t]);
-
-  // Phase 2 C: Android 12+ SCHEDULE_EXACT_ALARM 설정 화면 직접 호출.
-  // Android 13+ USE_EXACT_ALARM 자동 부여라 대부분의 기기는 여기 올 필요 없음.
-  const openExactAlarmSettings = async () => {
-    if (Platform.OS !== 'android') {
-      Linking.openSettings().catch(() => {});
+  const handleHeaderSave = async () => {
+    const v = validate();
+    if (!v.ok) {
+      Alert.alert(t('routine.edit.validationFailTitle'), v.error ?? '');
       return;
     }
-    try {
-      await IntentLauncher.startActivityAsync(
-        'android.settings.REQUEST_SCHEDULE_EXACT_ALARM_PERMISSION',
-        { data: 'package:com.shuttimer.app' }
-      );
-    } catch {
-      // intent 실패 시 앱 설정 화면 fallback
-      Linking.openSettings().catch(() => {});
+    const finalSteps: RoutineStep[] = steps.map(s => ({
+      id: s.id,
+      name: s.name.trim(),
+      startTime: s.startTime,
+      endTime: s.endTime,
+    }));
+    const routine: Routine = {
+      id: editingId ?? createRoutineId(),
+      name: name.trim(),
+      category,
+      steps: finalSteps,
+      schedule: { days },
+      soundKey,
+      active: isEditMode ? originalActiveRef.current : true,
+      autoAdvance,
+      createdAt: originalCreatedAtRef.current ?? Date.now(),
+    };
+    await upsertRoutine(routine);
+    if (routine.active && routine.schedule) {
+      await scheduleRoutinePrealerts(routine);
+    } else {
+      await cancelRoutinePrealerts(routine.id);
     }
+    navigation.goBack();
   };
 
-  const maybeShowExactAlarmNotice = async () => {
-    try {
-      const shown = await AsyncStorage.getItem('routine_exact_alarm_notice_shown');
-      if (shown === 'true') return;
-      await AsyncStorage.setItem('routine_exact_alarm_notice_shown', 'true');
-      Alert.alert(
-        t('routine.exactAlarmTitle', { defaultValue: '정확한 알림 권한' }),
-        t('routine.exactAlarmBody', { defaultValue: '정시에 알림을 받으려면 시스템 설정에서 "알람 및 리마인더" 권한을 허용해주세요. 권한이 없으면 알림이 최대 15분 지연될 수 있습니다.' }),
-        [
-          { text: t('routine.exactAlarmLater', { defaultValue: '나중에' }), style: 'cancel' },
-          {
-            text: t('routine.exactAlarmOpenSettings', { defaultValue: '설정 열기' }),
-            onPress: () => openExactAlarmSettings(),
+  const handleDelete = () => {
+    if (!editingId) return;
+    Alert.alert(
+      t('routine.deleteConfirmTitle'),
+      t('routine.deleteConfirmBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('routine.actionDelete'),
+          style: 'destructive',
+          onPress: async () => {
+            await cancelRoutinePrealerts(editingId);
+            await deleteRoutine(editingId);
+            navigation.goBack();
           },
-        ]
-      );
-    } catch {
-      // flag 저장/조회 실패 무시
-    }
+        },
+      ]
+    );
   };
+
+  // ─── 네비게이션 핸들러 ─────────────────────────────
+
+  const handleNavCategory = () => {
+    navigation.navigate('RoutineCategory', { current: category });
+  };
+
+  const handleNavDays = () => {
+    navigation.navigate('RoutineDays', { current: days });
+  };
+
+  const handleNavSound = () => {
+    navigation.navigate('RoutineSound', { current: soundKey });
+  };
+
+  // ─── 표시용 라벨 ────────────────────────────────────
+
+  const categoryLabel = (() => {
+    if (!category) return t('routine.edit.unselected');
+    const def = categoryCache.find(c => c.id === category);
+    if (!def) return t('routine.edit.unselected');
+    return def.labelKey ? t(def.labelKey) : def.label ?? category;
+  })();
+  const daysLabel = formatDaysLabel(days, t);
+  const soundLabel = formatSoundLabel(soundKey, t);
+
+  // ─── 렌더 ───────────────────────────────────────────
+
+  const initialPickerDate = (() => {
+    if (!pickerTarget) return new Date();
+    const step = steps[pickerTarget.stepIndex];
+    return hhmmToDate(step?.[pickerTarget.field] ?? '');
+  })();
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleClose}>
           <MaterialIcons name="close" size={28} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {editingId
-            ? t('routine.editTitle', { defaultValue: '루틴 편집' })
-            : t('routine.newTitle', { defaultValue: '새 루틴' })}
+          {isEditMode ? t('routine.edit.editTitle') : t('routine.edit.newTitle')}
         </Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={handleSave}>
-          <MaterialIcons name="check" size={28} color={colors.primary} />
+        <TouchableOpacity style={styles.iconBtn} onPress={handleHeaderSave}>
+          <Text style={styles.headerSave}>{t('routine.edit.save')}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* 이름 */}
-        <Text style={styles.sectionLabel}>{t('routine.fieldName', { defaultValue: '루틴 이름' })}</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 루틴 이름 */}
+        <Text style={styles.fieldLabel}>{t('routine.fieldName')}</Text>
         <TextInput
-          style={styles.textInput}
           value={name}
-          onChangeText={setName}
-          placeholder={t('routine.namePlaceholder', { defaultValue: '예: 아침 루틴' })}
+          onChangeText={text => {
+            setName(text);
+            markDirty();
+          }}
+          placeholder={t('routine.namePlaceholder')}
           placeholderTextColor={colors.secondary}
-          maxLength={40}
+          maxLength={ROUTINE_NAME_MAX}
+          style={styles.nameInput}
         />
 
-        {/* 미션 목록 */}
-        <Text style={styles.sectionLabel}>{t('routine.fieldMissions', { defaultValue: '미션' })}</Text>
-        {missions.map((m, idx) => {
-          const icon = m.missionKey === REST_MISSION_KEY ? null : MISSION_EMOJI[m.missionKey];
-          const label = m.missionKey === REST_MISSION_KEY
-            ? t('routine.restLabel', { defaultValue: '휴식' })
-            : MISSION_LABEL[m.missionKey] ?? m.missionKey;
+        {/* 세부 루틴 */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.stepsSection')}</Text>
+        {steps.map((step, idx) => {
+          const canSave = !!(step.name.trim() && step.startTime && step.endTime);
           return (
-            <View key={idx} style={styles.missionRow}>
-              <View style={styles.missionIconWrap}>
-                {icon ? (
-                  <Image source={icon} style={styles.missionEmoji} resizeMode="contain" />
-                ) : (
-                  <MaterialIcons name="bedtime" size={24} color={colors.secondary} />
+            <View key={step.id} style={styles.slotCard}>
+              <View style={styles.slotRow}>
+                <View style={styles.slotNumber}>
+                  <Text style={styles.slotNumberText}>{idx + 1}</Text>
+                </View>
+                <TextInput
+                  value={step.name}
+                  onChangeText={text => handleStepNameChange(idx, text)}
+                  placeholder={t('routine.edit.stepNamePlaceholder')}
+                  placeholderTextColor={colors.secondary}
+                  maxLength={STEP_NAME_MAX}
+                  style={styles.slotNameInput}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.slotSaveBtn,
+                    step.saved && styles.slotSaveBtnDone,
+                    !canSave && !step.saved && styles.slotSaveBtnDisabled,
+                  ]}
+                  onPress={() => handleSlotSave(idx)}
+                  disabled={!canSave}
+                >
+                  <Text
+                    style={[
+                      styles.slotSaveBtnText,
+                      step.saved && { color: colors.onPrimary },
+                      !canSave && !step.saved && { color: colors.secondary },
+                    ]}
+                  >
+                    {step.saved ? t('routine.edit.stepSlotSaved') : t('routine.edit.stepSlotSave')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.slotTimeRow}>
+                <TouchableOpacity onPress={() => handleStepTimeTap(idx, 'startTime')} style={styles.slotTimeBtn}>
+                  <Text style={[styles.slotTimeText, !step.startTime && styles.slotTimeEmpty]}>
+                    {formatTimeKr(step.startTime)}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.slotTimeSep}>~</Text>
+                <TouchableOpacity onPress={() => handleStepTimeTap(idx, 'endTime')} style={styles.slotTimeBtn}>
+                  <Text style={[styles.slotTimeText, !step.endTime && styles.slotTimeEmpty]}>
+                    {formatTimeKr(step.endTime)}
+                  </Text>
+                </TouchableOpacity>
+                {steps.length > 1 && (
+                  <TouchableOpacity
+                    onPress={() => handleDeleteStep(idx)}
+                    style={styles.slotDelBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialIcons name="remove-circle-outline" size={20} color={colors.secondary} />
+                  </TouchableOpacity>
                 )}
               </View>
-              <Text style={styles.missionLabel} numberOfLines={1}>{label}</Text>
-              <View style={styles.durationControl}>
-                <TouchableOpacity onPress={() => adjustDuration(idx, -1)}>
-                  <MaterialIcons name="remove" size={20} color={colors.onBackground} />
-                </TouchableOpacity>
-                <Text style={styles.durationText}>{m.durationMinutes}</Text>
-                <TouchableOpacity onPress={() => adjustDuration(idx, 1)}>
-                  <MaterialIcons name="add" size={20} color={colors.onBackground} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity onPress={() => removeMission(idx)}>
-                <MaterialIcons name="delete-outline" size={22} color={colors.error} />
-              </TouchableOpacity>
             </View>
           );
         })}
-        <TouchableOpacity style={styles.addBtn} onPress={addMission}>
-          <MaterialIcons name="add" size={20} color={colors.primary} />
-          <Text style={styles.addBtnText}>{t('routine.addMission', { defaultValue: '미션 추가' })}</Text>
-        </TouchableOpacity>
 
-        {/* 루프 */}
-        <Text style={styles.sectionLabel}>{t('routine.fieldLoop', { defaultValue: '반복 세트' })}</Text>
-        <View style={styles.inlineRow}>
-          <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustLoop(-1)}>
-            <MaterialIcons name="remove" size={22} color={colors.onBackground} />
+        {steps.length < MAX_STEPS && (
+          <TouchableOpacity style={styles.addStepBtn} onPress={handleAddStep}>
+            <MaterialIcons name="add" size={20} color={colors.primary} />
+            <Text style={styles.addStepText}>{t('routine.edit.addStep')}</Text>
           </TouchableOpacity>
-          <Text style={styles.loopText}>{loopCount}</Text>
-          <TouchableOpacity style={styles.adjustBtn} onPress={() => adjustLoop(1)}>
-            <MaterialIcons name="add" size={22} color={colors.onBackground} />
-          </TouchableOpacity>
-          <Text style={styles.loopHint}>
-            {t('routine.loopUnit', { defaultValue: '세트' })}
-          </Text>
-        </View>
-
-        {/* 예약 */}
-        <View style={styles.switchRow}>
-          <Text style={styles.sectionLabel}>{t('routine.fieldSchedule', { defaultValue: '예약' })}</Text>
-          <Switch value={scheduleEnabled} onValueChange={setScheduleEnabled} />
-        </View>
-        {scheduleEnabled && (
-          <>
-            {/* 요일 */}
-            <View style={styles.daysRow}>
-              {WEEKDAY_KEYS.map((key, d) => {
-                const on = days.includes(d);
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.dayChip, on && { backgroundColor: colors.primary }]}
-                    onPress={() => toggleDay(d)}
-                  >
-                    <Text style={[styles.dayChipText, on && { color: colors.onPrimary }]}>
-                      {t(`routine.weekday.${key}`, { defaultValue: key })}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {/* 시간 */}
-            <View style={styles.timeRow}>
-              <TouchableOpacity onPress={() => adjustHour(-1)}><MaterialIcons name="keyboard-arrow-up" size={28} color={colors.onBackground} /></TouchableOpacity>
-              <Text style={styles.timeText}>{String(timeHour).padStart(2, '0')}</Text>
-              <TouchableOpacity onPress={() => adjustHour(1)}><MaterialIcons name="keyboard-arrow-down" size={28} color={colors.onBackground} /></TouchableOpacity>
-              <Text style={styles.timeColon}>:</Text>
-              <TouchableOpacity onPress={() => adjustMinute(-5)}><MaterialIcons name="keyboard-arrow-up" size={28} color={colors.onBackground} /></TouchableOpacity>
-              <Text style={styles.timeText}>{String(timeMinute).padStart(2, '0')}</Text>
-              <TouchableOpacity onPress={() => adjustMinute(5)}><MaterialIcons name="keyboard-arrow-down" size={28} color={colors.onBackground} /></TouchableOpacity>
-            </View>
-          </>
         )}
 
-        {/* 진행 방식 — F6: 라벨 고정. Switch ON=자동 진행, OFF=확인 후 진행 */}
-        <View style={styles.switchRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sectionLabel}>
-              {t('routine.fieldAutoAdvance', { defaultValue: '자동 진행' })}
-            </Text>
-            <Text style={styles.switchHint}>
-              {autoAdvance
-                ? t('routine.autoAdvanceHintOn', { defaultValue: '미션 시간 종료 후 다음 미션 자동 시작' })
-                : t('routine.autoAdvanceHintOff', { defaultValue: '미션마다 알람 후 사용자 확인' })}
-            </Text>
-          </View>
-          <Switch value={autoAdvance} onValueChange={setAutoAdvance} />
-        </View>
+        {/* 설정 */}
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.settingsSection')}</Text>
 
-        {/* 알람 종료 방식 */}
-        <Text style={styles.sectionLabel}>{t('routine.fieldDismiss', { defaultValue: '알람 종료 방식' })}</Text>
-        <View style={styles.inlineRow}>
-          <TouchableOpacity
-            style={[styles.methodChip, dismissMethod === 'tap' && { backgroundColor: colors.primary }]}
-            onPress={() => setDismissMethod('tap')}
-          >
-            <Text style={[styles.methodChipText, dismissMethod === 'tap' && { color: colors.onPrimary }]}>
-              {t('routine.dismissTap', { defaultValue: '탭' })}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.methodChip, dismissMethod === 'shake' && { backgroundColor: colors.primary }]}
-            onPress={() => setDismissMethod('shake')}
-          >
-            <Text style={[styles.methodChipText, dismissMethod === 'shake' && { color: colors.onPrimary }]}>
-              {t('routine.dismissShake', { defaultValue: '흔들기' })}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ height: 60 }} />
-      </ScrollView>
-
-      {/* 미션 선택 모달 */}
-      <Modal
-        visible={missionPickerOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setMissionPickerOpen(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setMissionPickerOpen(false)}
-        >
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
-              {t('routine.pickMission', { defaultValue: '미션 선택' })}
-            </Text>
-            <ScrollView style={{ maxHeight: 400 }}>
-              {/* 휴식 */}
-              <TouchableOpacity style={styles.pickerRow} onPress={() => pickMission(REST_MISSION_KEY)}>
-                <MaterialIcons name="bedtime" size={24} color={colors.secondary} />
-                <Text style={styles.pickerRowText}>
-                  {t('routine.restLabel', { defaultValue: '휴식' })}
-                </Text>
-              </TouchableOpacity>
-              {/* 미션 풀 — F11: missionRow와 동일한 wrap 스타일 */}
-              {MISSION_POOL.map((key) => (
-                <TouchableOpacity key={key} style={styles.pickerRow} onPress={() => pickMission(key)}>
-                  <View style={styles.missionIconWrap}>
-                    <Image source={MISSION_EMOJI[key]} style={styles.missionEmoji} resizeMode="contain" />
-                  </View>
-                  <Text style={styles.pickerRowText}>{MISSION_LABEL[key] ?? key}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        <TouchableOpacity style={styles.settingRow} onPress={handleNavCategory}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldCategory')}</Text>
+          <View style={styles.settingValueRow}>
+            <Text style={[styles.settingValue, !category && styles.settingValueUnset]}>{categoryLabel}</Text>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
           </View>
         </TouchableOpacity>
-      </Modal>
+
+        <TouchableOpacity style={styles.settingRow} onPress={handleNavDays}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldDays')}</Text>
+          <View style={styles.settingValueRow}>
+            <Text style={[styles.settingValue, days.length === 0 && styles.settingValueUnset]}>{daysLabel}</Text>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.settingRow} onPress={handleNavSound}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldSound')}</Text>
+          <View style={styles.settingValueRow}>
+            <Text style={styles.settingValue}>{soundLabel}</Text>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.settingRow}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldAutoAdvance')}</Text>
+          <Switch
+            value={autoAdvance}
+            onValueChange={value => {
+              setAutoAdvance(value);
+              markDirty();
+            }}
+            trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+            thumbColor={colors.onPrimary}
+            style={{ transform: [{ scale: 0.85 }] }}
+          />
+        </View>
+
+        {/* 삭제 (편집 모드만) */}
+        {isEditMode && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+            <MaterialIcons name="delete-outline" size={20} color={colors.error} />
+            <Text style={styles.deleteBtnText}>{t('routine.edit.deleteRoutine')}</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
+
+      <DateTimePickerModal
+        isVisible={pickerVisible}
+        mode="time"
+        display="spinner"
+        date={initialPickerDate}
+        onConfirm={handlePickerConfirm}
+        onCancel={handlePickerCancel}
+        minuteInterval={1}
+        is24Hour={false}
+      />
     </SafeAreaView>
   );
 }
@@ -422,220 +589,177 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.onBackground,
-  },
-  iconBtn: {
-    padding: 8,
-    borderRadius: 50,
-    width: 44,
-    alignItems: 'center',
-  },
-  sectionLabel: {
-    fontSize: 13,
+  iconBtn: { padding: 8, borderRadius: 50, minWidth: 44, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.onBackground, letterSpacing: -0.5 },
+  headerSave: { fontSize: 15, fontWeight: '800', color: colors.primary },
+  content: { paddingHorizontal: 16, paddingBottom: 48 },
+  fieldLabel: {
+    fontSize: 11,
     fontWeight: '800',
     color: colors.secondary,
-    letterSpacing: 0.8,
-    marginHorizontal: 16,
-    marginTop: 20,
-    marginBottom: 10,
+    letterSpacing: 1.5,
+    marginTop: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
   },
-  textInput: {
-    marginHorizontal: 16,
-    padding: 12,
+  nameInput: {
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
     borderRadius: 10,
-    backgroundColor: colors.surfaceContainerLow,
-    color: colors.onBackground,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontSize: 15,
+    color: colors.onBackground,
   },
-  missionRow: {
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.secondary,
+    letterSpacing: 1.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  slotCard: {
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  slotRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceContainerLow,
     gap: 10,
   },
-  missionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+  slotNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerLowest,
   },
-  missionEmoji: {
-    width: 28,
-    height: 28,
+  slotNumberText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.onBackground,
   },
-  pickerRowEmoji: {
-    width: 28,
-    height: 28,
-  },
-  missionLabel: {
+  slotNameInput: {
     flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.onBackground,
+    paddingVertical: 4,
+  },
+  slotSaveBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  slotSaveBtnDone: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  slotSaveBtnDisabled: {
+    borderColor: colors.outlineVariant,
+  },
+  slotSaveBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  slotTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingLeft: 38,
+  },
+  slotTimeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceContainerLowest,
+    minWidth: 90,
+    alignItems: 'center',
+  },
+  slotTimeText: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.onBackground,
   },
-  durationControl: {
+  slotTimeEmpty: {
+    color: colors.secondary,
+    opacity: 0.6,
+  },
+  slotTimeSep: {
+    fontSize: 14,
+    color: colors.secondary,
+  },
+  slotDelBtn: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  addStepBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceContainerLowest,
-  },
-  durationText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.onBackground,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  addBtn: {
-    marginHorizontal: 16,
-    marginTop: 4,
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderStyle: 'dashed',
     borderColor: colors.primary,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
+    borderStyle: 'dashed',
+    marginTop: 4,
   },
-  addBtnText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  inlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-  },
-  adjustBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  loopText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.onBackground,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  loopHint: {
+  addStepText: {
     fontSize: 13,
-    color: colors.secondary,
+    fontWeight: '700',
+    color: colors.primary,
   },
-  switchRow: {
+  settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingRight: 16,
-  },
-  switchHint: {
-    fontSize: 12,
-    color: colors.secondary,
-    opacity: 0.8,
-    marginHorizontal: 16,
-    marginTop: -6,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceContainerLow,
     marginBottom: 8,
   },
-  daysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  dayChip: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  dayChipText: {
-    fontSize: 13,
+  settingLabel: {
+    fontSize: 14,
     fontWeight: '700',
     color: colors.onBackground,
   },
-  timeRow: {
+  settingValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  settingValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.onBackground,
+  },
+  settingValueUnset: {
+    color: colors.secondary,
+    opacity: 0.7,
+  },
+  deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  timeText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.onBackground,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  timeColon: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: colors.onBackground,
-    marginHorizontal: 4,
-  },
-  methodChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    marginTop: 24,
+    paddingVertical: 12,
     borderRadius: 10,
     backgroundColor: colors.surfaceContainerLow,
   },
-  methodChipText: {
+  deleteBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.onBackground,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 32,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.onBackground,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    gap: 12,
-    borderRadius: 8,
-  },
-  pickerRowText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.onBackground,
+    color: colors.error,
   },
 });

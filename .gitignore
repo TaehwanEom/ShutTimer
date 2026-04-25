@@ -27,3 +27,4 @@ yarn-error.*
 build/
 build */
 ios/
+!modules/**/ios/

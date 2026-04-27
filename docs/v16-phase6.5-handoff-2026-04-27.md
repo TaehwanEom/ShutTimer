@@ -338,6 +338,159 @@ eas build --platform android --profile preview --clear-cache
 
 ---
 
+### 10.6 T2 — 다단계 prealert 상세 명세
+
+#### 10.6.1 현재 상태
+- [routineScheduler.ts:12](../src/utils/routineScheduler.ts#L12) `ROUTINE_PREALERT_MINUTES` **단일 상수** — 1단계 prealert만 (예: 시작 5분 전)
+- 사용자 선호 (4-25 progress §8): **30분 + 5분 2단계** — 미구현
+- 64 한도 — `IOS_NOTIFICATION_SAFE_CAP = 54` ([routineScheduler.ts:347](../src/utils/routineScheduler.ts#L347))
+
+#### 10.6.2 작업 목표
+- 사용자 설정 가능한 다단계 prealert (예: 30분/15분/5분 중 다중 선택)
+- 또는 routine 별 `prealertMinutes[]` 필드 (default `[5, 30]`)
+- AlarmKit 통합 (T1) 후 64 한도 부담 ↓ → 다단계 도입 자연
+
+#### 10.6.3 영향 파일
+| 파일 | 변경 |
+|------|------|
+| `src/constants/routines.ts` | `Routine` 타입에 `prealertMinutes: number[]` 추가 (또는 user setting) |
+| `src/utils/routineScheduler.ts` | `scheduleRoutinePrealerts` 다중 슬롯 등록 + cancel 다중 슬롯 |
+| `src/screens/RoutineEditScreen.tsx` (선택) | prealert 시간 선택 UI |
+| `src/locales/ko.json` + `en.json` | 신규 텍스트 (prealert 시간 라벨) |
+
+#### 10.6.4 단계 분할
+| Step | 내용 |
+|------|------|
+| 1 | `Routine` 타입 + 마이그레이션 (default `[5, 30]`) |
+| 2 | `scheduleRoutinePrealerts` 다중 슬롯 등록 (AlarmKit + expo-notifications fallback 양쪽) |
+| 3 | cancel 함수 다중 슬롯 cancel |
+| 4 | (선택) RoutineEdit UI — 사용자 prealert 시간 다중 선택 |
+| 5 | 검증 — 30분 + 5분 둘 다 발화. 64 한도 검증 (T1 통합 후 부담 ↓) |
+
+#### 10.6.5 검증 시나리오
+1. 30분 전 prealert + 5분 전 prealert 둘 다 발화 (iOS 26+ AlarmKit / iOS 25 이하 expo-notifications)
+2. 매일 반복 — 다음 발화 시점에도 다중 슬롯 갱신
+3. 64 한도 (iOS 25 이하) — `[5, 30]` × 매일 7일 × N 루틴 = 14N 슬롯. 한도 초과 시 overflow 배너
+4. 사용자 설정 변경 — 기존 슬롯 cancel + 새 슬롯 등록
+5. 강제 종료 후 재시작 — stale 슬롯 cleanup
+
+#### 10.6.6 위험 / 의존성
+- **T1 (AlarmKit) 후 진행 권장** — 64 한도 부담 ↓
+- 64 한도 (iOS 25 이하 / Android) 빠르게 소비 — overflow 배너 활용
+- 기존 단일 slot 사용자 데이터 마이그레이션 (`prealertMinutes` 누락 시 default `[5]` 또는 `[5, 30]`)
+
+#### 10.6.7 작업량
+- Step 1~3 (백엔드만) ~1일
+- Step 4 (UI) 추가 시 +0.5-1일
+- 검증 0.5일 → **총 ~1-2일**
+
+---
+
+### 10.7 T3 — 잠금 화면 컨트롤 상세 명세 (v1.7 권장)
+
+#### 10.7.1 현재 상태
+- 인프라 **0건** (앱 코드 grep 결과 — Live Activities / ActivityKit / MediaStyle / Foreground Service 흔적 X)
+- v1.5 / v1.6 는 알람 응답 후 RoutineAlarm / AlarmScreen 진입만 — 잠금 화면 컨트롤 없음
+
+#### 10.7.2 작업 목표
+- iOS 16.1+ — Live Activities (Dynamic Island 포함) — 타이머 진행 중 잠금 화면에서 일시정지 / 취소 컨트롤
+- Android — Foreground Service + MediaStyle Notification 또는 ongoing notification with action buttons
+
+#### 10.7.3 영향 영역
+| 플랫폼 | 기술 | 추가 작업 |
+|--------|------|----------|
+| iOS 16.1+ | **ActivityKit (Live Activities)** + Dynamic Island | Widget Extension target 신규 + SwiftUI 코드 + ActivityKit ContentView |
+| Android | **Foreground Service** + MediaStyle Notification | foreground service 권한 + Notification action handler + receiver |
+
+#### 10.7.4 영향 파일 (예상)
+| 파일 / 영역 | 변경 |
+|-----------|------|
+| `modules/live-activity/` (신규) | Expo Modules API 기반 native 모듈 (iOS Swift + Android Kotlin) |
+| `ios/ShutTimer/...` | Widget Extension target 추가 (Xcode 프로젝트 설정) |
+| `android/app/src/main/AndroidManifest.xml` | `FOREGROUND_SERVICE` 권한 + service 등록 |
+| `app.json` | plugins 배열에 신규 모듈 등록, iOS infoPlist `UIBackgroundModes` |
+| `src/utils/timerScheduler.ts` (또는 신규) | Live Activity 시작/업데이트/종료 호출 |
+| `App.tsx` | timer / routine 시작 시 Live Activity trigger |
+
+#### 10.7.5 단계 분할 (대략)
+| Step | 내용 |
+|------|------|
+| 1 | iOS Live Activities — Widget Extension target + ActivityKit Swift 모듈 |
+| 2 | Android Foreground Service + MediaStyle Notification |
+| 3 | TS 인터페이스 + JS 호출 wrapper |
+| 4 | timer 시작 / 종료 / 일시정지 시 Live Activity 호출 |
+| 5 | routine 시작 / step 진행 시 Live Activity 업데이트 |
+| 6 | 검증 — 잠금 화면 / Dynamic Island / Android 알림 컨트롤 |
+
+#### 10.7.6 검증 시나리오
+1. iOS 16.1+ 타이머 시작 → 잠금 화면 Live Activity 표시 + 일시정지 / 취소 버튼 작동
+2. iOS 16.1+ 타이머 진행 중 — Dynamic Island compact / expanded 상태
+3. iOS 16.0 이하 fallback — Live Activity 미표시 (회귀 X)
+4. Android — Foreground Service Notification 진행률 + 일시정지 / 취소 작동
+5. routine 진행 중 — step 변경 시 Live Activity 업데이트
+6. 앱 kill 후 — Live Activity 자동 종료 (iOS) / Foreground Service 종료 (Android)
+
+#### 10.7.7 위험 요소
+- **신규 native 모듈** — Expo Modules API + Widget Extension target — 학습 곡선 + 빌드 복잡도 ↑
+- **iOS 16.1 미만 / Android API 24 미만** fallback 정책
+- **EAS Dev Build 재생성 필수** (네이티브 변경)
+- **반복실수 #1** — react-native-live-activity 같은 외부 패키지 사용 시 공식 문서 필독
+
+#### 10.7.8 작업량
+- iOS Live Activities 단독 ~3-5일
+- Android 동등 ~2-3일
+- **총 ~1주+** — v1.7 사이클 권장 (v1.6 출시 후)
+
+---
+
+### 10.8 T4 — Phase 7 다국어 동기화 상세 명세
+
+#### 10.8.1 현재 상태
+- ko.routine flat 186 키 (원본)
+- en.routine flat 186 키 (T0 작업으로 동기화 완료 — 17ac6af)
+- **12개 언어** (ja/zh-CN/zh-TW/fr/de/es/pt-BR/it/tr/ar/th/id) routine 섹션 0 키
+- top-level 키도 12개 언어에서 2개 누락 (ko/en=17, 다른=15)
+
+#### 10.8.2 작업 목표
+- 12개 언어 모두 ko ↔ 동일 구조 동기화
+- routine 섹션 186 키 + top-level 누락 ~10 키
+- **총 ~12 × 200 = ~2400 키 신규 번역**
+
+#### 10.8.3 작업 절차
+| Step | 내용 |
+|------|------|
+| 1 | en.json (이미 동기화됨) 을 base 로 12개 언어 자동 번역 (DeepL / GPT-4) |
+| 2 | 키별 자동 번역 결과 lint — i18next interpolation (`{{count}}` 등) 보존 검증 |
+| 3 | 자연스러움 / 문법 검수 (네이티브 또는 GPT-4 검수 모드) |
+| 4 | 13개 언어 동시 검증 — 시스템 언어 변경 후 routine 모든 화면 텍스트 검증 |
+
+#### 10.8.4 영향 파일
+- `src/locales/ja.json` / `zh-CN.json` / `zh-TW.json` / `fr.json` / `de.json` / `es.json` / `pt-BR.json` / `it.json` / `tr.json` / `ar.json` / `th.json` / `id.json` (12개)
+
+#### 10.8.5 검증 시나리오
+1. 시스템 언어 = 일본어 → 모든 routine 화면 일본어 표시
+2. ar (RTL) — 레이아웃 깨짐 X 검증 (오른쪽에서 왼쪽 언어)
+3. 인터폴레이션 (`{{n}}초`, `{{count}} 단계` 등) 모든 언어에서 정상 표시
+4. 텍스트 길이 — 독일어 / 프랑스어 등 긴 언어 UI 깨짐 X 검증
+
+#### 10.8.6 위험 요소
+- 자동 번역 품질 — 일부 자연스럽지 않을 수 있음 (검수 시간 ↑)
+- RTL (ar) — 레이아웃 별도 검증
+- 텍스트 길이 — UI 깨짐 가능 (특히 짧은 라벨)
+- 신규 키 누적 — T1 ~ T3 진행 중 새 키 추가되면 12개 언어 또 추가 필요 → **출시 직전 일괄이 정합**
+
+#### 10.8.7 작업량
+- 자동 번역 (Step 1) — ~1일
+- 검수 (Step 2~3) — ~1-2일
+- 검증 (Step 4) — ~0.5일
+- **총 ~2-4일**
+
+#### 10.8.8 진행 시점
+- **T1 + T2 (+ B 항목) 완료 후** — 모든 신규 텍스트 ko 확정 후 일괄
+- 출시 직전 1회 (사용자 정책 #1 — i18n 사이클 마지막)
+
+---
+
 ## 11. 핵심 메모리 / 정책 (다음 채팅 자동 로드)
 
 - `feedback_search_first.md` — 빌드 에러/API 시그니처 자체 추론 금지

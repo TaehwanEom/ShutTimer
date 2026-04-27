@@ -14,6 +14,8 @@ import {
   AppState,
   BackHandler,
   Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -38,7 +40,10 @@ import {
   stopRoutine,
 } from '../utils/routineController';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
-import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL } from '../constants/missionIcons';
+import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
+import { useSharedValue } from 'react-native-worklets-core';
+import AlarmCameraMode from './AlarmCameraMode';
+import type { Detection } from '../utils/objectDetection';
 import { SETTINGS_KEY } from '../constants/settings';
 
 type Props = {
@@ -49,6 +54,16 @@ type Props = {
 const SHAKE_THRESHOLD = 2.5;
 const SHAKE_COOLDOWN_MS = 400;
 const SHAKE_COUNT_REQUIRED = 2;
+// v1.6 Phase 6.5 — AlarmCameraMode 의 v1.5 검증 임계값 (분리 정책: 자체 선언, AlarmScreen import X)
+const TARGET_CONFIDENCE = 0.4;
+// v1.6 Phase 6.5 — 카메라 모드 검증 흐름 상수 (AlarmScreen 동일 값 차용)
+const RETRY_BANNER_MS = 1000;
+const BLINK_ON_MS = 100;
+const BLINK_OFF_MS = 80;
+const BLINK_COUNT = 2;
+const FEEDBACK_DELAY_MS = 300;
+const COMPLETE_ANIM_MS = 900;
+const ROUTINE_CAMERA_DURATION_SEC = 30; // routine 카메라 미션 시간 (AlarmScreen DEFAULT_SETTINGS.missionDuration 동일)
 
 export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
@@ -65,6 +80,66 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const shakeCountRef = useRef(0);
   const lastShakeTimeRef = useRef(0);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
+
+  // ─── v1.6 Phase 6.5 — AlarmCameraMode 마운트용 부모-측 state/SV ─────
+  // 분리 정책: AlarmScreen 의 동일 패턴을 차용. 코드/state 는 RoutineAlarm 자체 인스턴스 — AlarmScreen import X.
+  // SharedValues 6개 — frame processor + AlarmCameraMode props 용
+  const matched = useSharedValue(false);
+  const lastRun = useSharedValue(0);
+  const targetLabelsSV = useSharedValue<string[]>([]);
+  const thresholdSV = useSharedValue<number>(TARGET_CONFIDENCE);
+  const consecutiveHits = useSharedValue(0);
+  const isShufflingSV = useSharedValue(false);
+
+  // 슬롯머신 state — 재돌림 (Step D) + AlarmCameraMode props 용
+  const [isShuffling, setIsShuffling] = useState(false);
+  const [shuffledList, setShuffledList] = useState<string[]>([]);
+  const [shuffleIdx, setShuffleIdx] = useState(0);
+  const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearShuffle = useCallback(() => {
+    if (shuffleIntervalRef.current) {
+      clearInterval(shuffleIntervalRef.current);
+      shuffleIntervalRef.current = null;
+    }
+    if (shuffleTimeoutRef.current) {
+      clearTimeout(shuffleTimeoutRef.current);
+      shuffleTimeoutRef.current = null;
+    }
+    setIsShuffling(false);
+    setShuffledList([]);
+    setShuffleIdx(0);
+  }, []);
+
+  // UI 상태 — AlarmCameraMode props 요구치
+  const [isRetryBannerVisible, setIsRetryBannerVisible] = useState(false);
+  const [successAnimating, setSuccessAnimating] = useState(false);
+  const [resultState] = useState<'idle' | 'success' | 'fail'>('idle'); // routine 에선 'idle' 고정 (인식 후 즉시 handleDismiss)
+  const [attemptCount, setAttemptCount] = useState<1 | 2>(1);
+  const [remainingMs, setRemainingMs] = useState<number>(ROUTINE_CAMERA_DURATION_SEC * 1000);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentMissionRef = useRef<string | null>(null);
+  const missionDurationRef = useRef<number>(ROUTINE_CAMERA_DURATION_SEC);
+  // cameraMission 갱신 시 ref 동기화 (slot reshuffle 함수에서 사용)
+  useEffect(() => {
+    currentMissionRef.current = cameraMission;
+  }, [cameraMission]);
+  // remainingMs 기반 — AlarmCameraMode props 의 remainingSeconds (Math.ceil)
+  const remainingSeconds = Math.ceil(remainingMs / 1000);
+  // remainingMs 기반 — AlarmCameraMode props 의 isDanger (≤5초 + 활성 상태)
+  const isDanger = remainingSeconds <= 5 && remainingSeconds > 0 && !isShuffling && !isRetryBannerVisible && resultState === 'idle';
+
+  // 애니메이션 — AlarmCameraMode props 요구치
+  const successBlink = useRef(new Animated.Value(0)).current;
+  const successFill = useRef(new Animated.Value(0)).current;
+  const scanLine = useRef(new Animated.Value(0)).current;
+  const dangerBlink = useRef(new Animated.Value(0)).current;
+
+  // 레이아웃 — AlarmCameraMode props 요구치. AlarmScreen 패턴 차용 (Dimensions 기반 const).
+  // useState(0) 사용 시 마운트 직후 0×0 → 빈 화면 회귀 (Step C 회귀 fix).
+  const screenW = Dimensions.get('window').width;
+  const boxWidth = screenW - 32; // 좌우 16px 여백 (AlarmScreen 동일)
+  const boxHeight = boxWidth * 1.25; // 세로로 살짝 긴 박스
 
   // ─── 마운트: 배경 경로 여부 감지하여 세션 기록 보완 ────
   useEffect(() => {
@@ -161,6 +236,13 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── frame processor 갱신 — cameraMission 변경 시 SV 재설정 ──
+  useEffect(() => {
+    if (!cameraMission) return;
+    targetLabelsSV.value = MISSION_COCO_LABELS[cameraMission] ?? [];
+    thresholdSV.value = MISSION_CONFIDENCE_OVERRIDE[cameraMission] ?? TARGET_CONFIDENCE;
+  }, [cameraMission, targetLabelsSV, thresholdSV]);
+
   // ─── 흔들기 감지 (endMethod === 'shake' 만) ──────────────
   useEffect(() => {
     if (!routine || dismissed || routine.endMethod !== 'shake') return;
@@ -242,6 +324,173 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     stopAudio();
     stopVibe();
   }, [dismissed]);
+
+  // ─── v1.6 Phase 6.5 카메라 모드 핸들러 (AlarmScreen 패턴 그대로 차용) ──
+  // 인식 성공 시 — blink 시퀀스 → fill 애니메이션 → handleDismiss (routine 의 4-stage modal 흐름으로)
+  const triggerDetectionSequence = useCallback((_match: Detection) => {
+    setSuccessAnimating(true);
+    successBlink.setValue(0);
+    successFill.setValue(0);
+
+    const blinkSeq: Animated.CompositeAnimation[] = [];
+    for (let i = 0; i < BLINK_COUNT; i++) {
+      blinkSeq.push(
+        Animated.timing(successBlink, { toValue: 1, duration: BLINK_ON_MS, useNativeDriver: true }),
+        Animated.timing(successBlink, { toValue: 0, duration: BLINK_OFF_MS, useNativeDriver: true }),
+      );
+    }
+
+    Animated.sequence([
+      ...blinkSeq,
+      Animated.delay(FEEDBACK_DELAY_MS),
+    ]).start(() => {
+      Animated.timing(successFill, {
+        toValue: 1,
+        duration: COMPLETE_ANIM_MS,
+        useNativeDriver: false,
+      }).start(() => {
+        handleDismiss();
+      });
+    });
+  }, [handleDismiss, successBlink, successFill]);
+
+  // 슬롯머신 재돌림 — AlarmScreen.tsx:783-826 패턴. 분리 정책 (D-2-i): MISSION_POOL 전체 사용 (selectedMissions 분기 X).
+  const reshuffleMission = useCallback(() => {
+    if (isRetryBannerVisible) return;
+    if (shuffleIntervalRef.current || shuffleTimeoutRef.current) return;
+
+    isShufflingSV.value = true;
+    consecutiveHits.value = 0;
+    matched.value = false;
+    lastRun.value = Date.now();
+
+    // MISSION_POOL 전체 픽 (현재 cameraMission 제외)
+    const exclude = currentMissionRef.current;
+    const pool = exclude ? MISSION_POOL.filter(m => m !== exclude) : MISSION_POOL;
+    const final = pool.length > 0
+      ? pool[Math.floor(Math.random() * pool.length)]
+      : MISSION_POOL[Math.floor(Math.random() * MISSION_POOL.length)];
+    setCameraMission(final);
+    targetLabelsSV.value = MISSION_COCO_LABELS[final] ?? [];
+    thresholdSV.value = MISSION_CONFIDENCE_OVERRIDE[final] ?? TARGET_CONFIDENCE;
+
+    const visualPool = MISSION_POOL.filter((k) => k !== final);
+    const shuffled = [...visualPool].sort(() => Math.random() - 0.5);
+    if (shuffled.length === 0) shuffled.push(final);
+    setShuffledList(shuffled);
+    setShuffleIdx(0);
+    setIsShuffling(true);
+    shuffleIntervalRef.current = setInterval(() => {
+      setShuffleIdx((i) => (i + 1) % shuffled.length);
+    }, 60);
+
+    shuffleTimeoutRef.current = setTimeout(() => {
+      if (shuffleIntervalRef.current) {
+        clearInterval(shuffleIntervalRef.current);
+        shuffleIntervalRef.current = null;
+      }
+      shuffleTimeoutRef.current = null;
+      setShuffledList([]);
+      setShuffleIdx(0);
+      setIsShuffling(false);
+      consecutiveHits.value = 0;
+      matched.value = false;
+      lastRun.value = Date.now();
+      isShufflingSV.value = false;
+    }, 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRetryBannerVisible]);
+
+  // 카운트다운 — camera 분기 + 슬롯머신/재시도/성공 중엔 일시정지. dismissed 후 정지.
+  useEffect(() => {
+    if (routine?.endMethod !== 'camera') return;
+    if (dismissed) return;
+    if (resultState !== 'idle') return;
+    if (isRetryBannerVisible) return;
+    if (isShuffling) return;
+    if (matched.value) return;
+    const id = setInterval(() => {
+      setRemainingMs((prev) => Math.max(0, prev - 1000));
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routine?.endMethod, dismissed, resultState, isRetryBannerVisible, isShuffling]);
+
+  // 만료 처리 — 1차 시간 초과 = 재시도 배너 1초 후 시간 리셋. 2차 시간 초과 = handleDismiss (routine 다음 흐름).
+  useEffect(() => {
+    if (routine?.endMethod !== 'camera') return;
+    if (dismissed) return;
+    if (resultState !== 'idle') return;
+    if (isRetryBannerVisible) return;
+    if (isShuffling) return;
+    if (remainingMs > 0) return;
+    if (matched.value) return;
+
+    if (attemptCount === 1) {
+      setIsRetryBannerVisible(true);
+      retryTimeoutRef.current = setTimeout(() => {
+        consecutiveHits.value = 0;
+        matched.value = false;
+        setRemainingMs(missionDurationRef.current * 1000);
+        setAttemptCount(2);
+        setIsRetryBannerVisible(false);
+        retryTimeoutRef.current = null;
+      }, RETRY_BANNER_MS);
+    } else {
+      handleDismiss();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remainingMs, routine?.endMethod, dismissed, resultState, isRetryBannerVisible, attemptCount, isShuffling]);
+
+  // retryTimeoutRef cleanup
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // clearShuffle cleanup (언마운트)
+  useEffect(() => {
+    return () => clearShuffle();
+  }, [clearShuffle]);
+
+  // 스캔 라인 애니메이션 (camera + idle + !successAnimating). dismissed 후 정지.
+  useEffect(() => {
+    if (routine?.endMethod !== 'camera') return;
+    const active = !dismissed && resultState === 'idle' && !successAnimating;
+    if (!active) {
+      scanLine.stopAnimation(() => scanLine.setValue(0));
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLine, { toValue: 1, duration: 1600, useNativeDriver: true }),
+        Animated.timing(scanLine, { toValue: 0, duration: 1600, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [routine?.endMethod, dismissed, resultState, successAnimating, scanLine]);
+
+  // 위험 깜빡 (≤5초). dismissed 후 정지.
+  useEffect(() => {
+    if (routine?.endMethod !== 'camera') return;
+    if (dismissed || !isDanger) {
+      dangerBlink.stopAnimation(() => dangerBlink.setValue(0));
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dangerBlink, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(dangerBlink, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [routine?.endMethod, dismissed, isDanger, dangerBlink]);
 
   // ─── "다음 미션 시작" → controller.confirmAndAdvance ──
   const handleStartNext = useCallback(async () => {
@@ -327,18 +576,50 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       );
     }
     if (routine.endMethod === 'camera' && cameraMission) {
-      // TODO Phase 6.5: AlarmCameraMode 통합으로 실제 사진 인식 dismiss로 교체.
-      // 현재는 랜덤 미션 표시 + 탭 dismiss (임시).
-      const emoji = MISSION_EMOJI[cameraMission];
-      const label = MISSION_LABEL[cameraMission] ?? cameraMission;
+      // v1.6 Phase 6.5 — Step C: AlarmCameraMode 마운트 (props 29개 매핑).
+      // onMatchDetected / onReshuffle 은 Step D 에서 정식 핸들러로 교체 (현재 placeholder).
+      // wrapper: AlarmScreen 패턴 (검정 배경 + 헤더 + flex:1 박스 영역) 차용 — 분리 정책: 코드 별도 작성.
       return (
-        <TouchableOpacity style={styles.dismissArea} activeOpacity={0.9} onPress={handleDismiss}>
-          {emoji && <Image source={emoji} style={styles.cameraEmoji} resizeMode="contain" />}
-          <Text style={styles.completeText}>{label}</Text>
-          <Text style={styles.dismissHint}>
-            {t('routine.cameraScanHint', { defaultValue: '대상을 찾아 사진 촬영 (임시: 탭하여 계속)' })}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+            <Text style={{ fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -0.5 }}>
+              ShutTimer
+            </Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8 }}>
+        <AlarmCameraMode
+          matched={matched}
+          lastRun={lastRun}
+          targetLabelsSV={targetLabelsSV}
+          thresholdSV={thresholdSV}
+          consecutiveHits={consecutiveHits}
+          isShufflingSV={isShufflingSV}
+          currentMission={cameraMission}
+          currentEmoji={MISSION_EMOJI[cameraMission]}
+          missionLabel={MISSION_LABEL[cameraMission] ?? cameraMission}
+          missionSentence={t('routine.cameraScanHint', { defaultValue: '대상을 찾아 사진 촬영' })}
+          isShuffling={isShuffling}
+          shuffledList={shuffledList}
+          shuffleIdx={shuffleIdx}
+          isRetryBannerVisible={isRetryBannerVisible}
+          successAnimating={successAnimating}
+          resultState={resultState}
+          isDanger={isDanger}
+          remainingSeconds={remainingSeconds}
+          successBlink={successBlink}
+          successFill={successFill}
+          scanLine={scanLine}
+          dangerBlink={dangerBlink}
+          boxWidth={boxWidth}
+          boxHeight={boxHeight}
+          onMatchDetected={triggerDetectionSequence}
+          onReshuffle={reshuffleMission}
+          t={t}
+          permissionButtonStyle={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          permissionButtonTextStyle={{ color: colors.onPrimary, fontSize: 16, fontWeight: '700' }}
+        />
+          </View>
+        </View>
       );
     }
     // endMethod === 'auto' 는 이 화면 자체에 도달하지 않음 (controller가 직접 advance).
@@ -351,8 +632,12 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     );
   };
 
+  // camera 분기 진입 시 SafeAreaView 자체를 검정 배경으로 (노치 inset 영역 흰색 노출 방지).
+  // 다른 분기 (tap/shake/auto) 는 기존 styles.container 그대로 — 회귀 X.
+  // dismissed 후 (다음 미션 modal) 는 흰 배경으로 복원 — 라이트 theme 색상 충돌 방지.
+  const isCameraMode = routine?.endMethod === 'camera' && !dismissed;
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, isCameraMode && { backgroundColor: '#000' }]}>
       {!dismissed ? (
         renderDismissArea()
       ) : (
@@ -380,7 +665,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
               </Text>
               <TouchableOpacity style={styles.primaryBtn} onPress={handleStartNext}>
                 <Text style={styles.primaryBtnText}>
-                  {t('routine.startNext', { defaultValue: '다음 미션 시작' })}
+                  {t('routine.startNext', { defaultValue: '다음 루틴 시작' })}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.secondaryBtn} onPress={handleStop}>

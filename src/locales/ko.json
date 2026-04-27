@@ -327,7 +327,7 @@
     "shakeToDismiss": "흔들어서 계속",
     "allComplete": "모든 미션 완료!",
     "finish": "완료",
-    "startNext": "다음 미션 시작",
+    "startNext": "다음 루틴 시작",
     "prealertBody": "곧 루틴이 시작됩니다",
     "chainTitle": "다음 루틴",
     "chainBody": "다음 루틴이 시작됩니다",
@@ -346,7 +346,7 @@
       "camera": "카메라",
       "auto": "자동"
     },
-    "cameraScanHint": "대상을 찾아 사진 촬영 (임시: 탭하여 계속)",
+    "cameraScanHint": "대상을 찾아 사진 촬영",
     "scheduleOverflowTitle": "일부 루틴 알림 예약 실패",
     "scheduleOverflowBody": "{{count}}개 루틴이 시스템 한계로 예약되지 않았습니다. 사용하지 않는 루틴을 삭제하세요.",
     "edit": {

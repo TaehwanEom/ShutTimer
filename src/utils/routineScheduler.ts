@@ -16,6 +16,11 @@ import {
   nextOccurrenceTime,
 } from '../constants/routines';
 import { SETTINGS_KEY } from '../constants/settings';
+import {
+  saveAlarmMetadata,
+  loadAlarmMetadata,
+  deleteAlarmMetadata,
+} from './alarmkitMappingTable';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
 
@@ -418,6 +423,47 @@ export async function scheduleRoutineChain(
   fireAt: Date
 ): Promise<string | null> {
   if (fireAt.getTime() <= Date.now()) return null;
+  const useAlarmKit = await shouldUseAlarmKit();
+  if (useAlarmKit) {
+    return scheduleChainViaAlarmKit(routineId, nextStepIndex, fireAt);
+  }
+  return scheduleChainViaExpoNotifications(routineId, nextStepIndex, fireAt);
+}
+
+/** AlarmKit 경로 — iOS 26+. 64 한도 + 30초 사운드 한도 해방. */
+async function scheduleChainViaAlarmKit(
+  routineId: string,
+  nextStepIndex: number,
+  fireAt: Date
+): Promise<string | null> {
+  try {
+    const id = await AlarmkitBridge.scheduleAlarm({
+      routineId,
+      title: i18n.t('routine.chainTitle', { defaultValue: '다음 루틴' }),
+      fireAt: fireAt.getTime(),
+      stopLabel: i18n.t('routine.chainStop', { defaultValue: '확인' }),
+      type: 'chain',
+      nextStepIndex,
+    });
+    if (!id) return null;
+    await saveAlarmMetadata({
+      alarmId: id,
+      type: 'chain',
+      routineId,
+      nextStepIndex,
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** expo-notifications 경로 — iOS 25 이하 / Android. */
+async function scheduleChainViaExpoNotifications(
+  routineId: string,
+  nextStepIndex: number,
+  fireAt: Date
+): Promise<string | null> {
   try {
     const data: RoutineNotifData = {
       type: 'routine_chain',
@@ -445,8 +491,14 @@ export async function scheduleRoutineChain(
   }
 }
 
-/** 체인 알림 취소 (루틴 일시정지/종료 시) */
+/** 체인 알림 취소 (루틴 일시정지/종료 시). AlarmKit / expo-notifications 자동 분기. */
 export async function cancelRoutineChain(notifId: string): Promise<void> {
+  const meta = await loadAlarmMetadata(notifId);
+  if (meta) {
+    await AlarmkitBridge.cancelAlarm(notifId).catch(() => {});
+    await deleteAlarmMetadata(notifId);
+    return;
+  }
   await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
 }
 
@@ -462,6 +514,43 @@ export async function scheduleRoutineConfirmPrompt(
   fireAt: Date
 ): Promise<string | null> {
   if (fireAt.getTime() <= Date.now()) return null;
+  const useAlarmKit = await shouldUseAlarmKit();
+  if (useAlarmKit) {
+    return scheduleConfirmPromptViaAlarmKit(routineId, fireAt);
+  }
+  return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt);
+}
+
+/** AlarmKit 경로 — iOS 26+. */
+async function scheduleConfirmPromptViaAlarmKit(
+  routineId: string,
+  fireAt: Date
+): Promise<string | null> {
+  try {
+    const id = await AlarmkitBridge.scheduleAlarm({
+      routineId,
+      title: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
+      fireAt: fireAt.getTime(),
+      stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
+      type: 'confirm_prompt',
+    });
+    if (!id) return null;
+    await saveAlarmMetadata({
+      alarmId: id,
+      type: 'confirm_prompt',
+      routineId,
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** expo-notifications 경로 — iOS 25 이하 / Android. */
+async function scheduleConfirmPromptViaExpoNotifications(
+  routineId: string,
+  fireAt: Date
+): Promise<string | null> {
   try {
     const data = {
       type: 'routine_confirm_prompt' as const,
@@ -488,7 +577,13 @@ export async function scheduleRoutineConfirmPrompt(
   }
 }
 
-/** 확인 후 진행 프롬프트 알림 취소 (사용자 dismiss 시) */
+/** 확인 후 진행 프롬프트 알림 취소 (사용자 dismiss 시). AlarmKit / expo-notifications 자동 분기. */
 export async function cancelRoutineConfirmPrompt(notifId: string): Promise<void> {
+  const meta = await loadAlarmMetadata(notifId);
+  if (meta) {
+    await AlarmkitBridge.cancelAlarm(notifId).catch(() => {});
+    await deleteAlarmMetadata(notifId);
+    return;
+  }
   await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
 }

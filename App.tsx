@@ -83,6 +83,8 @@ import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState } from './src/utils/routineController';
 import { loadRoutines } from './src/constants/routines';
+import AlarmkitBridge from './modules/alarmkit-bridge';
+import { loadAlarmMetadata } from './src/utils/alarmkitMappingTable';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
   ? require('./src/screens/PoCPhotoValidationScreen').default
@@ -365,6 +367,76 @@ function AppNavigator() {
       .catch(e => {
         Logger.warn('AppNavigator', `Failed to get last notification response: ${e}`);
       });
+  }, []);
+
+  // v1.6 T1 — AlarmKit 알람 발화 listener (chain / confirm_prompt). prealert 는 mapping table 미저장 → 무시.
+  useEffect(() => {
+    const sub = AlarmkitBridge.addListener('onAlarmStateChange', async (event) => {
+      if (event.state !== 'alerting') return;
+      const meta = await loadAlarmMetadata(event.alarmId);
+      if (!meta) return;
+      if (!navigationRef.current?.isReady()) return;
+      const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
+
+      if (meta.type === 'chain') {
+        if (currentRoute === 'RoutineList') return;
+        navigationRef.current?.navigate('RoutineList');
+        return;
+      }
+
+      if (meta.type === 'confirm_prompt') {
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
+        const routines = await loadRoutines();
+        const r = routines.find(x => x.id === meta.routineId);
+        if (!r) {
+          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+          return;
+        }
+        if (!navigationRef.current?.isReady()) return;
+        if (r.endMethod === 'camera') {
+          navigationRef.current.navigate('RoutineAlarm', { routineId: meta.routineId });
+        } else {
+          navigationRef.current.navigate('RoutineList');
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // v1.6 T1 — 콜드스타트 시 AlarmKit alerting 알람 조회 (앱 kill 후 알람 발화 case)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!navigationRef.current?.isReady()) return;
+      try {
+        const alarms = await AlarmkitBridge.listAlarms();
+        const alerting = alarms.find(a => a.state === 'alerting');
+        if (!alerting) return;
+        const meta = await loadAlarmMetadata(alerting.id);
+        if (!meta) return;
+        const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
+        // 다른 알림 핸들러가 이미 navigate 했으면 skip
+        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
+
+        if (meta.type === 'chain') {
+          navigationRef.current?.navigate('RoutineList');
+          return;
+        }
+        if (meta.type === 'confirm_prompt') {
+          const routines = await loadRoutines();
+          const r = routines.find(x => x.id === meta.routineId);
+          if (!r) {
+            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            return;
+          }
+          if (r.endMethod === 'camera') {
+            navigationRef.current.navigate('RoutineAlarm', { routineId: meta.routineId });
+          } else {
+            navigationRef.current.navigate('RoutineList');
+          }
+        }
+      } catch {}
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화 + ActiveRoutine 자동 복원

@@ -22,6 +22,8 @@ import {
   scheduleRoutineConfirmPrompt,
   cancelRoutineConfirmPrompt,
 } from './routineScheduler';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
+import { listAllAlarmMetadata, deleteAlarmMetadata } from './alarmkitMappingTable';
 
 const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
 const ACTIVE_TIMER_KEY = 'activeTimer';
@@ -105,6 +107,16 @@ async function cancelBackgroundNotif(): Promise<void> {
       const t = (n.content?.data as any)?.type;
       if (t === 'routine_chain' || t === 'routine_confirm_prompt') {
         await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+      }
+    }
+  } catch {}
+  // v1.6 T1 — AlarmKit 잔존 알람 cleanup (chain / confirm_prompt 만. prealert 는 rolling schedule)
+  try {
+    const metas = await listAllAlarmMetadata();
+    for (const meta of metas) {
+      if (meta.type === 'chain' || meta.type === 'confirm_prompt') {
+        await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
+        await deleteAlarmMetadata(meta.alarmId);
       }
     }
   } catch {}

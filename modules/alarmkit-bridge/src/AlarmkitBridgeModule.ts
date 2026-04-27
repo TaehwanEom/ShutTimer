@@ -1,7 +1,16 @@
 import { NativeModule, requireNativeModule } from 'expo';
-import type { AuthorizationState, ScheduleAlarmParams } from './AlarmkitBridge.types';
+import type {
+  AuthorizationState,
+  ScheduleAlarmParams,
+  AlarmStateChangeEvent,
+  AlarmInfo,
+} from './AlarmkitBridge.types';
 
-declare class AlarmkitBridgeModule extends NativeModule {
+type AlarmkitBridgeEvents = {
+  onAlarmStateChange: (event: AlarmStateChangeEvent) => void;
+};
+
+declare class AlarmkitBridgeModule extends NativeModule<AlarmkitBridgeEvents> {
   /** iOS 26+ 사용 가능 여부 (sync). false 면 expo-notifications 폴백 필요. */
   isAvailable(): boolean;
   /** 권한 요청. 사용자에게 시스템 다이얼로그 노출. */
@@ -12,8 +21,8 @@ declare class AlarmkitBridgeModule extends NativeModule {
   scheduleAlarm(params: ScheduleAlarmParams): Promise<string>;
   /** alarm UUID 로 취소. */
   cancelAlarm(alarmId: string): Promise<void>;
-  /** 현재 등록된 알람 UUID 목록. */
-  listAlarms(): Promise<string[]>;
+  /** 현재 등록된 알람 목록 (id + state). v1.6 T1 — 콜드스타트 alerting filter 위해 state 포함. */
+  listAlarms(): Promise<AlarmInfo[]>;
 }
 
 // Native binary 에 모듈 미포함 (구 dev client / Expo Go) → app init throw 회피.
@@ -28,7 +37,9 @@ try {
     getAuthorizationState: async () => 'unavailable' as AuthorizationState,
     scheduleAlarm: async () => '',
     cancelAlarm: async () => {},
-    listAlarms: async () => [],
+    listAlarms: async (): Promise<AlarmInfo[]> => [],
+    addListener: () => ({ remove: () => {} }),
+    removeListener: () => {},
   } as unknown as AlarmkitBridgeModule;
 }
 export default bridge;

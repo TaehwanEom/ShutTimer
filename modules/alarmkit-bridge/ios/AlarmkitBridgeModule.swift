@@ -16,8 +16,50 @@ nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
 }
 
 public class AlarmkitBridgeModule: Module {
+  // v1.6 T1 — alarmUpdates AsyncSequence 구독 Task 보관
+  private var observerTask: Task<Void, Never>?
+
   public func definition() -> ModuleDefinition {
     Name("AlarmkitBridge")
+
+    // v1.6 T1 — JS 측 addListener 가능한 이벤트
+    Events("onAlarmStateChange")
+
+    // v1.6 T1 — alarmUpdates AsyncSequence 구독 (Opt-A)
+    OnStartObserving {
+      self.observerTask?.cancel()
+      self.observerTask = Task { [weak self] in
+        guard #available(iOS 26.0, *) else { return }
+        var lastStates: [UUID: Alarm.State] = [:]
+        for await alarms in AlarmManager.shared.alarmUpdates {
+          guard let self = self else { return }
+          let currentIds = Set(alarms.map { $0.id })
+          // removed 감지
+          for (id, _) in lastStates where !currentIds.contains(id) {
+            self.sendEvent("onAlarmStateChange", [
+              "alarmId": id.uuidString,
+              "state": "removed",
+            ])
+          }
+          // state 변화 감지
+          for alarm in alarms {
+            let prev = lastStates[alarm.id]
+            if prev != alarm.state {
+              self.sendEvent("onAlarmStateChange", [
+                "alarmId": alarm.id.uuidString,
+                "state": Self.alarmStateToString(alarm.state),
+              ])
+            }
+          }
+          lastStates = Dictionary(uniqueKeysWithValues: alarms.map { ($0.id, $0.state) })
+        }
+      }
+    }
+
+    OnStopObserving {
+      self.observerTask?.cancel()
+      self.observerTask = nil
+    }
 
     Function("isAvailable") { () -> Bool in
       if #available(iOS 26.0, *) {
@@ -78,10 +120,28 @@ public class AlarmkitBridgeModule: Module {
       try await AlarmManager.shared.cancel(id: uuid)
     }
 
-    AsyncFunction("listAlarms") { () async throws -> [String] in
+    // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.
+    AsyncFunction("listAlarms") { () async throws -> [[String: String]] in
       guard #available(iOS 26.0, *) else { return [] }
       let alarms = try AlarmManager.shared.alarms
-      return alarms.map { $0.id.uuidString }
+      return alarms.map { alarm in
+        [
+          "id": alarm.id.uuidString,
+          "state": Self.alarmStateToString(alarm.state),
+        ]
+      }
+    }
+  }
+
+  // v1.6 T1 — Alarm.State → String 매핑
+  @available(iOS 26.0, *)
+  private static func alarmStateToString(_ state: Alarm.State) -> String {
+    switch state {
+    case .scheduled: return "scheduled"
+    case .countdown: return "countdown"
+    case .paused: return "paused"
+    case .alerting: return "alerting"
+    @unknown default: return "scheduled"
     }
   }
 
@@ -102,4 +162,8 @@ struct ScheduleAlarmParams: Record {
   @Field var fireAt: Double
   @Field var stopLabel: String?
   @Field var soundName: String?
+  // v1.6 T1 신규 — chain/confirm_prompt 메타데이터 (JS mapping table 정공이라 Swift 본문 미사용)
+  @Field var type: String?              // 'prealert' | 'chain' | 'confirm_prompt'
+  @Field var nextStepIndex: Int?
+  @Field var endMethod: String?         // 'tap' | 'shake' | 'camera' | 'auto'
 }

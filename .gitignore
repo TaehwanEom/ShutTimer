@@ -28,3 +28,10 @@ build/
 build */
 ios/
 !modules/**/ios/
+
+# 작업 자료 / 백업 / 개인 IDE 상태
+.backup/
+.claude/
+*.mp4
+sound/
+svg/

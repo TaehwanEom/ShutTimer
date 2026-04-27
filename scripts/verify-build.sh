@@ -183,6 +183,9 @@ if [ -z "$PLIST_BN" ]; then
   SUMMARY+=("❌ CFBundleVersion not readable (Info.plist missing?)")
   BLOCKERS+=("CFBundleVersion unreadable")
   FAIL=1
+elif [ "$APP_BN" = "undefined" ] || [ "$APP_BN" = "N/A" ]; then
+  # appVersionSource: remote — buildNumber 의도적 제거. EAS 서버 측 관리.
+  SUMMARY+=("✅ CFBundleVersion check skipped (app.json buildNumber not set — appVersionSource: remote)")
 elif [ "$APP_BN" = "$PLIST_BN" ]; then
   SUMMARY+=("✅ CFBundleVersion match ($APP_BN)")
 else

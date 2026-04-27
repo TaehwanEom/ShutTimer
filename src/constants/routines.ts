@@ -1,5 +1,5 @@
 // v1.6 신 데이터 모델: 루틴 묶음 = 카테고리 + 시작시간 + 시퀀셜 step 들.
-// 각 step 은 이름 + duration(분). 첫 step 은 schedule.startTime 부터, 이후는 자동 누적 (시간 갭 무시).
+// 각 step 은 이름 + duration(초). 첫 step 은 schedule.startTime 부터, 이후는 자동 누적 (시간 갭 무시).
 // Routine.name 제거 — 카테고리가 묶음 식별, step.name 이 작업 식별.
 // 단일 타이머(ACTIVE_TIMER_KEY)와 상호 배타.
 
@@ -11,8 +11,8 @@ import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
 export type RoutineStep = {
   id: string;
   name: string;
-  /** 작업 길이 (분 단위). 0 이상. */
-  durationMinutes: number;
+  /** 작업 길이 (초 단위). 0 이상. */
+  durationSeconds: number;
   /** MISSION_POOL 키 또는 이모지/아이콘 식별자. 선택적. */
   icon?: string;
 };
@@ -31,6 +31,8 @@ export type Routine = {
   id: string;
   /** 카테고리 id (FIXED_CATEGORIES 또는 custom_xxx). 필수. */
   category: string;
+  /** 루틴 이름 (부제). 선택적. 비우면 카테고리 라벨로 표기. */
+  name?: string;
   steps: RoutineStep[];
   /** 예약 없는 수동 실행 루틴 허용. schedule 없거나 active=false면 예약 스킵. */
   schedule?: RoutineSchedule;
@@ -40,6 +42,8 @@ export type Routine = {
   active: boolean;
   /** step 종료 방식. */
   endMethod: RoutineEndMethod;
+  /** auto 모드 대기 카운트다운 (초). 1~60. 기본 60. */
+  autoCountdownSec?: number;
   createdAt: number;
 };
 
@@ -67,6 +71,16 @@ export const SCHEDULED_ROUTINE_NOTIFS_KEY = 'shuttimer_routine_notifs';
 export const ROUTINE_DEADLINE_MS = 24 * 60 * 60 * 1000;
 export const ROUTINE_PREALERT_MINUTES = 5;
 export const IOS_NOTIFICATION_SAFE_CAP = 54;
+
+// ─── 모드 헬퍼 ───────────────────────────────────────────────
+// schedule 유무로 예약/일반 구분 (단일 source of truth, invalid state 불가)
+export type RoutineMode = 'scheduled' | 'manual';
+export function getRoutineMode(r: Routine): RoutineMode {
+  return r.schedule ? 'scheduled' : 'manual';
+}
+export function getRoutineTotalSeconds(r: Routine): number {
+  return r.steps.reduce((acc, s) => acc + s.durationSeconds, 0);
+}
 
 // ─── 시간 계산 헬퍼 ──────────────────────────────────────────
 
@@ -149,15 +163,15 @@ export async function clearActiveRoutine(): Promise<void> {
 }
 
 // ─── 유효성 검증 ─────────────────────────────────────────────
-// 신 모델: durationMinutes 기반. 기존 startTime/endTime 데이터는 자동 탈락.
+// 신 모델: durationSeconds 기반. 기존 durationMinutes / startTime/endTime 데이터는 자동 탈락.
 
 function isValidStep(s: any): s is RoutineStep {
   return (
     s &&
     typeof s.id === 'string' &&
     typeof s.name === 'string' &&
-    typeof s.durationMinutes === 'number' &&
-    s.durationMinutes >= 0
+    typeof s.durationSeconds === 'number' &&
+    s.durationSeconds >= 0
   );
 }
 
@@ -196,9 +210,9 @@ export function createStepId(): string {
   return `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** 루틴 총 소요시간 (분) — 모든 step duration 합. */
-export function totalRoutineMinutes(r: Routine): number {
-  return r.steps.reduce((acc, s) => acc + Math.max(0, s.durationMinutes), 0);
+/** 루틴 총 소요시간 (초) — 모든 step duration 합. */
+export function totalRoutineSeconds(r: Routine): number {
+  return r.steps.reduce((acc, s) => acc + Math.max(0, s.durationSeconds), 0);
 }
 
 /** 진행률 0~1. ActiveRoutine 기반. */
@@ -210,18 +224,18 @@ export function routineProgress(r: Routine, ar: ActiveRoutine): number {
 /**
  * 특정 step 의 표시용 시작 시각 (분 단위, schedule.startTime 기준 누적).
  * step[0] = schedule.startTime
- * step[i] = schedule.startTime + sum(step[0..i-1].durationMinutes)
+ * step[i] = schedule.startTime + sum(step[0..i-1].durationSeconds / 60)
  * schedule 없으면 null.
  */
 export function stepStartMinutes(r: Routine, stepIdx: number): number | null {
   if (!r.schedule) return null;
   const base = parseHHMM(r.schedule.startTime);
   if (base === null) return null;
-  let acc = base;
+  let accSeconds = 0;
   for (let i = 0; i < stepIdx && i < r.steps.length; i++) {
-    acc += Math.max(0, r.steps[i].durationMinutes);
+    accSeconds += Math.max(0, r.steps[i].durationSeconds);
   }
-  return acc;
+  return base + Math.floor(accSeconds / 60);
 }
 
 /** step 표시용 시작 시각 ("HH:MM"). schedule 없으면 null. */
@@ -246,7 +260,7 @@ export async function recordStepSession(r: Routine, stepIdx: number): Promise<vo
       id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       date,
       icon: step.name,
-      minutes: Math.max(0, step.durationMinutes),
+      minutes: Math.round(Math.max(0, step.durationSeconds) / 60),
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {

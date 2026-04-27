@@ -3,7 +3,11 @@
     "favorites": "즐겨찾기",
     "add": "추가",
     "start": "시작",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "timerBlocked": {
+      "title": "루틴 진행 중",
+      "body": "루틴을 먼저 정지해야 단일 타이머를 시작할 수 있습니다."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -197,7 +201,7 @@
     "activeDays": "활동한 날",
     "daysFmt": "{{days}}일",
     "statsTotalTime": "총 사용 시간",
-    "statsTopMission": "최다 사용 미션",
+    "statsDailyUsage": "일일 사용시간",
     "statsStreak": "연속 사용일",
     "hoursMinutes": "{{hours}}시간 {{minutes}}분",
     "minutesOnly": "{{minutes}}분",
@@ -241,14 +245,28 @@
     "confirm": "확인"
   },
   "common": {
-    "cancel": "취소"
+    "cancel": "취소",
+    "confirm": "확인"
   },
   "routine": {
     "listTitle": "루틴",
     "newTitle": "새 루틴",
     "editTitle": "루틴 편집",
+    "tabScheduled": "예약",
+    "tabManual": "일반",
+    "createPickType": "어떤 루틴을 만들까요?",
+    "createScheduled": "예약 루틴",
+    "createScheduledDesc": "정해진 시간에 알람",
+    "createManual": "일반 루틴",
+    "createManualDesc": "원할 때 수동으로 시작",
+    "autoCountdownLabel": "자동 진행 대기",
+    "autoCountdownUnit": "{{sec}}초",
     "emptyTitle": "등록된 루틴이 없습니다",
+    "emptyTitleScheduled": "예약 루틴이 없습니다",
+    "emptyTitleManual": "일반 루틴이 없습니다",
     "emptyHint": "우측 상단 + 버튼으로 추가하세요",
+    "stepsCount": "{{count}}단계",
+    "totalDurationFmt": "루틴 시간 {{duration}}\n루틴 {{count}}단계",
     "fieldName": "루틴 이름",
     "namePlaceholder": "예: 아침 루틴",
     "fieldMissions": "미션",
@@ -288,6 +306,14 @@
     "actionDelete": "삭제",
     "deleteConfirmTitle": "루틴 삭제",
     "deleteConfirmBody": "이 루틴을 삭제하시겠어요?",
+    "editBlocked": {
+      "title": "루틴 진행 중",
+      "body": "진행 중인 루틴은 편집할 수 없습니다. 정지 후 시도하세요."
+    },
+    "deleteBlocked": {
+      "title": "루틴 진행 중",
+      "body": "진행 중인 루틴은 삭제할 수 없습니다. 정지 후 시도하세요."
+    },
     "validationNameEmpty": "루틴 이름을 입력하세요",
     "validationMissionsEmpty": "최소 1개 이상의 미션을 추가하세요",
     "notFound": "루틴을 찾을 수 없습니다",
@@ -303,10 +329,10 @@
     "finish": "완료",
     "startNext": "다음 미션 시작",
     "prealertBody": "곧 루틴이 시작됩니다",
-    "chainTitle": "다음 미션",
-    "chainBody": "다음 미션이 시작됩니다",
-    "confirmPromptTitle": "미션 완료",
-    "confirmPromptBody": "다음 미션을 시작하려면 앱을 여세요",
+    "chainTitle": "다음 루틴",
+    "chainBody": "다음 루틴이 시작됩니다",
+    "confirmPromptTitle": "다음 루틴",
+    "confirmPromptBody": "다음 루틴을 시작하려면 앱을 여세요",
     "timerConflictTitle": "진행 중인 타이머",
     "timerConflictBody": "진행 중인 단일 타이머가 있습니다. 취소하고 루틴을 시작하시겠어요?",
     "timerConflictProceed": "루틴 시작",
@@ -327,17 +353,27 @@
       "newTitle": "루틴 생성",
       "editTitle": "루틴 편집",
       "save": "저장",
-      "stepsSection": "단계",
+      "stepsSection": "루틴 추가",
+      "tapToSetDuration": "시간 설정",
+      "fieldRoutineName": "루틴 이름",
+      "routineNamePlaceholder": "예: 아침 운동",
+      "fieldAuto": "자동",
+      "autoHelpTitle": "자동 진행",
+      "autoHelpBody": "켜면 알람 없이 단계가 끝나면 자동으로 다음 단계로 넘어갑니다. 끄면 알람 후 사용자 액션(탭/흔들기/카메라)으로 종료해야 합니다.",
+      "daysHelpTitle": "반복 요일",
+      "daysHelpBody": "선택한 요일마다 루틴이 시작 시각에 자동으로 시작됩니다. 선택 안 하면 매일 반복됩니다.",
       "settingsSection": "설정",
-      "stepNamePlaceholder": "이름 입력",
+      "stepNamePlaceholder": "루틴 {{n}}",
       "stepSlotSave": "저장",
       "stepSlotSaved": "✓ 완료",
-      "addStep": "+ 추가",
+      "addStep": "추가",
       "fieldCategory": "카테고리",
-      "fieldDays": "반복",
+      "fieldDays": "반복 요일",
       "fieldSound": "사운드",
       "fieldAutoAdvance": "루틴 자동 진행",
       "fieldEndMethod": "종료 방식",
+      "autoCountdownLabel": "자동 진행 대기",
+      "autoCountdownUnit": "{{sec}}초",
       "deleteRoutine": "루틴 삭제",
       "unselected": "미선택",
       "validationFailTitle": "저장 실패",
@@ -346,8 +382,8 @@
       "validationStartTime": "시작 시간을 설정하세요",
       "fieldStartTime": "시작 시간",
       "validationDaysEmpty": "반복 요일을 선택하세요",
-      "validationStepsEmpty": "최소 1개 이상의 스텝을 추가하세요",
-      "validationStepIncomplete": "{{n}}번 스텝의 이름과 시간을 모두 입력하세요",
+      "validationStepsEmpty": "최소 1개 이상의 루틴을 추가하세요",
+      "validationStepIncomplete": "루틴을 추가하여 이름과 시간을 모두 입력하세요",
       "dirtyConfirmTitle": "변경 사항 저장 안 됨",
       "dirtyConfirmBody": "저장하지 않고 나가시겠습니까?",
       "dirtyConfirmExit": "나가기"
@@ -358,7 +394,7 @@
       "customSection": "내 카테고리",
       "addButton": "새 카테고리 추가",
       "addModalTitle": "새 카테고리",
-      "addPlaceholder": "예: 반려동물",
+      "addPlaceholder": "예: 고기 굽기",
       "addSave": "저장",
       "errLimit": "카테고리는 최대 {{max}}개까지 추가 가능합니다",
       "errDuplicate": "이미 같은 이름이 있습니다",
@@ -366,8 +402,8 @@
       "errTooLong": "이름은 최대 {{max}}자입니다",
       "deleteConfirmTitle": "카테고리 삭제",
       "deleteConfirmBody": "이 커스텀 카테고리를 삭제하시겠어요?",
-      "morning": "아침 루틴",
-      "evening": "저녁 루틴",
+      "morning": "아침",
+      "evening": "저녁",
       "exercise": "운동",
       "study": "공부",
       "chores": "가사",
@@ -375,7 +411,8 @@
       "work": "업무",
       "bedtime": "취침 준비",
       "meal": "식사",
-      "growth": "자기계발"
+      "growth": "자기계발",
+      "etc": "기타"
     },
     "days": {
       "title": "반복 요일",
@@ -389,6 +426,38 @@
       "preview": "미리듣기",
       "alarm": "경고음",
       "ringtone": "벨소리"
+    },
+    "run": {
+      "nextCountdownText": "{{n}}초 후 다음 루틴이 시작됩니다",
+      "autoCountdownText": "{{n}}초 후 다음 루틴이 진행됩니다",
+      "completeAlarmCountdown": "{{n}}초 후 알람이 종료됩니다",
+      "alarmTitle": "루틴 완료",
+      "dismissAlarm": "알람 종료",
+      "nextLabel": "다음",
+      "nextQuestion": "다음 루틴 진행하겠습니까?",
+      "startNext": "다음 루틴 시작",
+      "autoStartNow": "다음 루틴 진행",
+      "stop": "루틴 정지",
+      "completeTitle": "루틴 종료",
+      "completeName": "{{name}} 완료",
+      "confirm": "확인",
+      "cancel": "취소"
+    },
+    "alarmKit": {
+      "permissionRequiredTitle": "AlarmKit 권한",
+      "permissionRequiredBody": "iOS 26+ 에서 더 안정적인 알람 사용을 위해 AlarmKit 권한이 필요합니다.\n\n승인하지 않아도 알람은 정상 작동합니다.",
+      "openSettings": "설정 열기"
+    },
+    "duration": {
+      "hour": "시간",
+      "minute": "분",
+      "second": "초"
+    },
+    "time": {
+      "am": "오전",
+      "pm": "오후",
+      "hourUnit": "시",
+      "minuteUnit": "분"
     }
   }
 }

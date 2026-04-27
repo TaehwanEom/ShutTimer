@@ -1,0 +1,204 @@
+// 시작 시간 입력용 wheel picker. iPhone Clock 알람 다이얼 구조 (오전/오후 + 시 + 분).
+// DurationWheelPicker 의 Wheel 컴포넌트 재사용 (props 확장으로 loop / formatLabel 제어).
+
+import React, { useEffect, useState } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { Wheel, WHEEL_CONSTANTS } from './DurationWheelPicker';
+
+const { ITEM_HEIGHT, PICKER_HEIGHT } = WHEEL_CONSTANTS;
+
+type Props = {
+  isVisible: boolean;
+  /** 0~23 */
+  initialHour: number;
+  /** 0~59 */
+  initialMinute: number;
+  onConfirm: (hour24: number, minute: number) => void;
+  onCancel: () => void;
+  amLabel: string;
+  pmLabel: string;
+  hourUnitLabel: string;
+  minuteUnitLabel: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  textColor: string;
+  dimColor: string;
+  bgColor: string;
+  accentColor: string;
+};
+
+function hour24To12(h: number): { ampm: 0 | 1; hour12: number } {
+  const ampm = h >= 12 ? 1 : 0;
+  let hour12 = h % 12;
+  if (hour12 === 0) hour12 = 12;
+  return { ampm: ampm as 0 | 1, hour12 };
+}
+
+function hour12To24(ampm: 0 | 1, hour12: number): number {
+  if (ampm === 0) return hour12 === 12 ? 0 : hour12;
+  return hour12 === 12 ? 12 : hour12 + 12;
+}
+
+export default function TimeWheelPicker(props: Props) {
+  const {
+    isVisible,
+    initialHour,
+    initialMinute,
+    onConfirm,
+    onCancel,
+    amLabel,
+    pmLabel,
+    hourUnitLabel,
+    minuteUnitLabel,
+    confirmLabel,
+    cancelLabel,
+    textColor,
+    dimColor,
+    bgColor,
+    accentColor,
+  } = props;
+
+  const initialAmPm = hour24To12(initialHour).ampm;
+  const initialHour12 = hour24To12(initialHour).hour12;
+
+  const [ampm, setAmpm] = useState<0 | 1>(initialAmPm);
+  const [hour12, setHour12] = useState<number>(initialHour12);
+  const [minute, setMinute] = useState<number>(initialMinute);
+  const [seedKey, setSeedKey] = useState(0);
+
+  useEffect(() => {
+    if (isVisible) {
+      const { ampm: a, hour12: h } = hour24To12(initialHour);
+      setAmpm(a);
+      setHour12(h);
+      setMinute(initialMinute);
+      setSeedKey(k => k + 1);
+    }
+  }, [isVisible, initialHour, initialMinute]);
+
+  const handleConfirm = () => {
+    onConfirm(hour12To24(ampm, hour12), minute);
+  };
+
+  const ampmLabel = (v: number) => (v === 0 ? amLabel : pmLabel);
+
+  return (
+    <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.backdrop}>
+        <View style={[styles.sheet, { backgroundColor: bgColor }]}>
+          <View style={styles.row}>
+            <View style={styles.column}>
+              <Wheel
+                key={`ampm-${seedKey}`}
+                count={2}
+                initial={ampm}
+                onChange={(v) => setAmpm(v as 0 | 1)}
+                textColor={textColor}
+                dimColor={dimColor}
+                formatLabel={ampmLabel}
+                loop={false}
+                width={48}
+                align="center"
+              />
+            </View>
+            <View style={styles.column}>
+              <Wheel
+                key={`h-${seedKey}`}
+                count={12}
+                initial={hour12 - 1}
+                onChange={(v) => setHour12(v + 1)}
+                textColor={textColor}
+                dimColor={dimColor}
+                formatLabel={(v) => String(v + 1)}
+                width={48}
+                align="center"
+              />
+            </View>
+            <View style={styles.column}>
+              <Wheel
+                key={`m-${seedKey}`}
+                count={60}
+                initial={minute}
+                onChange={setMinute}
+                width={48}
+                align="center"
+                textColor={textColor}
+                dimColor={dimColor}
+                formatLabel={(v) => String(v).padStart(2, '0')}
+              />
+            </View>
+          </View>
+
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={onCancel} style={styles.actionBtn}>
+              <Text style={[styles.actionText, { color: dimColor }]}>{cancelLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleConfirm} style={styles.actionBtn}>
+              <Text style={[styles.actionText, { color: accentColor, fontWeight: '600' }]}>{confirmLabel}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: PICKER_HEIGHT,
+  },
+  column: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    marginHorizontal: 4,
+  },
+  unitColumn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  unit: {
+    fontSize: 14,
+    marginLeft: 2,
+    minWidth: 20,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingTop: 12,
+  },
+  actionBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 16,
+  },
+});

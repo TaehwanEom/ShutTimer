@@ -3,7 +3,11 @@
     "favorites": "Favorites",
     "add": "Add",
     "start": "START",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "timerBlocked": {
+      "title": "Routine in progress",
+      "body": "Stop the routine first to start a single timer."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -196,7 +200,7 @@
     "activeDays": "Active days",
     "daysFmt": "{{days}} days",
     "statsTotalTime": "Total Time",
-    "statsTopMission": "Top Mission",
+    "statsDailyUsage": "Daily Usage",
     "statsStreak": "Streak",
     "hoursMinutes": "{{hours}}h {{minutes}}m",
     "minutesOnly": "{{minutes}}m",
@@ -238,5 +242,68 @@
     "tooltipPlay": "Long-press the play button to stop the timer",
     "tooltipFav": "Long-press a favorite to edit",
     "confirm": "Confirm"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "routine": {
+    "tabScheduled": "Scheduled",
+    "tabManual": "Manual",
+    "createPickType": "Choose routine type",
+    "createScheduled": "Scheduled routine",
+    "createScheduledDesc": "Alarm at a set time",
+    "createManual": "Manual routine",
+    "createManualDesc": "Start when you want",
+    "autoCountdownLabel": "Auto-advance wait",
+    "autoCountdownUnit": "{{sec}}s",
+    "emptyTitleScheduled": "No scheduled routines",
+    "emptyTitleManual": "No manual routines",
+    "stepsCount": "{{count}} steps",
+    "totalDurationFmt": "Time {{duration}}\n{{count}} steps",
+    "editBlocked": {
+      "title": "Routine in progress",
+      "body": "You can't edit a routine while it's running. Stop it first."
+    },
+    "deleteBlocked": {
+      "title": "Routine in progress",
+      "body": "You can't delete a routine while it's running. Stop it first."
+    },
+    "edit": {
+      "autoCountdownLabel": "Auto-advance wait",
+      "autoCountdownUnit": "{{sec}}s"
+    },
+    "run": {
+      "nextCountdownText": "Next routine starts in {{n}}s",
+      "autoCountdownText": "Next routine continues in {{n}}s",
+      "completeAlarmCountdown": "Alarm ends in {{n}}s",
+      "alarmTitle": "Routine complete",
+      "dismissAlarm": "Dismiss",
+      "nextLabel": "Next",
+      "nextQuestion": "Continue to next routine?",
+      "startNext": "Start next routine",
+      "autoStartNow": "Continue now",
+      "stop": "Stop routine",
+      "completeTitle": "Routine ended",
+      "completeName": "{{name}} complete",
+      "confirm": "OK",
+      "cancel": "Cancel"
+    },
+    "alarmKit": {
+      "permissionRequiredTitle": "AlarmKit Permission",
+      "permissionRequiredBody": "AlarmKit permission is required for more reliable alarms on iOS 26+.\n\nAlarms will still work without granting permission.",
+      "openSettings": "Open Settings"
+    },
+    "duration": {
+      "hour": "h",
+      "minute": "m",
+      "second": "s"
+    },
+    "time": {
+      "am": "AM",
+      "pm": "PM",
+      "hourUnit": ":",
+      "minuteUnit": ""
+    }
   }
 }

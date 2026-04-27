@@ -53,11 +53,9 @@ export default function RoutineDaysScreen({ navigation, route }: Props) {
   };
 
   const handleDone = () => {
-    navigation.navigate({
-      name: 'RoutineEdit',
-      params: { selectedDays: days },
-      merge: true,
-    });
+    // popTo: 기존 RoutineEdit 인스턴스로 명시적 pop + params 전달 (state 보존 보장)
+    (navigation as any).popTo?.('RoutineEdit', { selectedDays: days }) ??
+      navigation.navigate({ name: 'RoutineEdit', params: { selectedDays: days }, merge: true } as any);
   };
 
   const isEveryday = arraysEqual(days, EVERYDAY);
@@ -67,13 +65,11 @@ export default function RoutineDaysScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleDone}>
           <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('routine.days.title')}</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={handleDone}>
-          <Text style={styles.doneBtn}>{t('routine.days.done')}</Text>
-        </TouchableOpacity>
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

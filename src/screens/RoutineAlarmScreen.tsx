@@ -30,6 +30,7 @@ import {
   ActiveRoutine,
   loadRoutines,
   loadActiveRoutine,
+  getRoutineMode,
 } from '../constants/routines';
 import {
   completeCurrentMission,
@@ -77,14 +78,21 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         return;
       }
 
+      // 이중 가드 — endMethod !== 'camera' 면 RoutineList 로 redirect (inline 진행).
+      // (App.tsx 알림 핸들러/콜드 스타트가 이미 분기하지만, 예측 못한 경로 fallback)
+      if (target.endMethod !== 'camera') {
+        navigation.replace('RoutineList');
+        return;
+      }
+
       // 배경 알림으로 직접 진입한 경로면 awaitingConfirm=false 상태.
       // controller.completeCurrentMission()이 세션 기록 + awaitingConfirm=true 저장.
       if (!existing.awaitingConfirm) {
         const res = await completeCurrentMission();
         if (res && res.kind === 'end') {
-          // 이론상 autoAdvance=false + 모든 미션 종료 → confirmAndAdvance에서 end 처리하지만
-          // 안전장치로 여기서도 Home 복귀
-          navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          // 마지막 step 완료 → 루틴이 속한 탭 (예약/일반) 으로 RoutineList 복귀
+          const tab = getRoutineMode(target);
+          navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params: { initialTab: tab } }] });
           return;
         }
         existing = await loadActiveRoutine();
@@ -193,7 +201,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         await stopRoutine();
         stopAudio();
         stopVibe();
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+        const tab = routine ? getRoutineMode(routine) : undefined;
+        navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params: tab ? { initialTab: tab } : undefined }] });
         return;
       }
       if (dismissed || !routine) return;
@@ -237,23 +246,27 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   // ─── "다음 미션 시작" → controller.confirmAndAdvance ──
   const handleStartNext = useCallback(async () => {
     const res = await confirmAndAdvance();
+    const tab = routine ? getRoutineMode(routine) : undefined;
+    const params = tab ? { initialTab: tab } : undefined;
     if (!res) {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      // fallback — 루틴이 속한 탭으로 RoutineList 복귀
+      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
       return;
     }
     if (res.kind === 'end') {
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      // 마지막 step 완료 → 루틴이 속한 탭으로 RoutineList 복귀
+      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
       return;
     }
-    // advance_auto (확인 후 진행도 다음 미션 준비는 auto와 동일한 구조)
+    // advance_auto — 다음 step 부터는 RoutineList 의 inline 진행 영역에서 처리
     navigation.reset({
       index: 1,
       routes: [
         { name: 'Home' },
-        { name: 'RoutineRun', params: { routineId: res.routine.id } },
+        { name: 'RoutineList', params },
       ],
     });
-  }, [navigation]);
+  }, [navigation, routine]);
 
   // ─── 정리 헬퍼 ───────────────────────────────────────────
   const stopAudio = () => {
@@ -277,8 +290,10 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     stopAudio();
     stopVibe();
     await stopRoutine();
-    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  }, [navigation]);
+    const tab = routine ? getRoutineMode(routine) : undefined;
+    const params = tab ? { initialTab: tab } : undefined;
+    navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
+  }, [navigation, routine]);
 
   if (!routine || !ar) {
     return <SafeAreaView style={styles.container} />;
@@ -289,7 +304,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const willEnd = nextIdx >= routine.steps.length;
   const nextStep = willEnd ? null : routine.steps[nextIdx];
   const nextLabel = nextStep ? nextStep.name : '';
-  const nextDurationMin = nextStep ? Math.max(0, nextStep.durationMinutes) : 0;
+  const nextDurationMin = nextStep ? Math.round(Math.max(0, nextStep.durationSeconds) / 60) : 0;
 
   // dismiss UI 분기
   const renderDismissArea = () => {

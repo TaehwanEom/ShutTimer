@@ -1,6 +1,6 @@
 // v1.6 신 모델: 루틴 편집 화면.
-// 데이터: 카테고리 + 시작시간 (schedule.startTime) + 시퀀셜 step (이름 + duration).
-// Routine.name 제거, RoutineStep.startTime/endTime 제거 → durationMinutes 만.
+// 데이터: 카테고리 + 시작시간 (schedule.startTime) + 시퀀셜 step (이름 + duration 초 단위).
+// Routine.name 제거, RoutineStep.startTime/endTime 제거 → durationSeconds 만.
 // 첫 step 표시 시각 = schedule.startTime, 이후 step 은 누적 자동 (UI 표시).
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -13,14 +13,17 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Linking,
+  Switch,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp, useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, StackActions } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
+import DurationWheelPicker from '../components/DurationWheelPicker';
+import TimeWheelPicker from '../components/TimeWheelPicker';
 import { ThemeColors } from '../constants/theme';
 import {
   Routine,
@@ -32,11 +35,13 @@ import {
   createRoutineId,
   createStepId,
   parseHHMM,
-  formatHHMM,
 } from '../constants/routines';
 import {
   scheduleRoutinePrealerts,
   cancelRoutinePrealerts,
+  requestAlarmKitAuthorizationIfNeeded,
+  isAlertShownThisCycle,
+  markAlertShown,
 } from '../utils/routineScheduler';
 import {
   FIXED_CATEGORIES,
@@ -53,8 +58,8 @@ type Props = {
 type LocalStep = {
   id: string;
   name: string;
-  /** 분 단위. 0이면 미설정 */
-  durationMinutes: number;
+  /** 초 단위. 0이면 미설정 */
+  durationSeconds: number;
 };
 
 const STEP_NAME_MAX = 20;
@@ -91,27 +96,17 @@ function formatTimeKr(hhmm: string): string {
   return `${ampm} ${h12}:${String(mm).padStart(2, '0')}`;
 }
 
-/** Date 객체 → 분 단위 (00:00 부터 합산). duration 입력용. */
-function dateToDurationMinutes(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-/** 분 단위 → Date (오늘 + 분). duration 입력 picker 초기값용. */
-function durationMinutesToDate(min: number): Date {
-  const d = new Date();
-  const safe = Math.max(0, Math.min(23 * 60 + 59, min));
-  d.setHours(Math.floor(safe / 60), safe % 60, 0, 0);
-  return d;
-}
-
-/** 분 단위 → 사람이 읽는 "Xh Ym" 또는 "Y분" */
-function formatDuration(min: number): string {
-  if (min <= 0) return '--';
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m}분`;
-  if (m === 0) return `${h}시간`;
-  return `${h}시간 ${m}분`;
+/** 초 단위 → 사람이 읽는 "Xh Ym Zs" / "Ym Zs" / "Zs". 0 이면 placeholder. */
+function formatDuration(sec: number, emptyLabel: string): string {
+  if (sec <= 0) return emptyLabel;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}시간`);
+  if (m > 0) parts.push(`${m}분`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}초`);
+  return parts.join(' ');
 }
 
 // ─── 카테고리/요일/사운드 라벨 ───────────────────────────
@@ -144,30 +139,52 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const styles = makeStyles(colors);
   const editingId = route.params?.routineId ?? null;
   const isEditMode = editingId !== null;
+  // 모드: 신규 → params.mode (default 'scheduled'), 편집 → 기존 routine 의 schedule 유무로 마운트 시 보정
+  const [mode, setMode] = useState<'scheduled' | 'manual'>(
+    () => route.params?.mode ?? 'scheduled',
+  );
 
   const [category, setCategory] = useState('');
+  const [routineName, setRoutineName] = useState('');
   const [startTime, setStartTime] = useState<string>(DEFAULT_START_TIME);
   const [days, setDays] = useState<number[]>([]);
   const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
+  const [autoCountdownSec, setAutoCountdownSec] = useState<number>(60);
   const [steps, setSteps] = useState<LocalStep[]>(() => [
-    { id: createStepId(), name: '', durationMinutes: 0 },
+    { id: createStepId(), name: '', durationSeconds: 0 },
   ]);
   const [dirty, setDirty] = useState(false);
 
-  // picker: 'startTime' (절대 시각) 또는 step duration 입력 (인덱스)
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState<
-    | { kind: 'startTime' }
-    | { kind: 'duration'; stepIndex: number }
-    | null
-  >(null);
+  // startTime picker (오전/오후 + 시 + 분) — 자체 wheel
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+
+  // step duration picker (시:분:초) — 자체 wheel
+  const [durationPickerVisible, setDurationPickerVisible] = useState(false);
+  const [durationPickerStepIndex, setDurationPickerStepIndex] = useState<number | null>(null);
 
   const [categoryCache, setCategoryCache] = useState<CategoryDef[]>([...FIXED_CATEGORIES]);
 
   const originalCreatedAtRef = useRef<number | null>(null);
   const originalActiveRef = useRef<boolean>(true);
   const loadedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // [DEBUG] mount/unmount 추적 — state reset 원인 확인용
+  useEffect(() => {
+    console.log('[RoutineEdit] MOUNTED', { editingId, params: route.params });
+    return () => console.log('[RoutineEdit] UNMOUNTED');
+  }, []);
+  useEffect(() => {
+    console.log('[RoutineEdit] params change', route.params);
+  }, [route.params]);
 
   const markDirty = () => setDirty(true);
 
@@ -187,16 +204,19 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       }
       originalCreatedAtRef.current = target.createdAt;
       originalActiveRef.current = target.active;
+      setMode(target.schedule ? 'scheduled' : 'manual');
       setCategory(target.category);
+      setRoutineName(target.name ?? '');
       setStartTime(target.schedule?.startTime ?? DEFAULT_START_TIME);
       setDays(target.schedule?.days ?? []);
       setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
       setEndMethod(target.endMethod);
+      setAutoCountdownSec(target.autoCountdownSec ?? 60);
       setSteps(
         target.steps.map(s => ({
           id: s.id,
           name: s.name,
-          durationMinutes: s.durationMinutes,
+          durationSeconds: s.durationSeconds,
         }))
       );
       loadedRef.current = true;
@@ -248,7 +268,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     if (steps.length >= MAX_STEPS) return;
     setSteps(prev => [
       ...prev,
-      { id: createStepId(), name: '', durationMinutes: 0 },
+      { id: createStepId(), name: '', durationSeconds: 0 },
     ]);
     markDirty();
   };
@@ -263,39 +283,45 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   };
 
   const handleStepDurationTap = (idx: number) => {
-    setPickerTarget({ kind: 'duration', stepIndex: idx });
-    setPickerVisible(true);
+    setDurationPickerStepIndex(idx);
+    setDurationPickerVisible(true);
   };
 
   const handleStartTimeTap = () => {
-    setPickerTarget({ kind: 'startTime' });
-    setPickerVisible(true);
+    setTimePickerVisible(true);
   };
 
-  const handlePickerConfirm = (date: Date) => {
-    if (!pickerTarget) {
-      setPickerVisible(false);
+  const handleTimePickerConfirm = (hour: number, minute: number) => {
+    const hh = String(hour).padStart(2, '0');
+    const mm = String(minute).padStart(2, '0');
+    setStartTime(`${hh}:${mm}`);
+    markDirty();
+    setTimePickerVisible(false);
+  };
+
+  const handleTimePickerCancel = () => {
+    setTimePickerVisible(false);
+  };
+
+  const handleDurationConfirm = (seconds: number) => {
+    if (durationPickerStepIndex === null) {
+      setDurationPickerVisible(false);
       return;
     }
-    if (pickerTarget.kind === 'startTime') {
-      setStartTime(dateToHhmm(date));
-    } else {
-      const idx = pickerTarget.stepIndex;
-      const minutes = dateToDurationMinutes(date);
-      setSteps(prev => {
-        const next = [...prev];
-        next[idx] = { ...next[idx], durationMinutes: minutes };
-        return next;
-      });
-    }
+    const idx = durationPickerStepIndex;
+    setSteps(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], durationSeconds: seconds };
+      return next;
+    });
     markDirty();
-    setPickerVisible(false);
-    setPickerTarget(null);
+    setDurationPickerVisible(false);
+    setDurationPickerStepIndex(null);
   };
 
-  const handlePickerCancel = () => {
-    setPickerVisible(false);
-    setPickerTarget(null);
+  const handleDurationCancel = () => {
+    setDurationPickerVisible(false);
+    setDurationPickerStepIndex(null);
   };
 
   const handleDeleteStep = (idx: number) => {
@@ -327,12 +353,16 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
 
   const validate = (): { ok: boolean; error?: string } => {
     if (!category) return { ok: false, error: t('routine.edit.validationCategoryEmpty') };
-    if (parseHHMM(startTime) === null) return { ok: false, error: t('routine.edit.validationStartTime') };
-    if (days.length === 0) return { ok: false, error: t('routine.edit.validationDaysEmpty') };
+    if (!routineName.trim()) return { ok: false, error: t('routine.edit.validationNameEmpty') };
+    // 예약 모드만 시작 시간 / 요일 필수. 일반 모드는 면제.
+    if (mode === 'scheduled') {
+      if (parseHHMM(startTime) === null) return { ok: false, error: t('routine.edit.validationStartTime') };
+      if (days.length === 0) return { ok: false, error: t('routine.edit.validationDaysEmpty') };
+    }
     if (steps.length === 0) return { ok: false, error: t('routine.edit.validationStepsEmpty') };
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i];
-      if (!s.name.trim() || s.durationMinutes <= 0) {
+      if (!s.name.trim() || s.durationSeconds <= 0) {
         return { ok: false, error: t('routine.edit.validationStepIncomplete', { n: i + 1 }) };
       }
     }
@@ -348,25 +378,49 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     const finalSteps: RoutineStep[] = steps.map(s => ({
       id: s.id,
       name: s.name.trim(),
-      durationMinutes: Math.max(0, s.durationMinutes),
+      durationSeconds: Math.max(0, s.durationSeconds),
     }));
     const routine: Routine = {
       id: editingId ?? createRoutineId(),
       category,
+      name: routineName.trim() || undefined,
       steps: finalSteps,
-      schedule: { startTime, days },
+      // manual 모드는 schedule 자체 미생성 (scheduler 자동 skip)
+      schedule: mode === 'scheduled' ? { startTime, days } : undefined,
       soundKey,
       active: isEditMode ? originalActiveRef.current : true,
       endMethod,
+      autoCountdownSec: endMethod === 'auto' ? autoCountdownSec : undefined,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
     };
     await upsertRoutine(routine);
+
     if (routine.active && routine.schedule) {
+      // iOS 26+ 에서만 AlarmKit 권한 요청. 미지원 / Android / iOS 25 이하는 'unavailable' silent.
+      const authState = await requestAlarmKitAuthorizationIfNeeded();
+      if (!isMountedRef.current) return;
+      if (authState === 'denied' && !isAlertShownThisCycle()) {
+        markAlertShown();
+        Alert.alert(
+          t('routine.alarmKit.permissionRequiredTitle'),
+          t('routine.alarmKit.permissionRequiredBody'),
+          [
+            {
+              text: t('routine.alarmKit.openSettings'),
+              onPress: () => { Linking.openURL('app-settings:').catch(() => {}); },
+            },
+            { text: t('common.confirm'), style: 'default' },
+          ],
+        );
+      }
       await scheduleRoutinePrealerts(routine);
     } else {
       await cancelRoutinePrealerts(routine.id);
     }
-    navigation.goBack();
+    if (!isMountedRef.current) return;
+    // RoutineEdit 을 stack 에서 제거하면서 RoutineList 의 initialTab 으로 복귀
+    // navigate 사용 시 RoutineEdit 위에 RoutineList 새 인스턴스가 push 되어 뒤로가기 시 RoutineEdit 노출되는 버그 회피
+    navigation.dispatch(StackActions.popTo('RoutineList', { initialTab: mode }));
   };
 
   const handleDelete = () => {
@@ -415,26 +469,14 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const soundLabel = formatSoundLabel(soundKey, t);
   const startTimeLabel = formatTimeKr(startTime);
 
-  // 각 step 표시용 시작 시각 (절대) — schedule.startTime + 누적 duration
-  const baseMin = parseHHMM(startTime) ?? 0;
-  let acc = baseMin;
-  const stepStartLabels = steps.map(s => {
-    const label = formatHHMM(acc);
-    acc += Math.max(0, s.durationMinutes);
-    return label;
-  });
-
   // ─── 렌더 ───────────────────────────────────────────
 
-  const initialPickerDate = (() => {
-    if (!pickerTarget) return new Date();
-    if (pickerTarget.kind === 'startTime') return hhmmToDate(startTime);
-    const step = steps[pickerTarget.stepIndex];
-    return durationMinutesToDate(step?.durationMinutes ?? 0);
-  })();
+  const startMin = parseHHMM(startTime) ?? 7 * 60;
+  const initialStartHour = Math.floor(startMin / 60);
+  const initialStartMinute = startMin % 60;
 
-  const pickerMode = pickerTarget?.kind === 'duration' ? 'time' : 'time';
-  const pickerIs24Hour = pickerTarget?.kind === 'duration';
+  const initialDurationSeconds =
+    durationPickerStepIndex !== null ? steps[durationPickerStepIndex]?.durationSeconds ?? 0 : 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -464,17 +506,35 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </View>
         </TouchableOpacity>
 
-        {/* 시작 시간 (예약) */}
-        <TouchableOpacity style={styles.topCard} onPress={handleStartTimeTap} activeOpacity={0.85}>
+        {/* 루틴 이름 (부제) */}
+        <View style={styles.topCard}>
           <View style={styles.topCardLabelRow}>
-            <MaterialIcons name="schedule" size={18} color={colors.primary} />
-            <Text style={styles.topCardLabel}>{t('routine.edit.fieldStartTime')}</Text>
+            <MaterialIcons name="label-outline" size={18} color={colors.primary} />
+            <Text style={styles.topCardLabel}>{t('routine.edit.fieldRoutineName')}</Text>
           </View>
-          <View style={styles.topCardValueRow}>
-            <Text style={styles.topCardValue}>{startTimeLabel}</Text>
-            <MaterialIcons name="chevron-right" size={22} color={colors.secondary} />
-          </View>
-        </TouchableOpacity>
+          <TextInput
+            value={routineName}
+            onChangeText={text => { setRoutineName(text); markDirty(); }}
+            placeholder={t('routine.edit.routineNamePlaceholder')}
+            placeholderTextColor={colors.secondary}
+            maxLength={20}
+            style={styles.routineNameInput}
+          />
+        </View>
+
+        {/* 시작 시간 (예약 모드 only) */}
+        {mode === 'scheduled' && (
+          <TouchableOpacity style={styles.topCard} onPress={handleStartTimeTap} activeOpacity={0.85}>
+            <View style={styles.topCardLabelRow}>
+              <MaterialIcons name="schedule" size={18} color={colors.primary} />
+              <Text style={styles.topCardLabel}>{t('routine.edit.fieldStartTime')}</Text>
+            </View>
+            <View style={styles.topCardValueRow}>
+              <Text style={styles.topCardValue}>{startTimeLabel}</Text>
+              <MaterialIcons name="chevron-right" size={22} color={colors.secondary} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* 단계 */}
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.stepsSection')}</Text>
@@ -482,17 +542,19 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           return (
             <View key={step.id} style={styles.slotCard}>
               <View style={styles.slotRow}>
-                <View style={styles.slotNumber}>
-                  <Text style={styles.slotNumberText}>{idx + 1}</Text>
-                </View>
                 <TextInput
                   value={step.name}
                   onChangeText={text => handleStepNameChange(idx, text)}
-                  placeholder={t('routine.edit.stepNamePlaceholder')}
+                  placeholder={t('routine.edit.stepNamePlaceholder', { n: String(idx + 1).padStart(2, '0') })}
                   placeholderTextColor={colors.secondary}
                   maxLength={STEP_NAME_MAX}
                   style={styles.slotNameInput}
                 />
+                <TouchableOpacity onPress={() => handleStepDurationTap(idx)} style={styles.slotDurationBtn}>
+                  <Text style={[styles.slotDurationText, step.durationSeconds <= 0 && styles.slotDurationEmpty]}>
+                    {formatDuration(step.durationSeconds, t('routine.edit.tapToSetDuration'))}
+                  </Text>
+                </TouchableOpacity>
                 {steps.length > 1 && (
                   <TouchableOpacity
                     onPress={() => handleDeleteStep(idx)}
@@ -501,16 +563,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
                     <MaterialIcons name="remove-circle-outline" size={20} color={colors.secondary} />
                   </TouchableOpacity>
                 )}
-              </View>
-              <View style={styles.slotMetaRow}>
-                <Text style={styles.slotMetaText}>
-                  {formatTimeKr(stepStartLabels[idx])} ·
-                </Text>
-                <TouchableOpacity onPress={() => handleStepDurationTap(idx)} style={styles.slotDurationBtn}>
-                  <Text style={[styles.slotDurationText, step.durationMinutes <= 0 && styles.slotDurationEmpty]}>
-                    {formatDuration(step.durationMinutes)}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
           );
@@ -526,13 +578,25 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
         {/* 설정 */}
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.settingsSection')}</Text>
 
-        <TouchableOpacity style={styles.settingRow} onPress={handleNavDays}>
-          <Text style={styles.settingLabel}>{t('routine.edit.fieldDays')}</Text>
-          <View style={styles.settingValueRow}>
-            <Text style={[styles.settingValue, days.length === 0 && styles.settingValueUnset]}>{daysLabel}</Text>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
-          </View>
-        </TouchableOpacity>
+        {/* 요일 (예약 모드 only) */}
+        {mode === 'scheduled' && (
+          <TouchableOpacity style={styles.settingRow} onPress={handleNavDays}>
+            <View style={styles.autoLabelRow}>
+              <Text style={styles.settingLabel}>{t('routine.edit.fieldDays')}</Text>
+              <TouchableOpacity
+                onPress={() => Alert.alert(t('routine.edit.daysHelpTitle'), t('routine.edit.daysHelpBody'))}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.autoHelpBtn}
+              >
+                <MaterialIcons name="help-outline" size={14} color={colors.secondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.settingValueRow}>
+              <Text style={[styles.settingValue, days.length === 0 && styles.settingValueUnset]}>{daysLabel}</Text>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.settingRow} onPress={handleNavSound}>
           <Text style={styles.settingLabel}>{t('routine.edit.fieldSound')}</Text>
@@ -542,33 +606,87 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.endMethodSection}>
-          <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
-          <View style={styles.endMethodSegment}>
-            {(['tap', 'shake', 'camera', 'auto'] as const).map(opt => {
-              const selected = endMethod === opt;
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
-                  onPress={() => {
-                    setEndMethod(opt);
-                    markDirty();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.endMethodBtnText,
-                      selected && styles.endMethodBtnTextSelected,
-                    ]}
-                  >
-                    {t(`routine.endMethod.${opt}`)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        {/* 자동 진행 토글 — 사운드 아래 */}
+        <View style={styles.settingRow}>
+          <View style={styles.autoLabelRow}>
+            <Text style={styles.settingLabel}>{t('routine.edit.fieldAuto')}</Text>
+            <TouchableOpacity
+              onPress={() => Alert.alert(t('routine.edit.autoHelpTitle'), t('routine.edit.autoHelpBody'))}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.autoHelpBtn}
+            >
+              <MaterialIcons name="help-outline" size={14} color={colors.secondary} />
+            </TouchableOpacity>
           </View>
+          <Switch
+            value={endMethod === 'auto'}
+            onValueChange={(on) => {
+              setEndMethod(on ? 'auto' : 'tap');
+              markDirty();
+            }}
+          />
         </View>
+
+        {/* 자동 진행 대기 시간 (자동 ON 일 때만, 1~60초) */}
+        {endMethod === 'auto' && (
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>{t('routine.edit.autoCountdownLabel', { defaultValue: '자동 진행 대기' })}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setAutoCountdownSec(s => Math.max(1, s - 5));
+                  markDirty();
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="remove-circle-outline" size={26} color={colors.primary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.onBackground, minWidth: 44, textAlign: 'center' }}>
+                {t('routine.edit.autoCountdownUnit', { sec: autoCountdownSec, defaultValue: `${autoCountdownSec}초` })}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setAutoCountdownSec(s => Math.min(60, s + 5));
+                  markDirty();
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="add-circle-outline" size={26} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* 종료 방식 (자동 OFF 일 때만) */}
+        {endMethod !== 'auto' && (
+          <View style={styles.endMethodSection}>
+            <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
+            <View style={styles.endMethodSegment}>
+              {(['tap', 'shake', 'camera'] as const).map(opt => {
+                const selected = endMethod === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
+                    onPress={() => {
+                      setEndMethod(opt);
+                      markDirty();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.endMethodBtnText,
+                        selected && styles.endMethodBtnTextSelected,
+                      ]}
+                    >
+                      {t(`routine.endMethod.${opt}`)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* 삭제 (편집 모드만) */}
         {isEditMode && (
@@ -581,15 +699,38 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      <DateTimePickerModal
-        isVisible={pickerVisible}
-        mode={pickerMode}
-        display="spinner"
-        date={initialPickerDate}
-        onConfirm={handlePickerConfirm}
-        onCancel={handlePickerCancel}
-        minuteInterval={1}
-        is24Hour={pickerIs24Hour}
+      <TimeWheelPicker
+        isVisible={timePickerVisible}
+        initialHour={initialStartHour}
+        initialMinute={initialStartMinute}
+        onConfirm={handleTimePickerConfirm}
+        onCancel={handleTimePickerCancel}
+        amLabel={t('routine.time.am')}
+        pmLabel={t('routine.time.pm')}
+        hourUnitLabel={t('routine.time.hourUnit')}
+        minuteUnitLabel={t('routine.time.minuteUnit')}
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
+        textColor={colors.onBackground}
+        dimColor={colors.secondary}
+        bgColor={colors.surfaceContainerLowest}
+        accentColor={colors.primary}
+      />
+
+      <DurationWheelPicker
+        isVisible={durationPickerVisible}
+        initialSeconds={initialDurationSeconds}
+        onConfirm={handleDurationConfirm}
+        onCancel={handleDurationCancel}
+        hourLabel={t('routine.duration.hour')}
+        minuteLabel={t('routine.duration.minute')}
+        secondLabel={t('routine.duration.second')}
+        confirmLabel={t('common.confirm')}
+        cancelLabel={t('common.cancel')}
+        textColor={colors.onBackground}
+        dimColor={colors.secondary}
+        bgColor={colors.surfaceContainerLowest}
+        accentColor={colors.primary}
       />
     </SafeAreaView>
   );
@@ -653,36 +794,43 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
+  routineNameInput: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.onBackground,
+    paddingVertical: 4,
+    paddingTop: 8,
+  },
   slotCard: {
     backgroundColor: colors.surfaceContainerLow,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 10,
   },
   slotRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   slotNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
   },
   slotNumberText: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '800',
     color: colors.onBackground,
   },
   slotNameInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.onBackground,
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   slotMetaRow: {
     flexDirection: 'row',
@@ -697,13 +845,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.secondary,
   },
   slotDurationBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     backgroundColor: colors.surfaceContainerLowest,
   },
   slotDurationText: {
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.onBackground,
   },
@@ -756,6 +904,15 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   settingValueUnset: {
     color: colors.secondary,
     opacity: 0.7,
+  },
+  autoLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+  },
+  autoHelpBtn: {
+    padding: 0,
+    marginTop: 3,
   },
   endMethodSection: {
     paddingVertical: 14,

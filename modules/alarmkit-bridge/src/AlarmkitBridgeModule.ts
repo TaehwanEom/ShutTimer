@@ -16,4 +16,19 @@ declare class AlarmkitBridgeModule extends NativeModule {
   listAlarms(): Promise<string[]>;
 }
 
-export default requireNativeModule<AlarmkitBridgeModule>('AlarmkitBridge');
+// Native binary 에 모듈 미포함 (구 dev client / Expo Go) → app init throw 회피.
+// stub 반환 — isAvailable() false 라서 호출처가 자동으로 expo-notifications 폴백.
+let bridge: AlarmkitBridgeModule;
+try {
+  bridge = requireNativeModule<AlarmkitBridgeModule>('AlarmkitBridge');
+} catch {
+  bridge = {
+    isAvailable: () => false,
+    requestAuthorization: async () => 'unavailable' as AuthorizationState,
+    getAuthorizationState: async () => 'unavailable' as AuthorizationState,
+    scheduleAlarm: async () => '',
+    cancelAlarm: async () => {},
+    listAlarms: async () => [],
+  } as unknown as AlarmkitBridgeModule;
+}
+export default bridge;

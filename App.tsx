@@ -76,13 +76,13 @@ import NoticeScreen from './src/screens/NoticeScreen';
 import MissionSelectScreen from './src/screens/MissionSelectScreen';
 import RoutineListScreen from './src/screens/RoutineListScreen';
 import RoutineEditScreen from './src/screens/RoutineEditScreen';
-import RoutineRunScreen from './src/screens/RoutineRunScreen';
 import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
 import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
 import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState } from './src/utils/routineController';
+import { loadRoutines } from './src/constants/routines';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
   ? require('./src/screens/PoCPhotoValidationScreen').default
@@ -108,15 +108,16 @@ export type RootStackParamList = {
   Notice: undefined;
   MissionSelect: undefined;
   // @v1.6 루틴 기능
-  RoutineList: undefined;
+  RoutineList: { initialTab?: 'scheduled' | 'manual' } | undefined;
   RoutineEdit: {
     routineId?: string;
+    /** 신규 생성 시 모드 — 미지정 시 'scheduled' default. 편집 모드면 무시 (기존 routine 의 schedule 유무 유지) */
+    mode?: 'scheduled' | 'manual';
     // Phase 4: 하위 화면에서 merge:true 로 반환되는 값들 (useEffect로 소비 후 undefined 세팅)
     selectedCategory?: string;
     selectedDays?: number[];
     selectedSound?: string;
   } | undefined;
-  RoutineRun: { routineId: string };
   RoutineAlarm: { routineId: string };
   RoutineCategory: { current?: string } | undefined;
   RoutineDays: { current?: number[] } | undefined;
@@ -268,6 +269,9 @@ function AppNavigator() {
       if (route === 'Alarm') return;
       const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
       if (isAlarmActive === 'true') return;
+      // routine 진행 중이면 단일 timer 알람 fallback 차단
+      const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
+      if (isRoutineActive === 'true') return;
       navigationRef.current?.navigate('Alarm');
     });
     return () => subscription.remove();
@@ -282,27 +286,42 @@ function AppNavigator() {
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
       if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
-        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineRun' || currentRoute === 'RoutineAlarm') return;
+        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
         navigationRef.current?.navigate('RoutineList');
         return;
       }
       if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
-        // 자동 진행 체인 — 이미 RoutineRun에 있으면 AppState 복귀 시 endAt 기준 자동 전환됨
-        if (currentRoute === 'RoutineRun') return;
-        navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
+        // 자동 진행 체인 — RoutineList 의 inline 진행이 active routine sync 로 자동 마운트
+        if (currentRoute === 'RoutineList') return;
+        navigationRef.current?.navigate('RoutineList');
         return;
       }
       if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-        // v1.6: 확인 후 진행 모드 배경 알림 — 탭 시 RoutineAlarm 이동
-        if (currentRoute === 'RoutineAlarm') return;
-        navigationRef.current?.navigate('RoutineAlarm', { routineId: data.routineId });
+        // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
+        // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
+        // camera → RoutineAlarm (scan UI).
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
+        const routines = await loadRoutines();
+        const r = routines.find(x => x.id === data.routineId);
+        if (!r) {
+          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+          return;
+        }
+        if (!navigationRef.current?.isReady()) return;
+        if (r.endMethod === 'camera') {
+          navigationRef.current.navigate('RoutineAlarm', { routineId: data.routineId });
+        } else {
+          navigationRef.current.navigate('RoutineList');
+        }
         return;
       }
 
-      // 기본 알람 경로
+      // 기본 알람 경로 — routine 진행 중이면 차단
       if (currentRoute === 'Alarm') return;
       const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
       if (isAlarmActive === 'true') return;
+      const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
+      if (isRoutineActive === 'true') return;
       navigationRef.current?.navigate('Alarm');
     });
     return () => subscription.remove();
@@ -311,7 +330,7 @@ function AppNavigator() {
   // 콜드 스타트: 알림 탭으로 앱 진입 시 적절한 화면 이동
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync()
-      .then(response => {
+      .then(async (response) => {
         if (!response) return;
         const data = (response?.notification?.request?.content?.data ?? {}) as any;
         if (data?.type === 'routine_prealert') {
@@ -319,13 +338,28 @@ function AppNavigator() {
           return;
         }
         if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
-          navigationRef.current?.navigate('RoutineRun', { routineId: data.routineId });
+          navigationRef.current?.navigate('RoutineList');
           return;
         }
         if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-          navigationRef.current?.navigate('RoutineAlarm', { routineId: data.routineId });
+          // endMethod 별 분기. tap/shake → RoutineList (inline). camera → RoutineAlarm.
+          const routines = await loadRoutines();
+          const r = routines.find(x => x.id === data.routineId);
+          if (!r) {
+            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            return;
+          }
+          if (!navigationRef.current?.isReady()) return;
+          if (r.endMethod === 'camera') {
+            navigationRef.current.navigate('RoutineAlarm', { routineId: data.routineId });
+          } else {
+            navigationRef.current.navigate('RoutineList');
+          }
           return;
         }
+        // 기본 알람 경로 — routine 진행 중이면 차단
+        const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
+        if (isRoutineActive === 'true') return;
         navigationRef.current?.navigate('Alarm');
       })
       .catch(e => {
@@ -340,13 +374,33 @@ function AppNavigator() {
     });
     // 콜드 스타트 복원 — 약간 지연 후 navigationRef 준비되면 분기
     const timer = setTimeout(() => {
+      if (!navigationRef.current?.isReady()) return;
+      // L331 getLastNotificationResponseAsync 핸들러가 이미 RoutineList/RoutineAlarm 로 navigate 했으면 skip
+      // (알림 탭으로 앱 진입 시 양쪽 모두 fire → RoutineAlarm 2개 stack 되는 회귀 차단)
+      const currentRoute = navigationRef.current.getCurrentRoute()?.name;
+      if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
       restoreRoutineState()
-        .then((res) => {
+        .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
           if (res.kind === 'run') {
-            navigationRef.current?.navigate('RoutineRun', { routineId: res.routineId });
+            // RoutineList 의 inline ActiveRoutineSection 이 active routine sync 로 자동 마운트
+            navigationRef.current.navigate('RoutineList');
           } else if (res.kind === 'alarm') {
-            navigationRef.current?.navigate('RoutineAlarm', { routineId: res.routineId });
+            // 'alarm' kind 는 controller 의 advance_confirm 매핑 — endMethod 별 분기.
+            // tap/shake → RoutineList (inline ActiveRoutineSection 의 awaitingConfirm 분기에서 Modal alarm 표시).
+            // camera → RoutineAlarm (scan UI).
+            const routines = await loadRoutines();
+            const r = routines.find(x => x.id === res.routineId);
+            if (!r) {
+              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+              return;
+            }
+            if (!navigationRef.current?.isReady()) return;
+            if (r.endMethod === 'camera') {
+              navigationRef.current.navigate('RoutineAlarm', { routineId: res.routineId });
+            } else {
+              navigationRef.current.navigate('RoutineList');
+            }
           }
         })
         .catch((e) => Logger.warn('AppNavigator', `restoreRoutineState failed: ${e}`));
@@ -375,7 +429,6 @@ function AppNavigator() {
         <Stack.Screen name="MissionSelect" component={MissionSelectScreen} />
         <Stack.Screen name="RoutineList" component={RoutineListScreen} />
         <Stack.Screen name="RoutineEdit" component={RoutineEditScreen} />
-        <Stack.Screen name="RoutineRun" component={RoutineRunScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="RoutineAlarm" component={RoutineAlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />

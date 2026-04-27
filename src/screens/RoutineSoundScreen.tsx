@@ -32,6 +32,7 @@ export default function RoutineSoundScreen({ navigation, route }: Props) {
   const styles = makeStyles(colors);
   const current = route.params?.current ?? DEFAULT_SOUND_ID;
 
+  const [selectedId, setSelectedId] = useState<string>(current);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const previewRef = useRef<Audio.Sound | null>(null);
 
@@ -65,20 +66,21 @@ export default function RoutineSoundScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleSelect = async (soundId: string) => {
+  const handleSelect = (soundId: string) => {
+    setSelectedId(soundId);
+  };
+
+  const handleConfirm = async () => {
     await stopPreview();
-    navigation.navigate({
-      name: 'RoutineEdit',
-      params: { selectedSound: soundId },
-      merge: true,
-    });
+    (navigation as any).popTo?.('RoutineEdit', { selectedSound: selectedId }) ??
+      navigation.navigate({ name: 'RoutineEdit', params: { selectedSound: selectedId }, merge: true } as any);
   };
 
   const alarmItems = ALARM_SOUNDS.filter(s => s.id.startsWith('alarm_'));
   const ringtoneItems = ALARM_SOUNDS.filter(s => s.id.startsWith('ringtone_'));
 
   const renderItem = (id: string) => {
-    const isSelected = current === id;
+    const isSelected = selectedId === id;
     const isPlaying = playingId === id;
     const num = id.split('_')[1] ?? '';
     const label = id.startsWith('alarm_')
@@ -118,7 +120,7 @@ export default function RoutineSoundScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleConfirm}>
           <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('routine.sound.title')}</Text>
@@ -153,8 +155,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  iconBtn: { padding: 8, borderRadius: 50, width: 44, alignItems: 'center' },
+  iconBtn: { padding: 8, borderRadius: 50, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.onBackground, letterSpacing: -0.5 },
+  headerDone: { fontSize: 16, fontWeight: '700', color: colors.primary },
   content: { paddingHorizontal: 16, paddingBottom: 48 },
   sectionTitle: {
     fontSize: 11,

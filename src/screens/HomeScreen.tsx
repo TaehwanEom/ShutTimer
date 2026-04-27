@@ -9,6 +9,8 @@ import {
   AppState,
   Animated,
   PanResponder,
+  DeviceEventEmitter,
+  Alert,
 } from 'react-native';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 
@@ -427,9 +429,18 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   // --- 타이머 시작 ---
-  const handleStart = () => {
+  const handleStart = async () => {
     const total = selectedMinutes * 60 + selectedSeconds;
     if (total <= 0) return;
+    // 루틴 진행 중이면 단일 타이머 시작 차단 — 두 시스템 동시 진행 방지
+    const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
+    if (isRoutineActive === 'true') {
+      Alert.alert(
+        t('home.timerBlocked.title', { defaultValue: '루틴 진행 중' }),
+        t('home.timerBlocked.body', { defaultValue: '루틴을 먼저 정지해야 단일 타이머를 시작할 수 있습니다.' }),
+      );
+      return;
+    }
     const mission = missionList[selectedIndex] ?? null;
     const now = Date.now();
     totalSecondsRef.current = total;
@@ -508,9 +519,43 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, [remainingSeconds, isRunning]);
 
-  // --- Cold start 타이머 복원 (mount 1회) ---
+  // --- 루틴이 단일 타이머 override 시 외부에서 발화하는 emit 수신 ---
+  // routineController.startRoutine(overrideTimer:true) 가 ACTIVE_TIMER_KEY 제거 + 타이머 알림 선택적 cancel
+  // + clearPreloadedSound 까지 처리한 직후 emit. 본 listener 는 HomeScreen 의 React state 만 리셋.
+  // ★ cancelAlarms() 호출 금지 — cancelAllScheduledNotificationsAsync 가 routine 알림까지 wipe 하는 race 차단.
   useEffect(() => {
-    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
+    const sub = DeviceEventEmitter.addListener('timerCancelledExternally', () => {
+      notificationIdsRef.current = [];
+      setIsRunning(false);
+      setIsPaused(false);
+      isPausedRef.current = false;
+      endAtRef.current = 0;
+      pausedAtRef.current = null;
+      remainingSecondsRef.current = 0;
+      setRemainingSeconds(0);
+      // dial 표시값도 리셋 — isRunning=false 일 때 dial 은 selectedMinutes/Seconds 표시.
+      // 리셋 안 하면 사용자의 마지막 선택값 (예: 5분) 이 그대로 남아 "이전 기록" 으로 보임.
+      setSelectedMinutes(0);
+      setSelectedSeconds(0);
+      setSelectedIndex(-1);
+    });
+    return () => sub.remove();
+  }, []);
+
+  // --- Cold start 타이머 복원 (mount 1회) ---
+  // ★ 루틴 진행 중이면 단일 타이머 stale state 자동 정리 + 복원 skip
+  //   (이전 세션에서 두 시스템 storage 가 동시에 남아있는 경우 양쪽 동시 부활 방지)
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(ACTIVE_TIMER_KEY),
+      AsyncStorage.getItem('isRoutineActive'),
+    ]).then(([raw, isRoutineActive]) => {
+      if (isRoutineActive === 'true') {
+        // 루틴 active — 단일 타이머 stale storage 정리 후 복원 skip
+        if (raw) AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
+        AsyncStorage.removeItem('isTimerActive').catch(() => {});
+        return;
+      }
       if (!raw) return;
       let t: ActiveTimer;
       try {

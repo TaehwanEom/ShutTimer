@@ -4,7 +4,7 @@
 
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import i18n from '../i18n';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
@@ -81,6 +81,26 @@ export async function requestAlarmKitAuthorizationIfNeeded(): Promise<'authorize
   } catch {
     return 'unavailable';
   }
+}
+
+// AppState 'active' 사이클당 Alert 1회 노출 허용. 시스템 설정 복귀 후 권한 캐시 invalidate.
+let _alertShownThisCycle = false;
+
+if (Platform.OS === 'ios') {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      _alarmKitAuthorized = null;
+      _alertShownThisCycle = false;
+    }
+  });
+}
+
+export function isAlertShownThisCycle(): boolean {
+  return _alertShownThisCycle;
+}
+
+export function markAlertShown(): void {
+  _alertShownThisCycle = true;
 }
 
 // Phase 2: 한계 초과 감지 시 RoutineListScreen 상단 배너 노출용 상태
@@ -408,8 +428,8 @@ export async function scheduleRoutineChain(
     const sound = await resolveSound();
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: i18n.t('routine.chainTitle', { defaultValue: '다음 미션' }),
-        body: i18n.t('routine.chainBody', { defaultValue: '다음 미션이 시작됩니다' }),
+        title: i18n.t('routine.chainTitle', { defaultValue: '다음 루틴' }),
+        body: i18n.t('routine.chainBody', { defaultValue: '다음 루틴이 시작됩니다' }),
         data: { ...data },
         sound,
         interruptionLevel: 'active',
@@ -451,8 +471,8 @@ export async function scheduleRoutineConfirmPrompt(
     const sound = await resolveSound();
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: i18n.t('routine.confirmPromptTitle', { defaultValue: '미션 완료' }),
-        body: i18n.t('routine.confirmPromptBody', { defaultValue: '다음 미션을 시작하려면 앱을 여세요' }),
+        title: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
+        body: i18n.t('routine.confirmPromptBody', { defaultValue: '다음 루틴을 시작하려면 앱을 여세요' }),
         data: { ...data },
         sound,
         interruptionLevel: 'active',

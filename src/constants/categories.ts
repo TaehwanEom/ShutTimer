@@ -14,24 +14,19 @@ export type CategoryDef = {
   icon: CategoryIcon;
 };
 
-// ─── 고정 10개 ───────────────────────────────────────────────
+// ─── 고정 카테고리 — 표시 5개 (chores/work/bedtime/meal/growth 는 hide) ───
 
 export const FIXED_CATEGORIES: readonly CategoryDef[] = [
   { id: 'morning',   labelKey: 'routine.category.morning',   icon: 'wb-sunny' },
   { id: 'evening',   labelKey: 'routine.category.evening',   icon: 'nights-stay' },
   { id: 'exercise',  labelKey: 'routine.category.exercise',  icon: 'fitness-center' },
   { id: 'study',     labelKey: 'routine.category.study',     icon: 'menu-book' },
-  { id: 'chores',    labelKey: 'routine.category.chores',    icon: 'cleaning-services' },
   { id: 'medicine',  labelKey: 'routine.category.medicine',  icon: 'medication' },
-  { id: 'work',      labelKey: 'routine.category.work',      icon: 'work' },
-  { id: 'bedtime',   labelKey: 'routine.category.bedtime',   icon: 'bedtime' },
-  { id: 'meal',      labelKey: 'routine.category.meal',      icon: 'restaurant' },
-  { id: 'growth',    labelKey: 'routine.category.growth',    icon: 'self-improvement' },
+  { id: 'etc',       labelKey: 'routine.category.etc',       icon: 'category' },
 ] as const;
 
 // ─── 커스텀 제약 ─────────────────────────────────────────────
 
-export const CUSTOM_CATEGORY_MAX = 5;
 export const CUSTOM_CATEGORY_NAME_MAX = 10;
 
 // ─── 커스텀 CRUD ─────────────────────────────────────────────
@@ -59,7 +54,7 @@ async function saveCustomCategories(list: CategoryDef[]): Promise<void> {
 
 export type AddCustomResult =
   | { ok: true; list: CategoryDef[] }
-  | { ok: false; reason: 'limit' | 'duplicate' | 'empty' | 'too_long' };
+  | { ok: false; reason: 'duplicate' | 'empty' | 'too_long' };
 
 export async function addCustomCategory(rawName: string): Promise<AddCustomResult> {
   const name = rawName.trim();
@@ -67,7 +62,6 @@ export async function addCustomCategory(rawName: string): Promise<AddCustomResul
   if (name.length > CUSTOM_CATEGORY_NAME_MAX) return { ok: false, reason: 'too_long' };
 
   const list = await loadCustomCategories();
-  if (list.length >= CUSTOM_CATEGORY_MAX) return { ok: false, reason: 'limit' };
 
   const exists = FIXED_CATEGORIES.some(c => c.id === `custom_${name}`) ||
     list.some(c => c.label === name);

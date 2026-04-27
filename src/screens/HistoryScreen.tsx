@@ -199,24 +199,8 @@ export default function HistoryScreen({ navigation }: Props) {
   const totalMinutes = monthEntries.reduce((acc, [, v]) => acc + v.reduce((s, x) => s + x.minutes, 0), 0);
   const activeDays = monthEntries.length;
 
-  // 최다 미션 (월 내, 사용 시간 합계 기준)
-  const topMission = useMemo(() => {
-    const byIcon: Record<string, number> = {};
-    for (const [, sessions] of monthEntries) {
-      for (const s of sessions) {
-        byIcon[s.icon] = (byIcon[s.icon] || 0) + s.minutes;
-      }
-    }
-    let maxIcon = '';
-    let maxMinutes = 0;
-    for (const [icon, minutes] of Object.entries(byIcon)) {
-      if (minutes > maxMinutes) {
-        maxIcon = icon;
-        maxMinutes = minutes;
-      }
-    }
-    return maxMinutes > 0 ? { icon: maxIcon, minutes: maxMinutes } : null;
-  }, [monthEntries]);
+  // 선택된 날 사용 시간 합계
+  const selectedDayMinutes = sessions.reduce((acc, s) => acc + s.minutes, 0);
 
   // 연속 사용일 (오늘 기준 전체, 캘린더 월 무관)
   // - 오늘 세션 있음: 오늘부터 역순
@@ -346,22 +330,15 @@ export default function HistoryScreen({ navigation }: Props) {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
+              {selectedDayMinutes > 0 ? formatTime(selectedDayMinutes) : t('history.empty', { defaultValue: '-' })}
+            </Text>
+            <Text style={styles.statLabel}>{t('history.statsDailyUsage', { defaultValue: '일일 사용시간' })}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
               {totalMinutes > 0 ? formatTime(totalMinutes) : t('history.empty', { defaultValue: '-' })}
             </Text>
             <Text style={styles.statLabel}>{t('history.statsTotalTime', { defaultValue: '총 사용 시간' })}</Text>
-          </View>
-          <View style={styles.statCard}>
-            {topMission ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <MaterialIcons name={topMission.icon as any} size={20} color={colors.primary} />
-                <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
-                  {topMission.icon === 'timer' ? t('history.timer') : t(`icons.${topMission.icon}`)}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.statValue}>{t('history.empty', { defaultValue: '-' })}</Text>
-            )}
-            <Text style={styles.statLabel}>{t('history.statsTopMission', { defaultValue: '최다 사용 미션' })}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -392,7 +369,7 @@ export default function HistoryScreen({ navigation }: Props) {
                 <MaterialIcons name={s.icon as any} size={20} color={colors.primary} />
               </View>
               <Text style={styles.sessionLabel}>
-                {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`)}
+                {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`, { defaultValue: s.icon })}
               </Text>
               <Text style={styles.sessionMinutes}>{t('history.minutesFmt', { min: s.minutes })}</Text>
             </View>

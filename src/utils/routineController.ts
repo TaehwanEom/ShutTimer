@@ -3,6 +3,8 @@
 // Phase 1+2: steps 기반 데이터 모델로 타입 보정. 로직 유지. loopCount/missions 제거.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import {
   Routine,
   ActiveRoutine,
@@ -13,6 +15,7 @@ import {
   clearActiveRoutine,
   recordStepSession,
 } from '../constants/routines';
+import { clearPreloadedSound } from './alarmSoundPreload';
 import {
   scheduleRoutineChain,
   cancelRoutineChain,
@@ -53,7 +56,7 @@ export type RestoreResult =
 function createFreshAr(r: Routine): ActiveRoutine {
   const now = Date.now();
   const firstStep = r.steps[0];
-  const durationMs = firstStep ? Math.max(0, firstStep.durationMinutes) * 60 * 1000 : 60 * 1000;
+  const durationMs = firstStep ? Math.max(0, firstStep.durationSeconds) * 1000 : 60 * 1000;
   return {
     routineId: r.id,
     currentStepIndex: 0,
@@ -94,6 +97,17 @@ async function cancelBackgroundNotif(): Promise<void> {
     await cancelRoutineConfirmPrompt(currentConfirmPromptId);
     currentConfirmPromptId = null;
   }
+  // ★ 강제 종료 등으로 모듈 ref 가 사라진 경우 대비 — iOS 시스템 큐에 잔존하는 routine_chain /
+  //   routine_confirm_prompt 알림 모두 조회 + cancel. routine_prealert 는 rolling schedule 이므로 제외.
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of all) {
+      const t = (n.content?.data as any)?.type;
+      if (t === 'routine_chain' || t === 'routine_confirm_prompt') {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+      }
+    }
+  } catch {}
 }
 
 async function findRoutine(routineId: string): Promise<Routine | null> {
@@ -127,6 +141,20 @@ export async function startRoutine(
   if (activeTimerRaw && options.overrideTimer) {
     await AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
     await AsyncStorage.removeItem(IS_TIMER_ACTIVE_KEY).catch(() => {});
+    // 단일 timer 의 시스템 예약 알림 cancel — routine_* 외 모든 알림 (단일 timer 알림은 type 없음).
+    try {
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      for (const n of all) {
+        const t = (n.content?.data as any)?.type;
+        if (t !== 'routine_prealert' && t !== 'routine_chain' && t !== 'routine_confirm_prompt') {
+          await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+        }
+      }
+    } catch {}
+    // preload 된 알람 사운드 정리 (HomeScreen 이 scheduleAlarm 시 createAsync 한 핸들 누수 방지)
+    await clearPreloadedSound().catch(() => {});
+    // HomeScreen 의 React state / setInterval 리셋 신호 — 루틴이 단일 타이머를 override 했음을 알림
+    DeviceEventEmitter.emit('timerCancelledExternally');
   }
 
   const existing = await loadActiveRoutine();
@@ -190,7 +218,7 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
 
   if (routine.endMethod === 'auto') {
     const nextStep = routine.steps[nextIdx];
-    const durationMs = Math.max(0, nextStep.durationMinutes) * 60 * 1000;
+    const durationMs = Math.max(0, nextStep.durationSeconds) * 1000;
     const now = Date.now();
     const nextAr: ActiveRoutine = {
       ...ar,
@@ -231,7 +259,7 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
   }
 
   const nextStep = routine.steps[nextIdx];
-  const durationMs = Math.max(0, nextStep.durationMinutes) * 60 * 1000;
+  const durationMs = Math.max(0, nextStep.durationSeconds) * 1000;
   const now = Date.now();
   const nextAr: ActiveRoutine = {
     ...ar,

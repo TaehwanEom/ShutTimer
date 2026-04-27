@@ -240,6 +240,22 @@ export default function AlarmScreen({ navigation }: Props) {
     accelSubRef.current = null;
   }, []);
 
+  // 이중 가드 — routine 진행 중 단일 timer 알림 발화로 잘못 진입한 경우 즉시 RoutineList 로 redirect.
+  // (RoutineList 가 active routine sync 로 inline 진행 영역 자동 마운트)
+  useEffect(() => {
+    AsyncStorage.getItem('isRoutineActive').then(async v => {
+      if (v !== 'true') return;
+      const arRaw = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
+      if (!arRaw) return;
+      try {
+        const ar = JSON.parse(arRaw);
+        if (ar?.routineId) {
+          navigation.replace('RoutineList');
+        }
+      } catch {}
+    }).catch(() => {});
+  }, [navigation]);
+
   // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
   // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
   useEffect(() => {

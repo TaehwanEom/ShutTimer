@@ -28,7 +28,6 @@ import {
   loadCustomCategories,
   addCustomCategory,
   deleteCustomCategory,
-  CUSTOM_CATEGORY_MAX,
   CUSTOM_CATEGORY_NAME_MAX,
 } from '../constants/categories';
 
@@ -57,11 +56,8 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
   }, [refresh]);
 
   const handleSelect = (id: string) => {
-    navigation.navigate({
-      name: 'RoutineEdit',
-      params: { selectedCategory: id },
-      merge: true,
-    });
+    (navigation as any).popTo?.('RoutineEdit', { selectedCategory: id }) ??
+      navigation.navigate({ name: 'RoutineEdit', params: { selectedCategory: id }, merge: true } as any);
   };
 
   const handleAddOpen = () => {
@@ -82,9 +78,6 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
           break;
         case 'duplicate':
           setInputError(t('routine.category.errDuplicate'));
-          break;
-        case 'limit':
-          setInputError(t('routine.category.errLimit', { max: CUSTOM_CATEGORY_MAX }));
           break;
       }
       return;
@@ -134,7 +127,6 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
     );
   };
 
-  const canAddMore = custom.length < CUSTOM_CATEGORY_MAX;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -162,19 +154,12 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
         )}
 
         <TouchableOpacity
-          style={[styles.addBtn, !canAddMore && styles.addBtnDisabled]}
+          style={styles.addBtn}
           onPress={handleAddOpen}
-          disabled={!canAddMore}
           activeOpacity={0.7}
         >
-          <MaterialIcons
-            name="add"
-            size={22}
-            color={canAddMore ? colors.primary : colors.secondary}
-          />
-          <Text style={[styles.addBtnText, !canAddMore && { color: colors.secondary }]}>
-            {t('routine.category.addButton')} ({custom.length}/{CUSTOM_CATEGORY_MAX})
-          </Text>
+          <MaterialIcons name="add" size={22} color={colors.primary} />
+          <Text style={styles.addBtnText}>{t('routine.category.addButton')}</Text>
         </TouchableOpacity>
       </ScrollView>
 

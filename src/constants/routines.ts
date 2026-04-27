@@ -69,6 +69,9 @@ export const ACTIVE_ROUTINE_KEY = 'shuttimer_active_routine';
 export const SCHEDULED_ROUTINE_NOTIFS_KEY = 'shuttimer_routine_notifs';
 
 export const ROUTINE_DEADLINE_MS = 24 * 60 * 60 * 1000;
+/** v1.6 T2 — 다단계 prealert 시간 (분). 시작 30분 전 + 5분 전 2회 알림. */
+export const ROUTINE_PREALERT_MINUTES_LIST: readonly number[] = [30, 5];
+/** @deprecated v1.6 T2 — 다단계로 전환됨. ROUTINE_PREALERT_MINUTES_LIST 사용. */
 export const ROUTINE_PREALERT_MINUTES = 5;
 export const IOS_NOTIFICATION_SAFE_CAP = 54;
 

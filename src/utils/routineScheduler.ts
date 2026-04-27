@@ -1,5 +1,5 @@
 // v1.6: 루틴 알림 스케줄러.
-// (1) 시작 5분 전 푸시 알림 — iOS 26+ 면 AlarmKit (한도 없음), 그 외 expo-notifications WEEKLY (64 한계).
+// (1) 다단계 prealert (T2) — 시작 30분 전 + 5분 전 2회. iOS 26+ AlarmKit (한도 해방) / 그 외 expo-notifications WEEKLY (64 한계).
 // (2) 자동 진행 모드 백그라운드 체인 — DATE trigger 1개. AlarmKit/expo-notifications 모두 임시 1슬롯.
 
 import * as Notifications from 'expo-notifications';
@@ -9,7 +9,8 @@ import i18n from '../i18n';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
   Routine,
-  ROUTINE_PREALERT_MINUTES,
+  RoutineStep,
+  ROUTINE_PREALERT_MINUTES_LIST,
   SCHEDULED_ROUTINE_NOTIFS_KEY,
   IOS_NOTIFICATION_SAFE_CAP,
   loadRoutines,
@@ -20,6 +21,7 @@ import {
   saveAlarmMetadata,
   loadAlarmMetadata,
   deleteAlarmMetadata,
+  listAllAlarmMetadata,
 } from './alarmkitMappingTable';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
@@ -178,17 +180,17 @@ async function saveNotifRecords(list: ScheduledRoutineRecord[]): Promise<void> {
 // ─── 시간 계산 헬퍼 ──────────────────────────────────────────
 
 /**
- * "HH:MM" 형태 시작 시간에서 5분 전 시점 계산.
+ * "HH:MM" 형태 시작 시간에서 prealertMinutes 분 전 시점 계산.
  * 자정을 넘어 전날로 넘어가는 경우 요일 오프셋 -1 반환.
  */
-function computeAlertTime(time: string): { hour: number; minute: number; dayOffset: number } | null {
+function computeAlertTime(time: string, prealertMinutes: number): { hour: number; minute: number; dayOffset: number } | null {
   const [hStr, mStr] = time.split(':');
   const h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   if (isNaN(h) || isNaN(m)) return null;
 
   const startTotal = h * 60 + m;
-  const alertTotal = startTotal - ROUTINE_PREALERT_MINUTES;
+  const alertTotal = startTotal - prealertMinutes;
 
   if (alertTotal < 0) {
     const adjusted = alertTotal + 24 * 60;
@@ -219,11 +221,9 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
   return scheduleViaExpoNotifications(routine);
 }
 
-/** AlarmKit 경로 — iOS 26+. 64 한도 없음. fixed-date 1회성이라 요일별 다음 발화 1개씩 등록. */
+/** AlarmKit 경로 — iOS 26+. 64 한도 없음. fixed-date 1회성이라 (요일 × prealert 단계) 만큼 등록. */
 async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
   if (!routine.schedule) return [];
-  const alertTime = computeAlertTime(routine.schedule.startTime);
-  if (!alertTime) return [];
 
   const effectiveDays = routine.schedule.days.length === 0
     ? [0, 1, 2, 3, 4, 5, 6]
@@ -231,22 +231,28 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
 
   const alarmIds: string[] = [];
   const now = new Date();
-  const title = i18n.t('routine.prealertTitle', { defaultValue: '루틴 시작' });
   const stopLabel = i18n.t('routine.prealertStop', { defaultValue: '확인' });
 
-  for (const day of effectiveDays) {
-    const fireDate = computeNextOccurrence(day, alertTime, now);
-    if (!fireDate) continue;
-    try {
-      const id = await AlarmkitBridge.scheduleAlarm({
-        routineId: routine.id,
-        title,
-        fireAt: fireDate.getTime(),
-        stopLabel,
-      });
-      alarmIds.push(id);
-    } catch {
-      // 등록 실패 무시
+  for (const prealertMin of ROUTINE_PREALERT_MINUTES_LIST) {
+    const alertTime = computeAlertTime(routine.schedule.startTime, prealertMin);
+    if (!alertTime) continue;
+    const titleKey = `routine.prealertTitle${prealertMin}m`;
+    const title = i18n.t(titleKey, { defaultValue: `${prealertMin}분 후 루틴 시작` });
+
+    for (const day of effectiveDays) {
+      const fireDate = computeNextOccurrence(day, alertTime, now);
+      if (!fireDate) continue;
+      try {
+        const id = await AlarmkitBridge.scheduleAlarm({
+          routineId: routine.id,
+          title,
+          fireAt: fireDate.getTime(),
+          stopLabel,
+        });
+        alarmIds.push(id);
+      } catch {
+        // 등록 실패 무시
+      }
     }
   }
 
@@ -262,44 +268,51 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
   return alarmIds;
 }
 
-/** expo-notifications WEEKLY 경로 — iOS 25 이하 / Android. 64 한도 적용. */
+/** expo-notifications WEEKLY 경로 — iOS 25 이하 / Android. 64 한도 적용 (routine 수 × prealert 단계). */
 async function scheduleViaExpoNotifications(routine: Routine): Promise<string[]> {
   if (!routine.schedule) return [];
-  const alertTime = computeAlertTime(routine.schedule.startTime);
-  if (!alertTime) return [];
 
   const { days } = routine.schedule;
   const effectiveDays = days.length === 0 ? [0, 1, 2, 3, 4, 5, 6] : days;
   const ids: string[] = [];
   const sound = await resolveSound();
 
-  for (const day of effectiveDays) {
-    const alertDay = (day + alertTime.dayOffset + 7) % 7;
-    const weekday = alertDay + 1;
+  for (const prealertMin of ROUTINE_PREALERT_MINUTES_LIST) {
+    const alertTime = computeAlertTime(routine.schedule.startTime, prealertMin);
+    if (!alertTime) continue;
+    const titleKey = `routine.prealertTitle${prealertMin}m`;
+    const bodyKey = `routine.prealertBody${prealertMin}m`;
+    const title = i18n.t(titleKey, { defaultValue: `${prealertMin}분 후 루틴 시작` });
+    const body = i18n.t(bodyKey, { defaultValue: `${prealertMin}분 후 루틴이 시작됩니다` });
 
-    try {
-      const data: RoutineNotifData = {
-        type: 'routine_prealert',
-        routineId: routine.id,
-      };
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: i18n.t('routine.prealertTitle', { defaultValue: '루틴 시작' }),
-          body: i18n.t('routine.prealertBody', { defaultValue: '곧 루틴이 시작됩니다' }),
-          data: { ...data },
-          sound,
-          interruptionLevel: 'active',
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-          weekday,
-          hour: alertTime.hour,
-          minute: alertTime.minute,
-        },
-      });
-      ids.push(id);
-    } catch {
-      // 예약 실패 무시 (64개 한계 등)
+    for (const day of effectiveDays) {
+      const alertDay = (day + alertTime.dayOffset + 7) % 7;
+      const weekday = alertDay + 1;
+
+      try {
+        const data: RoutineNotifData = {
+          type: 'routine_prealert',
+          routineId: routine.id,
+        };
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: { ...data },
+            sound,
+            interruptionLevel: 'active',
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+            weekday,
+            hour: alertTime.hour,
+            minute: alertTime.minute,
+          },
+        });
+        ids.push(id);
+      } catch {
+        // 예약 실패 무시 (64개 한계 등)
+      }
     }
   }
 
@@ -413,6 +426,9 @@ export async function loadScheduleStatus(): Promise<ScheduleStatus | null> {
 // ─── 백그라운드 체인 (자동 진행 모드 — 미션 종료 시점 DATE trigger) ─
 
 /**
+ * @deprecated v1.6 옵션 A — `scheduleAllRoutineChains` 사용 (BG/KILL 자동 진행 보장).
+ * 본 함수는 호환성 보존만. 신규 호출 금지.
+ *
  * 자동 진행 모드에서 현재 미션 종료 시점에 발화할 알림 1개 예약.
  * 발화 시 App.tsx notification handler가 data.type === 'routine_chain'으로 분기.
  * 연쇄 방식: 이 알림 발화 시 다음 미션 알림을 다시 등록.
@@ -491,7 +507,10 @@ async function scheduleChainViaExpoNotifications(
   }
 }
 
-/** 체인 알림 취소 (루틴 일시정지/종료 시). AlarmKit / expo-notifications 자동 분기. */
+/**
+ * @deprecated v1.6 옵션 A — `cancelAllRoutineChains` 사용.
+ * 체인 알림 취소 (루틴 일시정지/종료 시). AlarmKit / expo-notifications 자동 분기.
+ */
 export async function cancelRoutineChain(notifId: string): Promise<void> {
   const meta = await loadAlarmMetadata(notifId);
   if (meta) {
@@ -586,4 +605,111 @@ export async function cancelRoutineConfirmPrompt(notifId: string): Promise<void>
     return;
   }
   await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
+}
+
+// ─── v1.6 옵션 A — chain 일괄 등록 (BG/KILL 자동 진행 보장) ─────
+
+export type ScheduleAllChainsResult = {
+  ok: boolean;
+  alarmIds: string[];
+  skipped: number;
+  reason?: 'limit' | 'permission' | 'unknown';
+};
+
+/**
+ * 옵션 A — routine 시작/재개 시 모든 step 종료 시점 chain 알람을 일괄 등록.
+ * BG/KILL 자동 진행 보장 (시스템 측이 정확한 시점에 자동 fire). JS 핸들러 의존 X.
+ *
+ * fireAt[i] = startTime + sum(steps[0..i].durationSeconds * 1000), i = 0..N-2
+ * (마지막 step 종료 = routine 자체 종료라 chain 알람 없음)
+ *
+ * 멱등성: 진입 시 동일 routineId 의 기존 chain 알람 일괄 cancel 후 신규 등록.
+ * `options.skipPrependCancel = true` 로 호출자가 cancel 처리한 경우 skip 가능.
+ *
+ * @param startTime  routine 또는 현재 step 시작 시점 (resume 시 = 현재 step 의 시작 시점)
+ */
+export async function scheduleAllRoutineChains(
+  routineId: string,
+  steps: RoutineStep[],
+  startTime: Date,
+  options?: { skipPrependCancel?: boolean }
+): Promise<ScheduleAllChainsResult> {
+  if (!options?.skipPrependCancel) {
+    try {
+      const existing = await listAllAlarmMetadata();
+      const existingChain = existing.filter(m => m.routineId === routineId && m.type === 'chain');
+      await Promise.all(
+        existingChain.map(m => cancelRoutineChain(m.alarmId).catch(() => {}))
+      );
+    } catch {
+      // mapping table 조회 실패 무시 — 등록 시도 진행
+    }
+  }
+
+  const fireAts: { fireAt: Date; nextStepIndex: number }[] = [];
+  let acc = startTime.getTime();
+  for (let i = 0; i < steps.length - 1; i++) {
+    acc += Math.max(0, steps[i].durationSeconds) * 1000;
+    fireAts.push({ fireAt: new Date(acc), nextStepIndex: i + 1 });
+  }
+  if (fireAts.length === 0) {
+    return { ok: true, alarmIds: [], skipped: 0 };
+  }
+
+  const useAlarmKit = await shouldUseAlarmKit();
+  if (useAlarmKit) {
+    return scheduleAllViaAlarmKit(routineId, fireAts);
+  }
+  return scheduleAllViaExpoNotifications(routineId, fireAts);
+}
+
+async function scheduleAllViaAlarmKit(
+  routineId: string,
+  fireAts: { fireAt: Date; nextStepIndex: number }[]
+): Promise<ScheduleAllChainsResult> {
+  const alarmIds: string[] = [];
+  for (const { fireAt, nextStepIndex } of fireAts) {
+    try {
+      const id = await scheduleChainViaAlarmKit(routineId, nextStepIndex, fireAt);
+      if (!id) {
+        await Promise.all(alarmIds.map(aid => cancelRoutineChain(aid).catch(() => {})));
+        return { ok: false, alarmIds: [], skipped: fireAts.length, reason: 'limit' };
+      }
+      alarmIds.push(id);
+    } catch {
+      await Promise.all(alarmIds.map(aid => cancelRoutineChain(aid).catch(() => {})));
+      return { ok: false, alarmIds: [], skipped: fireAts.length, reason: 'unknown' };
+    }
+  }
+  return { ok: true, alarmIds, skipped: 0 };
+}
+
+async function scheduleAllViaExpoNotifications(
+  routineId: string,
+  fireAts: { fireAt: Date; nextStepIndex: number }[]
+): Promise<ScheduleAllChainsResult> {
+  const records = await loadNotifRecords();
+  const usedByPrealert = records.reduce((acc, r) => acc + r.notifIds.length, 0);
+  const available = Math.max(0, IOS_NOTIFICATION_SAFE_CAP - usedByPrealert);
+
+  const ids: string[] = [];
+  let skipped = 0;
+  for (let i = 0; i < fireAts.length; i++) {
+    if (i >= available) {
+      skipped = fireAts.length - i;
+      break;
+    }
+    const { fireAt, nextStepIndex } = fireAts[i];
+    const id = await scheduleChainViaExpoNotifications(routineId, nextStepIndex, fireAt);
+    if (id) ids.push(id);
+  }
+  return { ok: skipped === 0, alarmIds: ids, skipped, reason: skipped > 0 ? 'limit' : undefined };
+}
+
+/**
+ * 옵션 A — chain 알람 일괄 cancel (pause / stop 시점).
+ * Promise.all + 개별 try/catch — 일부 실패해도 나머지 계속 진행.
+ */
+export async function cancelAllRoutineChains(alarmIds: string[]): Promise<void> {
+  await Promise.all(alarmIds.map(id => cancelRoutineChain(id).catch(() => {})));
 }

@@ -17,12 +17,13 @@ import {
 } from '../constants/routines';
 import { clearPreloadedSound } from './alarmSoundPreload';
 import {
-  scheduleRoutineChain,
-  cancelRoutineChain,
+  scheduleAllRoutineChains,
+  cancelAllRoutineChains,
   scheduleRoutineConfirmPrompt,
   cancelRoutineConfirmPrompt,
 } from './routineScheduler';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
+import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from './alarmkitMappingTable';
 
 const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
@@ -30,8 +31,11 @@ const ACTIVE_TIMER_KEY = 'activeTimer';
 const IS_TIMER_ACTIVE_KEY = 'isTimerActive';
 
 // 현재 예약된 배경 알림 id — 모듈 레벨에서 보관 (UI 마운트/언마운트와 독립)
-let currentChainNotifId: string | null = null;
+// v1.6 옵션 A: chain 은 일괄 등록 (N-1개) 이라 배열. confirm_prompt 는 단일 그대로.
+let currentChainAlarmIds: string[] = [];
 let currentConfirmPromptId: string | null = null;
+// v1.6 T3 Phase 4: 활성 LiveActivity id — 잠금화면/다이내믹 아일랜드 표시용.
+let currentLiveActivityId: string | null = null;
 
 // ─── 결과 타입 ───────────────────────────────────────────────
 
@@ -70,30 +74,33 @@ function createFreshAr(r: Routine): ActiveRoutine {
   };
 }
 
-/** 현재 step 종료 시점에 발화할 배경 알림 예약. endMethod === 'auto' 면 chain, 그 외엔 confirmPrompt 분기. */
+/**
+ * 현재 step 종료 시점에 발화할 배경 알림 예약. confirm_prompt 모드 전용.
+ *
+ * v1.6 옵션 A: endMethod === 'auto' (chain) 는 routine 시작/재개 시점에
+ * `scheduleAllRoutineChains` 로 N-1개 일괄 등록 → 매 step 진입 시점엔 추가 등록 X.
+ */
 async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<void> {
-  await cancelBackgroundNotif();
-  if (ar.pausedAt !== null) return;
-  const fireAt = new Date(ar.stepEndAt);
-
-  if (r.endMethod === 'auto') {
-    const nextIdx = ar.currentStepIndex + 1;
-    // 마지막 step이면 체인 알림 없음 (advanceToNext 호출 안 됨)
-    if (nextIdx < r.steps.length) {
-      const id = await scheduleRoutineChain(r.id, nextIdx, fireAt);
-      currentChainNotifId = id;
-    }
-  } else {
-    // 확인 후 진행 — 마지막 step이라도 종료 알림 필요 (RoutineAlarm 유도)
-    const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
-    currentConfirmPromptId = id;
+  // 옵션 A: chain 일괄 등록 보존 — confirm_prompt 만 cancel + 재등록.
+  // currentChainAlarmIds 는 startRoutine / resumeRoutine 에서 별도 관리.
+  if (currentConfirmPromptId) {
+    await cancelRoutineConfirmPrompt(currentConfirmPromptId);
+    currentConfirmPromptId = null;
   }
+  if (ar.pausedAt !== null) return;
+
+  if (r.endMethod === 'auto') return;
+
+  // 확인 후 진행 — 마지막 step이라도 종료 알림 필요 (RoutineAlarm 유도)
+  const fireAt = new Date(ar.stepEndAt);
+  const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
+  currentConfirmPromptId = id;
 }
 
 async function cancelBackgroundNotif(): Promise<void> {
-  if (currentChainNotifId) {
-    await cancelRoutineChain(currentChainNotifId);
-    currentChainNotifId = null;
+  if (currentChainAlarmIds.length > 0) {
+    await cancelAllRoutineChains(currentChainAlarmIds);
+    currentChainAlarmIds = [];
   }
   if (currentConfirmPromptId) {
     await cancelRoutineConfirmPrompt(currentConfirmPromptId);
@@ -127,8 +134,102 @@ async function findRoutine(routineId: string): Promise<Routine | null> {
   return list.find(r => r.id === routineId) ?? null;
 }
 
+/**
+ * v1.6 T3 Phase 4 — LiveActivity 시작 또는 갱신.
+ * iOS 16.2+ + 사용자 권한 활성 시에만 실제 표시. 그 외엔 silent skip.
+ */
+async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): Promise<void> {
+  try {
+    if (!LiveActivityBridge.areActivitiesEnabled()) return;
+  } catch {
+    return;
+  }
+  const step = routine.steps[ar.currentStepIndex];
+  if (!step) return;
+
+  const stepDurationMs = Math.max(0, step.durationSeconds) * 1000;
+  const remaining = Math.max(0, ar.stepEndAt - Date.now());
+  const elapsed = Math.max(0, stepDurationMs - remaining);
+  const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
+  const routineName = routine.name ?? routine.category;
+
+  if (currentLiveActivityId) {
+    try {
+      await LiveActivityBridge.update({
+        activityId: currentLiveActivityId,
+        stepName: step.name,
+        stepEndAt: ar.stepEndAt,
+        progress,
+      });
+      return;
+    } catch {
+      // update 실패 — start 로 재시도
+      currentLiveActivityId = null;
+    }
+  }
+
+  try {
+    const id = await LiveActivityBridge.start({
+      routineId: routine.id,
+      routineName,
+      stepName: step.name,
+      stepEndAt: ar.stepEndAt,
+      progress,
+    });
+    currentLiveActivityId = id || null;
+  } catch {
+    // 권한 거부 / 시스템 한도 등 — silent skip
+  }
+}
+
+/**
+ * v1.6 T3 Phase 4 — 활성 LiveActivity 종료. fullCleanup 시점에 호출.
+ */
+async function endLiveActivity(): Promise<void> {
+  if (!currentLiveActivityId) {
+    // 모듈 변수 stale 방지 — 시스템에 잔존 가능성 있을 때 endAll
+    try {
+      if (LiveActivityBridge.areActivitiesEnabled()) {
+        await LiveActivityBridge.endAll();
+      }
+    } catch {}
+    return;
+  }
+  try {
+    await LiveActivityBridge.end({
+      activityId: currentLiveActivityId,
+      dismissalPolicy: 'immediate',
+    });
+  } catch {}
+  currentLiveActivityId = null;
+}
+
+/**
+ * v1.6 옵션 A — endMethod === 'auto' 인 routine 의 남은 chain 알람을 일괄 등록.
+ * startRoutine 신규/resumed/expired 분기 + resumeRoutine + restoreRoutineState 시점에서 호출.
+ * `scheduleAllRoutineChains` 가 멱등성 보장 (진입 시 기존 cancel 후 재등록).
+ */
+async function reinstallChainsIfAuto(routine: Routine, ar: ActiveRoutine): Promise<void> {
+  if (routine.endMethod !== 'auto') return;
+  const remainingSteps = routine.steps.slice(ar.currentStepIndex);
+  if (remainingSteps.length <= 1) {
+    if (currentChainAlarmIds.length > 0) {
+      await cancelAllRoutineChains(currentChainAlarmIds);
+      currentChainAlarmIds = [];
+    }
+    return;
+  }
+  const stepStart = new Date(ar.stepEndAt - Math.max(0, remainingSteps[0].durationSeconds) * 1000);
+  const result = await scheduleAllRoutineChains(routine.id, remainingSteps, stepStart);
+  currentChainAlarmIds = result.alarmIds;
+  if (result.skipped > 0) {
+    console.warn(`[routine] ${result.skipped} chain alarms skipped (reason=${result.reason ?? 'unknown'})`);
+  }
+}
+
 async function fullCleanup(): Promise<void> {
   await cancelBackgroundNotif();
+  await endLiveActivity();
   await clearActiveRoutine();
   await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
 }
@@ -178,11 +279,15 @@ export async function startRoutine(
       await saveActiveRoutine(fresh);
       await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
       await scheduleBackgroundNotif(target, fresh);
+      await reinstallChainsIfAuto(target, fresh);
+      await startOrUpdateLiveActivity(target, fresh);
       return { kind: 'started', ar: fresh, routine: target };
     }
     await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
     if (existing.pausedAt === null && !existing.awaitingConfirm) {
       await scheduleBackgroundNotif(target, existing);
+      await reinstallChainsIfAuto(target, existing);
+      await startOrUpdateLiveActivity(target, existing);
     }
     return { kind: 'resumed', ar: existing, routine: target };
   }
@@ -196,6 +301,8 @@ export async function startRoutine(
   await saveActiveRoutine(fresh);
   await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
   await scheduleBackgroundNotif(target, fresh);
+  await reinstallChainsIfAuto(target, fresh);
+  await startOrUpdateLiveActivity(target, fresh);
   return { kind: 'started', ar: fresh, routine: target };
 }
 
@@ -241,6 +348,7 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
     };
     await saveActiveRoutine(nextAr);
     await scheduleBackgroundNotif(routine, nextAr);
+    await startOrUpdateLiveActivity(routine, nextAr);
     return { kind: 'advance_auto', ar: nextAr, routine };
   } else {
     if (!ar.awaitingConfirm) {
@@ -282,6 +390,7 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
   };
   await saveActiveRoutine(nextAr);
   await scheduleBackgroundNotif(routine, nextAr);
+  await startOrUpdateLiveActivity(routine, nextAr);
   return { kind: 'advance_auto', ar: nextAr, routine };
 }
 
@@ -310,6 +419,8 @@ export async function resumeRoutine(): Promise<ActiveRoutine | null> {
   };
   await saveActiveRoutine(resumed);
   await scheduleBackgroundNotif(routine, resumed);
+  await reinstallChainsIfAuto(routine, resumed);
+  await startOrUpdateLiveActivity(routine, resumed);
   return resumed;
 }
 
@@ -346,14 +457,19 @@ export async function restoreRoutineState(): Promise<RestoreResult> {
     return { kind: 'run', routineId: routine.id };
   }
 
-  if (Date.now() >= ar.stepEndAt) {
+  // v1.6 옵션 A: BG/KILL 자동 진행 후 사용자 복귀 — 시간 차이만큼 다회 진행 처리.
+  // 시스템 측 chain 알람은 시간이 되면 자동 fire 됐을 것. ar.currentStepIndex 만 갱신 안 된 상태.
+  let cur: ActiveRoutine = ar;
+  while (Date.now() >= cur.stepEndAt) {
     const result = await completeCurrentMission();
     if (!result) return { kind: 'none' };
     if (result.kind === 'end') return { kind: 'none' };
     if (result.kind === 'advance_confirm') return { kind: 'alarm', routineId: routine.id };
-    if (result.kind === 'advance_auto') return { kind: 'run', routineId: routine.id };
+    cur = result.ar;
   }
 
-  await scheduleBackgroundNotif(routine, ar);
+  await scheduleBackgroundNotif(routine, cur);
+  await reinstallChainsIfAuto(routine, cur);
+  await startOrUpdateLiveActivity(routine, cur);
   return { kind: 'run', routineId: routine.id };
 }

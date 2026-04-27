@@ -16,12 +16,14 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.shuttimer.app",
       "entitlements": {
-        "com.apple.developer.usernotifications.time-sensitive": true
+        "com.apple.developer.usernotifications.time-sensitive": true,
+        "com.apple.security.application-groups": ["group.com.shuttimer.app"]
       },
       "infoPlist": {
         "NSCameraUsageDescription": "Scan a photo to dismiss the timer.",
         "NSMotionUsageDescription": "Used to detect shake gesture to dismiss the alarm.",
         "NSAlarmKitUsageDescription": "정확한 시각에 루틴 알람을 발화하기 위해 AlarmKit 권한이 필요합니다.",
+        "NSSupportsLiveActivities": true,
         "UIBackgroundModes": [
           "audio"
         ],
@@ -210,7 +212,7 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "16.0"
+            "deploymentTarget": "16.2"
           }
         }
       ],
@@ -242,7 +244,8 @@
         }
       ],
       "./plugins/withInfoPlistLocalizations.js",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@bacons/apple-targets"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

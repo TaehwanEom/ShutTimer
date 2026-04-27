@@ -91,26 +91,43 @@ public class AlarmkitBridgeModule: Module {
       let fireDate = Date(timeIntervalSince1970: params.fireAt / 1000.0)
       let schedule = Alarm.Schedule.fixed(fireDate)
 
-      let stopButton = AlarmButton(
-        text: LocalizedStringResource(stringLiteral: params.stopLabel ?? "Stop"),
-        textColor: .white,
-        systemImageName: "stop.fill"
-      )
-      let alert = AlarmPresentation.Alert(
-        title: LocalizedStringResource(stringLiteral: params.title),
-        stopButton: stopButton
-      )
+      // v1.6 Phase 5 — iOS 26.1+ 에서 stopButton deprecated. #available 분기.
+      let alert: AlarmPresentation.Alert
+      if #available(iOS 26.1, *) {
+        alert = AlarmPresentation.Alert(
+          title: LocalizedStringResource(stringLiteral: params.title)
+        )
+      } else {
+        let stopButton = AlarmButton(
+          text: LocalizedStringResource(stringLiteral: params.stopLabel ?? "Stop"),
+          textColor: .white,
+          systemImageName: "stop.fill"
+        )
+        alert = AlarmPresentation.Alert(
+          title: LocalizedStringResource(stringLiteral: params.title),
+          stopButton: stopButton
+        )
+      }
       let presentation = AlarmPresentation(alert: alert)
       let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,
         tintColor: Color.red
       )
 
+      // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
+      // 사용자 stop = LiveActivityIntent.perform() 호출 (5-Lite no-op) + 옵션 A 다음 chain alarm 자동 fire.
       let id = UUID()
-      _ = try await AlarmManager.shared.schedule(
-        id: id,
-        configuration: .alarm(schedule: schedule, attributes: attributes)
-      )
+      let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
+      if params.type == "chain" {
+        config = .alarm(
+          schedule: schedule,
+          attributes: attributes,
+          stopIntent: NextStepIntent()
+        )
+      } else {
+        config = .alarm(schedule: schedule, attributes: attributes)
+      }
+      _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
       return id.uuidString
     }
 

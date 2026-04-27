@@ -55,8 +55,8 @@ type WheelProps = {
 // items = count × LOOP_REPEAT, 가운데 cycle 에서 시작.
 // onMomentumScrollEnd 에서 boundary cycle (0 또는 LOOP_REPEAT-1) 도달 시
 // 같은 value 의 가운데 cycle 위치로 silent jump (isJumpingRef 로 재진입 방지).
-const LOOP_REPEAT = 7;
-const CENTER_CYCLE = 3;
+const LOOP_REPEAT = 5;
+const CENTER_CYCLE = 2;
 
 export function Wheel({ count, initial, onChange, textColor, dimColor, formatLabel, loop = true, width, align = 'flex-end' }: WheelProps) {
   const ref = useRef<ScrollView>(null);
@@ -72,7 +72,7 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
     setCenterIdx(initialIdx);
     const t = setTimeout(() => {
       ref.current?.scrollTo({ y: initialIdx * ITEM_HEIGHT, animated: false });
-      setTimeout(() => { isJumpingRef.current = false; }, 80);
+      setTimeout(() => { isJumpingRef.current = false; }, 50);
     }, 0);
     return () => clearTimeout(t);
   }, [initialIdx]);
@@ -97,7 +97,7 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
         const targetIdx = CENTER_CYCLE * count + value;
         setCenterIdx(targetIdx);
         ref.current?.scrollTo({ y: targetIdx * ITEM_HEIGHT, animated: false });
-        setTimeout(() => { isJumpingRef.current = false; }, 80);
+        setTimeout(() => { isJumpingRef.current = false; }, 50);
       }
     }
   };
@@ -119,7 +119,7 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
       decelerationRate="fast"
       onMomentumScrollEnd={handleEnd}
       onScroll={handleScroll}
-      scrollEventThrottle={16}
+      scrollEventThrottle={32}
       contentContainerStyle={{ paddingVertical: SIDE_PADDING }}
       style={scrollStyle}
     >

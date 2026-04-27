@@ -84,7 +84,7 @@ import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState } from './src/utils/routineController';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
-import { loadAlarmMetadata } from './src/utils/alarmkitMappingTable';
+import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
   ? require('./src/screens/PoCPhotoValidationScreen').default
@@ -379,6 +379,8 @@ function AppNavigator() {
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
       if (meta.type === 'chain') {
+        // v1.6 옵션 A: fire 된 chain 알람 mapping cleanup (시스템 측 알람은 자동 dismiss)
+        await deleteAlarmMetadata(event.alarmId);
         if (currentRoute === 'RoutineList') return;
         navigationRef.current?.navigate('RoutineList');
         return;
@@ -418,6 +420,8 @@ function AppNavigator() {
         if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
 
         if (meta.type === 'chain') {
+          // v1.6 옵션 A: cold-start 시 fire 된 chain 알람 mapping cleanup
+          await deleteAlarmMetadata(alerting.id);
           navigationRef.current?.navigate('RoutineList');
           return;
         }

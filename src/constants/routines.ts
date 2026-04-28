@@ -25,7 +25,9 @@ export type RoutineSchedule = {
 };
 
 /** step 종료 방식. auto = 알람 없이 즉시 다음 step. 나머지 3종은 알람 출력 후 해당 방식으로 종료. */
-export type RoutineEndMethod = 'tap' | 'shake' | 'camera' | 'auto';
+// v1.6 Phase 12 — 'auto' 제거. iOS 백그라운드 자동 진행 = 서버 push 인프라 필요 (별도 사이클).
+// 기존 'auto' 데이터 = loadRoutines 안 silent migration → 'tap' 변환 (사용자 데이터 보존).
+export type RoutineEndMethod = 'tap' | 'shake' | 'camera';
 
 export type Routine = {
   id: string;
@@ -42,7 +44,10 @@ export type Routine = {
   active: boolean;
   /** step 종료 방식. */
   endMethod: RoutineEndMethod;
-  /** auto 모드 대기 카운트다운 (초). 1~60. 기본 60. */
+  /**
+   * @deprecated v1.6 Phase 12 — 'auto' 제거. 필드 보존 (기존 데이터 디코딩 호환).
+   * 신규 routine 에선 사용 X.
+   */
   autoCountdownSec?: number;
   createdAt: number;
 };
@@ -113,7 +118,14 @@ export async function loadRoutines(): Promise<Routine[]> {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidRoutine);
+    // v1.6 Phase 12 — silent migration: 'auto' endMethod = 'tap' 으로 변환 (사용자 데이터 보존).
+    const migrated = parsed.map((r: any) => {
+      if (r && r.endMethod === 'auto') {
+        return { ...r, endMethod: 'tap' };
+      }
+      return r;
+    });
+    return migrated.filter(isValidRoutine);
   } catch {
     return [];
   }
@@ -198,7 +210,7 @@ function isValidRoutine(r: any): r is Routine {
     (r.schedule === undefined || isValidSchedule(r.schedule)) &&
     typeof r.soundKey === 'string' &&
     typeof r.active === 'boolean' &&
-    (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera' || r.endMethod === 'auto') &&
+    (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera') &&
     typeof r.createdAt === 'number'
   );
 }

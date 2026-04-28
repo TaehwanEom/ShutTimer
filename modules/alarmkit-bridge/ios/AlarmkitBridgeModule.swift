@@ -10,6 +10,10 @@ import AlarmKit
 import SwiftUI
 #endif
 
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
+
 @available(iOS 26.0, *)
 nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
   // ShutTimer 측에서 routineId 로 매칭하므로 metadata 자체는 비움
@@ -114,18 +118,31 @@ public class AlarmkitBridgeModule: Module {
         tintColor: Color.red
       )
 
+      // v1.6 Phase 12 — sound 파라미터 명시 (이전: default 미지정 = 사용자 디바이스 매너모드 시 묵음 가능).
+      // params.soundName 비어있으면 default system sound 사용.
+      let alertSound: AlertConfiguration.AlertSound
+      if let name = params.soundName, !name.isEmpty {
+        alertSound = .named(name)
+      } else {
+        alertSound = .default
+      }
+
       // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
-      // 사용자 stop = LiveActivityIntent.perform() 호출 (5-Lite no-op) + 옵션 A 다음 chain alarm 자동 fire.
       let id = UUID()
       let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
       if params.type == "chain" {
         config = .alarm(
           schedule: schedule,
           attributes: attributes,
-          stopIntent: NextStepIntent()
+          stopIntent: NextStepIntent(),
+          sound: alertSound
         )
       } else {
-        config = .alarm(schedule: schedule, attributes: attributes)
+        config = .alarm(
+          schedule: schedule,
+          attributes: attributes,
+          sound: alertSound
+        )
       }
       _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
       return id.uuidString
@@ -135,6 +152,28 @@ public class AlarmkitBridgeModule: Module {
       guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
       try await AlarmManager.shared.cancel(id: uuid)
+    }
+
+    // v1.6 Phase 10-A — App Group UserDefaults helper (LA Intent 동기화 통로)
+    Function("writeAppGroupString") { (key: String, value: String?) -> Bool in
+      guard let defaults = UserDefaults(suiteName: "group.com.shuttimer.app") else { return false }
+      if let v = value {
+        defaults.set(v, forKey: key)
+      } else {
+        defaults.removeObject(forKey: key)
+      }
+      return true
+    }
+
+    Function("readAppGroupString") { (key: String) -> String? in
+      guard let defaults = UserDefaults(suiteName: "group.com.shuttimer.app") else { return nil }
+      return defaults.string(forKey: key)
+    }
+
+    Function("removeAppGroupKey") { (key: String) -> Bool in
+      guard let defaults = UserDefaults(suiteName: "group.com.shuttimer.app") else { return false }
+      defaults.removeObject(forKey: key)
+      return true
     }
 
     // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.

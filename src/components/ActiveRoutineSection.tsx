@@ -81,7 +81,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const completingRef = useRef(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalStage, setModalStage] = useState<'alarm' | 'next' | 'nextCountdown' | 'auto' | 'complete'>('alarm');
+  // v1.6 Phase 12 — 'auto' / 'complete' stage 제거 (auto 모드 영구 미사용).
+  const [modalStage, setModalStage] = useState<'alarm' | 'next' | 'nextCountdown'>('alarm');
   const [autoCountdown, setAutoCountdown] = useState(60);
   const modalVisibleRef = useRef(false);
   useEffect(() => { modalVisibleRef.current = modalVisible; }, [modalVisible]);
@@ -272,17 +273,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     if (modalVisibleRef.current) return;
     if (!routine || !ar) return;
 
-    if (routine.endMethod === 'auto') {
-      const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
-      setAutoCountdown(routine.autoCountdownSec ?? 60);
-      // 마지막 step: 'complete' stage — 카운트다운 후 사운드 자동 정지하지만 modal 은 사용자 "확인" 까지 유지.
-      // 그 외: 'auto' stage — 카운트다운 0 도달 시 자동 advance.
-      setModalStage(isLastStep ? 'complete' : 'auto');
-      setModalVisible(true);
-      startAlarmEffects();
-      return;
-    }
-
+    // v1.6 Phase 12 — endMethod === 'auto' 분기 제거 (auto 모드 영구 미사용).
     completingRef.current = true;
     try {
       const res = await completeCurrentMission();
@@ -453,73 +444,21 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     }
   }, [onClose, stopAlarmAudio, stopAlarmVibe]);
 
-  const handleAutoNow = useCallback(async () => {
-    if (completingRef.current) return;
-    completingRef.current = true;
-    try {
-      stopAlarmAudio();
-      stopAlarmVibe();
-      const res = await completeCurrentMission();
-      if (!res) {
-        setModalVisible(false);
-        setModalStage('alarm');
-        return;
-      }
-      if (res.kind === 'end') {
-        setModalVisible(false);
-        setModalStage('alarm');
-        onClose();
-        return;
-      }
-      if (res.kind === 'advance_auto') {
-        setRoutine(res.routine);
-        setAr(res.ar);
-        setModalVisible(false);
-        setModalStage('alarm');
-      }
-    } finally {
-      completingRef.current = false;
-    }
-  }, [onClose]);
+  // v1.6 Phase 12 — handleAutoNow 함수 제거 (auto 모드 영구 미사용 + 무한 루프 영역 함께 제거).
 
-  // 마지막 step 'complete' 모달의 "확인" 버튼 — 사운드 정지 + completeCurrentMission + onClose
-  const handleCompleteConfirm = useCallback(async () => {
-    if (completingRef.current) return;
-    completingRef.current = true;
-    try {
-      stopAlarmAudio();
-      stopAlarmVibe();
-      await completeCurrentMission();
-      setModalVisible(false);
-      setModalStage('alarm');
-      onClose();
-    } finally {
-      completingRef.current = false;
-    }
-  }, [onClose, stopAlarmAudio, stopAlarmVibe]);
+  // v1.6 Phase 12 — handleCompleteConfirm 제거 ('complete' stage 미사용).
 
-  // auto / complete / nextCountdown 카운터 — 같은 autoCountdown state 공유. 0 도달 시 stage 별 분기:
-  //   'auto' (중간 step, auto 모드)        → handleAutoNow 자동 advance
-  //   'complete' (마지막 step, auto 모드)  → 사운드/진동 정지, modal 은 사용자 "확인" 까지 유지
-  //   'nextCountdown' (tap/shake/camera)   → handleStartNext (confirmAndAdvance + 다음 step 시작)
+  // v1.6 Phase 12 — 'auto' / 'complete' stage 제거. 'nextCountdown' 만 처리 (tap/shake/camera 모드 prep 카운트다운).
   useEffect(() => {
     if (!modalVisible) return;
-    if (modalStage !== 'auto' && modalStage !== 'complete' && modalStage !== 'nextCountdown') return;
+    if (modalStage !== 'nextCountdown') return;
     if (autoCountdown <= 0) {
-      if (modalStage === 'auto') {
-        handleAutoNow();
-      } else if (modalStage === 'nextCountdown') {
-        handleStartNext();
-      } else {
-        // 'complete': 사운드/진동 정지. modal 은 그대로.
-        stopAlarmAudio();
-        stopAlarmVibe();
-      }
+      handleStartNext();
       return;
     }
     const id = setTimeout(() => setAutoCountdown(c => c - 1), 1000);
     return () => clearTimeout(id);
-  }, [modalVisible, modalStage, autoCountdown, handleAutoNow, handleStartNext, stopAlarmAudio, stopAlarmVibe]);
+  }, [modalVisible, modalStage, autoCountdown, handleStartNext]);
 
   // 흔들기 감지
   useEffect(() => {
@@ -815,80 +754,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
               );
             })()}
 
-            {modalStage === 'auto' && (
-              <>
-                <View style={{
-                  width: 96, height: 96, borderRadius: 48,
-                  backgroundColor: colors.primary,
-                  alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 24,
-                }}>
-                  <Text style={{ fontSize: 32, fontWeight: '800', color: colors.onPrimary }}>
-                    {autoCountdown}
-                  </Text>
-                </View>
-                <Text style={{
-                  fontSize: 16, fontWeight: '700', color: colors.onBackground,
-                  marginBottom: 28, textAlign: 'center',
-                }}>
-                  {t('routine.run.autoCountdownText', { n: autoCountdown, defaultValue: `${autoCountdown}초 후 다음 루틴이 진행됩니다` })}
-                </Text>
-                <TouchableOpacity
-                  onPress={handleAutoNow}
-                  style={{
-                    width: '100%',
-                    backgroundColor: colors.primary,
-                    paddingVertical: 16,
-                    borderRadius: 14,
-                    alignItems: 'center',
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onPrimary }}>{t('routine.run.autoStartNow', { defaultValue: '다음 루틴 진행' })}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleStopFromModal}>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>{t('routine.run.stop', { defaultValue: '루틴 정지' })}</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {modalStage === 'complete' && routine && (
-              <>
-                <View style={{
-                  width: 96, height: 96, borderRadius: 48,
-                  backgroundColor: colors.primary,
-                  alignItems: 'center', justifyContent: 'center',
-                  marginBottom: 24,
-                }}>
-                  <MaterialIcons name="check-circle" size={56} color={colors.onPrimary} />
-                </View>
-                <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 6 }}>{t('routine.run.completeTitle', { defaultValue: '루틴 종료' })}</Text>
-                <Text
-                  style={{ fontSize: 24, fontWeight: '800', color: colors.onBackground, marginBottom: 12, textAlign: 'center' }}
-                  numberOfLines={2}
-                >
-                  {t('routine.run.completeName', { name: routine.name || '루틴', defaultValue: `${routine.name || '루틴'} 완료` })}
-                </Text>
-                {autoCountdown > 0 && (
-                  <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 20 }}>
-                    {t('routine.run.completeAlarmCountdown', { n: autoCountdown, defaultValue: `${autoCountdown}초 후 알람이 종료됩니다` })}
-                  </Text>
-                )}
-                <TouchableOpacity
-                  onPress={handleCompleteConfirm}
-                  style={{
-                    width: '100%',
-                    backgroundColor: colors.primary,
-                    paddingVertical: 16,
-                    borderRadius: 14,
-                    alignItems: 'center',
-                    marginTop: autoCountdown > 0 ? 0 : 12,
-                  }}
-                >
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onPrimary }}>{t('routine.run.confirm', { defaultValue: '확인' })}</Text>
-                </TouchableOpacity>
-              </>
-            )}
+            {/* v1.6 Phase 12 — 'auto' / 'complete' modal UI 제거 (auto 모드 영구 미사용). */}
           </View>
         </View>
       </Modal>

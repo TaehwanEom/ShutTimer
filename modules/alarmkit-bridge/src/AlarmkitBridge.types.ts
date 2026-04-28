@@ -5,7 +5,7 @@ export type AuthorizationState =
   | 'unsupported'
   | 'unknown';
 
-export type AlarmKitType = 'prealert' | 'chain' | 'confirm_prompt';
+export type AlarmKitType = 'prealert' | 'chain' | 'confirm_prompt' | 'timer_main';
 
 export type AlarmKitEndMethod = 'tap' | 'shake' | 'camera' | 'auto';
 

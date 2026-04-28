@@ -32,7 +32,9 @@ public class LiveActivityBridgeModule: Module {
         let contentState = ShutTimerActivityAttributes.ContentState(
           currentStepName: params.stepName,
           stepEndAt: params.stepEndAt,
-          progress: params.progress
+          progress: params.progress,
+          paused: false,
+          stage: params.stage ?? "step"
         )
         let activity = try Activity<ShutTimerActivityAttributes>.request(
           attributes: attributes,
@@ -55,7 +57,9 @@ public class LiveActivityBridgeModule: Module {
       let contentState = ShutTimerActivityAttributes.ContentState(
         currentStepName: params.stepName,
         stepEndAt: params.stepEndAt,
-        progress: params.progress
+        progress: params.progress,
+        paused: false,
+        stage: params.stage ?? "step"
       )
       await activity.update(.init(state: contentState, staleDate: nil))
     }
@@ -84,6 +88,8 @@ struct StartParams: Record {
   @Field var stepName: String
   @Field var stepEndAt: Double
   @Field var progress: Double
+  /** v1.6 Phase 12 — LA stage. 'step' (default) | 'manual_prompt' */
+  @Field var stage: String?
 }
 
 struct UpdateParams: Record {
@@ -91,6 +97,7 @@ struct UpdateParams: Record {
   @Field var stepName: String
   @Field var stepEndAt: Double
   @Field var progress: Double
+  @Field var stage: String?
 }
 
 struct EndParams: Record {

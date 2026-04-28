@@ -150,7 +150,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const [days, setDays] = useState<number[]>([]);
   const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
-  const [autoCountdownSec, setAutoCountdownSec] = useState<number>(60);
+  // v1.6 Phase 12 — autoCountdownSec state 제거 ('auto' endMethod 영구 미사용).
   const [steps, setSteps] = useState<LocalStep[]>(() => [
     { id: createStepId(), name: '', durationSeconds: 0 },
   ]);
@@ -211,7 +211,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       setDays(target.schedule?.days ?? []);
       setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
       setEndMethod(target.endMethod);
-      setAutoCountdownSec(target.autoCountdownSec ?? 60);
       setSteps(
         target.steps.map(s => ({
           id: s.id,
@@ -390,7 +389,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       soundKey,
       active: isEditMode ? originalActiveRef.current : true,
       endMethod,
-      autoCountdownSec: endMethod === 'auto' ? autoCountdownSec : undefined,
+      // v1.6 Phase 12 — autoCountdownSec 신규 routine 에선 미사용 (필드는 보존, 기존 데이터 호환).
       createdAt: originalCreatedAtRef.current ?? Date.now(),
     };
     await upsertRoutine(routine);
@@ -606,87 +605,35 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </View>
         </TouchableOpacity>
 
-        {/* 자동 진행 토글 — 사운드 아래 */}
-        <View style={styles.settingRow}>
-          <View style={styles.autoLabelRow}>
-            <Text style={styles.settingLabel}>{t('routine.edit.fieldAuto')}</Text>
-            <TouchableOpacity
-              onPress={() => Alert.alert(t('routine.edit.autoHelpTitle'), t('routine.edit.autoHelpBody'))}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={styles.autoHelpBtn}
-            >
-              <MaterialIcons name="help-outline" size={14} color={colors.secondary} />
-            </TouchableOpacity>
-          </View>
-          <Switch
-            value={endMethod === 'auto'}
-            onValueChange={(on) => {
-              setEndMethod(on ? 'auto' : 'tap');
-              markDirty();
-            }}
-          />
-        </View>
-
-        {/* 자동 진행 대기 시간 (자동 ON 일 때만, 1~60초) */}
-        {endMethod === 'auto' && (
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>{t('routine.edit.autoCountdownLabel', { defaultValue: '자동 진행 대기' })}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setAutoCountdownSec(s => Math.max(1, s - 5));
-                  markDirty();
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name="remove-circle-outline" size={26} color={colors.primary} />
-              </TouchableOpacity>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.onBackground, minWidth: 44, textAlign: 'center' }}>
-                {t('routine.edit.autoCountdownUnit', { sec: autoCountdownSec, defaultValue: `${autoCountdownSec}초` })}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setAutoCountdownSec(s => Math.min(60, s + 5));
-                  markDirty();
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <MaterialIcons name="add-circle-outline" size={26} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* 종료 방식 (자동 OFF 일 때만) */}
-        {endMethod !== 'auto' && (
-          <View style={styles.endMethodSection}>
-            <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
-            <View style={styles.endMethodSegment}>
-              {(['tap', 'shake', 'camera'] as const).map(opt => {
-                const selected = endMethod === opt;
-                return (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
-                    onPress={() => {
-                      setEndMethod(opt);
-                      markDirty();
-                    }}
+        {/* v1.6 Phase 12 — 자동 진행 토글 + 대기 시간 UI 제거. 'auto' endMethod 영구 미사용 (서버 push 인프라 필요). */}
+        {/* 종료 방식 — 항상 표시 (tap / shake / camera) */}
+        <View style={styles.endMethodSection}>
+          <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
+          <View style={styles.endMethodSegment}>
+            {(['tap', 'shake', 'camera'] as const).map(opt => {
+              const selected = endMethod === opt;
+              return (
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
+                  onPress={() => {
+                    setEndMethod(opt);
+                    markDirty();
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.endMethodBtnText,
+                      selected && styles.endMethodBtnTextSelected,
+                    ]}
                   >
-                    <Text
-                      style={[
-                        styles.endMethodBtnText,
-                        selected && styles.endMethodBtnTextSelected,
-                      ]}
-                    >
-                      {t(`routine.endMethod.${opt}`)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                    {t(`routine.endMethod.${opt}`)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
+        </View>
 
         {/* 삭제 (편집 모드만) */}
         {isEditMode && (

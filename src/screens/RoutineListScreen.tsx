@@ -14,6 +14,7 @@ import {
   Animated,
   PanResponder,
   Modal,
+  DeviceEventEmitter,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -718,6 +719,16 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const [createPickerVisible, setCreatePickerVisible] = useState(false);
   const [activeManualRoutineId, setActiveManualRoutineId] = useState<string | null>(null);
   const [collapseSignal, setCollapseSignal] = useState(0);
+
+  // v1.6 Phase 12 — 위젯 ✕ stop 시 RoutineListScreen activeManualRoutineId 정리.
+  // 외부 stop 경로 (App.tsx handleControlSignal stop 분기) 에서 emit → 즉시 ActiveRoutineSection 언마운트.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('routineClearedExternally', () => {
+      setActiveManualRoutineId(null);
+      setActiveRoutine(null);
+    });
+    return () => sub.remove();
+  }, []);
 
   // 진행 중 루틴이 있을 때 자동으로 해당 카드로 스크롤 — routineId 단위 1회 (유저가 이후 자유 스크롤 가능)
   const scrollViewRef = useRef<ScrollView | null>(null);

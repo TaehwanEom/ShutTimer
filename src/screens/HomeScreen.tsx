@@ -33,6 +33,25 @@ import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { preloadAlarmSound, clearPreloadedSound } from '../utils/alarmSoundPreload';
 import { useTranslation } from 'react-i18next';
+import { Platform } from 'react-native';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
+import LiveActivityBridge from '../../modules/live-activity-bridge';
+import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
+import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
+
+// v1.6 Phase 9 — 일반 타이머 AlarmKit 가용성 (file-local — 분리 정책 정공)
+async function shouldUseAlarmKitInTimer(): Promise<boolean> {
+  if (Platform.OS !== 'ios') return false;
+  const ver = parseInt(String(Platform.Version), 10);
+  if (isNaN(ver) || ver < 26) return false;
+  if (!AlarmkitBridge.isAvailable()) return false;
+  try {
+    const state = await AlarmkitBridge.getAuthorizationState();
+    return state === 'authorized';
+  } catch {
+    return false;
+  }
+}
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -325,6 +344,10 @@ export default function HomeScreen({ navigation }: Props) {
   // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
   const endAtRef = useRef<number>(0);
   const pausedAtRef = useRef<number | null>(null);
+  // v1.6 Phase 9 — AlarmKit alarm id (timer_main type) + LiveActivity id
+  const alarmkitIdRef = useRef<string | null>(null);
+  const activeLiveActivityIdRef = useRef<string | null>(null);
+  const timerRoutineIdRef = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -360,6 +383,38 @@ export default function HomeScreen({ navigation }: Props) {
 
     // 타이머 활성 플래그 (foreground 이중 재생 방지 — App.tsx NotifHandler 경로)
     AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
+
+    // v1.6 Phase 9 — AlarmKit 분기 (iOS 26+ + 권한). 성공 시 expo-notifications 경로 skip.
+    const useAlarmKit = await shouldUseAlarmKitInTimer();
+    if (useAlarmKit) {
+      // 기존 AlarmKit alarm cleanup
+      if (alarmkitIdRef.current) {
+        await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
+        await deleteAlarmMetadata(alarmkitIdRef.current).catch(() => {});
+        alarmkitIdRef.current = null;
+      }
+      const fireAt = Date.now() + seconds * 1000;
+      const routineId = timerRoutineIdRef.current ?? `main_timer_${Date.now()}`;
+      timerRoutineIdRef.current = routineId;
+      try {
+        const id = await AlarmkitBridge.scheduleAlarm({
+          routineId,
+          title: t('home.timerCompleteTitle', { defaultValue: '타이머 완료' }),
+          fireAt,
+          stopLabel: t('home.timerStop', { defaultValue: '확인' }),
+          type: 'timer_main',
+        });
+        if (id) {
+          await saveAlarmMetadata({ alarmId: id, type: 'timer_main', routineId });
+          alarmkitIdRef.current = id;
+          // v1.6 Phase 10-A — LA Intent 가 read 해 AlarmKit pause/resume/cancel 호출
+          writeChainAlarms(routineId, [id]);
+          return; // expo-notifications 경로 skip
+        }
+      } catch {
+        // AlarmKit 실패 시 expo-notifications 폴백 진행
+      }
+    }
 
     // 사운드 + 사용자 설정
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
@@ -416,6 +471,17 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const cancelAlarms = async (opts?: { keepPreload?: boolean }) => {
+    // v1.6 Phase 9 — AlarmKit alarm cancel
+    if (alarmkitIdRef.current) {
+      await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
+      await deleteAlarmMetadata(alarmkitIdRef.current).catch(() => {});
+      alarmkitIdRef.current = null;
+    }
+    // v1.6 Phase 10-A — App Group cleanup
+    if (timerRoutineIdRef.current) {
+      clearChainAlarms(timerRoutineIdRef.current);
+    }
+    timerRoutineIdRef.current = null;
     // 메모리 배열 + 시스템 예약 양쪽 모두 정리 (cold start 복원 후 메모리 배열이 비어있어도 안전)
     await Notifications.cancelAllScheduledNotificationsAsync();
     notificationIdsRef.current = [];
@@ -447,6 +513,9 @@ export default function HomeScreen({ navigation }: Props) {
     remainingSecondsRef.current = total;
     endAtRef.current = now + total * 1000;
     pausedAtRef.current = null;
+    // v1.6 Phase 9 — routineId 선할당 (scheduleAlarm await 없이 호출되므로
+    //                LA start 와 AlarmKit alarm 의 routineId 일치 보장)
+    timerRoutineIdRef.current = `main_timer_${now}`;
     setRemainingSeconds(total);
     setIsRunning(true);
     setIsPaused(false);
@@ -454,6 +523,23 @@ export default function HomeScreen({ navigation }: Props) {
     // @v1.5 — 알림 권한은 Onboarding이 처리. 미응답 사용자 대비 fallback (이미 응답 시 no-op)
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
+    // v1.6 Phase 9 — LiveActivity 시작 (iOS 16.2+ 권한 활성 시. 그 외 silent skip)
+    try {
+      if (LiveActivityBridge.areActivitiesEnabled()) {
+        const routineId = timerRoutineIdRef.current;
+        const stepName = t('home.timerName', { defaultValue: '타이머' });
+        const id = await LiveActivityBridge.start({
+          routineId,
+          routineName: stepName,
+          stepName,
+          stepEndAt: endAtRef.current,
+          progress: 0,
+        });
+        activeLiveActivityIdRef.current = id || null;
+      }
+    } catch {
+      // 권한 / 시스템 한도 — silent skip
+    }
     // 영속화 (cold start 복원용)
     AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({
       startedAt: now,
@@ -512,12 +598,59 @@ export default function HomeScreen({ navigation }: Props) {
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
       AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
+      // v1.6 Phase 9 — LiveActivity 종료
+      if (activeLiveActivityIdRef.current) {
+        LiveActivityBridge.end({
+          activityId: activeLiveActivityIdRef.current,
+          dismissalPolicy: 'immediate',
+        }).catch(() => {});
+        activeLiveActivityIdRef.current = null;
+      }
       // v1.5: 타이머 자연 종료 → AlarmScreen 진입. preload된 사운드를 AlarmScreen이 consume하도록 유지.
       cancelAlarms({ keepPreload: true }).then(() => {
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }
   }, [remainingSeconds, isRunning]);
+
+  // v1.6 Phase 10-E — LA Intent (timer 측) → state 동기화
+  // LA Intent 가 이미 AlarmKit pause/resume/cancel + Activity update/end 처리.
+  // RN = state + AsyncStorage 갱신만 (chain alarm 재조작 X).
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('laControlTimer', (signal: LAControlSignal) => {
+      if (signal.action === 'pause' && !isPausedRef.current && isRunning) {
+        // 위험 #X 정정: signal.timestamp = LA Intent perform 시점 (실제 누름 시각).
+        pausedAtRef.current = signal.timestamp;
+        isPausedRef.current = true;
+        setIsPaused(true);
+        AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
+          if (!raw) return;
+          try {
+            const t: ActiveTimer = JSON.parse(raw);
+            AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, pausedAt: signal.timestamp })).catch(() => {});
+          } catch {}
+        });
+      } else if (signal.action === 'resume' && isPausedRef.current && isRunning) {
+        // 위험 #X 정정: pauseDuration = resume signal.timestamp - 실제 pausedAt
+        const pauseDuration = Math.max(0, signal.timestamp - (pausedAtRef.current ?? signal.timestamp));
+        endAtRef.current += pauseDuration;
+        pausedAtRef.current = null;
+        isPausedRef.current = false;
+        setIsPaused(false);
+        AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
+          if (!raw) return;
+          try {
+            const t: ActiveTimer = JSON.parse(raw);
+            AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, endAt: endAtRef.current, pausedAt: null })).catch(() => {});
+          } catch {}
+        });
+      } else if (signal.action === 'stop') {
+        // LA Intent 가 이미 AlarmKit cancel + Activity end 처리. handleCancel = state 정리 (cancelAlarms / endLiveActivity 가 noop 호환).
+        handleCancel();
+      }
+    });
+    return () => sub.remove();
+  }, [isRunning]);
 
   // --- 루틴이 단일 타이머 override 시 외부에서 발화하는 emit 수신 ---
   // routineController.startRoutine(overrideTimer:true) 가 ACTIVE_TIMER_KEY 제거 + 타이머 알림 선택적 cancel
@@ -549,14 +682,23 @@ export default function HomeScreen({ navigation }: Props) {
     Promise.all([
       AsyncStorage.getItem(ACTIVE_TIMER_KEY),
       AsyncStorage.getItem('isRoutineActive'),
-    ]).then(([raw, isRoutineActive]) => {
+    ]).then(async ([raw, isRoutineActive]) => {
       if (isRoutineActive === 'true') {
-        // 루틴 active — 단일 타이머 stale storage 정리 후 복원 skip
+        // 루틴 active — 단일 타이머 stale storage 정리 후 복원 skip.
+        // LA cleanup = routine 측 restoreRoutineState 가 자동 처리 (HomeScreen 영역 외).
         if (raw) AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
         AsyncStorage.removeItem('isTimerActive').catch(() => {});
         return;
       }
-      if (!raw) return;
+      if (!raw) {
+        // ActiveTimer 없음 + routine 도 없음 → stale LA 가능 (이전 세션 잔존)
+        try {
+          if (LiveActivityBridge.areActivitiesEnabled()) {
+            await LiveActivityBridge.endAll().catch(() => {});
+          }
+        } catch {}
+        return;
+      }
       let t: ActiveTimer;
       try {
         t = JSON.parse(raw);
@@ -572,8 +714,16 @@ export default function HomeScreen({ navigation }: Props) {
       endAtRef.current = endAt;
       pausedAtRef.current = pausedAt;
 
+      // v1.6 Phase 9 — 복원 시 stale LA 일괄 종료 (timer 만 영향 — routine 동시 active 차단됨).
+      // 진행 중 분기에서 신규 LA 재등록.
+      try {
+        if (LiveActivityBridge.areActivitiesEnabled()) {
+          await LiveActivityBridge.endAll().catch(() => {});
+        }
+      } catch {}
+
       if (pausedAt !== null) {
-        // Pause 상태 복원 — 알람 재예약 X (이미 cancelAlarms됨)
+        // Pause 상태 복원 — 알람 재예약 X (이미 cancelAlarms됨). LA 재등록도 skip (pause = 시간 정지 표시 의미 약함).
         const remaining = Math.max(0, Math.ceil((endAt - pausedAt) / 1000));
         remainingSecondsRef.current = remaining;
         setRemainingSeconds(remaining);
@@ -592,6 +742,28 @@ export default function HomeScreen({ navigation }: Props) {
         setIsRunning(true);
         // 예약 알림은 이미 iOS 네이티브 레이어에 남아있음. 플래그만 재설정 (foreground suppress)
         AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
+        // v1.6 Phase 9 — LA 재등록 (진행 중 복원 시 잠금화면 가시화 복구)
+        try {
+          if (LiveActivityBridge.areActivitiesEnabled()) {
+            const total = t.totalSeconds * 1000;
+            const elapsed = Math.max(0, total - (endAt - now));
+            const progress = total > 0 ? Math.min(1, elapsed / total) : 0;
+            const newRoutineId = `main_timer_${now}`;
+            timerRoutineIdRef.current = newRoutineId;
+            // T4 일괄 (정책 #1) — 복원 useEffect 안 't' 변수 = ActiveTimer 와 충돌해 useTranslation 의 t 사용 X. ko 하드코딩.
+            const stepName = '타이머';
+            const id = await LiveActivityBridge.start({
+              routineId: newRoutineId,
+              routineName: stepName,
+              stepName,
+              stepEndAt: endAt,
+              progress,
+            });
+            activeLiveActivityIdRef.current = id || null;
+          }
+        } catch {
+          // 권한 / 시스템 한도 — silent skip
+        }
       } else {
         // 알람 시간 지났음 → 세션 기록 + AlarmScreen
         saveSession(t.totalSeconds, t.missionIcon ?? 'timer');
@@ -630,6 +802,14 @@ export default function HomeScreen({ navigation }: Props) {
       // pause: pause 시점 저장 + 알람 취소
       pausedAtRef.current = now;
       cancelAlarms();
+      // v1.6 발견 #E — pause 시 LA 종료 (ContentState paused 미지원 — 카운트다운 진행처럼 보임 ↔ 실제 알람 X 혼란 차단)
+      if (activeLiveActivityIdRef.current) {
+        LiveActivityBridge.end({
+          activityId: activeLiveActivityIdRef.current,
+          dismissalPolicy: 'immediate',
+        }).catch(() => {});
+        activeLiveActivityIdRef.current = null;
+      }
     } else {
       // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
       const pauseDuration = now - (pausedAtRef.current ?? now);
@@ -637,6 +817,26 @@ export default function HomeScreen({ navigation }: Props) {
       pausedAtRef.current = null;
       const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
       scheduleAlarm(remainingSecs);
+      // v1.6 발견 #E — resume 시 LA 신규 start (pause 시 end 한 LA 재개)
+      try {
+        if (LiveActivityBridge.areActivitiesEnabled()) {
+          const total = Math.max(1, totalSecondsRef.current * 1000);
+          const elapsed = Math.max(0, total - (endAtRef.current - now));
+          const progress = Math.min(1, elapsed / total);
+          const stepName = t('home.timerName', { defaultValue: '타이머' });
+          const routineId = timerRoutineIdRef.current ?? `main_timer_${now}`;
+          timerRoutineIdRef.current = routineId;
+          LiveActivityBridge.start({
+            routineId,
+            routineName: stepName,
+            stepName,
+            stepEndAt: endAtRef.current,
+            progress,
+          }).then(id => {
+            activeLiveActivityIdRef.current = id || null;
+          }).catch(() => {});
+        }
+      } catch {}
     }
     // AsyncStorage 업데이트 (cold start 복원용)
     AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
@@ -656,6 +856,14 @@ export default function HomeScreen({ navigation }: Props) {
   // --- 취소 ---
   const handleCancel = () => {
     cancelAlarms();
+    // v1.6 Phase 9 — LiveActivity 즉시 종료
+    if (activeLiveActivityIdRef.current) {
+      LiveActivityBridge.end({
+        activityId: activeLiveActivityIdRef.current,
+        dismissalPolicy: 'immediate',
+      }).catch(() => {});
+      activeLiveActivityIdRef.current = null;
+    }
     AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
     setIsRunning(false);
     setIsPaused(false);

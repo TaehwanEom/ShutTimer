@@ -12,6 +12,8 @@ export type LiveActivityStartParams = {
   stepEndAt: number;
   /** 진행률 0~1 */
   progress: number;
+  /** v1.6 Phase 12 — LA stage. 'step' (default) | 'manual_prompt' (수동 모드 alerting 후 다음 진행 대기) */
+  stage?: string;
 };
 
 export type LiveActivityUpdateParams = {
@@ -19,6 +21,8 @@ export type LiveActivityUpdateParams = {
   stepName: string;
   stepEndAt: number;
   progress: number;
+  /** v1.6 Phase 12 — LA stage. 'step' | 'manual_prompt' */
+  stage?: string;
 };
 
 export type LiveActivityDismissalPolicy = 'immediate' | 'default';

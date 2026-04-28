@@ -15,6 +15,10 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var stepEndAt: Double
         /** 진행률 0~1 */
         var progress: Double
+        /** v1.6 Phase 10 — 일시정지 상태 (UI 토글용). default false = 기존 디코딩 호환 */
+        var paused: Bool = false
+        /** v1.6 Phase 12 — LA stage. 'step' (현 step 카운트다운) / 'auto_countdown' (대기) / 'manual_prompt' (수동 다음 진행 Button). default = 기존 호환 */
+        var stage: String = "step"
     }
 
     /** 루틴 이름 (불변) */

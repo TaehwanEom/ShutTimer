@@ -244,6 +244,7 @@
         }
       ],
       "./plugins/withInfoPlistLocalizations.js",
+      "./plugins/withWidgetAppIntentsMetadata.js",
       "@react-native-community/datetimepicker",
       "@bacons/apple-targets"
     ],

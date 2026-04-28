@@ -23,6 +23,12 @@ declare class AlarmkitBridgeModule extends NativeModule<AlarmkitBridgeEvents> {
   cancelAlarm(alarmId: string): Promise<void>;
   /** 현재 등록된 알람 목록 (id + state). v1.6 T1 — 콜드스타트 alerting filter 위해 state 포함. */
   listAlarms(): Promise<AlarmInfo[]>;
+  /** v1.6 Phase 10-A — App Group UserDefaults write (LA Intent 동기화). value=null 시 삭제. */
+  writeAppGroupString(key: string, value: string | null): boolean;
+  /** v1.6 Phase 10-A — App Group UserDefaults read. */
+  readAppGroupString(key: string): string | null;
+  /** v1.6 Phase 10-A — App Group UserDefaults key 삭제. */
+  removeAppGroupKey(key: string): boolean;
 }
 
 // Native binary 에 모듈 미포함 (구 dev client / Expo Go) → app init throw 회피.
@@ -38,6 +44,9 @@ try {
     scheduleAlarm: async () => '',
     cancelAlarm: async () => {},
     listAlarms: async (): Promise<AlarmInfo[]> => [],
+    writeAppGroupString: () => false,
+    readAppGroupString: () => null,
+    removeAppGroupKey: () => false,
     addListener: () => ({ remove: () => {} }),
     removeListener: () => {},
   } as unknown as AlarmkitBridgeModule;

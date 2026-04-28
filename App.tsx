@@ -1,7 +1,7 @@
 import './src/i18n';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, DeviceEventEmitter } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -81,7 +81,8 @@ import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
 import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState } from './src/utils/routineController';
+import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage } from './src/utils/routineController';
+import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
@@ -265,7 +266,12 @@ function AppNavigator() {
 
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도) + 이중 가드 (시나리오 A 방어)
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(async () => {
+    const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
+      // v1.6 Phase 12 — expo-notifications 폴백 경로의 routine_confirm_prompt fire 시 LA stage 자동 전환
+      const data = notification?.request?.content?.data as any;
+      if (data?.type === 'routine_confirm_prompt') {
+        await setLiveActivityStage('manual_prompt').catch(() => {});
+      }
       if (!navigationRef.current?.isReady()) return;
       const route = navigationRef.current?.getCurrentRoute()?.name;
       if (route === 'Alarm') return;
@@ -299,6 +305,8 @@ function AppNavigator() {
         return;
       }
       if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
+        // v1.6 Phase 12 — 알림 탭 경로의 routine_confirm_prompt 도 LA stage 자동 전환
+        await setLiveActivityStage('manual_prompt').catch(() => {});
         // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
         // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
         // camera → RoutineAlarm (scan UI).
@@ -344,6 +352,8 @@ function AppNavigator() {
           return;
         }
         if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
+          // v1.6 Phase 12 — cold-start 알림 탭 경로도 LA stage 자동 전환
+          await setLiveActivityStage('manual_prompt').catch(() => {});
           // endMethod 별 분기. tap/shake → RoutineList (inline). camera → RoutineAlarm.
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === data.routineId);
@@ -378,15 +388,23 @@ function AppNavigator() {
       if (!navigationRef.current?.isReady()) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
+      // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). 잔존 mapping silent cleanup 만.
       if (meta.type === 'chain') {
-        // v1.6 옵션 A: fire 된 chain 알람 mapping cleanup (시스템 측 알람은 자동 dismiss)
         await deleteAlarmMetadata(event.alarmId);
-        if (currentRoute === 'RoutineList') return;
-        navigationRef.current?.navigate('RoutineList');
+        return;
+      }
+
+      if (meta.type === 'timer_main') {
+        // v1.6 Phase 9: 일반 타이머 AlarmKit fire → AlarmScreen navigate
+        await deleteAlarmMetadata(event.alarmId);
+        if (currentRoute === 'Alarm') return;
+        navigationRef.current?.navigate('Alarm');
         return;
       }
 
       if (meta.type === 'confirm_prompt') {
+        // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
+        await setLiveActivityStage('manual_prompt').catch(() => {});
         if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.routineId);
@@ -420,12 +438,19 @@ function AppNavigator() {
         if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
 
         if (meta.type === 'chain') {
-          // v1.6 옵션 A: cold-start 시 fire 된 chain 알람 mapping cleanup
+          // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). cold-start 잔존 mapping silent cleanup.
           await deleteAlarmMetadata(alerting.id);
-          navigationRef.current?.navigate('RoutineList');
+          return;
+        }
+        if (meta.type === 'timer_main') {
+          // v1.6 Phase 9: cold-start 시 fire 된 timer_main 알람
+          await deleteAlarmMetadata(alerting.id);
+          navigationRef.current?.navigate('Alarm');
           return;
         }
         if (meta.type === 'confirm_prompt') {
+          // v1.6 Phase 12 — cold-start AlarmKit alerting 경로도 LA stage 자동 전환
+          await setLiveActivityStage('manual_prompt').catch(() => {});
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === meta.routineId);
           if (!r) {
@@ -441,6 +466,48 @@ function AppNavigator() {
       } catch {}
     }, 1500);
     return () => clearTimeout(timer);
+  }, []);
+
+  // v1.6 Phase 10-D — LA control signal polling (App Group ↔ RN 동기화)
+  // LiveActivityIntent.perform() 안에서 설정한 control signal 을 cold-start + AppState 'active' 시 처리.
+  // signal.routineId.startsWith('main_timer_') = timer 측 (DeviceEventEmitter emit) / 그 외 = routine 측 (controller 호출).
+  useEffect(() => {
+    const handleControlSignal = async () => {
+      const signal = readControlSignal();
+      if (!signal) return;
+      clearControlSignal();
+      try {
+        if (signal.routineId.startsWith('main_timer_')) {
+          // timer 측 — HomeScreen listener 가 처리
+          DeviceEventEmitter.emit('laControlTimer', signal);
+        } else {
+          // routine 측 — pause/resume = LA Intent 가 이미 native 처리. RN 은 ar 동기화만.
+          // 위험 #X 정정: signal.timestamp = LA Intent perform 시점 (실제 누름 시각). RN polling 시점 X.
+          if (signal.action === 'pause') await pauseRoutineFromLA(signal.timestamp);
+          else if (signal.action === 'resume') await resumeRoutineFromLA(signal.timestamp);
+          else if (signal.action === 'stop') {
+            await stopRoutine();
+            // v1.6 Phase 12 — 위젯 ✕ stop 시 RoutineListScreen 의 activeManualRoutineId 정리 트리거.
+            // (onClose 콜백은 JS 내부 stop 에서만 호출 → 외부 stop 경로 별도 emit 필요)
+            DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+          }
+          // v1.6 Phase 12 — 위젯 "다음 진행" Button (AdvanceNextStepIntent) perform 후 routine advance
+          else if (signal.action === 'advance') await advanceRoutineFromLA(signal.routineId);
+        }
+      } catch (e) {
+        Logger.warn('LAControl', `signal handle failed: ${e}`);
+      }
+    };
+    // cold-start
+    const t = setTimeout(handleControlSignal, 1500);
+    // foreground 진입 시
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') handleControlSignal();
+    });
+    return () => {
+      clearTimeout(t);
+      sub.remove();
+    };
   }, []);
 
   // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화 + ActiveRoutine 자동 복원

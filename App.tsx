@@ -382,6 +382,7 @@ function AppNavigator() {
   // v1.6 T1 — AlarmKit 알람 발화 listener (chain / confirm_prompt). prealert 는 mapping table 미저장 → 무시.
   useEffect(() => {
     const sub = AlarmkitBridge.addListener('onAlarmStateChange', async (event) => {
+      console.warn('[onAlarmStateChange]', event.alarmId, event.state, 'AppState:', AppState.currentState);
       if (event.state !== 'alerting') return;
       const meta = await loadAlarmMetadata(event.alarmId);
       if (!meta) return;
@@ -396,7 +397,9 @@ function AppNavigator() {
 
       if (meta.type === 'timer_main') {
         // v1.6 Phase 9: 일반 타이머 AlarmKit fire → AlarmScreen navigate
-        await deleteAlarmMetadata(event.alarmId);
+        // v1.6 hotfix — deleteAlarmMetadata 호출 제거. AlarmScreen.stopAudioAndVibration 의
+        // listAllAlarmMetadata loop 가 cancel + delete 통합 처리 (race 방지: listener 가
+        // 먼저 metadata 삭제하면 AlarmScreen cleanup 이 A 를 못 찾아 system 측 ghost 잔존).
         if (currentRoute === 'Alarm') return;
         navigationRef.current?.navigate('Alarm');
         return;
@@ -444,7 +447,7 @@ function AppNavigator() {
         }
         if (meta.type === 'timer_main') {
           // v1.6 Phase 9: cold-start 시 fire 된 timer_main 알람
-          await deleteAlarmMetadata(alerting.id);
+          // v1.6 hotfix — deleteAlarmMetadata 호출 제거. AlarmScreen 가 cleanup 책임 통합.
           navigationRef.current?.navigate('Alarm');
           return;
         }
@@ -469,12 +472,17 @@ function AppNavigator() {
   }, []);
 
   // v1.6 Phase 10-D — LA control signal polling (App Group ↔ RN 동기화)
-  // LiveActivityIntent.perform() 안에서 설정한 control signal 을 cold-start + AppState 'active' 시 처리.
+  // LiveActivityIntent.perform() 안에서 설정한 control signal 을 cold-start + AppState 'active' + 1초 polling 시 처리.
   // signal.routineId.startsWith('main_timer_') = timer 측 (DeviceEventEmitter emit) / 그 외 = routine 측 (controller 호출).
+  // v1.6 hotfix — 1초 setInterval polling 추가. iPhone foreground active 유지 시 Watch / LA Button 신호 처리 누락 방지.
   useEffect(() => {
+    let inFlight = false;
     const handleControlSignal = async () => {
+      if (inFlight) return;
       const signal = readControlSignal();
       if (!signal) return;
+      console.warn('[LAControl] signal:', signal.action, signal.routineId, 'AppState:', AppState.currentState);
+      inFlight = true;
       clearControlSignal();
       try {
         if (signal.routineId.startsWith('main_timer_')) {
@@ -496,6 +504,8 @@ function AppNavigator() {
         }
       } catch (e) {
         Logger.warn('LAControl', `signal handle failed: ${e}`);
+      } finally {
+        inFlight = false;
       }
     };
     // cold-start
@@ -504,8 +514,11 @@ function AppNavigator() {
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active') handleControlSignal();
     });
+    // v1.6 hotfix — 1초 polling (foreground active 유지 시 Watch / LA Button 신호 즉시 반영).
+    const poll = setInterval(handleControlSignal, 1000);
     return () => {
       clearTimeout(t);
+      clearInterval(poll);
       sub.remove();
     };
   }, []);

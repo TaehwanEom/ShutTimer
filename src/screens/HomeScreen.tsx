@@ -38,6 +38,7 @@ import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
+import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 
 // v1.6 Phase 9 — 일반 타이머 AlarmKit 가용성 (file-local — 분리 정책 정공)
 async function shouldUseAlarmKitInTimer(): Promise<boolean> {
@@ -375,6 +376,26 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   const scheduleAlarm = async (seconds: number) => {
+    // v1.6 hotfix — AlarmKit 권한 미결정 시 명시 요청.
+    // 권한 grant 시 AlarmKit alerting fire = silent/Focus 우회 자동.
+    // 미요청 상태로 expo 폴백만 등록되면 silent mode 시 kill 상태 무음.
+    const akAuth = await requestAlarmKitAuthorizationIfNeeded();
+    console.warn('[timer] AlarmKit auth:', akAuth);
+
+    // Phase E 진단 — 등록 전 system 측 alarm 상태
+    try {
+      const before = await AlarmkitBridge.listAlarms();
+      console.warn('[timer] alarms before:', before.length, JSON.stringify(before));
+    } catch (e) {
+      console.warn('[timer] listAlarms before fail:', String(e));
+    }
+
+    // v1.6 hotfix — 사용자 설정 사운드 사전 로드 (AlarmKit + expo 양쪽 사용).
+    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
+    const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+    const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+    const alarmEnabled = alarmEnabledRaw !== 'false';
+
     // 기존 예약 모두 취소
     for (const oldId of notificationIdsRef.current) {
       await Notifications.cancelScheduledNotificationAsync(oldId);
@@ -384,8 +405,9 @@ export default function HomeScreen({ navigation }: Props) {
     // 타이머 활성 플래그 (foreground 이중 재생 방지 — App.tsx NotifHandler 경로)
     AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
 
-    // v1.6 Phase 9 — AlarmKit 분기 (iOS 26+ + 권한). 성공 시 expo-notifications 경로 skip.
-    const useAlarmKit = await shouldUseAlarmKitInTimer();
+    // v1.6 Phase 9 — AlarmKit 분기 (iOS 26+ + 권한 + 알람 ON). 성공 시 expo-notifications 경로 skip.
+    // alarmEnabled=false 시 AlarmKit 미사용 (사용자 무음 의도 ↔ AlarmKit silent 우회 강제 충돌).
+    const useAlarmKit = alarmEnabled && (await shouldUseAlarmKitInTimer());
     if (useAlarmKit) {
       // 기존 AlarmKit alarm cleanup
       if (alarmkitIdRef.current) {
@@ -403,7 +425,16 @@ export default function HomeScreen({ navigation }: Props) {
           fireAt,
           stopLabel: t('home.timerStop', { defaultValue: '확인' }),
           type: 'timer_main',
+          soundName: soundItem.pushSound, // v1.6 hotfix — 사용자 설정 사운드 풀스크린 발화
         });
+        console.warn('[timer] scheduled id:', id);
+        // Phase E 진단 — 등록 직후 system 측 alarm 상태
+        try {
+          const after = await AlarmkitBridge.listAlarms();
+          console.warn('[timer] alarms after:', after.length, JSON.stringify(after));
+        } catch (e) {
+          console.warn('[timer] listAlarms after fail:', String(e));
+        }
         if (id) {
           await saveAlarmMetadata({ alarmId: id, type: 'timer_main', routineId });
           alarmkitIdRef.current = id;
@@ -411,17 +442,14 @@ export default function HomeScreen({ navigation }: Props) {
           writeChainAlarms(routineId, [id]);
           return; // expo-notifications 경로 skip
         }
-      } catch {
-        // AlarmKit 실패 시 expo-notifications 폴백 진행
+      } catch (e) {
+        // Phase E 진단 — catch 빈 블록 → throw 표면화
+        console.warn('[timer] schedule throw:', String(e));
       }
     }
 
-    // 사운드 + 사용자 설정
-    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
-    const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
-    const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
+    // 사운드 + 사용자 설정 (expo 폴백)
     const vibrationEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.VIBRATION_ENABLED);
-    const alarmEnabled = alarmEnabledRaw !== 'false';
     const vibrationEnabled = vibrationEnabledRaw !== 'false';
 
     // iOS 푸시는 사운드 없으면 진동도 안 옴. 알람 OFF + 진동 ON 케이스에서 무음 WAV로 진동만 유도.
@@ -470,11 +498,16 @@ export default function HomeScreen({ navigation }: Props) {
     notificationIdsRef.current = ids;
   };
 
-  const cancelAlarms = async (opts?: { keepPreload?: boolean }) => {
+  const cancelAlarms = async (opts?: { keepPreload?: boolean; keepAlarmKit?: boolean }) => {
     // v1.6 Phase 9 — AlarmKit alarm cancel
+    // v1.6 hotfix — keepAlarmKit=true (timer 자연 종료 path) 시 JS preemptive cancel skip.
+    // AlarmKit alerting UI 가 사용자 stop 까지 지속 (시계앱 동일 동작). cleanup 책임은
+    // AlarmScreen.stopAudioAndVibration 의 listAllAlarmMetadata loop (timer_main filter).
     if (alarmkitIdRef.current) {
-      await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
-      await deleteAlarmMetadata(alarmkitIdRef.current).catch(() => {});
+      if (!opts?.keepAlarmKit) {
+        await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
+        await deleteAlarmMetadata(alarmkitIdRef.current).catch(() => {});
+      }
       alarmkitIdRef.current = null;
     }
     // v1.6 Phase 10-A — App Group cleanup
@@ -504,6 +537,10 @@ export default function HomeScreen({ navigation }: Props) {
       Alert.alert(
         t('home.timerBlocked.title', { defaultValue: '루틴 진행 중' }),
         t('home.timerBlocked.body', { defaultValue: '루틴을 먼저 정지해야 단일 타이머를 시작할 수 있습니다.' }),
+        [{
+          text: t('common.confirm', { defaultValue: '확인' }),
+          onPress: () => navigation.navigate('RoutineList'),
+        }],
       );
       return;
     }
@@ -607,7 +644,9 @@ export default function HomeScreen({ navigation }: Props) {
         activeLiveActivityIdRef.current = null;
       }
       // v1.5: 타이머 자연 종료 → AlarmScreen 진입. preload된 사운드를 AlarmScreen이 consume하도록 유지.
-      cancelAlarms({ keepPreload: true }).then(() => {
+      // v1.6 hotfix — keepAlarmKit:true. JS countdown=0 시 AlarmKit cancel 호출 시 alerting UI 즉시 dismiss
+      // (= "잠깐 비췄다 꺼짐" #2) + system 측 ghost 잔존 가능 (#3 후보) 동시 차단.
+      cancelAlarms({ keepPreload: true, keepAlarmKit: true }).then(() => {
         navigation.navigate('Alarm', { missionId: mission?.id ?? undefined, missionIcon: mission?.icon ?? undefined });
       });
     }

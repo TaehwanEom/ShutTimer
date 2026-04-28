@@ -27,6 +27,8 @@ import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
+import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -223,6 +225,18 @@ export default function AlarmScreen({ navigation }: Props) {
       clearInterval(vibrationIntervalRef.current);
       vibrationIntervalRef.current = null;
     }
+    // v1.6 hotfix — AlarmKit timer_main alarm cancel (시스템 alerting UI 사운드 중단).
+    // 미적용 시 stopAsync 가 expo-av 만 정리해 system alerting 사운드 잔존 → 지속 울림.
+    // type='timer_main' 만 filter — 루틴 진행 중 일반 타이머 dismiss 시 routine 알람 보존.
+    try {
+      const metas = await listAllAlarmMetadata();
+      for (const m of metas) {
+        if (m.type === 'timer_main') {
+          await AlarmkitBridge.cancelAlarm(m.alarmId).catch(() => {});
+          await deleteAlarmMetadata(m.alarmId).catch(() => {});
+        }
+      }
+    } catch {}
     // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
     await Promise.all([
       Notifications.cancelAllScheduledNotificationsAsync().catch(() => {}),
@@ -259,8 +273,10 @@ export default function AlarmScreen({ navigation }: Props) {
   // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
   // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
   useEffect(() => {
+    console.warn('[AlarmScreen] mount, AppState:', AppState.currentState);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     return () => {
+      console.warn('[AlarmScreen] unmount');
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});
     };
   }, []);

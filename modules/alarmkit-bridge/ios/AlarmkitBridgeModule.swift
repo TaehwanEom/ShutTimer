@@ -96,21 +96,52 @@ public class AlarmkitBridgeModule: Module {
       let schedule = Alarm.Schedule.fixed(fireDate)
 
       // v1.6 Phase 5 — iOS 26.1+ 에서 stopButton deprecated. #available 분기.
+      // v1.6 hotfix — confirm_prompt 타입 + secondaryLabel 전달 시 secondary button 결합.
+      // AdvanceNextStepIntent 가 App Group "la_control_signal" 에 advance 작성 → RN polling 처리.
+      let hasSecondary = params.type == "confirm_prompt"
+        && (params.secondaryLabel?.isEmpty == false)
       let alert: AlarmPresentation.Alert
       if #available(iOS 26.1, *) {
-        alert = AlarmPresentation.Alert(
-          title: LocalizedStringResource(stringLiteral: params.title)
-        )
+        if hasSecondary, let secLabel = params.secondaryLabel {
+          let secondaryButton = AlarmButton(
+            text: LocalizedStringResource(stringLiteral: secLabel),
+            textColor: .white,
+            systemImageName: "forward.fill"
+          )
+          alert = AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: params.title),
+            secondaryButton: secondaryButton,
+            secondaryButtonBehavior: .custom
+          )
+        } else {
+          alert = AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: params.title)
+          )
+        }
       } else {
         let stopButton = AlarmButton(
           text: LocalizedStringResource(stringLiteral: params.stopLabel ?? "Stop"),
           textColor: .white,
           systemImageName: "stop.fill"
         )
-        alert = AlarmPresentation.Alert(
-          title: LocalizedStringResource(stringLiteral: params.title),
-          stopButton: stopButton
-        )
+        if hasSecondary, let secLabel = params.secondaryLabel {
+          let secondaryButton = AlarmButton(
+            text: LocalizedStringResource(stringLiteral: secLabel),
+            textColor: .white,
+            systemImageName: "forward.fill"
+          )
+          alert = AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: params.title),
+            stopButton: stopButton,
+            secondaryButton: secondaryButton,
+            secondaryButtonBehavior: .custom
+          )
+        } else {
+          alert = AlarmPresentation.Alert(
+            title: LocalizedStringResource(stringLiteral: params.title),
+            stopButton: stopButton
+          )
+        }
       }
       let presentation = AlarmPresentation(alert: alert)
       let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
@@ -128,6 +159,7 @@ public class AlarmkitBridgeModule: Module {
       }
 
       // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
+      // v1.6 hotfix — confirm_prompt + secondaryLabel 시 secondaryIntent 결합 (AdvanceNextStepIntent).
       let id = UUID()
       let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
       if params.type == "chain" {
@@ -135,6 +167,13 @@ public class AlarmkitBridgeModule: Module {
           schedule: schedule,
           attributes: attributes,
           stopIntent: NextStepIntent(),
+          sound: alertSound
+        )
+      } else if hasSecondary {
+        config = .alarm(
+          schedule: schedule,
+          attributes: attributes,
+          secondaryIntent: AdvanceNextStepIntent(routineId: params.routineId),
           sound: alertSound
         )
       } else {
@@ -222,4 +261,6 @@ struct ScheduleAlarmParams: Record {
   @Field var type: String?              // 'prealert' | 'chain' | 'confirm_prompt'
   @Field var nextStepIndex: Int?
   @Field var endMethod: String?         // 'tap' | 'shake' | 'camera' | 'auto'
+  // v1.6 hotfix — confirm_prompt 잠금 alerting UI 의 보조 버튼 라벨. 미전달 시 stop 버튼만 노출 (회귀 X)
+  @Field var secondaryLabel: String?
 }

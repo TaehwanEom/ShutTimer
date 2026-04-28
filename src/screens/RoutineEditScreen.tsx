@@ -139,9 +139,10 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const styles = makeStyles(colors);
   const editingId = route.params?.routineId ?? null;
   const isEditMode = editingId !== null;
-  // 모드: 신규 → params.mode (default 'scheduled'), 편집 → 기존 routine 의 schedule 유무로 마운트 시 보정
+  // 모드: 신규 → params.mode (default 'manual' — v1.6 hotfix 예약 비활성), 편집 → 기존 routine 의 schedule 유무로 마운트 시 보정
+  // @preserve scheduled-routine — 예약 패러다임 결정 후 default 'scheduled' 복원 검토
   const [mode, setMode] = useState<'scheduled' | 'manual'>(
-    () => route.params?.mode ?? 'scheduled',
+    () => route.params?.mode ?? 'manual',
   );
 
   const [category, setCategory] = useState('');

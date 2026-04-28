@@ -28,6 +28,8 @@ export type ScheduleAlarmParams = {
   nextStepIndex?: number;
   /** confirm_prompt 전용 — endMethod 분기 */
   endMethod?: AlarmKitEndMethod;
+  /** v1.6 hotfix — 잠금화면 alerting UI 의 보조 버튼 라벨. confirm_prompt 타입에 한해 "다음 진행" 버튼 노출 (AdvanceNextStepIntent 결합) */
+  secondaryLabel?: string;
 };
 
 /** v1.6 T1 — alarmUpdates AsyncSequence state 변화를 JS 측에 emit */

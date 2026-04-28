@@ -715,7 +715,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [customCategories, setCustomCategories] = useState<CategoryDef[]>([]);
-  const [activeTab, setActiveTab] = useState<RoutineMode>('scheduled');
+  // v1.6 hotfix — @preserve scheduled-routine. 예약 루틴 임시 비활성. 'manual' 기본 강제.
+  // 향후 알람 패러다임 분리 (예약 = AlarmKit 단발/반복) 결정 후 복원. 'scheduled' 로 되돌리면 됨.
+  const [activeTab, setActiveTab] = useState<RoutineMode>('manual');
   const [createPickerVisible, setCreatePickerVisible] = useState(false);
   const [activeManualRoutineId, setActiveManualRoutineId] = useState<string | null>(null);
   const [collapseSignal, setCollapseSignal] = useState(0);
@@ -913,13 +915,20 @@ export default function RoutineListScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
         <TouchableOpacity
           style={styles.iconBtn}
-          onPress={() => setCreatePickerVisible(true)}
+          onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
         >
           <MaterialIcons name="add" size={28} color={colors.onBackground} />
         </TouchableOpacity>
       </View>
 
-      {/* 생성 타입 선택 모달 — 예약 / 일반 */}
+      {/*
+        ═══════════════════════════════════════════════════════════
+        @preserve scheduled-routine — v1.6 hotfix 임시 비활성.
+        예약 루틴을 알람 패러다임으로 분리할지 결정 전까지 모달/탭 모두 가시화 ❌.
+        기존 데이터 (storage / scheduler prealert) 는 보존 — UI 만 차단.
+        복원 시: 본 주석 블록 해제 + + 버튼 onPress 를 setCreatePickerVisible(true) 로 되돌림.
+        ═══════════════════════════════════════════════════════════
+
       <Modal
         visible={createPickerVisible}
         transparent
@@ -963,7 +972,6 @@ export default function RoutineListScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </Modal>
 
-      {/* 예약/일반 탭 */}
       <View style={styles.tabBar}>
         {(['scheduled', 'manual'] as const).map(tab => {
           const selected = activeTab === tab;
@@ -981,6 +989,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
           );
         })}
       </View>
+      */}
 
       <View ref={scrollContainerRef} style={{ flex: 1 }}>
       <ScrollView

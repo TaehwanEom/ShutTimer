@@ -556,7 +556,10 @@ async function scheduleConfirmPromptViaAlarmKit(
       fireAt: fireAt.getTime(),
       stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       type: 'confirm_prompt',
+      // v1.6 hotfix — 잠금 alerting UI 에 "다음 진행" 버튼 노출 (AdvanceNextStepIntent 결합)
+      secondaryLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
     });
+    console.warn('[routine] confirm_prompt akId:', id);
     if (!id) return null;
     await saveAlarmMetadata({
       alarmId: id,

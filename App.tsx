@@ -407,6 +407,7 @@ function AppNavigator() {
 
       if (meta.type === 'confirm_prompt') {
         // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
+        console.warn('[onAlarmStateChange] confirm_prompt route:', currentRoute, 'routineId:', meta.routineId);
         await setLiveActivityStage('manual_prompt').catch(() => {});
         if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
         const routines = await loadRoutines();

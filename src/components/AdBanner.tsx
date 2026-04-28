@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Logger } from '../utils/logger';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 // import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
@@ -50,12 +51,15 @@ export default function AdBanner() {
           unitId={BANNER_UNIT_ID}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           requestOptions={{ requestNonPersonalizedAdsOnly: npa }}
-          onAdFailedToLoad={(error: any) => console.warn('Banner ad failed:', error?.code, error?.message, error)}
+          onAdFailedToLoad={(error: any) =>
+            Logger.warn('AdMob', `Banner failed: code=${error?.code} domain=${error?.domain} msg=${error?.message}`)
+          }
+          onAdLoaded={() => Logger.info('AdMob', 'Banner loaded')}
         />
       </View>
     );
-  } catch (e) {
-    console.warn('BannerAd failed to load:', e);
+  } catch (e: any) {
+    Logger.warn('AdMob', `BannerAd require failed: ${e?.message || e}`);
     return null;
   }
 }

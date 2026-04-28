@@ -85,7 +85,9 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<v
 
   // 마지막 step 이라도 종료 알림 필요 (RoutineAlarm / 위젯 manual_prompt 유도)
   const fireAt = new Date(ar.stepEndAt);
+  console.warn('[routine] schedBgNotif fireAt:', fireAt.toISOString(), 'stepIdx:', ar.currentStepIndex);
   const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
+  console.warn('[routine] schedBgNotif id:', id);
   currentConfirmPromptId = id;
 }
 
@@ -194,6 +196,7 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
  * 위젯 자동 stage 전환 — App.tsx onAlarmStateChange listener 가 confirm_prompt alerting 시 호출.
  */
 export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Promise<void> {
+  console.warn('[routine] setStage stage:', stage, 'laId:', currentLiveActivityId);
   if (!currentLiveActivityId) return;
   try {
     if (!LiveActivityBridge.areActivitiesEnabled()) return;
@@ -218,7 +221,10 @@ export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Pro
       progress,
       stage,
     });
-  } catch {}
+    console.warn('[routine] LA update OK');
+  } catch (e) {
+    console.warn('[routine] LA update throw:', String(e));
+  }
 }
 
 /**

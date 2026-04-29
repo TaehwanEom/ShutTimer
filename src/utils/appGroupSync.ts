@@ -97,6 +97,18 @@ export type RoutineSnapshot = {
   i18nAdvanceLabel: string;
   /** snapshot 작성 시점 ms (stale 검증) */
   savedAt: number;
+  /**
+   * v1.6 hotfix B2-2 — native 측 다음 step 진행 시 누적되는 완료 step indices.
+   * RN syncRoutineFromSnapshot 시 flush → recordStepSession 호출 (사용자 active 시점 일괄 record).
+   * record timing = 실제 step 진행 시점 ❌ — 사용자 active 시점.
+   * optional = 기존 snapshot Codable 호환 (cf8eaa8 빌드 디코딩).
+   */
+  completedStepIndices?: number[];
+  /**
+   * v1.6 hotfix B2-2 — native 측 마지막 step 종료 시 true.
+   * RN sync 가 flush + fullCleanup + clearSnapshot 처리.
+   */
+  routineEnded?: boolean;
 };
 
 /**

@@ -31,6 +31,7 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import {
   writeRoutineSnapshot,
   clearRoutineSnapshot,
+  readRoutineSnapshot,
   type RoutineSnapshot,
   type RoutineSnapshotStep,
 } from './appGroupSync';
@@ -95,8 +96,10 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<v
 
   // 마지막 step 이라도 종료 알림 필요 (RoutineAlarm / 위젯 manual_prompt 유도)
   const fireAt = new Date(ar.stepEndAt);
-  Logger.warn('routine', `schedBgNotif fireAt=${fireAt.toISOString()} stepIdx=${ar.currentStepIndex}`);
-  const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
+  // v1.6 hotfix B1 — alerting UI title 에 다음 step name 포함 ("다음 루틴 조깅"). 마지막 step 시 undefined.
+  const nextStepName = r.steps[ar.currentStepIndex + 1]?.name;
+  Logger.warn('routine', `schedBgNotif fireAt=${fireAt.toISOString()} stepIdx=${ar.currentStepIndex} next=${nextStepName ?? '(end)'}`);
+  const id = await scheduleRoutineConfirmPrompt(r.id, fireAt, nextStepName);
   Logger.warn('routine', `schedBgNotif id=${id}`);
   currentConfirmPromptId = id;
 
@@ -139,6 +142,8 @@ async function mirrorRoutineSnapshot(r: Routine, ar: ActiveRoutine, alarmId: str
       i18nConfirmPromptStop: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       i18nAdvanceLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
       savedAt: Date.now(),
+      completedStepIndices: [],
+      routineEnded: false,
     };
     writeRoutineSnapshot(snapshot);
   } catch (e) {
@@ -467,7 +472,6 @@ export async function advanceRoutineFromLA(routineId: string): Promise<MissionEn
  * RN 은 ActiveRoutine + currentConfirmPromptId + LiveActivity 만 native 갱신본에 맞춰 동기화.
  */
 export async function syncRoutineFromSnapshot(routineId: string): Promise<MissionEndResult | null> {
-  const { readRoutineSnapshot } = await import('./appGroupSync');
   const snapshot = readRoutineSnapshot();
   const ar = await loadActiveRoutine();
   if (!ar || ar.routineId !== routineId) return null;
@@ -477,8 +481,21 @@ export async function syncRoutineFromSnapshot(routineId: string): Promise<Missio
     return null;
   }
 
-  // snapshot 부재 = native 가 마지막 step 처리 후 cleanup → routine 종료.
-  if (!snapshot || snapshot.routineId !== routineId) {
+  // v1.6 hotfix B2-2 — native 가 누적한 완료 step session record flush.
+  // record timing = 사용자 active 시점 (실제 진행 시점 ❌). 단 history 누락 회피.
+  const completed = snapshot?.completedStepIndices ?? [];
+  if (snapshot && completed.length > 0) {
+    for (const completedIdx of completed) {
+      try {
+        await recordStepSession(routine, completedIdx);
+      } catch (e) {
+        Logger.warn('routine', `recordStepSession flush fail idx=${completedIdx} err=${String(e)}`);
+      }
+    }
+  }
+
+  // snapshot 부재 또는 routineEnded=true (native 마지막 step 처리) → routine 종료.
+  if (!snapshot || snapshot.routineId !== routineId || snapshot.routineEnded === true) {
     await fullCleanup();
     return { kind: 'end', routine };
   }
@@ -493,9 +510,14 @@ export async function syncRoutineFromSnapshot(routineId: string): Promise<Missio
     awaitingConfirm: false,
   };
   await saveActiveRoutine(nextAr);
-  // LA 갱신 — native 측은 ActivityKit 직접 갱신 ❌ (Attribute 정의 동기화 + 권한 복잡).
-  // RN active 시 본 동기화 시점에 LA update 호출.
+  // LA 갱신 — native 가 이미 Activity.update 호출 (B2-1 fix) → RN sync 시 추가 갱신은 멱등.
+  // 단 LA recreate 케이스 (currentLiveActivityId stale) 보장 위해 호출.
   await startOrUpdateLiveActivity(routine, nextAr);
+  // completedStepIndices flush 후 snapshot 갱신 (다음 record 누락 회피)
+  if (completed.length > 0) {
+    const cleared: RoutineSnapshot = { ...snapshot, completedStepIndices: [] };
+    writeRoutineSnapshot(cleared);
+  }
   return { kind: 'advance_auto', ar: nextAr, routine };
 }
 

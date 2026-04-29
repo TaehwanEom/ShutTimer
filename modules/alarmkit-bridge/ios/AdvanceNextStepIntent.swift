@@ -50,6 +50,9 @@ private struct RoutineSnapshot: Codable {
     let i18nConfirmPromptStop: String
     let i18nAdvanceLabel: String
     var savedAt: Double
+    // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
+    var completedStepIndices: [Int]?
+    var routineEnded: Bool?
 }
 
 // MARK: - App Group helpers
@@ -112,6 +115,16 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
     let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
     let schedule = Alarm.Schedule.fixed(nextFireDate)
 
+    // v1.6 hotfix B1 — alerting UI title 에 다음 step name 추가 ("다음 루틴 조깅" 형식).
+    // 본 alarm 종료 시 alerting → 다음 진행 step = nextStepIdx+1. 마지막 시 nil.
+    let titleSuffix: String
+    if nextStepIdx + 1 < snapshot.totalSteps {
+        titleSuffix = " " + snapshot.steps[nextStepIdx + 1].name
+    } else {
+        titleSuffix = ""
+    }
+    let alertTitle = snapshot.i18nConfirmPromptTitle + titleSuffix
+
     // confirm_prompt + secondaryButton ("다음 진행") 결합 — 기존 AlarmkitBridgeModule.swift 정합.
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {
@@ -121,7 +134,7 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
             systemImageName: "forward.fill"
         )
         alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptTitle),
+            title: LocalizedStringResource(stringLiteral: alertTitle),
             secondaryButton: secondaryButton,
             secondaryButtonBehavior: .custom
         )
@@ -137,7 +150,7 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
             systemImageName: "forward.fill"
         )
         alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptTitle),
+            title: LocalizedStringResource(stringLiteral: alertTitle),
             stopButton: stopButton,
             secondaryButton: secondaryButton,
             secondaryButtonBehavior: .custom
@@ -197,11 +210,17 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             try? AlarmManager.shared.stop(id: currentUuid)
         }
 
+        let completedIdx = snapshot.currentStepIndex
         let nextIdx = snapshot.currentStepIndex + 1
 
-        // 3. 마지막 step → cleanup + 종료
+        // 3. 마지막 step → routineEnded=true + completed push + snapshot 보존 (RN sync 가 cleanup)
         if nextIdx >= snapshot.totalSteps {
-            clearSnapshot()
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
+            snapshot.routineEnded = true
+            snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
+            writeSnapshot(snapshot)
             writeAdvanceDoneSignal(routineId: routineId)
             return .result()
         }
@@ -209,7 +228,10 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
         // 4. 다음 step alarm 등록
         do {
             let newId = try await scheduleNextStepAlarm(snapshot: snapshot, nextStepIdx: nextIdx)
-            // 5. snapshot 갱신
+            // 5. snapshot 갱신 — completedStepIndices 에 이전 step 누적 (RN flush 대상)
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
             snapshot.stepEndAt = Date().timeIntervalSince1970 * 1000.0

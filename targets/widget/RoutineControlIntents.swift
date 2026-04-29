@@ -80,6 +80,9 @@ private struct WidgetRoutineSnapshot: Codable {
     let i18nConfirmPromptStop: String
     let i18nAdvanceLabel: String
     var savedAt: Double
+    // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
+    var completedStepIndices: [Int]?
+    var routineEnded: Bool?
 }
 
 private func readRoutineSnapshot() -> WidgetRoutineSnapshot? {
@@ -211,6 +214,15 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
     let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
     let schedule = Alarm.Schedule.fixed(nextFireDate)
 
+    // v1.6 hotfix B1 — alerting UI title 에 다음 step name 추가
+    let titleSuffix: String
+    if nextStepIdx + 1 < snapshot.totalSteps {
+        titleSuffix = " " + snapshot.steps[nextStepIdx + 1].name
+    } else {
+        titleSuffix = ""
+    }
+    let alertTitle = snapshot.i18nConfirmPromptTitle + titleSuffix
+
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {
         let secondaryButton = AlarmButton(
@@ -219,7 +231,7 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
             systemImageName: "forward.fill"
         )
         alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptTitle),
+            title: LocalizedStringResource(stringLiteral: alertTitle),
             secondaryButton: secondaryButton,
             secondaryButtonBehavior: .custom
         )
@@ -235,7 +247,7 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
             systemImageName: "forward.fill"
         )
         alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptTitle),
+            title: LocalizedStringResource(stringLiteral: alertTitle),
             stopButton: stopButton,
             secondaryButton: secondaryButton,
             secondaryButtonBehavior: .custom
@@ -294,11 +306,23 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             try? AlarmManager.shared.stop(id: currentUuid)
         }
 
+        let completedIdx = snapshot.currentStepIndex
         let nextIdx = snapshot.currentStepIndex + 1
 
-        // 2. 마지막 step → cleanup + 종료 signal
+        // 2. 마지막 step → routineEnded + completed push + snapshot 보존 (RN sync 가 cleanup)
         if nextIdx >= snapshot.totalSteps {
-            clearRoutineSnapshot()
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
+            snapshot.routineEnded = true
+            snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
+            writeRoutineSnapshot(snapshot)
+            // v1.6 hotfix B2-1 — LA 종료 (잠금/백그라운드 즉시 사라짐)
+            for activity in Activity<ShutTimerActivityAttributes>.activities {
+                if activity.attributes.routineId == routineId {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+            }
             writeControlSignal(action: "advance_done", routineId: routineId)
             return .result()
         }
@@ -306,12 +330,33 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
         // 3. 다음 step alarm 등록
         do {
             let newId = try await scheduleNextStepAlarm(snapshot: snapshot, nextStepIdx: nextIdx)
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
             snapshot.stepEndAt = Date().timeIntervalSince1970 * 1000.0
                 + snapshot.steps[nextIdx].durationSec * 1000.0
             snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
             writeRoutineSnapshot(snapshot)
+
+            // v1.6 hotfix B2-1 — LA 즉시 갱신 (잠금/백그라운드 즉시 stepEndAt + stepName 변경).
+            // widget target 정의의 ShutTimerActivityAttributes 와 동일 type → 검색 OK.
+            let nextStepName = snapshot.steps[nextIdx].name
+            for activity in Activity<ShutTimerActivityAttributes>.activities {
+                if activity.attributes.routineId == routineId {
+                    var newState = activity.content.state
+                    newState.currentStepName = nextStepName
+                    newState.stepEndAt = snapshot.stepEndAt
+                    newState.progress = 0
+                    newState.paused = false
+                    newState.stage = "step"
+                    newState.currentStepIndex = nextIdx
+                    newState.totalSteps = snapshot.totalSteps
+                    await activity.update(.init(state: newState, staleDate: nil))
+                }
+            }
+
             writeControlSignal(action: "advance_done", routineId: routineId)
         } catch {
             // schedule 실패 — RN polling fallback

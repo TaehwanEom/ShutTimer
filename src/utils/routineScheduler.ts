@@ -532,33 +532,41 @@ export async function cancelRoutineChain(notifId: string): Promise<void> {
  */
 export async function scheduleRoutineConfirmPrompt(
   routineId: string,
-  fireAt: Date
+  fireAt: Date,
+  // v1.6 hotfix B1 — alerting UI title 에 다음 step name 포함 ("다음 루틴 조깅" 형식).
+  // 마지막 step 종료 시점 = nextStepName undefined → 기본 "다음 루틴" 만 표시.
+  nextStepName?: string
 ): Promise<string | null> {
   if (fireAt.getTime() <= Date.now()) return null;
   const useAlarmKit = await shouldUseAlarmKit();
   if (useAlarmKit) {
     // v1.6 Phase 12 — AlarmKit 등록 실패 시 expo-notifications 폴백 (silent fail 방지).
-    const akId = await scheduleConfirmPromptViaAlarmKit(routineId, fireAt);
+    const akId = await scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName);
     if (akId) return akId;
     Logger.warn('routine', 'AlarmKit confirm_prompt 등록 실패 → expo-notifications 폴백');
-    return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt);
+    return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt, nextStepName);
   }
-  return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt);
+  return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt, nextStepName);
 }
 
 /** AlarmKit 경로 — iOS 26+. */
 async function scheduleConfirmPromptViaAlarmKit(
   routineId: string,
-  fireAt: Date
+  fireAt: Date,
+  nextStepName?: string
 ): Promise<string | null> {
   try {
     // v1.6 hotfix — confirm_prompt 사운드 통일. 사용자 설정 사운드 (단일 timer 와 동일 정책).
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
 
+    // v1.6 hotfix B1 — title 동적 생성 ("다음 루틴 {nextStepName}" / 마지막 step 시 "다음 루틴")
+    const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
+    const title = nextStepName ? `${baseTitle} ${nextStepName}` : baseTitle;
+
     const id = await AlarmkitBridge.scheduleAlarm({
       routineId,
-      title: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
+      title,
       fireAt: fireAt.getTime(),
       stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       type: 'confirm_prompt',
@@ -583,7 +591,8 @@ async function scheduleConfirmPromptViaAlarmKit(
 /** expo-notifications 경로 — iOS 25 이하 / Android. */
 async function scheduleConfirmPromptViaExpoNotifications(
   routineId: string,
-  fireAt: Date
+  fireAt: Date,
+  nextStepName?: string
 ): Promise<string | null> {
   try {
     const data = {
@@ -592,9 +601,11 @@ async function scheduleConfirmPromptViaExpoNotifications(
       scheduledFor: fireAt.getTime(),
     };
     const sound = await resolveSound();
+    const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
+    const title = nextStepName ? `${baseTitle} ${nextStepName}` : baseTitle;
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
+        title,
         body: i18n.t('routine.confirmPromptBody', { defaultValue: '다음 루틴을 시작하려면 앱을 여세요' }),
         data: { ...data },
         sound,

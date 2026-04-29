@@ -14,6 +14,10 @@ export type LiveActivityStartParams = {
   progress: number;
   /** v1.6 Phase 12 — LA stage. 'step' (default) | 'manual_prompt' (수동 모드 alerting 후 다음 진행 대기) */
   stage?: string;
+  /** v1.6 hotfix — 0-based 현재 step index. 위젯 "stepName(N/M)" 표시용 */
+  currentStepIndex?: number;
+  /** v1.6 hotfix — 총 step 수 */
+  totalSteps?: number;
 };
 
 export type LiveActivityUpdateParams = {
@@ -23,6 +27,9 @@ export type LiveActivityUpdateParams = {
   progress: number;
   /** v1.6 Phase 12 — LA stage. 'step' | 'manual_prompt' */
   stage?: string;
+  /** v1.6 hotfix — 위젯 "stepName(N/M)" 표시용 */
+  currentStepIndex?: number;
+  totalSteps?: number;
 };
 
 export type LiveActivityDismissalPolicy = 'immediate' | 'default';

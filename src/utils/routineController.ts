@@ -25,6 +25,15 @@ import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from './alarmkitMappingTable';
 import { Logger } from './logger';
+import i18n from '../i18n';
+import { SETTINGS_KEY } from '../constants/settings';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import {
+  writeRoutineSnapshot,
+  clearRoutineSnapshot,
+  type RoutineSnapshot,
+  type RoutineSnapshotStep,
+} from './appGroupSync';
 
 const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
 const ACTIVE_TIMER_KEY = 'activeTimer';
@@ -90,6 +99,51 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<v
   const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
   Logger.warn('routine', `schedBgNotif id=${id}`);
   currentConfirmPromptId = id;
+
+  // v1.6 hotfix — App Group routine_snapshot mirror.
+  // 잠금/백그라운드에서 AdvanceNextStepIntent.perform() 이 native 측 직접
+  // AlarmManager.shared.stop(currentAlarmId) + 다음 step alarm schedule 하기 위함.
+  // RN setInterval 백그라운드 정지 우회 — perform() 안에서 snapshot 읽고 처리.
+  if (id) {
+    await mirrorRoutineSnapshot(r, ar, id);
+  }
+}
+
+/**
+ * v1.6 hotfix — routine_snapshot 작성. scheduleBackgroundNotif 내부 호출.
+ * native 측 AdvanceNextStepIntent.perform() 가 읽어서 다음 step alarm 직접 등록.
+ */
+async function mirrorRoutineSnapshot(r: Routine, ar: ActiveRoutine, alarmId: string): Promise<void> {
+  try {
+    const soundId = (await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND)) ?? DEFAULT_SOUND_ID;
+    const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+    const pushSound = soundItem?.pushSound ?? '';
+
+    const steps: RoutineSnapshotStep[] = r.steps.map(s => ({
+      name: s.name,
+      durationSec: Math.max(0, s.durationSeconds),
+      // v1.6 — 모든 step 이 동일 사용자 설정 사운드 (사운드 통일 정책 정합)
+      soundName: pushSound,
+    }));
+
+    const snapshot: RoutineSnapshot = {
+      routineId: r.id,
+      // routine.name 은 optional — fallback = category (LA start/update 와 동일 정책)
+      routineName: r.name ?? r.category,
+      currentStepIndex: ar.currentStepIndex,
+      totalSteps: r.steps.length,
+      steps,
+      currentAlarmId: alarmId,
+      stepEndAt: ar.stepEndAt,
+      i18nConfirmPromptTitle: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
+      i18nConfirmPromptStop: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
+      i18nAdvanceLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
+      savedAt: Date.now(),
+    };
+    writeRoutineSnapshot(snapshot);
+  } catch (e) {
+    Logger.warn('routine', `snapshot mirror fail: ${String(e)}`);
+  }
 }
 
 async function cancelBackgroundNotif(): Promise<void> {
@@ -119,6 +173,9 @@ async function cancelBackgroundNotif(): Promise<void> {
       }
     }
   } catch {}
+  // v1.6 hotfix — App Group routine_snapshot cleanup. native 측 perform() 에서
+  // stale snapshot 으로 잘못된 alarm 등록 회피.
+  clearRoutineSnapshot();
 }
 
 async function findRoutine(routineId: string): Promise<Routine | null> {
@@ -170,6 +227,8 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
         stepName: step.name,
         stepEndAt: ar.stepEndAt,
         progress,
+        currentStepIndex: ar.currentStepIndex,
+        totalSteps: routine.steps.length,
       });
       return;
     } catch {
@@ -185,6 +244,8 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
       stepName: step.name,
       stepEndAt: ar.stepEndAt,
       progress,
+      currentStepIndex: ar.currentStepIndex,
+      totalSteps: routine.steps.length,
     });
     currentLiveActivityId = id || null;
   } catch {
@@ -226,6 +287,8 @@ export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Pro
         stepEndAt: ar.stepEndAt,
         progress,
         stage,
+        currentStepIndex: ar.currentStepIndex,
+        totalSteps: routine.steps.length,
       });
       currentLiveActivityId = id || null;
       Logger.warn('routine', `LA recreate stage=${stage} id=${currentLiveActivityId}`);
@@ -242,6 +305,8 @@ export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Pro
       stepEndAt: ar.stepEndAt,
       progress,
       stage,
+      currentStepIndex: ar.currentStepIndex,
+      totalSteps: routine.steps.length,
     });
     Logger.warn('routine', 'LA update OK');
   } catch (e) {
@@ -394,6 +459,44 @@ export async function advanceRoutineFromLA(routineId: string): Promise<MissionEn
   const ar = await loadActiveRoutine();
   if (!ar || ar.routineId !== routineId) return null;
   return await confirmAndAdvance();
+}
+
+/**
+ * v1.6 hotfix — AdvanceNextStepIntent.perform() native 처리 완료 후 RN 후속 동기화.
+ * native 가 이미 (a) 현재 alarm stop (b) 다음 step alarm schedule (c) snapshot 갱신 완료한 상태.
+ * RN 은 ActiveRoutine + currentConfirmPromptId + LiveActivity 만 native 갱신본에 맞춰 동기화.
+ */
+export async function syncRoutineFromSnapshot(routineId: string): Promise<MissionEndResult | null> {
+  const { readRoutineSnapshot } = await import('./appGroupSync');
+  const snapshot = readRoutineSnapshot();
+  const ar = await loadActiveRoutine();
+  if (!ar || ar.routineId !== routineId) return null;
+  const routine = await findRoutine(ar.routineId);
+  if (!routine) {
+    await fullCleanup();
+    return null;
+  }
+
+  // snapshot 부재 = native 가 마지막 step 처리 후 cleanup → routine 종료.
+  if (!snapshot || snapshot.routineId !== routineId) {
+    await fullCleanup();
+    return { kind: 'end', routine };
+  }
+
+  // native 갱신본 기준 ar 동기화. currentConfirmPromptId 갱신 (RN 측 다음 cancel 시 매칭).
+  currentConfirmPromptId = snapshot.currentAlarmId;
+  const nextAr: ActiveRoutine = {
+    ...ar,
+    currentStepIndex: snapshot.currentStepIndex,
+    stepEndAt: snapshot.stepEndAt,
+    pausedAt: null,
+    awaitingConfirm: false,
+  };
+  await saveActiveRoutine(nextAr);
+  // LA 갱신 — native 측은 ActivityKit 직접 갱신 ❌ (Attribute 정의 동기화 + 권한 복잡).
+  // RN active 시 본 동기화 시점에 LA update 호출.
+  await startOrUpdateLiveActivity(routine, nextAr);
+  return { kind: 'advance_auto', ar: nextAr, routine };
 }
 
 /**

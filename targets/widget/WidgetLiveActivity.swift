@@ -24,6 +24,10 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var paused: Bool = false
         /** v1.6 Phase 12 — LA stage ('step' / 'auto_countdown' / 'manual_prompt'). default = 기존 호환 */
         var stage: String = "step"
+        /** v1.6 hotfix — 0-based 현재 step index. default = 기존 LA 디코딩 호환 */
+        var currentStepIndex: Int = 0
+        /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
+        var totalSteps: Int = 1
     }
 
     /** 루틴/타이머 이름 (불변) */
@@ -40,10 +44,17 @@ struct LockScreenView: View {
         HStack(spacing: 12) {
             // 좌측: 라벨 + 카운트다운 / 'manual_prompt' 시 = "다음 진행 대기"
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(context.attributes.routineName)
-                    .font(.subheadline)
-                    .foregroundColor(.brand)
-                    .lineLimit(1)
+                // v1.6 hotfix — totalSteps>1 시 "routineName · stepName(N/M)" 표시 (사용자 step 진행 가시화)
+                Group {
+                    if context.state.totalSteps > 1 && !context.state.currentStepName.isEmpty {
+                        Text("\(context.attributes.routineName) · \(context.state.currentStepName)(\(context.state.currentStepIndex + 1)/\(context.state.totalSteps))")
+                    } else {
+                        Text(context.attributes.routineName)
+                    }
+                }
+                .font(.subheadline)
+                .foregroundColor(.brand)
+                .lineLimit(1)
                 if context.state.stage == "manual_prompt" {
                     // v1.6 Phase 12 — 수동 모드 alerting 후 stage. "다음 진행 대기" 텍스트.
                     Text("다음 진행")
@@ -268,9 +279,16 @@ struct WidgetLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if !context.state.currentStepName.isEmpty {
-                        Text(context.state.currentStepName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // v1.6 hotfix — totalSteps>1 시 "stepName (N/M)" 표시
+                        if context.state.totalSteps > 1 {
+                            Text("\(context.state.currentStepName) (\(context.state.currentStepIndex + 1)/\(context.state.totalSteps))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text(context.state.currentStepName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             } compactLeading: {

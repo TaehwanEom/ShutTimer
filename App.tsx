@@ -81,7 +81,7 @@ import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
 import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage } from './src/utils/routineController';
+import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
@@ -509,7 +509,11 @@ function AppNavigator() {
             // (onClose 콜백은 JS 내부 stop 에서만 호출 → 외부 stop 경로 별도 emit 필요)
             DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
           }
+          // v1.6 hotfix — AdvanceNextStepIntent.perform() native 처리 완료 신호.
+          // native 가 alarm stop + 다음 step schedule + snapshot 갱신 완료 → RN 은 ar/LA 동기화만.
+          else if (signal.action === 'advance_done') await syncRoutineFromSnapshot(signal.routineId);
           // v1.6 Phase 12 — 위젯 "다음 진행" Button (AdvanceNextStepIntent) perform 후 routine advance
+          // (native 처리 fallback 또는 iOS<26 경로).
           else if (signal.action === 'advance') await advanceRoutineFromLA(signal.routineId);
         }
       } catch (e) {

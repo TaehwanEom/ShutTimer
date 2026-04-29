@@ -34,7 +34,9 @@ public class LiveActivityBridgeModule: Module {
           stepEndAt: params.stepEndAt,
           progress: params.progress,
           paused: false,
-          stage: params.stage ?? "step"
+          stage: params.stage ?? "step",
+          currentStepIndex: params.currentStepIndex ?? 0,
+          totalSteps: params.totalSteps ?? 1
         )
         let activity = try Activity<ShutTimerActivityAttributes>.request(
           attributes: attributes,
@@ -59,7 +61,9 @@ public class LiveActivityBridgeModule: Module {
         stepEndAt: params.stepEndAt,
         progress: params.progress,
         paused: false,
-        stage: params.stage ?? "step"
+        stage: params.stage ?? "step",
+        currentStepIndex: params.currentStepIndex ?? 0,
+        totalSteps: params.totalSteps ?? 1
       )
       await activity.update(.init(state: contentState, staleDate: nil))
     }
@@ -90,6 +94,10 @@ struct StartParams: Record {
   @Field var progress: Double
   /** v1.6 Phase 12 — LA stage. 'step' (default) | 'manual_prompt' */
   @Field var stage: String?
+  /** v1.6 hotfix — 0-based 현재 step index */
+  @Field var currentStepIndex: Int?
+  /** v1.6 hotfix — 총 step 수 */
+  @Field var totalSteps: Int?
 }
 
 struct UpdateParams: Record {
@@ -98,6 +106,8 @@ struct UpdateParams: Record {
   @Field var stepEndAt: Double
   @Field var progress: Double
   @Field var stage: String?
+  @Field var currentStepIndex: Int?
+  @Field var totalSteps: Int?
 }
 
 struct EndParams: Record {

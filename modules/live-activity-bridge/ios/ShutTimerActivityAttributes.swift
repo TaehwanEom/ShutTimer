@@ -19,6 +19,10 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var paused: Bool = false
         /** v1.6 Phase 12 — LA stage. 'step' (현 step 카운트다운) / 'auto_countdown' (대기) / 'manual_prompt' (수동 다음 진행 Button). default = 기존 호환 */
         var stage: String = "step"
+        /** v1.6 hotfix — 0-based 현재 step index. default = 기존 LA 디코딩 호환 */
+        var currentStepIndex: Int = 0
+        /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
+        var totalSteps: Int = 1
     }
 
     /** 루틴 이름 (불변) */

@@ -7,7 +7,8 @@
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 
 // v1.6 hotfix — 'open_app_dismiss' 추가. timer_main slide-to-stop 시 OpenAppDismissIntent 작성.
-export type LAControlAction = 'pause' | 'resume' | 'stop' | 'advance' | 'open_app_dismiss';
+// v1.6 hotfix — 'advance_done' 추가. AdvanceNextStepIntent.perform() native 처리 후 RN 후속 동기화 신호.
+export type LAControlAction = 'pause' | 'resume' | 'stop' | 'advance' | 'open_app_dismiss' | 'advance_done';
 
 export type LAControlSignal = {
   action: LAControlAction;
@@ -17,6 +18,7 @@ export type LAControlSignal = {
 
 const KEY_SIGNAL = 'la_control_signal';
 const KEY_ALARM_IDS_PREFIX = 'chain_alarms_';
+const KEY_ROUTINE_SNAPSHOT = 'routine_snapshot';
 
 /** LA Intent perform() → RN polling. App Group 의 control signal 1회 read. */
 export function readControlSignal(): LAControlSignal | null {
@@ -59,4 +61,72 @@ export function clearChainAlarms(routineId: string): void {
   try {
     AlarmkitBridge.removeAppGroupKey(`${KEY_ALARM_IDS_PREFIX}${routineId}`);
   } catch {}
+}
+
+// v1.6 hotfix — routine snapshot. 잠금/백그라운드에서 AdvanceNextStepIntent.perform()
+// 이 native 측 직접 다음 step alarm schedule 하기 위한 routine 데이터 mirror.
+// RN setInterval 백그라운드 정지 우회 — perform() 안에서 routine_snapshot 읽고
+// AlarmManager.shared.stop(현재 alarm) + AlarmManager.shared.schedule(다음 step) 직접 호출.
+
+export type RoutineSnapshotStep = {
+  /** step 이름 (UI 표시용) */
+  name: string;
+  /** step duration 초 */
+  durationSec: number;
+  /** AlarmKit AlertSound 이름 (사용자 설정 사운드 push file 명) */
+  soundName: string;
+};
+
+export type RoutineSnapshot = {
+  routineId: string;
+  /** 루틴 이름 (LA Attribute routineName 과 동일) */
+  routineName: string;
+  /** 0-based 현재 step index */
+  currentStepIndex: number;
+  /** 총 step 수 */
+  totalSteps: number;
+  /** 모든 step 정보 (다음 step alarm 등록 시 필요) */
+  steps: RoutineSnapshotStep[];
+  /** 현재 fire 된 confirm_prompt alarm 의 ID — perform() 시 stop(id:) 호출 대상 */
+  currentAlarmId: string;
+  /** 현재 step 종료 timestamp ms (LA / 검증용) */
+  stepEndAt: number;
+  /** i18n mirror — native i18n 직접 접근 ❌. RN 가 미리 번역해 mirror */
+  i18nConfirmPromptTitle: string;
+  i18nConfirmPromptStop: string;
+  i18nAdvanceLabel: string;
+  /** snapshot 작성 시점 ms (stale 검증) */
+  savedAt: number;
+};
+
+/**
+ * 다음 step 진행을 native 가 할 수 있게 routine 데이터 mirror.
+ * scheduleBackgroundNotif 호출 직후 호출 — currentAlarmId 와 ar.stepEndAt 동기화 필수.
+ */
+export function writeRoutineSnapshot(snapshot: RoutineSnapshot): void {
+  try {
+    AlarmkitBridge.writeAppGroupString(KEY_ROUTINE_SNAPSHOT, JSON.stringify(snapshot));
+  } catch {}
+}
+
+/** routine 종료 시 cleanup. */
+export function clearRoutineSnapshot(): void {
+  try {
+    AlarmkitBridge.removeAppGroupKey(KEY_ROUTINE_SNAPSHOT);
+  } catch {}
+}
+
+/** RN 측 polling 에서 'advance_done' 처리 시 native 갱신본 read. */
+export function readRoutineSnapshot(): RoutineSnapshot | null {
+  try {
+    const raw = AlarmkitBridge.readAppGroupString(KEY_ROUTINE_SNAPSHOT);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.routineId !== 'string' || typeof parsed?.currentStepIndex !== 'number') {
+      return null;
+    }
+    return parsed as RoutineSnapshot;
+  } catch {
+    return null;
+  }
 }

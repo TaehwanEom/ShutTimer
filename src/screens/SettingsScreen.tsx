@@ -9,6 +9,7 @@ import {
   ScrollView,
   Modal,
   Alert,
+  Share,
 } from 'react-native';
 import { Logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -605,21 +606,35 @@ export default function SettingsScreen({ navigation }: Props) {
             style={styles.toggleRow}
             onPress={async () => {
               const logs = await Logger.getLogs();
-              const recent = logs.slice(0, 50);
-              const text = recent.length === 0
+              const text = logs.length === 0
                 ? '로그 없음'
-                : recent.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
-              Alert.alert('최근 로그 (50개)', text, [
-                { text: '복사용 표시', onPress: () => Alert.alert('전체', text) },
-                { text: '클리어', onPress: () => Logger.clearLogs() },
-                { text: '닫기' },
-              ]);
+                : logs.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
+              try {
+                // Share API → iOS 공유 시트 (메일/메시지/메모/복사 등 선택 가능)
+                await Share.share({ message: text, title: 'ShutTimer 디버그 로그' });
+              } catch (e) {
+                Alert.alert('공유 실패', String(e));
+              }
             }}
             activeOpacity={0.7}
           >
             <View style={styles.toggleLeft}>
               <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>최근 로그 보기</Text>
+              <Text style={styles.toggleLabel}>최근 로그 공유 (복사 가능)</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              await Logger.clearLogs();
+              Alert.alert('완료', '로그 클리어됨');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="delete-sweep" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>로그 클리어</Text>
             </View>
             <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
           </TouchableOpacity>

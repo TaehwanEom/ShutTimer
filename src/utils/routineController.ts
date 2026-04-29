@@ -24,6 +24,7 @@ import {
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from './alarmkitMappingTable';
+import { Logger } from './logger';
 
 const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
 const ACTIVE_TIMER_KEY = 'activeTimer';
@@ -85,9 +86,9 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<v
 
   // 마지막 step 이라도 종료 알림 필요 (RoutineAlarm / 위젯 manual_prompt 유도)
   const fireAt = new Date(ar.stepEndAt);
-  console.warn('[routine] schedBgNotif fireAt:', fireAt.toISOString(), 'stepIdx:', ar.currentStepIndex);
+  Logger.warn('routine', `schedBgNotif fireAt=${fireAt.toISOString()} stepIdx=${ar.currentStepIndex}`);
   const id = await scheduleRoutineConfirmPrompt(r.id, fireAt);
-  console.warn('[routine] schedBgNotif id:', id);
+  Logger.warn('routine', `schedBgNotif id=${id}`);
   currentConfirmPromptId = id;
 }
 
@@ -196,8 +197,7 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
  * 위젯 자동 stage 전환 — App.tsx onAlarmStateChange listener 가 confirm_prompt alerting 시 호출.
  */
 export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Promise<void> {
-  console.warn('[routine] setStage stage:', stage, 'laId:', currentLiveActivityId);
-  if (!currentLiveActivityId) return;
+  Logger.warn('routine', `setStage stage=${stage} laId=${currentLiveActivityId}`);
   try {
     if (!LiveActivityBridge.areActivitiesEnabled()) return;
   } catch {
@@ -213,6 +213,28 @@ export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Pro
   const remaining = Math.max(0, ar.stepEndAt - Date.now());
   const elapsed = Math.max(0, stepDurationMs - remaining);
   const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
+
+  // v1.6 hotfix — currentLiveActivityId stale 시 endAll → start 재생성 (가설 C 직접 fix).
+  // 잠금 진입 / cold-start 등으로 module-level ref 가 사라진 경우에도 LA stage 전환 보장.
+  if (!currentLiveActivityId) {
+    try {
+      await LiveActivityBridge.endAll().catch(() => {});
+      const id = await LiveActivityBridge.start({
+        routineId: ar.routineId,
+        routineName: routine.name ?? routine.category,
+        stepName: step.name,
+        stepEndAt: ar.stepEndAt,
+        progress,
+        stage,
+      });
+      currentLiveActivityId = id || null;
+      Logger.warn('routine', `LA recreate stage=${stage} id=${currentLiveActivityId}`);
+    } catch (e) {
+      Logger.warn('routine', `LA recreate throw=${String(e)}`);
+    }
+    return;
+  }
+
   try {
     await LiveActivityBridge.update({
       activityId: currentLiveActivityId,
@@ -221,9 +243,9 @@ export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Pro
       progress,
       stage,
     });
-    console.warn('[routine] LA update OK');
+    Logger.warn('routine', 'LA update OK');
   } catch (e) {
-    console.warn('[routine] LA update throw:', String(e));
+    Logger.warn('routine', `LA update throw=${String(e)}`);
   }
 }
 

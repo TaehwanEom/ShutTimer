@@ -23,6 +23,8 @@ import {
   deleteAlarmMetadata,
   listAllAlarmMetadata,
 } from './alarmkitMappingTable';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import { Logger } from './logger';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
 
@@ -538,7 +540,7 @@ export async function scheduleRoutineConfirmPrompt(
     // v1.6 Phase 12 — AlarmKit 등록 실패 시 expo-notifications 폴백 (silent fail 방지).
     const akId = await scheduleConfirmPromptViaAlarmKit(routineId, fireAt);
     if (akId) return akId;
-    console.warn('[routine] AlarmKit confirm_prompt 등록 실패 → expo-notifications 폴백');
+    Logger.warn('routine', 'AlarmKit confirm_prompt 등록 실패 → expo-notifications 폴백');
     return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt);
   }
   return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt);
@@ -550,6 +552,10 @@ async function scheduleConfirmPromptViaAlarmKit(
   fireAt: Date
 ): Promise<string | null> {
   try {
+    // v1.6 hotfix — confirm_prompt 사운드 통일. 사용자 설정 사운드 (단일 timer 와 동일 정책).
+    const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
+    const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+
     const id = await AlarmkitBridge.scheduleAlarm({
       routineId,
       title: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
@@ -558,8 +564,9 @@ async function scheduleConfirmPromptViaAlarmKit(
       type: 'confirm_prompt',
       // v1.6 hotfix — 잠금 alerting UI 에 "다음 진행" 버튼 노출 (AdvanceNextStepIntent 결합)
       secondaryLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
+      soundName: soundItem.pushSound,
     });
-    console.warn('[routine] confirm_prompt akId:', id);
+    Logger.warn('routine', `confirm_prompt akId=${id}`);
     if (!id) return null;
     await saveAlarmMetadata({
       alarmId: id,
@@ -568,7 +575,7 @@ async function scheduleConfirmPromptViaAlarmKit(
     });
     return id;
   } catch (e) {
-    console.warn('[routine] scheduleConfirmPromptViaAlarmKit error:', e);
+    Logger.warn('routine', `scheduleConfirmPromptViaAlarmKit error=${String(e)}`);
     return null;
   }
 }

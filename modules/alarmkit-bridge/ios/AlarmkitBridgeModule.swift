@@ -179,9 +179,12 @@ public class AlarmkitBridgeModule: Module {
           sound: alertSound
         )
       } else if hasSecondary {
+        // v1.6 hotfix — confirm_prompt 에 stopIntent 도 결합. iOS alerting UI 1초 자동 dismiss 회피 가설.
+        // slide-to-stop 시 secondaryIntent 와 동일하게 advance 처리 (사용자 의도 정합).
         config = .alarm(
           schedule: schedule,
           attributes: attributes,
+          stopIntent: AdvanceNextStepIntent(routineId: params.routineId),
           secondaryIntent: AdvanceNextStepIntent(routineId: params.routineId),
           sound: alertSound
         )

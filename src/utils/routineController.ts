@@ -113,6 +113,15 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<v
 }
 
 /**
+ * v1.6 hotfix — autoCountdownSec 0~60 clamp. default 5.
+ * routine.autoCountdownSec 미지정 시 default. 범위 외 시 clamp.
+ */
+export function clampCountdown(sec: number | undefined): number {
+  const v = typeof sec === 'number' ? sec : 5;
+  return Math.max(0, Math.min(60, Math.floor(v)));
+}
+
+/**
  * v1.6 hotfix — routine_snapshot 작성. scheduleBackgroundNotif 내부 호출.
  * native 측 AdvanceNextStepIntent.perform() 가 읽어서 다음 step alarm 직접 등록.
  */
@@ -142,6 +151,7 @@ async function mirrorRoutineSnapshot(r: Routine, ar: ActiveRoutine, alarmId: str
       i18nConfirmPromptStop: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       i18nAdvanceLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
       savedAt: Date.now(),
+      autoCountdownSec: clampCountdown(r.autoCountdownSec),
       completedStepIndices: [],
       routineEnded: false,
     };

@@ -50,6 +50,9 @@ private struct RoutineSnapshot: Codable {
     let i18nConfirmPromptStop: String
     let i18nAdvanceLabel: String
     var savedAt: Double
+    // v1.6 hotfix — "다음 루틴 진행" 후 다음 step 시작 전 대기 시간 (초). 0~60 clamp.
+    // optional = 이전 snapshot 디코딩 호환. nil 시 default 5 사용.
+    var autoCountdownSec: Double?
     // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
     var completedStepIndices: [Int]?
     var routineEnded: Bool?
@@ -111,7 +114,9 @@ private func writeAdvanceFallbackSignal(routineId: String) {
 private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) async throws -> UUID {
     let nextStep = snapshot.steps[nextStepIdx]
     let durationMs = nextStep.durationSec * 1000.0
-    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + durationMs
+    // v1.6 hotfix — 다음 step 시작 전 대기 시간 (autoCountdownSec). default 5초. 0~60 clamp.
+    let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + countdownSec * 1000.0 + durationMs
     let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
     let schedule = Alarm.Schedule.fixed(nextFireDate)
 
@@ -234,9 +239,11 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
-            snapshot.stepEndAt = Date().timeIntervalSince1970 * 1000.0
-                + snapshot.steps[nextIdx].durationSec * 1000.0
-            snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
+            // v1.6 hotfix — autoCountdownSec 반영. 다음 step 종료 시점 = countdown + duration 후.
+            let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+            let nowMs = Date().timeIntervalSince1970 * 1000.0
+            snapshot.stepEndAt = nowMs + countdownSec * 1000.0 + snapshot.steps[nextIdx].durationSec * 1000.0
+            snapshot.savedAt = nowMs
             writeSnapshot(snapshot)
             // 6. RN polling 측 'advance_done' 신호 (active 시 ar/LA 동기화)
             writeAdvanceDoneSignal(routineId: routineId)

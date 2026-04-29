@@ -73,6 +73,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const [routine, setRoutine] = useState<Routine | null>(null);
   const [ar, setAr] = useState<ActiveRoutine | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // v1.6 hotfix — dismissed 후 자동 진행 카운트다운 (autoCountdownSec → 0). 0 시 즉시 진행.
+  const [countdown, setCountdown] = useState<number | null>(null);
   // camera 모드: 랜덤 MISSION_POOL 1개 — mount 시 한 번 픽
   const [cameraMission, setCameraMission] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -492,6 +494,36 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     return () => anim.stop();
   }, [routine?.endMethod, dismissed, isDanger, dangerBlink]);
 
+  // v1.6 hotfix — dismissed=true 진입 시 autoCountdownSec 카운트다운 자동 시작.
+  // 카운트 종료 → handleStartNext 자동 호출 (앱 내 + 잠금/백그라운드 양쪽 흐름 동일 카운트 정합).
+  // 카운트 0 (사용자 setting) = 즉시 진행. 카운트 중 ✕ → handleStop (취소).
+  useEffect(() => {
+    if (!dismissed || !routine || !ar) return;
+    // willEnd (마지막 step) = 카운트 ❌. "완료" 버튼만 표시.
+    const nextIdxLocal = ar.currentStepIndex + 1;
+    if (nextIdxLocal >= routine.steps.length) return;
+    const initial = Math.max(0, Math.min(60, Math.floor(routine.autoCountdownSec ?? 5)));
+    if (initial === 0) {
+      // 즉시 진행
+      handleStartNext();
+      return;
+    }
+    setCountdown(initial);
+    const tick = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null) return prev;
+        if (prev <= 1) {
+          clearInterval(tick);
+          handleStartNext();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dismissed, routine, ar]);
+
   // ─── "다음 미션 시작" → controller.confirmAndAdvance ──
   const handleStartNext = useCallback(async () => {
     const res = await confirmAndAdvance();
@@ -663,11 +695,12 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
               <Text style={styles.nextDuration}>
                 {nextDurationMin} {t('routine.minutesUnit', { defaultValue: '분' })}
               </Text>
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleStartNext}>
-                <Text style={styles.primaryBtnText}>
-                  {t('routine.startNext', { defaultValue: '다음 루틴 시작' })}
+              {/* v1.6 hotfix — autoCountdownSec 카운트 표시 (자동 진행). ✕ 누르면 취소(routine 종료). */}
+              {countdown !== null && countdown > 0 && (
+                <Text style={styles.nextDuration}>
+                  {t('routine.advanceCountdown', { defaultValue: '{{n}}초 후 자동 진행', n: countdown })}
                 </Text>
-              </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.secondaryBtn} onPress={handleStop}>
                 <Text style={styles.secondaryBtnText}>
                   {t('routine.stopRoutine', { defaultValue: '루틴 중단' })}

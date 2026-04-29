@@ -80,6 +80,9 @@ private struct WidgetRoutineSnapshot: Codable {
     let i18nConfirmPromptStop: String
     let i18nAdvanceLabel: String
     var savedAt: Double
+    // v1.6 hotfix — "다음 루틴 진행" 후 다음 step 시작 전 대기 시간 (초). 0~60 clamp.
+    // optional = 이전 snapshot 디코딩 호환. nil 시 default 5 사용.
+    var autoCountdownSec: Double?
     // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
     var completedStepIndices: [Int]?
     var routineEnded: Bool?
@@ -210,7 +213,9 @@ struct StopRoutineIntent: LiveActivityIntent {
 private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx: Int) async throws -> UUID {
     let nextStep = snapshot.steps[nextStepIdx]
     let durationMs = nextStep.durationSec * 1000.0
-    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + durationMs
+    // v1.6 hotfix — 다음 step 시작 전 대기 시간 (autoCountdownSec). default 5초. 0~60 clamp.
+    let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + countdownSec * 1000.0 + durationMs
     let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
     let schedule = Alarm.Schedule.fixed(nextFireDate)
 
@@ -335,24 +340,34 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
-            snapshot.stepEndAt = Date().timeIntervalSince1970 * 1000.0
-                + snapshot.steps[nextIdx].durationSec * 1000.0
-            snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
+            // v1.6 hotfix — autoCountdownSec 반영. 다음 step 종료 시점 = countdown + duration 후.
+            let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+            let nowMs = Date().timeIntervalSince1970 * 1000.0
+            let countdownMs = countdownSec * 1000.0
+            snapshot.stepEndAt = nowMs + countdownMs + snapshot.steps[nextIdx].durationSec * 1000.0
+            snapshot.savedAt = nowMs
             writeRoutineSnapshot(snapshot)
 
-            // v1.6 hotfix B2-1 — LA 즉시 갱신 (잠금/백그라운드 즉시 stepEndAt + stepName 변경).
-            // widget target 정의의 ShutTimerActivityAttributes 와 동일 type → 검색 OK.
+            // v1.6 hotfix — LA 즉시 갱신. countdownSec > 0 시 stage='pre_advance' (카운트 표시),
+            // = 0 시 stage='step' (즉시 다음 step 진행 중). LA stepEndAt 분리 (snapshot 과 다름):
+            //   pre_advance LA stepEndAt = 카운트 종료 시점 (사용자 시점 카운트다운 표시)
+            //   step LA stepEndAt = 다음 step 종료 시점 (snapshot.stepEndAt 정합)
             let nextStepName = snapshot.steps[nextIdx].name
             for activity in Activity<ShutTimerActivityAttributes>.activities {
                 if activity.attributes.routineId == routineId {
                     var newState = activity.content.state
                     newState.currentStepName = nextStepName
-                    newState.stepEndAt = snapshot.stepEndAt
                     newState.progress = 0
                     newState.paused = false
-                    newState.stage = "step"
                     newState.currentStepIndex = nextIdx
                     newState.totalSteps = snapshot.totalSteps
+                    if countdownSec > 0 {
+                        newState.stage = "pre_advance"
+                        newState.stepEndAt = nowMs + countdownMs
+                    } else {
+                        newState.stage = "step"
+                        newState.stepEndAt = snapshot.stepEndAt
+                    }
                     await activity.update(.init(state: newState, staleDate: nil))
                 }
             }

@@ -42,23 +42,33 @@ struct LockScreenView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // 좌측: 라벨 + 카운트다운 / 'manual_prompt' 시 = "다음 진행 대기"
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                // v1.6 hotfix — totalSteps>1 시 "routineName · stepName(N/M)" 표시 (사용자 step 진행 가시화)
-                Group {
+            // v1.6 hotfix — VStack 2열 분리 (텍스트 잘림 fix). 1열=routineName / 2열=stepName(N/M).
+            // 줄바꿈 시 frame minHeight 고정으로 높이 변동 ❌ (사용자 요청 — 갑작스런 높이 변경 회피).
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.attributes.routineName)
+                        .font(.caption)
+                        .foregroundColor(.brand)
+                        .lineLimit(1)
                     if context.state.totalSteps > 1 && !context.state.currentStepName.isEmpty {
-                        Text("\(context.attributes.routineName) · \(context.state.currentStepName)(\(context.state.currentStepIndex + 1)/\(context.state.totalSteps))")
-                    } else {
-                        Text(context.attributes.routineName)
+                        Text("\(context.state.currentStepName) (\(context.state.currentStepIndex + 1)/\(context.state.totalSteps))")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
                     }
                 }
-                .font(.subheadline)
-                .foregroundColor(.brand)
-                .lineLimit(1)
                 if context.state.stage == "manual_prompt" {
                     // v1.6 Phase 12 — 수동 모드 alerting 후 stage. "다음 진행 대기" 텍스트.
                     Text("다음 진행")
                         .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                } else if context.state.stage == "pre_advance" {
+                    // v1.6 hotfix — autoCountdownSec 카운트 표시. stepEndAt = 카운트 종료 시점.
+                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                        .monospacedDigit()
+                        .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -126,7 +136,9 @@ struct LockScreenView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .frame(minHeight: 56)  // paused/normal 위젯 높이 고정
+        // v1.6 hotfix — minHeight 76 (이전 56). VStack 2열 분리 시 갑작스런 높이 변동 회피.
+        // 모든 stage (step / paused / manual_prompt / pre_advance) 동일 높이.
+        .frame(minHeight: 76)
         .activityBackgroundTint(Color.black.opacity(0.85))
         .activitySystemActionForegroundColor(Color.white)
     }

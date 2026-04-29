@@ -45,8 +45,9 @@ export type Routine = {
   /** step 종료 방식. */
   endMethod: RoutineEndMethod;
   /**
-   * @deprecated v1.6 Phase 12 — 'auto' 제거. 필드 보존 (기존 데이터 디코딩 호환).
-   * 신규 routine 에선 사용 X.
+   * v1.6 hotfix — "다음 루틴 진행" 누름 후 다음 step 시작까지 대기 시간 (초).
+   * 0~60 범위. default 5. 양쪽 흐름 (앱 내 + 잠금/백그라운드) 동일 카운트.
+   * 의미 변경 (이전 'auto' 모드 카운트 → 진행 후 대기 카운트). 필드 보존.
    */
   autoCountdownSec?: number;
   createdAt: number;

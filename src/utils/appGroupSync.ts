@@ -98,6 +98,11 @@ export type RoutineSnapshot = {
   /** snapshot 작성 시점 ms (stale 검증) */
   savedAt: number;
   /**
+   * v1.6 hotfix — "다음 루틴 진행" 누름 후 다음 step 시작 전 대기 시간 (초).
+   * routine.autoCountdownSec ?? 5. native perform() 시 fireAt 계산에 사용.
+   */
+  autoCountdownSec: number;
+  /**
    * v1.6 hotfix B2-2 — native 측 다음 step 진행 시 누적되는 완료 step indices.
    * RN syncRoutineFromSnapshot 시 flush → recordStepSession 호출 (사용자 active 시점 일괄 record).
    * record timing = 실제 step 진행 시점 ❌ — 사용자 active 시점.

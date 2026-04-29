@@ -6,7 +6,8 @@
 
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 
-export type LAControlAction = 'pause' | 'resume' | 'stop' | 'advance';
+// v1.6 hotfix — 'open_app_dismiss' 추가. timer_main slide-to-stop 시 OpenAppDismissIntent 작성.
+export type LAControlAction = 'pause' | 'resume' | 'stop' | 'advance' | 'open_app_dismiss';
 
 export type LAControlSignal = {
   action: LAControlAction;

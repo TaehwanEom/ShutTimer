@@ -487,8 +487,17 @@ function AppNavigator() {
       clearControlSignal();
       try {
         if (signal.routineId.startsWith('main_timer_')) {
-          // timer 측 — HomeScreen listener 가 처리
-          DeviceEventEmitter.emit('laControlTimer', signal);
+          // v1.6 hotfix — timer_main alarm slide-to-stop 시 OpenAppDismissIntent 가 'open_app_dismiss'
+          // 작성. 앱 자동 foreground 진입 후 본 polling 이 받아 AlarmScreen 진입 → dismiss method UI.
+          if (signal.action === 'open_app_dismiss') {
+            if (navigationRef.current?.isReady()) {
+              const route = navigationRef.current.getCurrentRoute()?.name;
+              if (route !== 'Alarm') navigationRef.current.navigate('Alarm');
+            }
+          } else {
+            // timer 측 (pause/resume/stop) — HomeScreen listener 가 처리
+            DeviceEventEmitter.emit('laControlTimer', signal);
+          }
         } else {
           // routine 측 — pause/resume = LA Intent 가 이미 native 처리. RN 은 ar 동기화만.
           // 위험 #X 정정: signal.timestamp = LA Intent perform 시점 (실제 누름 시각). RN polling 시점 X.

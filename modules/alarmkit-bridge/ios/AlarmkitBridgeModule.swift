@@ -160,6 +160,8 @@ public class AlarmkitBridgeModule: Module {
 
       // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
       // v1.6 hotfix — confirm_prompt + secondaryLabel 시 secondaryIntent 결합 (AdvanceNextStepIntent).
+      // v1.6 hotfix — timer_main 에 stopIntent: OpenAppDismissIntent 결합. slide-to-stop 시
+      //   앱 자동 foreground 진입 → AlarmScreen → 사용자 dismiss method (탭/흔들기/카메라) 정공.
       let id = UUID()
       let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
       if params.type == "chain" {
@@ -167,6 +169,13 @@ public class AlarmkitBridgeModule: Module {
           schedule: schedule,
           attributes: attributes,
           stopIntent: NextStepIntent(),
+          sound: alertSound
+        )
+      } else if params.type == "timer_main" {
+        config = .alarm(
+          schedule: schedule,
+          attributes: attributes,
+          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
           sound: alertSound
         )
       } else if hasSecondary {

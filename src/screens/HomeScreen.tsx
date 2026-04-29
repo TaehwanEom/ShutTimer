@@ -418,10 +418,19 @@ export default function HomeScreen({ navigation }: Props) {
       const fireAt = Date.now() + seconds * 1000;
       const routineId = timerRoutineIdRef.current ?? `main_timer_${Date.now()}`;
       timerRoutineIdRef.current = routineId;
+      // v1.6 hotfix — title 동적 생성. 사용자 dismiss method 별 안내 텍스트.
+      // 잠금 alerting UI 의 title 영역 (현재 "타이머 완료") 에 종료 방식 즉시 인지.
+      const dismissMethodForTitle = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
+      const alarmTitle =
+        dismissMethodForTitle === 'tap'
+          ? t('home.alarmTitleTap', { defaultValue: '타이머 완료 — 탭하여 종료' })
+          : dismissMethodForTitle === 'shake'
+            ? t('home.alarmTitleShake', { defaultValue: '타이머 완료 — 흔들어 종료' })
+            : t('home.alarmTitleCamera', { defaultValue: '타이머 완료 — 카메라로 종료' });
       try {
         const id = await AlarmkitBridge.scheduleAlarm({
           routineId,
-          title: t('home.timerCompleteTitle', { defaultValue: '타이머 완료' }),
+          title: alarmTitle,
           fireAt,
           stopLabel: t('home.timerStop', { defaultValue: '확인' }),
           type: 'timer_main',

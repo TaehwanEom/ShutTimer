@@ -33,7 +33,8 @@ const persistAll = () => {
 };
 
 const record = (level: 'info' | 'warn' | 'error', tag: string, message: string) => {
-  if (!__DEV__) return;
+  // v1.6 hotfix — production 빌드에서도 AsyncStorage 저장 (TestFlight console 미라우팅 회피).
+  // 디버그 화면에서 Logger.getLogs() 로 조회.
   const entry: LogEntry = {
     timestamp: new Date().toISOString(),
     level,

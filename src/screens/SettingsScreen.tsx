@@ -8,9 +8,9 @@ import {
   Switch,
   ScrollView,
   Modal,
-  // @preserve IAP — Alert는 purchase 섹션에서만 사용. Phase 2+ 복원용.
-  // Alert,
+  Alert,
 } from 'react-native';
+import { Logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -596,6 +596,33 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={styles.comingSoonText}>{t('settings.comingSoon')}</Text>
             </View>
           </View>
+        </View>
+
+        {/* v1.6 hotfix — 디버그 로그 (production 포함). Logger.warn / info 가 AsyncStorage 에 저장됨. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>디버그</Text>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              const logs = await Logger.getLogs();
+              const recent = logs.slice(0, 50);
+              const text = recent.length === 0
+                ? '로그 없음'
+                : recent.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
+              Alert.alert('최근 로그 (50개)', text, [
+                { text: '복사용 표시', onPress: () => Alert.alert('전체', text) },
+                { text: '클리어', onPress: () => Logger.clearLogs() },
+                { text: '닫기' },
+              ]);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>최근 로그 보기</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
         </View>
 
         {/* @v1.5-poc — __DEV__ 가드. production 빌드에선 자동 배제 (dead code elimination). */}

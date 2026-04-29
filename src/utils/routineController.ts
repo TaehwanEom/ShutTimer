@@ -371,7 +371,11 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
     await recordStepSession(routine, ar.currentStepIndex);
   }
 
-  await cancelBackgroundNotif();
+  // v1.6 hotfix — 단일 timer #2 와 동일 안티 패턴 제거. cancelBackgroundNotif 호출 시
+  // AlarmKit alerting UI 즉시 dismiss 됨 (preempt cancel). 사용자 stop / 다음 진행 누름까지 alerting 지속이 정공.
+  // 다음 step 등록 시 scheduleBackgroundNotif 가 currentConfirmPromptId 자동 cancel + 재등록 → 중복 ❌.
+  // stop 시 fullCleanup 가 cancel.
+  // await cancelBackgroundNotif();  // ← 제거
 
   // v1.6 Phase 12 — auto 분기 제거. 모든 endMethod 가 confirm 처리 (사용자 stop/dismiss/위젯 advance 후 진행).
   if (!ar.awaitingConfirm) {

@@ -17,7 +17,7 @@ import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgR
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
@@ -56,6 +56,7 @@ async function shouldUseAlarmKitInTimer(): Promise<boolean> {
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  route?: RouteProp<RootStackParamList, 'Home'>;
 };
 
 // 진행 중인 타이머 영속화 (cold start 복원용)
@@ -265,7 +266,7 @@ function MissionItem({ mission, isSelected, onPress, onLongPress, t }: {
   );
 }
 
-export default function HomeScreen({ navigation }: Props) {
+export default function HomeScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const styles = makeStyles(colors);
@@ -359,6 +360,19 @@ export default function HomeScreen({ navigation }: Props) {
       AsyncStorage.getItem(MISSIONS_STORAGE_KEY).then(value => {
         const list: Mission[] = value ? JSON.parse(value) : MISSIONS;
         setMissionList(list);
+        // v1.6 후속 — FavoritesListScreen 측 selectedFavoriteId 수신 시 selectedIndex + selectedMinutes 적용 (자동 시작 ❌).
+        const favoriteId = route?.params?.selectedFavoriteId;
+        if (favoriteId) {
+          const idx = list.findIndex(m => m.id === favoriteId);
+          if (idx >= 0) {
+            setSelectedIndex(idx);
+            setSelectedMinutes(list[idx].defaultMinutes ?? 60);
+            setSelectedSeconds(0);
+            // route.params 소비 후 정리 (재진입 시 동일 favorite 재적용 회피)
+            navigation.setParams({ selectedFavoriteId: undefined });
+            return;
+          }
+        }
         // 선택된 favorite의 defaultMinutes가 편집됐으면 다이얼 표시 값도 갱신
         setSelectedIndex(prev => {
           const newIdx = prev >= list.length ? -1 : prev;
@@ -372,7 +386,7 @@ export default function HomeScreen({ navigation }: Props) {
           return newIdx;
         });
       });
-    }, [])
+    }, [route?.params?.selectedFavoriteId])
   );
 
   const scheduleAlarm = async (seconds: number) => {
@@ -994,29 +1008,6 @@ export default function HomeScreen({ navigation }: Props) {
               )}
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('History')}>
-            <View>
-              <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-              <View style={{ position: 'absolute', top: 9, left: 5, right: 5, gap: 2 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                  <View style={{ width: 2.5, height: 2.5, borderRadius: 1.25, backgroundColor: colors.onBackground, opacity: 0.35 }} />
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('RoutineList')}>
-            <MaterialIcons name="repeat" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -1073,94 +1064,66 @@ export default function HomeScreen({ navigation }: Props) {
             {timeText.replace(':', ' : ')}
           </Text>
         </View>
-        <View style={{ width: BTN_SIZE + 16, height: BTN_SIZE + 16, alignItems: 'center', justifyContent: 'center' }}>
-          {isRunning && (
-            <Svg width={BTN_SIZE + 16} height={BTN_SIZE + 16} style={{ position: 'absolute' }}>
-              <SvgCircle
-                cx={(BTN_SIZE + 16) / 2}
-                cy={(BTN_SIZE + 16) / 2}
-                r={BTN_RADIUS}
-                fill="none"
-                stroke={colors.outlineVariant}
-                strokeWidth={3}
-                opacity={0.3}
+        {/* v1.6 후속 — Play 버튼 + List 버튼 horizontal layout (flex spacer 영역, Play 중앙 + List 우측, 수직 중앙 정렬) */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', paddingHorizontal: 24 }}>
+          <View style={{ flex: 1 }} />
+          <View style={{ width: BTN_SIZE + 16, height: BTN_SIZE + 16, alignItems: 'center', justifyContent: 'center' }}>
+            {isRunning && (
+              <Svg width={BTN_SIZE + 16} height={BTN_SIZE + 16} style={{ position: 'absolute' }}>
+                <SvgCircle
+                  cx={(BTN_SIZE + 16) / 2}
+                  cy={(BTN_SIZE + 16) / 2}
+                  r={BTN_RADIUS}
+                  fill="none"
+                  stroke={colors.outlineVariant}
+                  strokeWidth={3}
+                  opacity={0.3}
+                />
+                <AnimatedSvgCircle
+                  cx={(BTN_SIZE + 16) / 2}
+                  cy={(BTN_SIZE + 16) / 2}
+                  r={BTN_RADIUS}
+                  fill="none"
+                  stroke={colors.primary}
+                  strokeWidth={3}
+                  strokeDasharray={BTN_CIRCUMFERENCE}
+                  strokeDashoffset={longPressDashoffset}
+                  strokeLinecap="round"
+                  rotation="-90"
+                  origin={`${(BTN_SIZE + 16) / 2}, ${(BTN_SIZE + 16) / 2}`}
+                />
+              </Svg>
+            )}
+            <TouchableOpacity
+              style={styles.playButton}
+              onPress={() => { if (longPressFired.current) return; isRunning ? handlePauseResume() : handleStart(); }}
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name={isRunning ? (isPaused ? 'play-arrow' : 'pause') : 'play-arrow'}
+                size={40}
+                color={colors.onPrimary}
               />
-              <AnimatedSvgCircle
-                cx={(BTN_SIZE + 16) / 2}
-                cy={(BTN_SIZE + 16) / 2}
-                r={BTN_RADIUS}
-                fill="none"
-                stroke={colors.primary}
-                strokeWidth={3}
-                strokeDasharray={BTN_CIRCUMFERENCE}
-                strokeDashoffset={longPressDashoffset}
-                strokeLinecap="round"
-                rotation="-90"
-                origin={`${(BTN_SIZE + 16) / 2}, ${(BTN_SIZE + 16) / 2}`}
-              />
-            </Svg>
-          )}
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={() => { if (longPressFired.current) return; isRunning ? handlePauseResume() : handleStart(); }}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons
-              name={isRunning ? (isPaused ? 'play-arrow' : 'pause') : 'play-arrow'}
-              size={40}
-              color={colors.onPrimary}
-            />
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1, alignItems: 'flex-end' }} pointerEvents={isRunning ? 'none' : 'auto'}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('FavoritesList')}
+              style={{ opacity: isRunning ? 0.3 : 1 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.surfaceContainerLow }}>
+                <MaterialIcons name="format-list-bulleted" size={20} color={colors.primary} />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>{t('home.list', { defaultValue: 'List' })}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
-      {/* Mission Selection — 하단 고정 */}
-      <View style={[styles.missionSection, isRunning && { opacity: 0.3 }]} pointerEvents={isRunning ? 'none' : 'auto'}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: '100%' }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-            <Text style={[styles.missionTitle, { marginBottom: 0, marginHorizontal: 12 }]}>{t('home.favorites')}</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-          </View>
-          {missionList.length === 0 ? (
-            <View style={{ alignItems: 'center' }}>
-              <TouchableOpacity style={styles.missionItem} onPress={() => navigation.navigate('EditMissions')}>
-                <View style={styles.addTimerBtn}>
-                  <MaterialIcons name="add" size={26} color={colors.secondary} />
-                </View>
-                <Text style={styles.missionLabel}>{t('home.add')}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.missionList}>
-              <TouchableOpacity style={styles.missionItem} onPress={() => navigation.navigate('EditMissions')}>
-                <View style={styles.addTimerBtn}>
-                  <MaterialIcons name="add" size={26} color={colors.secondary} />
-                </View>
-                <Text style={styles.missionLabel}>{t('home.add')}</Text>
-              </TouchableOpacity>
-              {missionList.map((mission, index) => (
-                <MissionItem
-                  key={`${mission.id}-${index}`}
-                  mission={mission}
-                  isSelected={selectedIndex === index}
-                  onPress={() => {
-                    if (selectedIndex === index) {
-                      setSelectedIndex(-1);
-                    } else {
-                      setSelectedIndex(index);
-                      setSelectedMinutes(mission.defaultMinutes ?? 60);
-                      setSelectedSeconds(0);
-                    }
-                  }}
-                  onLongPress={() => navigation.navigate('AddTimer', { editId: mission.id, editIcon: mission.icon, editMinutes: mission.defaultMinutes ?? 60, dialType })}
-                  t={t}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
+      {/* v1.6 후속 — 즐겨찾기 영역 제거 후 AdBanner 위치 정정. flex spacer 으로 화면 하단 push. */}
+      <View style={{ flex: 1 }} />
       <AdBanner />
       </ScrollView>
     </SafeAreaView>

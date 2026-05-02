@@ -1,13 +1,15 @@
 import './src/i18n';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
-import { AppState, Platform, DeviceEventEmitter } from 'react-native';
+import { AppState, Platform, DeviceEventEmitter, View, Text } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -80,6 +82,7 @@ import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
 import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
 import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
+import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
@@ -102,7 +105,8 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
-  Home: undefined;
+  Home: { selectedFavoriteId?: string } | undefined;
+  FavoritesList: undefined;
   Running: { mission: Mission | null; minutes: number };
   Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' } | undefined;
   Settings: undefined;
@@ -131,6 +135,40 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator();
+
+// v1.6 후속 — Calendar placeholder (= Phase A 샘플, Phase C 에서 신설 화면 교체).
+function CalendarPlaceholder() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ fontSize: 18, color: '#888' }}>준비 중</Text>
+    </View>
+  );
+}
+
+// v1.6 후속 — 하단 탭 (타이머 / 루틴 / 캘린더 / 설정).
+function MainTabsNavigator() {
+  return (
+    <Tab.Navigator screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="HomeTab" component={HomeScreen} options={{
+        tabBarLabel: '타이머',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
+      }} />
+      <Tab.Screen name="RoutineTab" component={RoutineListScreen} options={{
+        tabBarLabel: '루틴',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
+      }} />
+      <Tab.Screen name="CalendarTab" component={CalendarPlaceholder} options={{
+        tabBarLabel: '캘린더',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="calendar-today" size={size} color={color} />,
+      }} />
+      <Tab.Screen name="SettingsTab" component={SettingsScreen} options={{
+        tabBarLabel: '설정',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="settings" size={size} color={color} />,
+      }} />
+    </Tab.Navigator>
+  );
+}
 
 function AppNavigator() {
   const { isDark } = useTheme();
@@ -605,11 +643,11 @@ function AppNavigator() {
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Splash"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ headerShown: false, gestureEnabled: false }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ gestureEnabled: false }} />
-        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Home" component={MainTabsNavigator} />
         <Stack.Screen name="Running" component={RunningScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Alarm" component={AlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -624,6 +662,7 @@ function AppNavigator() {
         <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
         <Stack.Screen name="RoutineSound" component={RoutineSoundScreen} />
+        <Stack.Screen name="FavoritesList" component={FavoritesListScreen} />
         {/* @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 프로덕션 빌드에서 자동 제외. 삭제 금지. */}
         {__DEV__ && (
           <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />

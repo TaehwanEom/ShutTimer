@@ -24,6 +24,7 @@ import { SETTINGS_KEY, DialType } from '../constants/settings';
 import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
 import AdBanner from '../components/AdBanner';
+import BottomTabBar from '../components/BottomTabBar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 
@@ -340,19 +341,24 @@ export default function AddTimerScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* v1.6 후속 — 저장 버튼 위 AdBanner */}
-      <View style={{ position: 'absolute', bottom: 110, left: 0, right: 0 }}>
+      {/* v1.6 후속 — 저장 버튼 위 AdBanner (= BottomTabBar 위 영역) */}
+      <View style={{ position: 'absolute', bottom: 170, left: 0, right: 0 }}>
         <AdBanner />
       </View>
 
       {/* 저장 버튼 */}
       <TouchableOpacity
-        style={[styles.saveButton, !selectedIcon && styles.saveButtonDisabled]}
+        style={[styles.saveButton, !selectedIcon && styles.saveButtonDisabled, { bottom: 100 }]}
         onPress={handleSave}
         disabled={!selectedIcon}
       >
         <Text style={styles.saveButtonText}>{t('addTimer.save')}</Text>
       </TouchableOpacity>
+
+      {/* v1.6 후속 — 외부 Stack.Screen 측 하단 시각 Tab Bar */}
+      <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+        <BottomTabBar />
+      </View>
 
       {/* 아이콘 모달 */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>

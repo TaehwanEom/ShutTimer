@@ -599,64 +599,83 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* v1.6 hotfix — 디버그 로그 (production 포함). Logger.warn / info 가 AsyncStorage 에 저장됨. */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>디버그</Text>
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={async () => {
-              const logs = await Logger.getLogs();
-              const text = logs.length === 0
-                ? '로그 없음'
-                : logs.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
-              try {
-                // Share API → iOS 공유 시트 (메일/메시지/메모/복사 등 선택 가능)
-                await Share.share({ message: text, title: 'ShutTimer 디버그 로그' });
-              } catch (e) {
-                Alert.alert('공유 실패', String(e));
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>최근 로그 공유 (복사 가능)</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.toggleRow}
-            onPress={async () => {
-              await Logger.clearLogs();
-              Alert.alert('완료', '로그 클리어됨');
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="delete-sweep" size={22} color={colors.onBackground} />
-              <Text style={styles.toggleLabel}>로그 클리어</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-          </TouchableOpacity>
-        </View>
+        {/*
+          ═══════════════════════════════════════════════════════════
+           @preserve — 디버그 섹션 (로그 공유 / 클리어)
+           보존 결정일: 2026-05-03
+           비활성화 사유: 사용자 명시 — 본 빌드 노출 ❌, 나중에 재사용
+           재활성화: 주석 해제만으로 즉시 복원 가능
+           ⚠️ 이 블록 삭제 금지.
 
-        {/* @v1.5-poc — __DEV__ 가드. production 빌드에선 자동 배제 (dead code elimination). */}
-        {__DEV__ && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>DEBUG (v1.5 PoC)</Text>
-            <TouchableOpacity
-              style={styles.toggleRow}
-              onPress={() => navigation.navigate('PoCPhotoValidation')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.toggleLeft}>
-                <MaterialIcons name="science" size={22} color={colors.onBackground} />
-                <Text style={styles.toggleLabel}>사진 인식 PoC</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
-            </TouchableOpacity>
-          </View>
-        )}
+           @preserve-original:
+           <View style={styles.section}>
+             <Text style={styles.sectionTitle}>디버그</Text>
+             <TouchableOpacity
+               style={styles.toggleRow}
+               onPress={async () => {
+                 const logs = await Logger.getLogs();
+                 const text = logs.length === 0
+                   ? '로그 없음'
+                   : logs.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
+                 try {
+                   await Share.share({ message: text, title: 'ShutTimer 디버그 로그' });
+                 } catch (e) {
+                   Alert.alert('공유 실패', String(e));
+                 }
+               }}
+               activeOpacity={0.7}
+             >
+               <View style={styles.toggleLeft}>
+                 <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
+                 <Text style={styles.toggleLabel}>최근 로그 공유 (복사 가능)</Text>
+               </View>
+               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+             </TouchableOpacity>
+             <TouchableOpacity
+               style={styles.toggleRow}
+               onPress={async () => {
+                 await Logger.clearLogs();
+                 Alert.alert('완료', '로그 클리어됨');
+               }}
+               activeOpacity={0.7}
+             >
+               <View style={styles.toggleLeft}>
+                 <MaterialIcons name="delete-sweep" size={22} color={colors.onBackground} />
+                 <Text style={styles.toggleLabel}>로그 클리어</Text>
+               </View>
+               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+             </TouchableOpacity>
+           </View>
+          ═══════════════════════════════════════════════════════════
+        */}
+
+        {/*
+          ═══════════════════════════════════════════════════════════
+           @preserve @v1.5-poc — DEBUG (v1.5 PoC) 사진 인식 진입 버튼
+           보존 결정일: 2026-05-03
+           비활성화 사유: 사용자 명시 — 본 빌드 노출 ❌, 나중에 재사용
+           재활성화: 주석 해제만으로 즉시 복원 가능
+           ⚠️ 이 블록 삭제 금지.
+
+           @preserve-original:
+           {__DEV__ && (
+             <View style={styles.section}>
+               <Text style={styles.sectionTitle}>DEBUG (v1.5 PoC)</Text>
+               <TouchableOpacity
+                 style={styles.toggleRow}
+                 onPress={() => navigation.navigate('PoCPhotoValidation')}
+                 activeOpacity={0.7}
+               >
+                 <View style={styles.toggleLeft}>
+                   <MaterialIcons name="science" size={22} color={colors.onBackground} />
+                   <Text style={styles.toggleLabel}>사진 인식 PoC</Text>
+                 </View>
+                 <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+               </TouchableOpacity>
+             </View>
+           )}
+          ═══════════════════════════════════════════════════════════
+        */}
       </ScrollView>
 
       {/* 사운드 선택 모달 */}

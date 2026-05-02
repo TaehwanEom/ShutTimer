@@ -90,10 +90,20 @@ import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
 import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
-// @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
-const PoCPhotoValidationScreen = __DEV__
-  ? require('./src/screens/PoCPhotoValidationScreen').default
-  : null;
+/*
+  ═══════════════════════════════════════════════════════════
+   @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
+   보존 결정일: 2026-05-03
+   비활성화 사유: 사용자 명시 — 본 빌드 노출 ❌, 나중에 재사용
+   재활성화: 주석 해제만으로 즉시 복원 가능
+   ⚠️ 이 블록 삭제 금지.
+
+   @preserve-original:
+   const PoCPhotoValidationScreen = __DEV__
+     ? require('./src/screens/PoCPhotoValidationScreen').default
+     : null;
+  ═══════════════════════════════════════════════════════════
+*/
 import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
@@ -148,8 +158,15 @@ function CalendarPlaceholder() {
 
 // v1.6 후속 — 하단 탭 (타이머 / 루틴 / 캘린더 / 설정).
 function MainTabsNavigator() {
+  const { colors } = useTheme();
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
+    <Tab.Navigator screenOptions={{
+      headerShown: false,
+      tabBarActiveTintColor: colors.primary,
+      tabBarInactiveTintColor: colors.secondary,
+      tabBarStyle: { backgroundColor: colors.surfaceContainerLowest, borderTopColor: colors.outlineVariant },
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
+    }}>
       <Tab.Screen name="HomeTab" component={HomeScreen} options={{
         tabBarLabel: '타이머',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
@@ -158,7 +175,7 @@ function MainTabsNavigator() {
         tabBarLabel: '루틴',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
       }} />
-      <Tab.Screen name="CalendarTab" component={CalendarPlaceholder} options={{
+      <Tab.Screen name="CalendarTab" component={HistoryScreen} options={{
         tabBarLabel: '캘린더',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="calendar-today" size={size} color={color} />,
       }} />
@@ -663,10 +680,20 @@ function AppNavigator() {
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
         <Stack.Screen name="RoutineSound" component={RoutineSoundScreen} />
         <Stack.Screen name="FavoritesList" component={FavoritesListScreen} />
-        {/* @v1.5-poc — 영구 내부 검증 도구. __DEV__ 가드로 프로덕션 빌드에서 자동 제외. 삭제 금지. */}
-        {__DEV__ && (
-          <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />
-        )}
+        {/*
+          ═══════════════════════════════════════════════════════════
+           @preserve @v1.5-poc — PoCPhotoValidation Stack.Screen
+           보존 결정일: 2026-05-03
+           비활성화 사유: 사용자 명시 — 본 빌드 노출 ❌, 나중에 재사용
+           재활성화: 주석 해제만으로 즉시 복원 가능 (+ App.tsx require 영역도 해제)
+           ⚠️ 이 블록 삭제 금지.
+
+           @preserve-original:
+           {__DEV__ && (
+             <Stack.Screen name="PoCPhotoValidation" component={PoCPhotoValidationScreen} />
+           )}
+          ═══════════════════════════════════════════════════════════
+        */}
       </Stack.Navigator>
     </NavigationContainer>
     </>

@@ -11,6 +11,7 @@ import { SETTINGS_KEY } from '../constants/settings';
 import { useTheme } from '../context/ThemeContext';
 import { RootStackParamList } from '../../App';
 import AdBanner from '../components/AdBanner';
+import BottomTabBar from '../components/BottomTabBar';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FavoritesList'>;
@@ -273,6 +274,7 @@ export default function FavoritesListScreen({ navigation }: Props) {
       )}
 
       <AdBanner />
+      <BottomTabBar />
     </SafeAreaView>
   );
 }

@@ -49,6 +49,7 @@ import {
   loadCustomCategories,
 } from '../constants/categories';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import AdBanner from '../components/AdBanner';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineEdit'>;
@@ -490,6 +491,9 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           <Text style={styles.headerSave}>{t('routine.edit.save')}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* v1.6 후속 — 헤더와 카테고리 사이 AdBanner */}
+      <AdBanner />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* 카테고리 — 최상단 */}

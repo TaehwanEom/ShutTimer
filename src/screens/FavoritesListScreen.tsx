@@ -7,6 +7,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { Mission, MISSIONS, MISSIONS_STORAGE_KEY } from '../constants/missions';
+import { SETTINGS_KEY } from '../constants/settings';
 import { useTheme } from '../context/ThemeContext';
 import { RootStackParamList } from '../../App';
 import AdBanner from '../components/AdBanner';
@@ -203,11 +204,15 @@ export default function FavoritesListScreen({ navigation }: Props) {
     navigation.navigate('Home', { screen: 'HomeTab', params: { selectedFavoriteId: mission.id } } as any);
   };
 
-  const handleEdit = (mission: Mission) => {
+  const handleEdit = async (mission: Mission) => {
+    // v1.6 후속 — dialType 미전달 시 AddTimer mount 직후 'classic' 깜빡임 영역 정정. 사용자 dial 영역 즉시 정합.
+    const dialTypeRaw = await AsyncStorage.getItem(SETTINGS_KEY.DIAL_TYPE);
+    const dialType = dialTypeRaw === 'digital' ? 'digital' : 'classic';
     navigation.navigate('AddTimer', {
       editId: mission.id,
       editIcon: mission.icon,
       editMinutes: mission.defaultMinutes ?? 60,
+      dialType,
     });
   };
 

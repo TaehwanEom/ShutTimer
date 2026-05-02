@@ -23,6 +23,7 @@ import { MISSIONS, MISSIONS_STORAGE_KEY, ICON_OPTIONS, Mission } from '../consta
 import { SETTINGS_KEY, DialType } from '../constants/settings';
 import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
+import AdBanner from '../components/AdBanner';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTranslation } from 'react-i18next';
 
@@ -338,6 +339,11 @@ export default function AddTimerScreen({ navigation, route }: Props) {
           </View>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* v1.6 후속 — 저장 버튼 위 AdBanner */}
+      <View style={{ position: 'absolute', bottom: 110, left: 0, right: 0 }}>
+        <AdBanner />
+      </View>
 
       {/* 저장 버튼 */}
       <TouchableOpacity

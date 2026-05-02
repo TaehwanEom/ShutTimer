@@ -95,6 +95,8 @@ export type RoutineSnapshot = {
   i18nConfirmPromptTitle: string;
   i18nConfirmPromptStop: string;
   i18nAdvanceLabel: string;
+  /** v1.6 — 마지막 step alerting UI title (= 모든 루틴 끝났을 때). optional = 이전 snapshot 호환 */
+  i18nRoutineCompleteTitle?: string;
   /** snapshot 작성 시점 ms (stale 검증) */
   savedAt: number;
   /**

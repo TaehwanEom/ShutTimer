@@ -56,6 +56,8 @@ private struct RoutineSnapshot: Codable {
     // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
     var completedStepIndices: [Int]?
     var routineEnded: Bool?
+    // v1.6 — 마지막 step alerting UI title. optional = 이전 snapshot 호환.
+    var i18nRoutineCompleteTitle: String?
 }
 
 // MARK: - App Group helpers
@@ -119,13 +121,13 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
     // 본 alarm 종료 시 alerting → 다음 진행 step = nextStepIdx+1. 마지막 시 nil.
     // v1.6 #13 — 본 alarm 자체가 마지막 step (nextStepIdx == totalSteps - 1) 이면 secondary "다음 진행" 제거.
     let isLastStep = nextStepIdx + 1 >= snapshot.totalSteps
-    let titleSuffix: String
-    if !isLastStep {
-        titleSuffix = " " + snapshot.steps[nextStepIdx + 1].name
+    // v1.6 — 마지막 step alerting = "루틴 완료" (snapshot.i18nRoutineCompleteTitle), 일반 = "다음 루틴 [step name]"
+    let alertTitle: String
+    if isLastStep {
+        alertTitle = snapshot.i18nRoutineCompleteTitle ?? "루틴 완료"
     } else {
-        titleSuffix = ""
+        alertTitle = snapshot.i18nConfirmPromptTitle + " " + snapshot.steps[nextStepIdx + 1].name
     }
-    let alertTitle = snapshot.i18nConfirmPromptTitle + titleSuffix
 
     // v1.6 #13 — 마지막 step alerting UI = "밀어서 중단" 만 (secondary 제거). 일반 = stopButton + secondary 결합.
     let alert: AlarmPresentation.Alert

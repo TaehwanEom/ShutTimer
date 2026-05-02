@@ -151,6 +151,7 @@ async function mirrorRoutineSnapshot(r: Routine, ar: ActiveRoutine, alarmId: str
       i18nConfirmPromptTitle: i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' }),
       i18nConfirmPromptStop: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       i18nAdvanceLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
+      i18nRoutineCompleteTitle: i18n.t('routine.routineCompleteTitle', { defaultValue: '루틴 완료' }),
       savedAt: Date.now(),
       autoCountdownSec: clampCountdown(r.autoCountdownSec),
       completedStepIndices: [],

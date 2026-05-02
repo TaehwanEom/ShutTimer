@@ -423,10 +423,10 @@ export default function HomeScreen({ navigation }: Props) {
       const dismissMethodForTitle = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
       const alarmTitle =
         dismissMethodForTitle === 'tap'
-          ? t('home.alarmTitleTap', { defaultValue: '타이머 완료 탭하여 종료하세요' })
+          ? t('home.alarmTitleTap', { defaultValue: '타이머 완료\n탭하여 종료' })
           : dismissMethodForTitle === 'shake'
-            ? t('home.alarmTitleShake', { defaultValue: '타이머 완료\n흔들어 종료하세요' })
-            : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물을 스캔하여 종료하세요' });
+            ? t('home.alarmTitleShake', { defaultValue: '타이머 완료\n흔들어서 종료' })
+            : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물 스캔 종료' });
       try {
         const id = await AlarmkitBridge.scheduleAlarm({
           routineId,

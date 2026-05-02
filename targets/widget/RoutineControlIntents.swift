@@ -86,6 +86,8 @@ private struct WidgetRoutineSnapshot: Codable {
     // v1.6 hotfix B2-2 — RN syncRoutineFromSnapshot flush 대상. optional = 기존 디코딩 호환.
     var completedStepIndices: [Int]?
     var routineEnded: Bool?
+    // v1.6 — 마지막 step alerting UI title. optional = 이전 snapshot 호환.
+    var i18nRoutineCompleteTitle: String?
 }
 
 private func readRoutineSnapshot() -> WidgetRoutineSnapshot? {
@@ -253,14 +255,13 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
     let nextStep = snapshot.steps[nextStepIdx]
     let durationSec = max(0.001, nextStep.durationSec)
 
-    // v1.6 hotfix B1 — alerting UI title 에 다음 step name 추가
-    let titleSuffix: String
+    // v1.6 — 마지막 step alerting = "루틴 완료" (snapshot.i18nRoutineCompleteTitle), 일반 = "다음 루틴 [step name]"
+    let alertTitle: String
     if nextStepIdx + 1 < snapshot.totalSteps {
-        titleSuffix = " " + snapshot.steps[nextStepIdx + 1].name
+        alertTitle = snapshot.i18nConfirmPromptTitle + " " + snapshot.steps[nextStepIdx + 1].name
     } else {
-        titleSuffix = ""
+        alertTitle = snapshot.i18nRoutineCompleteTitle ?? "루틴 완료"
     }
-    let alertTitle = snapshot.i18nConfirmPromptTitle + titleSuffix
 
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {

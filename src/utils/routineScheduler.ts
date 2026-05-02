@@ -560,9 +560,10 @@ async function scheduleConfirmPromptViaAlarmKit(
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
 
-    // v1.6 hotfix B1 — title 동적 생성 ("다음 루틴 {nextStepName}" / 마지막 step 시 "다음 루틴")
+    // v1.6 hotfix B1 — title 동적 생성 ("다음 루틴 {nextStepName}" / 마지막 step (1-step routine) 시 "루틴 완료")
     const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
-    const title = nextStepName ? `${baseTitle} ${nextStepName}` : baseTitle;
+    const completeTitle = i18n.t('routine.routineCompleteTitle', { defaultValue: '루틴 완료' });
+    const title = nextStepName ? `${baseTitle} ${nextStepName}` : completeTitle;
 
     // v1.6 #13 — 마지막 step (nextStepName 미전달 = 1-step routine) 의 alerting UI = "밀어서 중단" 만 (secondary 제거).
     const isLastStep = !nextStepName;

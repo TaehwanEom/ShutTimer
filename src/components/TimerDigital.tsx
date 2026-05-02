@@ -134,12 +134,9 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
   const blinkAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!isWarning) {
+      // 정지 시 opacity 즉시 1 reset (native driver 의 duration:0 timing 비동기 race 회피).
       blinkAnim.stopAnimation();
-      Animated.timing(blinkAnim, {
-        toValue: 1,
-        duration: 0,
-        useNativeDriver: true,
-      }).start();
+      blinkAnim.setValue(1);
       return;
     }
     const anim = Animated.loop(

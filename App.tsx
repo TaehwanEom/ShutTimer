@@ -503,10 +503,6 @@ function AppNavigator() {
             }
           }
           else if (signal.action === 'pause') {
-            // 진단 — 위젯 측 PauseRoutineIntent.perform 의 단계별 결과 로그
-            const dbg = AlarmkitBridge.readAppGroupString('pause_debug_info');
-            console.warn('[PauseDebug]', dbg);
-            AlarmkitBridge.removeAppGroupKey('pause_debug_info');
             // v1.6 #4-B Fix 2 — emit try/finally 분리. pauseRoutineFromLA throw 시에도 emit 보장 (UI 동기화).
             try {
               await pauseRoutineFromLA(signal.timestamp);

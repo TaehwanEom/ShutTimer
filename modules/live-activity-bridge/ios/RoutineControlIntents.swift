@@ -78,34 +78,15 @@ struct PauseRoutineIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         // v1.6 #4-A — chain_alarms (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 pause.
-        // 진단 로그 — App Group key 에 별도 write (RN polling 이 read + console.log).
-        var debug = "start"
         let alarmIds = readAlarmIds(routineId: routineId)
-        debug += "|chain:\(alarmIds.count)"
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.pause(id: id)
             }
         }
-        if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId) {
-            debug += "|snap:\(currentAlarmId.prefix(8))"
-            if let currentUuid = UUID(uuidString: currentAlarmId) {
-                do {
-                    try AlarmManager.shared.pause(id: currentUuid)
-                    debug += "|paused:ok"
-                } catch {
-                    debug += "|paused:err:\(String(describing: error).prefix(60))"
-                }
-            } else {
-                debug += "|uuid:fail"
-            }
-        } else {
-            debug += "|snap:missing"
-        }
-
-        // 디버그 정보 별도 key 에 write (signal.action 은 'pause' 그대로 유지)
-        if let defaults = UserDefaults(suiteName: APP_GROUP) {
-            defaults.set(debug, forKey: "pause_debug_info")
+        if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId),
+           let currentUuid = UUID(uuidString: currentAlarmId) {
+            try? AlarmManager.shared.pause(id: currentUuid)
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {

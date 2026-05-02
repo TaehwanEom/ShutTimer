@@ -29,6 +29,7 @@ import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
+import { stopRoutine } from '../utils/routineController';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -123,7 +124,7 @@ const RESULT_BG = {
   fail: '#c62828',
 };
 
-export default function AlarmScreen({ navigation }: Props) {
+export default function AlarmScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree } = usePurchase();
@@ -175,9 +176,13 @@ export default function AlarmScreen({ navigation }: Props) {
   // const cameraRef = useRef<CameraView>(null);
 
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  // v1.6 — goHome 호출 시점에 빈 화면 노출 (광고 닫힘 → AlarmScreen 한 frame 비치는 회귀 차단).
+  const [dismissingHome, setDismissingHome] = useState(false);
   // App.tsx에서 사전 로드한 dismissMethod 사용 (AsyncStorage 비동기 지연 제거).
+  // v1.6 #12 — routine 마지막 step 진입 시 route.params.endMethod 우선 (settingsCache 무시).
   // 캐시 미적중 시 default fallback. settingsLoaded 후 useEffect에서 정확값으로 갱신.
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(
+    ((route.params as { endMethod?: DismissMethod } | undefined)?.endMethod) ??
     getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod
   );
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
@@ -257,6 +262,9 @@ export default function AlarmScreen({ navigation }: Props) {
   // 이중 가드 — routine 진행 중 단일 timer 알림 발화로 잘못 진입한 경우 즉시 RoutineList 로 redirect.
   // (RoutineList 가 active routine sync 로 inline 진행 영역 자동 마운트)
   useEffect(() => {
+    // v1.6 #12 — 마지막 step camera 정공 진입은 redirect ❌ (의도된 navigate).
+    const fromRoutine = (route.params as { fromRoutine?: string } | undefined)?.fromRoutine;
+    if (fromRoutine === 'last_step') return;
     AsyncStorage.getItem('isRoutineActive').then(async v => {
       if (v !== 'true') return;
       const arRaw = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
@@ -268,7 +276,7 @@ export default function AlarmScreen({ navigation }: Props) {
         }
       } catch {}
     }).catch(() => {});
-  }, [navigation]);
+  }, [navigation, route.params]);
 
   // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
   // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
@@ -281,15 +289,23 @@ export default function AlarmScreen({ navigation }: Props) {
     };
   }, []);
 
-  const goHome = useCallback(() => {
+  const goHome = useCallback(async () => {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
+    setDismissingHome(true);
     if (autoResultTimeoutRef.current) {
       clearTimeout(autoResultTimeoutRef.current);
       autoResultTimeoutRef.current = null;
     }
+    // v1.6 #12 — 마지막 step 진입한 경우 routine 정상 종료 + RoutineList 복귀.
+    const fromRoutine = (route.params as { fromRoutine?: string } | undefined)?.fromRoutine;
+    if (fromRoutine === 'last_step') {
+      await stopRoutine().catch(() => {});
+      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+      return;
+    }
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  }, [navigation]);
+  }, [navigation, route.params]);
 
   // 광고 종료 후 분기: 카메라 결과 화면 OR 홈
   const handleAfterAd = useCallback(() => {
@@ -426,7 +442,9 @@ export default function AlarmScreen({ navigation }: Props) {
       const durationRaw = pairs[4][1];
       const selectedRaw = pairs[5][1];
       const alarmEnabled = alarmRaw !== 'false';
-      if (method) setDismissMethod(method);
+      // v1.6 #12 — routine 마지막 step 진입 시 settingsCache override ❌ (route.params.endMethod 우선).
+      const routeEndMethod = (route.params as { endMethod?: DismissMethod } | undefined)?.endMethod;
+      if (method && !routeEndMethod) setDismissMethod(method);
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
       if (durationRaw !== null) {
         const n = parseInt(durationRaw, 10);
@@ -884,9 +902,12 @@ export default function AlarmScreen({ navigation }: Props) {
     return () => anim.stop();
   }, [remainingMs, dismissMethod, isShuffling, isRetryBannerVisible, resultState, dangerBlink]);
 
-  // 설정 로드 전 빈 화면
+  // 설정 로드 전 빈 화면 / goHome 호출 후 빈 검은 화면 (광고 닫힘 → 화면 전환 잔상 차단)
   if (!settingsLoaded) {
     return <SafeAreaView style={styles.container} />;
+  }
+  if (dismissingHome) {
+    return <SafeAreaView style={[styles.container, { backgroundColor: '#000' }]} />;
   }
 
   // 결과 화면 (최우선 렌더)

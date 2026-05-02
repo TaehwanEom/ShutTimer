@@ -18,6 +18,7 @@ import AlarmKit
 private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"
 private let KEY_ALARM_IDS_PREFIX = "chain_alarms_"
+private let KEY_ROUTINE_SNAPSHOT = "routine_snapshot"
 
 private func readAlarmIds(routineId: String) -> [String] {
     guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return [] }
@@ -28,6 +29,26 @@ private func readAlarmIds(routineId: String) -> [String] {
         return []
     }
     return ids
+}
+
+// v1.6 #4-A — snapshot read 헬퍼 (chain_alarms 미사용 영역 fallback. 위젯 측과 동일 패턴).
+private struct LARoutineSnapshot: Codable {
+    let routineId: String
+    var currentAlarmId: String
+}
+
+private func readSnapshotCurrentAlarmId(routineId: String) -> String? {
+    guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return nil }
+    guard let raw = defaults.string(forKey: KEY_ROUTINE_SNAPSHOT),
+          let data = raw.data(using: .utf8),
+          let snapshot = try? JSONDecoder().decode(LARoutineSnapshot.self, from: data),
+          snapshot.routineId == routineId else { return nil }
+    return snapshot.currentAlarmId
+}
+
+private func clearRoutineSnapshot() {
+    guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return }
+    defaults.removeObject(forKey: KEY_ROUTINE_SNAPSHOT)
 }
 
 private func writeControlSignal(action: String, routineId: String) {
@@ -56,11 +77,35 @@ struct PauseRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 pause.
+        // 진단 로그 — App Group key 에 별도 write (RN polling 이 read + console.log).
+        var debug = "start"
         let alarmIds = readAlarmIds(routineId: routineId)
+        debug += "|chain:\(alarmIds.count)"
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.pause(id: id)
             }
+        }
+        if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId) {
+            debug += "|snap:\(currentAlarmId.prefix(8))"
+            if let currentUuid = UUID(uuidString: currentAlarmId) {
+                do {
+                    try AlarmManager.shared.pause(id: currentUuid)
+                    debug += "|paused:ok"
+                } catch {
+                    debug += "|paused:err:\(String(describing: error).prefix(60))"
+                }
+            } else {
+                debug += "|uuid:fail"
+            }
+        } else {
+            debug += "|snap:missing"
+        }
+
+        // 디버그 정보 별도 key 에 write (signal.action 은 'pause' 그대로 유지)
+        if let defaults = UserDefaults(suiteName: APP_GROUP) {
+            defaults.set(debug, forKey: "pause_debug_info")
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -88,11 +133,16 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms + snapshot.currentAlarmId 둘 다 resume.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.resume(id: id)
             }
+        }
+        if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId),
+           let currentUuid = UUID(uuidString: currentAlarmId) {
+            try? AlarmManager.shared.resume(id: currentUuid)
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -120,11 +170,16 @@ struct StopRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms + snapshot.currentAlarmId 둘 다 cancel + snapshot 정리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.cancel(id: id)
             }
+        }
+        if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId),
+           let currentUuid = UUID(uuidString: currentAlarmId) {
+            try? AlarmManager.shared.cancel(id: currentUuid)
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -136,6 +191,8 @@ struct StopRoutineIntent: LiveActivityIntent {
         if let defaults = UserDefaults(suiteName: APP_GROUP) {
             defaults.removeObject(forKey: "\(KEY_ALARM_IDS_PREFIX)\(routineId)")
         }
+        // v1.6 #4-A — snapshot 정리 (RN polling 대기 없이 즉시 cleanup).
+        clearRoutineSnapshot()
 
         writeControlSignal(action: "stop", routineId: routineId)
         return .result()

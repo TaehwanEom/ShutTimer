@@ -564,14 +564,16 @@ async function scheduleConfirmPromptViaAlarmKit(
     const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
     const title = nextStepName ? `${baseTitle} ${nextStepName}` : baseTitle;
 
+    // v1.6 #13 — 마지막 step (nextStepName 미전달 = 1-step routine) 의 alerting UI = "밀어서 중단" 만 (secondary 제거).
+    const isLastStep = !nextStepName;
     const id = await AlarmkitBridge.scheduleAlarm({
       routineId,
       title,
       fireAt: fireAt.getTime(),
       stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
       type: 'confirm_prompt',
-      // v1.6 hotfix — 잠금 alerting UI 에 "다음 진행" 버튼 노출 (AdvanceNextStepIntent 결합)
-      secondaryLabel: i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
+      // 마지막 step 일 때 secondaryLabel 미전달 → AlarmkitBridgeModule 측 hasSecondary=false 분기로 진입 → "다음 진행" 버튼 미노출.
+      secondaryLabel: isLastStep ? undefined : i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
       soundName: soundItem.pushSound,
     });
     Logger.warn('routine', `confirm_prompt akId=${id}`);

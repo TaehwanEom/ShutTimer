@@ -32,6 +32,7 @@ import {
   writeRoutineSnapshot,
   clearRoutineSnapshot,
   readRoutineSnapshot,
+  clearChainAlarms,
   type RoutineSnapshot,
   type RoutineSnapshotStep,
 } from './appGroupSync';
@@ -354,10 +355,20 @@ async function endLiveActivity(): Promise<void> {
 // v1.6 Phase 12 — reinstallChainsIfAuto 함수 제거 (auto 모드 영구 미사용).
 
 async function fullCleanup(): Promise<void> {
+  // v1.6 #9 — native cleanup: snapshot 기반 currentAlarm cancel + chain alarm 정리 (cancelBackgroundNotif loop 외 fallback).
+  const snapshot = readRoutineSnapshot();
+  if (snapshot?.currentAlarmId) {
+    await AlarmkitBridge.cancelAlarm(snapshot.currentAlarmId).catch(() => {});
+  }
+  if (snapshot?.routineId) {
+    clearChainAlarms(snapshot.routineId);
+  }
   await cancelBackgroundNotif();
   await endLiveActivity();
   await clearActiveRoutine();
   await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
+  // v1.6 #9 — snapshot 명시적 정리 (cancelBackgroundNotif 끝에서 이미 호출, idempotent).
+  clearRoutineSnapshot();
 }
 
 // ─── 공개 API ───────────────────────────────────────────────
@@ -572,6 +583,9 @@ export async function pauseRoutine(): Promise<ActiveRoutine | null> {
   const paused: ActiveRoutine = { ...ar, pausedAt: Date.now() };
   await saveActiveRoutine(paused);
   await cancelBackgroundNotif();
+  // v1.6 #4-D — pause 시 snapshot 명시적 cleanup (위젯 측 perform() race 방지).
+  // cancelBackgroundNotif 가 이미 clearRoutineSnapshot 호출하지만 idempotent.
+  clearRoutineSnapshot();
   // v1.6 발견 #D — pause 시 LA 종료 (잠금화면 카운트다운 진행 표시 ↔ 실제 알람 X 혼란 차단).
   // resume 시 reinstallChainsIfAuto + startOrUpdateLiveActivity 가 자동 재시작.
   await endLiveActivity();

@@ -92,9 +92,6 @@ public class AlarmkitBridgeModule: Module {
         )
       }
 
-      let fireDate = Date(timeIntervalSince1970: params.fireAt / 1000.0)
-      let schedule = Alarm.Schedule.fixed(fireDate)
-
       // v1.6 Phase 5 — iOS 26.1+ 에서 stopButton deprecated. #available 분기.
       // v1.6 hotfix — confirm_prompt 타입 + secondaryLabel 전달 시 secondary button 결합.
       // AdvanceNextStepIntent 가 App Group "la_control_signal" 에 advance 작성 → RN polling 처리.
@@ -162,36 +159,75 @@ public class AlarmkitBridgeModule: Module {
       // v1.6 hotfix — confirm_prompt + secondaryLabel 시 secondaryIntent 결합 (AdvanceNextStepIntent).
       // v1.6 hotfix — timer_main 에 stopIntent: OpenAppDismissIntent 결합. slide-to-stop 시
       //   앱 자동 foreground 진입 → AlarmScreen → 사용자 dismiss method (탭/흔들기/카메라) 정공.
+      // v1.6 옵션 C 통합 — 모든 alarm 분기 .timer(duration:) 통합 (countdown state → pause 호환).
+      // AlarmManager.pause(id:) = countdown state alarm 만 호환 (Apple 공식). fixed schedule = scheduled state = throw.
+      // 모든 분기 .timer(duration:) + Countdown/Paused presentation 통일.
+      let nowMsAll = Date().timeIntervalSince1970 * 1000.0
+      let durationSecAll = max(0.001, (params.fireAt - nowMsAll) / 1000.0)
+      let pauseButtonAll = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "일시정지"),
+        textColor: .white,
+        systemImageName: "pause.fill"
+      )
+      let resumeButtonAll = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "재개"),
+        textColor: .white,
+        systemImageName: "play.fill"
+      )
+      let countdownAll = AlarmPresentation.Countdown(
+        title: LocalizedStringResource(stringLiteral: params.title),
+        pauseButton: pauseButtonAll
+      )
+      let pausedAll = AlarmPresentation.Paused(
+        title: LocalizedStringResource(stringLiteral: "일시정지됨"),
+        resumeButton: resumeButtonAll
+      )
+      let timerPresentationAll = AlarmPresentation(
+        alert: alert,
+        countdown: countdownAll,
+        paused: pausedAll
+      )
+      let timerAttributesAll = AlarmAttributes<ShutTimerAlarmMetadata>(
+        presentation: timerPresentationAll,
+        tintColor: Color.red
+      )
+
       let id = UUID()
       let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
       if params.type == "chain" {
-        config = .alarm(
-          schedule: schedule,
-          attributes: attributes,
+        config = .timer(
+          duration: durationSecAll,
+          attributes: timerAttributesAll,
           stopIntent: NextStepIntent(),
           sound: alertSound
         )
       } else if params.type == "timer_main" {
-        config = .alarm(
-          schedule: schedule,
-          attributes: attributes,
+        config = .timer(
+          duration: durationSecAll,
+          attributes: timerAttributesAll,
           stopIntent: OpenAppDismissIntent(routineId: params.routineId),
           sound: alertSound
         )
       } else if hasSecondary {
-        // v1.6 hotfix — confirm_prompt 에 stopIntent 도 결합. iOS alerting UI 1초 자동 dismiss 회피 가설.
-        // slide-to-stop 시 secondaryIntent 와 동일하게 advance 처리 (사용자 의도 정합).
-        config = .alarm(
-          schedule: schedule,
-          attributes: attributes,
-          stopIntent: AdvanceNextStepIntent(routineId: params.routineId),
+        config = .timer(
+          duration: durationSecAll,
+          attributes: timerAttributesAll,
+          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
           secondaryIntent: AdvanceNextStepIntent(routineId: params.routineId),
           sound: alertSound
         )
+      } else if params.type == "confirm_prompt" {
+        config = .timer(
+          duration: durationSecAll,
+          attributes: timerAttributesAll,
+          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
+          sound: alertSound
+        )
       } else {
-        config = .alarm(
-          schedule: schedule,
-          attributes: attributes,
+        config = .timer(
+          duration: durationSecAll,
+          attributes: timerAttributesAll,
+          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
           sound: alertSound
         )
       }

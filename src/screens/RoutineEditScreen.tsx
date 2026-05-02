@@ -151,9 +151,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const [days, setDays] = useState<number[]>([]);
   const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
-  // v1.6 hotfix — "다음 루틴 진행" 누름 후 다음 step 시작 전 대기 시간 (0~60초).
-  // 양쪽 흐름 (앱 내 + 잠금/백그라운드) 동일 카운트.
-  const [autoCountdownSec, setAutoCountdownSec] = useState<number>(5);
   const [steps, setSteps] = useState<LocalStep[]>(() => [
     { id: createStepId(), name: '', durationSeconds: 0 },
   ]);
@@ -214,8 +211,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       setDays(target.schedule?.days ?? []);
       setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
       setEndMethod(target.endMethod);
-      // v1.6 hotfix — autoCountdownSec 복원 (default 5 / 0~60 clamp)
-      setAutoCountdownSec(Math.max(0, Math.min(60, Math.floor(target.autoCountdownSec ?? 5))));
       setSteps(
         target.steps.map(s => ({
           id: s.id,
@@ -394,8 +389,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       soundKey,
       active: isEditMode ? originalActiveRef.current : true,
       endMethod,
-      // v1.6 hotfix — "다음 루틴 진행" 후 다음 step 시작 전 대기 (0~60초, default 5)
-      autoCountdownSec: Math.max(0, Math.min(60, Math.floor(autoCountdownSec))),
       createdAt: originalCreatedAtRef.current ?? Date.now(),
     };
     await upsertRoutine(routine);
@@ -633,39 +626,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
                     ]}
                   >
                     {t(`routine.endMethod.${opt}`)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* v1.6 hotfix — 다음 루틴 진행 대기 시간 (0~60초). 양쪽 흐름 동일 카운트. */}
-        <View style={styles.endMethodSection}>
-          <Text style={styles.settingLabel}>
-            {t('routine.edit.fieldAutoCountdown', { defaultValue: '다음 루틴 대기 시간' })}
-          </Text>
-          <View style={styles.endMethodSegment}>
-            {[0, 3, 5, 10, 30, 60].map(opt => {
-              const selected = autoCountdownSec === opt;
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
-                  onPress={() => {
-                    setAutoCountdownSec(opt);
-                    markDirty();
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.endMethodBtnText,
-                      selected && styles.endMethodBtnTextSelected,
-                    ]}
-                  >
-                    {opt === 0
-                      ? t('routine.edit.autoCountdownOff', { defaultValue: '없음' })
-                      : `${opt}${t('common.unitSecondsShort', { defaultValue: '초' })}`}
                   </Text>
                 </TouchableOpacity>
               );

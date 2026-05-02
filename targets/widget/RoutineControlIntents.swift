@@ -120,11 +120,35 @@ struct PauseRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms 영역 (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 처리.
+        // 진단 — 단계별 결과 별도 App Group key 에 write.
+        var debug = "widget:start"
         let alarmIds = readAlarmIds(routineId: routineId)
+        debug += "|chain:\(alarmIds.count)"
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.pause(id: id)
             }
+        }
+        if let snapshot = readRoutineSnapshot(),
+           snapshot.routineId == routineId {
+            debug += "|snap:\(snapshot.currentAlarmId.prefix(8))"
+            if let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
+                do {
+                    try AlarmManager.shared.pause(id: currentUuid)
+                    debug += "|paused:ok"
+                } catch {
+                    debug += "|paused:err:\(String(describing: error).prefix(60))"
+                }
+            } else {
+                debug += "|uuid:fail"
+            }
+        } else {
+            debug += "|snap:missing"
+        }
+
+        if let defaults = UserDefaults(suiteName: APP_GROUP) {
+            defaults.set(debug, forKey: "pause_debug_info")
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -152,11 +176,17 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms 영역 + snapshot.currentAlarmId 둘 다 처리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.resume(id: id)
             }
+        }
+        if let snapshot = readRoutineSnapshot(),
+           snapshot.routineId == routineId,
+           let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
+            try? AlarmManager.shared.resume(id: currentUuid)
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -184,11 +214,18 @@ struct StopRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.6 #4-A — chain_alarms 영역 + snapshot.currentAlarmId 둘 다 cancel.
+        // (chain_alarms 미사용 케이스 = snapshot 만 cancel → 다음 step alerting fire 차단)
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
                 try? AlarmManager.shared.cancel(id: id)
             }
+        }
+        if let snapshot = readRoutineSnapshot(),
+           snapshot.routineId == routineId,
+           let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
+            try? AlarmManager.shared.cancel(id: currentUuid)
         }
 
         for activity in Activity<ShutTimerActivityAttributes>.activities {
@@ -200,6 +237,8 @@ struct StopRoutineIntent: LiveActivityIntent {
         if let defaults = UserDefaults(suiteName: APP_GROUP) {
             defaults.removeObject(forKey: "\(KEY_ALARM_IDS_PREFIX)\(routineId)")
         }
+        // v1.6 #4-A — snapshot 정리 (RN polling 대기 없이 위젯 측 즉시 cleanup).
+        clearRoutineSnapshot()
 
         writeControlSignal(action: "stop", routineId: routineId)
         return .result()
@@ -212,12 +251,7 @@ struct StopRoutineIntent: LiveActivityIntent {
 @available(iOS 26.0, *)
 private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx: Int) async throws -> UUID {
     let nextStep = snapshot.steps[nextStepIdx]
-    let durationMs = nextStep.durationSec * 1000.0
-    // v1.6 hotfix — 다음 step 시작 전 대기 시간 (autoCountdownSec). default 5초. 0~60 clamp.
-    let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
-    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + countdownSec * 1000.0 + durationMs
-    let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
-    let schedule = Alarm.Schedule.fixed(nextFireDate)
+    let durationSec = max(0.001, nextStep.durationSec)
 
     // v1.6 hotfix B1 — alerting UI title 에 다음 step name 추가
     let titleSuffix: String
@@ -258,7 +292,31 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
             secondaryButtonBehavior: .custom
         )
     }
-    let presentation = AlarmPresentation(alert: alert)
+
+    // v1.6 옵션 C 통합 — .timer(duration:) + Countdown/Paused presentation (pause API 호환).
+    let pauseButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "일시정지"),
+        textColor: .white,
+        systemImageName: "pause.fill"
+    )
+    let resumeButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "재개"),
+        textColor: .white,
+        systemImageName: "play.fill"
+    )
+    let countdownContent = AlarmPresentation.Countdown(
+        title: LocalizedStringResource(stringLiteral: alertTitle),
+        pauseButton: pauseButton
+    )
+    let pausedContent = AlarmPresentation.Paused(
+        title: LocalizedStringResource(stringLiteral: "일시정지됨"),
+        resumeButton: resumeButton
+    )
+    let presentation = AlarmPresentation(
+        alert: alert,
+        countdown: countdownContent,
+        paused: pausedContent
+    )
     let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,
         tintColor: Color.red
@@ -272,8 +330,8 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
     }
 
     let id = UUID()
-    let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata> = .alarm(
-        schedule: schedule,
+    let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata> = .timer(
+        duration: durationSec,
         attributes: attributes,
         stopIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
         secondaryIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
@@ -340,18 +398,13 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
-            // v1.6 hotfix — autoCountdownSec 반영. 다음 step 종료 시점 = countdown + duration 후.
-            let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+            // v1.6 — 5초 대기 제거. 다음 step 종료 = duration 후.
             let nowMs = Date().timeIntervalSince1970 * 1000.0
-            let countdownMs = countdownSec * 1000.0
-            snapshot.stepEndAt = nowMs + countdownMs + snapshot.steps[nextIdx].durationSec * 1000.0
+            snapshot.stepEndAt = nowMs + snapshot.steps[nextIdx].durationSec * 1000.0
             snapshot.savedAt = nowMs
             writeRoutineSnapshot(snapshot)
 
-            // v1.6 hotfix — LA 즉시 갱신. countdownSec > 0 시 stage='pre_advance' (카운트 표시),
-            // = 0 시 stage='step' (즉시 다음 step 진행 중). LA stepEndAt 분리 (snapshot 과 다름):
-            //   pre_advance LA stepEndAt = 카운트 종료 시점 (사용자 시점 카운트다운 표시)
-            //   step LA stepEndAt = 다음 step 종료 시점 (snapshot.stepEndAt 정합)
+            // LA 즉시 갱신 — stage='step' 단일.
             let nextStepName = snapshot.steps[nextIdx].name
             for activity in Activity<ShutTimerActivityAttributes>.activities {
                 if activity.attributes.routineId == routineId {
@@ -361,13 +414,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
                     newState.paused = false
                     newState.currentStepIndex = nextIdx
                     newState.totalSteps = snapshot.totalSteps
-                    if countdownSec > 0 {
-                        newState.stage = "pre_advance"
-                        newState.stepEndAt = nowMs + countdownMs
-                    } else {
-                        newState.stage = "step"
-                        newState.stepEndAt = snapshot.stepEndAt
-                    }
+                    newState.stage = "step"
+                    newState.stepEndAt = snapshot.stepEndAt
                     await activity.update(.init(state: newState, staleDate: nil))
                 }
             }

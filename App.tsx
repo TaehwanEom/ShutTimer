@@ -85,6 +85,7 @@ import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRouti
 import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
+import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
 import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
 // @v1.5-poc — 영구 내부 검증 도구. __DEV__ 조건부 require로 production 번들에서 완전 제외. dev client는 자동 require로 그대로 작동. 삭제 금지.
 const PoCPhotoValidationScreen = __DEV__
@@ -103,7 +104,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: undefined;
   Running: { mission: Mission | null; minutes: number };
-  Alarm: { missionId?: string; missionIcon?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
@@ -294,7 +295,7 @@ function AppNavigator() {
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
       if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
-        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
+        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
         navigationRef.current?.navigate('RoutineList');
         return;
       }
@@ -310,7 +311,7 @@ function AppNavigator() {
         // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
         // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
         // camera → RoutineAlarm (scan UI).
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === data.routineId);
         if (!r) {
@@ -318,11 +319,8 @@ function AppNavigator() {
           return;
         }
         if (!navigationRef.current?.isReady()) return;
-        if (r.endMethod === 'camera') {
-          navigationRef.current.navigate('RoutineAlarm', { routineId: data.routineId });
-        } else {
-          navigationRef.current.navigate('RoutineList');
-        }
+        // v1.6 A-1 — 모달 통일. 모든 endMethod (tap/shake/camera) = RoutineList → ActiveRoutineSection modal.
+        navigationRef.current.navigate('RoutineList');
         return;
       }
 
@@ -354,7 +352,7 @@ function AppNavigator() {
         if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
           // v1.6 Phase 12 — cold-start 알림 탭 경로도 LA stage 자동 전환
           await setLiveActivityStage('manual_prompt').catch(() => {});
-          // endMethod 별 분기. tap/shake → RoutineList (inline). camera → RoutineAlarm.
+          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === data.routineId);
           if (!r) {
@@ -362,11 +360,7 @@ function AppNavigator() {
             return;
           }
           if (!navigationRef.current?.isReady()) return;
-          if (r.endMethod === 'camera') {
-            navigationRef.current.navigate('RoutineAlarm', { routineId: data.routineId });
-          } else {
-            navigationRef.current.navigate('RoutineList');
-          }
+          navigationRef.current.navigate('RoutineList');
           return;
         }
         // 기본 알람 경로 — routine 진행 중이면 차단
@@ -384,6 +378,10 @@ function AppNavigator() {
     const sub = AlarmkitBridge.addListener('onAlarmStateChange', async (event) => {
       console.warn('[onAlarmStateChange]', event.alarmId, event.state, 'AppState:', AppState.currentState);
       if (event.state !== 'alerting') return;
+      // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
+      if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active') {
+        await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
+      }
       const meta = await loadAlarmMetadata(event.alarmId);
       if (!meta) return;
       if (!navigationRef.current?.isReady()) return;
@@ -409,7 +407,7 @@ function AppNavigator() {
         // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
         Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} routineId=${meta.routineId}`);
         await setLiveActivityStage('manual_prompt').catch(() => {});
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList') return;
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.routineId);
         if (!r) {
@@ -417,11 +415,8 @@ function AppNavigator() {
           return;
         }
         if (!navigationRef.current?.isReady()) return;
-        if (r.endMethod === 'camera') {
-          navigationRef.current.navigate('RoutineAlarm', { routineId: meta.routineId });
-        } else {
-          navigationRef.current.navigate('RoutineList');
-        }
+        // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
+        navigationRef.current.navigate('RoutineList');
       }
     });
     return () => sub.remove();
@@ -439,7 +434,7 @@ function AppNavigator() {
         if (!meta) return;
         const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
         // 다른 알림 핸들러가 이미 navigate 했으면 skip
-        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
+        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
 
         if (meta.type === 'chain') {
           // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). cold-start 잔존 mapping silent cleanup.
@@ -461,11 +456,8 @@ function AppNavigator() {
             navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
             return;
           }
-          if (r.endMethod === 'camera') {
-            navigationRef.current.navigate('RoutineAlarm', { routineId: meta.routineId });
-          } else {
-            navigationRef.current.navigate('RoutineList');
-          }
+          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
+          navigationRef.current.navigate('RoutineList');
         }
       } catch {}
     }, 1500);
@@ -501,20 +493,56 @@ function AppNavigator() {
         } else {
           // routine 측 — pause/resume = LA Intent 가 이미 native 처리. RN 은 ar 동기화만.
           // 위험 #X 정정: signal.timestamp = LA Intent perform 시점 (실제 누름 시각). RN polling 시점 X.
-          if (signal.action === 'pause') await pauseRoutineFromLA(signal.timestamp);
-          else if (signal.action === 'resume') await resumeRoutineFromLA(signal.timestamp);
+          // v1.6 B 영역 — 잠금 alerting "밀어서 중단" → OpenAppDismissIntent.perform → 앱 자동 진입 + routine 정지.
+          if (signal.action === 'open_app_dismiss') {
+            // v1.6 Fix 2 — emit try/finally 분리. throw 시에도 emit 보장.
+            try {
+              await stopRoutine();
+            } finally {
+              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+            }
+          }
+          else if (signal.action === 'pause') {
+            // 진단 — 위젯 측 PauseRoutineIntent.perform 의 단계별 결과 로그
+            const dbg = AlarmkitBridge.readAppGroupString('pause_debug_info');
+            console.warn('[PauseDebug]', dbg);
+            AlarmkitBridge.removeAppGroupKey('pause_debug_info');
+            // v1.6 #4-B Fix 2 — emit try/finally 분리. pauseRoutineFromLA throw 시에도 emit 보장 (UI 동기화).
+            try {
+              await pauseRoutineFromLA(signal.timestamp);
+            } finally {
+              DeviceEventEmitter.emit('routinePausedExternally', { routineId: signal.routineId, timestamp: signal.timestamp });
+            }
+          }
+          else if (signal.action === 'resume') {
+            try {
+              await resumeRoutineFromLA(signal.timestamp);
+            } finally {
+              DeviceEventEmitter.emit('routineResumedExternally', { routineId: signal.routineId, timestamp: signal.timestamp });
+            }
+          }
           else if (signal.action === 'stop') {
-            await stopRoutine();
             // v1.6 Phase 12 — 위젯 ✕ stop 시 RoutineListScreen 의 activeManualRoutineId 정리 트리거.
             // (onClose 콜백은 JS 내부 stop 에서만 호출 → 외부 stop 경로 별도 emit 필요)
-            DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+            try {
+              await stopRoutine();
+            } finally {
+              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+            }
           }
           // v1.6 hotfix — AdvanceNextStepIntent.perform() native 처리 완료 신호.
           // native 가 alarm stop + 다음 step schedule + snapshot 갱신 완료 → RN 은 ar/LA 동기화만.
-          else if (signal.action === 'advance_done') await syncRoutineFromSnapshot(signal.routineId);
+          else if (signal.action === 'advance_done') {
+            await syncRoutineFromSnapshot(signal.routineId);
+            // 앱 active 시 ActiveRoutineSection modal 자동 dismiss + 사운드 stop
+            DeviceEventEmitter.emit('routineAdvancedExternally', { routineId: signal.routineId });
+          }
           // v1.6 Phase 12 — 위젯 "다음 진행" Button (AdvanceNextStepIntent) perform 후 routine advance
           // (native 처리 fallback 또는 iOS<26 경로).
-          else if (signal.action === 'advance') await advanceRoutineFromLA(signal.routineId);
+          else if (signal.action === 'advance') {
+            await advanceRoutineFromLA(signal.routineId);
+            DeviceEventEmitter.emit('routineAdvancedExternally', { routineId: signal.routineId });
+          }
         }
       } catch (e) {
         Logger.warn('LAControl', `signal handle failed: ${e}`);
@@ -548,7 +576,7 @@ function AppNavigator() {
       // L331 getLastNotificationResponseAsync 핸들러가 이미 RoutineList/RoutineAlarm 로 navigate 했으면 skip
       // (알림 탭으로 앱 진입 시 양쪽 모두 fire → RoutineAlarm 2개 stack 되는 회귀 차단)
       const currentRoute = navigationRef.current.getCurrentRoute()?.name;
-      if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm') return;
+      if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
       restoreRoutineState()
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
@@ -566,11 +594,8 @@ function AppNavigator() {
               return;
             }
             if (!navigationRef.current?.isReady()) return;
-            if (r.endMethod === 'camera') {
-              navigationRef.current.navigate('RoutineAlarm', { routineId: res.routineId });
-            } else {
-              navigationRef.current.navigate('RoutineList');
-            }
+            // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
+            navigationRef.current.navigate('RoutineList');
           }
         })
         .catch((e) => Logger.warn('AppNavigator', `restoreRoutineState failed: ${e}`));

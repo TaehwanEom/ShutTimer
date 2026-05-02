@@ -14,6 +14,7 @@ import {
   Animated,
   Modal,
   Vibration,
+  DeviceEventEmitter,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -26,7 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
-import { Routine, ActiveRoutine } from '../constants/routines';
+import { Routine, ActiveRoutine, loadActiveRoutine, loadRoutines } from '../constants/routines';
 import {
   startRoutine,
   completeCurrentMission,
@@ -40,13 +41,9 @@ import { SETTINGS_KEY } from '../constants/settings';
 
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 
-// tap/shake/camera 모드의 'nextCountdown' stage 카운트다운 시간 (초). 사용자 prep 시간.
-const NEXT_COUNTDOWN_SEC = 5;
-
-// camera 모드 awaitingConfirm 시 RoutineAlarm 자동 진입 — 같은 step 의 같은 awaitingConfirm 세션이면 1회만 navigate.
-// (사용자가 RoutineAlarm 에서 dismiss 후 RoutineList 로 돌아왔을 때 무한 loop 차단)
-// sig: routineId + startedAt + currentStepIndex. step 진행 / 새 routine 시작 시 sig 변경 → 재진입 허용.
-let cameraScanNavigatedFor: string | null = null;
+// v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate 시 중복 push 차단.
+// sig: routineId + currentStepIndex. AlarmScreen 의 stopRoutine 후에는 routine 정리되므로 sig 무효.
+let lastStepNavigatedFor: string | null = null;
 
 function formatDurationLabel(sec: number): string {
   if (sec <= 0) return '0분';
@@ -82,8 +79,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   const completingRef = useRef(false);
   const [modalVisible, setModalVisible] = useState(false);
   // v1.6 Phase 12 — 'auto' / 'complete' stage 제거 (auto 모드 영구 미사용).
-  const [modalStage, setModalStage] = useState<'alarm' | 'next' | 'nextCountdown'>('alarm');
-  const [autoCountdown, setAutoCountdown] = useState(60);
+  // v1.6 — 'alarm' 단계 (알람 종료 모달) 제거. step 종료 시 즉시 'next' 단계 (다음 진행 모달).
+  // v1.6 — 'nextCountdown' 단계 제거. "다음 루틴 시작" 누르면 즉시 다음 step 진행.
+  const [modalStage, setModalStage] = useState<'alarm' | 'next'>('next');
   const modalVisibleRef = useRef(false);
   useEffect(() => { modalVisibleRef.current = modalVisible; }, [modalVisible]);
 
@@ -93,6 +91,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   useEffect(() => {
     if (initStartedRef.current) return;
     initStartedRef.current = true;
+    // v1.6 #12 — 새 routine 시작 시 module-level navigate 가드 reset (재시도 / 다른 routine 진입 시 차단 방지).
+    lastStepNavigatedFor = null;
     let cancelled = false;
     const init = async () => {
       const res = await startRoutine(routineId);
@@ -137,18 +137,22 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         setAr(r.ar);
         setIsPaused(r.ar.pausedAt !== null);
         if (r.ar.awaitingConfirm) {
-          if (r.routine.endMethod === 'camera') {
-            const sig = `${r.routine.id}-${r.ar.startedAt}-${r.ar.currentStepIndex}`;
-            if (cameraScanNavigatedFor !== sig) {
-              cameraScanNavigatedFor = sig;
-              // App.tsx 콜드 스타트 핸들러가 이미 RoutineAlarm 로 navigate 했으면 skip (이중 push 차단)
-              const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
-              if (currentRoute !== 'RoutineAlarm') {
-                navigation.navigate('RoutineAlarm', { routineId: r.routine.id });
-              }
+          const isLastStep = r.ar.currentStepIndex + 1 >= r.routine.steps.length;
+          if (isLastStep) {
+            // v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate.
+            const sig = `${r.routine.id}-${r.ar.currentStepIndex}`;
+            const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
+            if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
+              lastStepNavigatedFor = sig;
+              navigation.navigate('Alarm', {
+                fromRoutine: 'last_step',
+                routineId: r.routine.id,
+                endMethod: r.routine.endMethod,
+              });
             }
           } else {
-            setModalStage('alarm');
+            // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
+            setModalStage('next');
             setModalVisible(true);
             startAlarmEffects();
           }
@@ -162,8 +166,10 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
   // ─── 카운트다운 tick ──────────────────────────────────────
   useEffect(() => {
-    console.log('[V1 timer-tick] effect run', { routine: !!routine, ar: !!ar, isPaused, awaitingConfirm: ar?.awaitingConfirm, modalVisible });
-    if (!routine || !ar || isPaused || ar.awaitingConfirm || modalVisible) {
+    console.log('[V1 timer-tick] effect run', { routine: !!routine, ar: !!ar, isPaused, pausedAt: ar?.pausedAt, awaitingConfirm: ar?.awaitingConfirm, modalVisible });
+    // v1.6 #4-C Fix 1 — ar.pausedAt 가드 추가. 위젯 pause 신호 폴링 처리 후 ar.pausedAt 가 갱신됐지만
+    // setIsPaused(true) emit 가 race 로 늦으면 tick 진행 → 시간 mismatch. ar.pausedAt 검사로 확실 차단.
+    if (!routine || !ar || isPaused || ar.pausedAt !== null || ar.awaitingConfirm || modalVisible) {
       if (tickRef.current) { console.log('[V1 timer-tick] EARLY CLEANUP'); clearInterval(tickRef.current); tickRef.current = null; }
       return;
     }
@@ -292,13 +298,25 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       if (res.kind === 'advance_confirm') {
         setRoutine(res.routine);
         setAr(res.ar);
-        if (res.routine.endMethod === 'camera') {
-          navigation.navigate('RoutineAlarm', { routineId: res.routine.id });
-        } else {
-          setModalStage('alarm');
-          setModalVisible(true);
-          startAlarmEffects();
+        const isLastStep = res.ar.currentStepIndex + 1 >= res.routine.steps.length;
+        if (isLastStep) {
+          // v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate.
+          const sig = `${res.routine.id}-${res.ar.currentStepIndex}`;
+          const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
+          if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
+            lastStepNavigatedFor = sig;
+            navigation.navigate('Alarm', {
+              fromRoutine: 'last_step',
+              routineId: res.routine.id,
+              endMethod: res.routine.endMethod,
+            });
+          }
+          return;
         }
+        // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
+        setModalStage('next');
+        setModalVisible(true);
+        startAlarmEffects();
         return;
       }
     } finally {
@@ -317,20 +335,6 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       if (next) { setAr(next); setIsPaused(true); }
     }
   }, [routine, ar, isPaused]);
-
-  // ─── 'nextCountdown' stage 게이지 — 5초 동안 0→1 선형 보간 (depletion 시각화)
-  const nextCountdownAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (modalStage !== 'nextCountdown') return;
-    nextCountdownAnim.setValue(0);
-    const animation = Animated.timing(nextCountdownAnim, {
-      toValue: 1,
-      duration: NEXT_COUNTDOWN_SEC * 1000,
-      useNativeDriver: false, // SVG strokeDashoffset 은 native driver 미지원
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [modalStage, nextCountdownAnim]);
 
   // ─── 길게 누르기 게이지 (1초 hold → 정지) ─────────────
   const longPressAnim = useRef(new Animated.Value(0)).current;
@@ -420,17 +424,6 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     }
   }, [onClose]);
 
-  // 'next' → 'nextCountdown' 전환. tap/shake/camera 모드 prep 시간 (NEXT_COUNTDOWN_SEC 초) 노출.
-  const handleStartNextWithCountdown = useCallback(() => {
-    setAutoCountdown(NEXT_COUNTDOWN_SEC);
-    setModalStage('nextCountdown');
-  }, []);
-
-  // 'nextCountdown' → 'next' preview 복귀. 사용자가 카운트다운 도중 취소 시.
-  const handleCancelCountdown = useCallback(() => {
-    setModalStage('next');
-  }, []);
-
   const handleStopFromModal = useCallback(async () => {
     if (completingRef.current) return;
     completingRef.current = true;
@@ -450,21 +443,10 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
   // v1.6 Phase 12 — handleCompleteConfirm 제거 ('complete' stage 미사용).
 
-  // v1.6 Phase 12 — 'auto' / 'complete' stage 제거. 'nextCountdown' 만 처리 (tap/shake/camera 모드 prep 카운트다운).
+  // 흔들기 감지 — v1.6 A-1: 모달 통일 후 'next' 단계 안에서 흔들기 = 자동 진행 트리거.
+  // 일반 step = "다음 루틴 시작" 누른 효과. 마지막 step = "루틴 완료" 누른 효과 (handleStartNext 가 'end' 분기 → onClose).
   useEffect(() => {
-    if (!modalVisible) return;
-    if (modalStage !== 'nextCountdown') return;
-    if (autoCountdown <= 0) {
-      handleStartNext();
-      return;
-    }
-    const id = setTimeout(() => setAutoCountdown(c => c - 1), 1000);
-    return () => clearTimeout(id);
-  }, [modalVisible, modalStage, autoCountdown, handleStartNext]);
-
-  // 흔들기 감지
-  useEffect(() => {
-    if (!modalVisible || modalStage !== 'alarm' || !routine || routine.endMethod !== 'shake') return;
+    if (!modalVisible || modalStage !== 'next' || !routine || routine.endMethod !== 'shake') return;
     shakeCountRef.current = 0;
     lastShakeTimeRef.current = 0;
     Accelerometer.setUpdateInterval(100);
@@ -475,7 +457,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         lastShakeTimeRef.current = now;
         shakeCountRef.current += 1;
         if (shakeCountRef.current >= SHAKE_COUNT_REQUIRED) {
-          handleAlarmDismiss();
+          handleStartNext();
         }
       }
     });
@@ -484,7 +466,55 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       sub.remove();
       accelSubRef.current = null;
     };
-  }, [modalVisible, modalStage, routine, handleAlarmDismiss]);
+  }, [modalVisible, modalStage, routine, handleStartNext]);
+
+  // v1.6 — 위젯 / 잠금 alerting 측 외부 다음 진행 / 정지 → app modal dismiss + 사운드 stop + state sync.
+  useEffect(() => {
+    const subAdvance = DeviceEventEmitter.addListener('routineAdvancedExternally', async (payload: { routineId: string }) => {
+      if (!routineId || payload?.routineId !== routineId) return;
+      stopAlarmAudio();
+      stopAlarmVibe();
+      setModalVisible(false);
+      // routine state 측 갱신 — 다음 step UI 즉시 표시.
+      const nextAr = await loadActiveRoutine();
+      if (nextAr) {
+        setAr(nextAr);
+        const routines = await loadRoutines();
+        const r = routines.find(x => x.id === nextAr.routineId);
+        if (r) setRoutine(r);
+      }
+    });
+    const subCleared = DeviceEventEmitter.addListener('routineClearedExternally', (payload: { routineId: string }) => {
+      if (!routineId || payload?.routineId !== routineId) return;
+      stopAlarmAudio();
+      stopAlarmVibe();
+      setModalVisible(false);
+      onClose();
+    });
+    // v1.6 #4-C Fix 3 — 위젯 측 Pause / Resume 처리 후 RN ar 동기화.
+    // routineId match 가드 제거: payload.routineId !== local routineId 라도 AsyncStorage 의 ar 신뢰
+    //   (active routine 단일 invariant 보장 → mismatch 케이스 = stale routineId 차단 무관, ar 갱신 우선).
+    const subPaused = DeviceEventEmitter.addListener('routinePausedExternally', async (_payload: { routineId: string }) => {
+      const nextAr = await loadActiveRoutine();
+      if (nextAr && nextAr.routineId === routineId) {
+        setAr(nextAr);
+        setIsPaused(nextAr.pausedAt !== null);
+      }
+    });
+    const subResumed = DeviceEventEmitter.addListener('routineResumedExternally', async (_payload: { routineId: string }) => {
+      const nextAr = await loadActiveRoutine();
+      if (nextAr && nextAr.routineId === routineId) {
+        setAr(nextAr);
+        setIsPaused(nextAr.pausedAt !== null);
+      }
+    });
+    return () => {
+      subAdvance.remove();
+      subCleared.remove();
+      subPaused.remove();
+      subResumed.remove();
+    };
+  }, [routineId, onClose, stopAlarmAudio, stopAlarmVibe]);
 
   // unmount cleanup
   useEffect(() => {
@@ -656,7 +686,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
             {modalStage === 'next' && routine && ar && (() => {
               const nextStep = routine.steps[ar.currentStepIndex + 1];
-              if (!nextStep) return null;
+              const willEnd = !nextStep;
               return (
                 <>
                   <View style={{
@@ -667,96 +697,65 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
                   }}>
                     <MaterialIcons name="check" size={56} color={colors.onPrimary} />
                   </View>
-                  <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 6 }}>{t('routine.run.nextLabel', { defaultValue: '다음' })}</Text>
-                  <Text
-                    style={{ fontSize: 28, fontWeight: '800', color: colors.onBackground, marginBottom: 16, textAlign: 'center' }}
-                    numberOfLines={2}
-                  >
-                    {nextStep.name}
-                  </Text>
-                  <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 20 }}>
-                    {t('routine.run.nextQuestion', { defaultValue: '다음 루틴 진행하겠습니까?' })}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={handleStartNextWithCountdown}
-                    style={{
-                      width: '100%',
-                      backgroundColor: colors.primary,
-                      paddingVertical: 16,
-                      borderRadius: 14,
-                      alignItems: 'center',
-                      marginBottom: 16,
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onPrimary }}>{t('routine.run.startNext', { defaultValue: '다음 루틴 시작' })}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={handleStopFromModal}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>{t('routine.run.stop', { defaultValue: '루틴 정지' })}</Text>
-                  </TouchableOpacity>
+                  {willEnd ? (
+                    <>
+                      <Text
+                        style={{ fontSize: 28, fontWeight: '800', color: colors.onBackground, marginBottom: 16, textAlign: 'center' }}
+                        numberOfLines={2}
+                      >
+                        {t('routine.run.completeTitle', { defaultValue: '루틴 완료' })}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 20 }}>
+                        {t('routine.run.completeQuestion', { defaultValue: '모든 루틴을 완료했습니다' })}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleStartNext}
+                        style={{
+                          width: '100%',
+                          backgroundColor: colors.primary,
+                          paddingVertical: 16,
+                          borderRadius: 14,
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onPrimary }}>{t('routine.run.completeRoutine', { defaultValue: '루틴 완료' })}</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 6 }}>{t('routine.run.nextLabel', { defaultValue: '다음' })}</Text>
+                      <Text
+                        style={{ fontSize: 28, fontWeight: '800', color: colors.onBackground, marginBottom: 16, textAlign: 'center' }}
+                        numberOfLines={2}
+                      >
+                        {nextStep!.name}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: colors.secondary, marginBottom: 20 }}>
+                        {t('routine.run.nextQuestion', { defaultValue: '다음 루틴 진행하겠습니까?' })}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleStartNext}
+                        style={{
+                          width: '100%',
+                          backgroundColor: colors.primary,
+                          paddingVertical: 16,
+                          borderRadius: 14,
+                          alignItems: 'center',
+                          marginBottom: 16,
+                        }}
+                      >
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.onPrimary }}>{t('routine.run.startNext', { defaultValue: '다음 루틴 시작' })}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleStopFromModal}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>{t('routine.run.stop', { defaultValue: '루틴 정지' })}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </>
               );
             })()}
 
-            {modalStage === 'nextCountdown' && (() => {
-              const RING_SIZE = 120;
-              const RING_RADIUS = 50;
-              const RING_C = 2 * Math.PI * RING_RADIUS;
-              // depletion: 0 (full) → 1 (empty). dashoffset 으로 stroke 가시 영역 축소.
-              const ringDashoffset = nextCountdownAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, RING_C],
-              });
-              return (
-                <>
-                  <View style={{
-                    width: RING_SIZE, height: RING_SIZE,
-                    alignItems: 'center', justifyContent: 'center',
-                    marginBottom: 24,
-                  }}>
-                    <Svg width={RING_SIZE} height={RING_SIZE} style={{ position: 'absolute' }}>
-                      <SvgCircle
-                        cx={RING_SIZE / 2}
-                        cy={RING_SIZE / 2}
-                        r={RING_RADIUS}
-                        fill="none"
-                        stroke={colors.outlineVariant}
-                        strokeWidth={8}
-                        opacity={0.3}
-                      />
-                      <AnimatedSvgCircle
-                        cx={RING_SIZE / 2}
-                        cy={RING_SIZE / 2}
-                        r={RING_RADIUS}
-                        fill="none"
-                        stroke={colors.primary}
-                        strokeWidth={8}
-                        strokeDasharray={RING_C}
-                        strokeDashoffset={ringDashoffset}
-                        strokeLinecap="round"
-                        rotation="-90"
-                        origin={`${RING_SIZE / 2}, ${RING_SIZE / 2}`}
-                      />
-                    </Svg>
-                    <Text style={{ fontSize: 40, fontWeight: '800', color: colors.primary }}>
-                      {autoCountdown}
-                    </Text>
-                  </View>
-                  <Text style={{
-                    fontSize: 16, fontWeight: '700', color: colors.onBackground,
-                    marginBottom: 28, textAlign: 'center',
-                  }}>
-                    {t('routine.run.nextCountdownText', { n: autoCountdown, defaultValue: `${autoCountdown}초 후 다음 루틴이 시작됩니다` })}
-                  </Text>
-                  <TouchableOpacity onPress={handleCancelCountdown}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.error }}>
-                      {t('routine.run.cancel', { defaultValue: '취소' })}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              );
-            })()}
-
-            {/* v1.6 Phase 12 — 'auto' / 'complete' modal UI 제거 (auto 모드 영구 미사용). */}
+            {/* v1.6 — 'nextCountdown' / 'auto' / 'complete' modal UI 제거. "다음 루틴 시작" 즉시 진행. */}
           </View>
         </View>
       </Modal>

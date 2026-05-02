@@ -113,55 +113,89 @@ private func writeAdvanceFallbackSignal(routineId: String) {
 @available(iOS 26.0, *)
 private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) async throws -> UUID {
     let nextStep = snapshot.steps[nextStepIdx]
-    let durationMs = nextStep.durationSec * 1000.0
-    // v1.6 hotfix — 다음 step 시작 전 대기 시간 (autoCountdownSec). default 5초. 0~60 clamp.
-    let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
-    let nextFireAtMs = Date().timeIntervalSince1970 * 1000.0 + countdownSec * 1000.0 + durationMs
-    let nextFireDate = Date(timeIntervalSince1970: nextFireAtMs / 1000.0)
-    let schedule = Alarm.Schedule.fixed(nextFireDate)
+    let durationSec = max(0.001, nextStep.durationSec)
 
     // v1.6 hotfix B1 — alerting UI title 에 다음 step name 추가 ("다음 루틴 조깅" 형식).
     // 본 alarm 종료 시 alerting → 다음 진행 step = nextStepIdx+1. 마지막 시 nil.
+    // v1.6 #13 — 본 alarm 자체가 마지막 step (nextStepIdx == totalSteps - 1) 이면 secondary "다음 진행" 제거.
+    let isLastStep = nextStepIdx + 1 >= snapshot.totalSteps
     let titleSuffix: String
-    if nextStepIdx + 1 < snapshot.totalSteps {
+    if !isLastStep {
         titleSuffix = " " + snapshot.steps[nextStepIdx + 1].name
     } else {
         titleSuffix = ""
     }
     let alertTitle = snapshot.i18nConfirmPromptTitle + titleSuffix
 
-    // confirm_prompt + secondaryButton ("다음 진행") 결합 — 기존 AlarmkitBridgeModule.swift 정합.
+    // v1.6 #13 — 마지막 step alerting UI = "밀어서 중단" 만 (secondary 제거). 일반 = stopButton + secondary 결합.
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {
-        let secondaryButton = AlarmButton(
-            text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
-            textColor: .white,
-            systemImageName: "forward.fill"
-        )
-        alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: alertTitle),
-            secondaryButton: secondaryButton,
-            secondaryButtonBehavior: .custom
-        )
+        if isLastStep {
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle)
+            )
+        } else {
+            let secondaryButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
+                textColor: .white,
+                systemImageName: "forward.fill"
+            )
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                secondaryButton: secondaryButton,
+                secondaryButtonBehavior: .custom
+            )
+        }
     } else {
         let stopButton = AlarmButton(
             text: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptStop),
             textColor: .white,
             systemImageName: "stop.fill"
         )
-        let secondaryButton = AlarmButton(
-            text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
-            textColor: .white,
-            systemImageName: "forward.fill"
-        )
-        alert = AlarmPresentation.Alert(
-            title: LocalizedStringResource(stringLiteral: alertTitle),
-            stopButton: stopButton,
-            secondaryButton: secondaryButton,
-            secondaryButtonBehavior: .custom
-        )
+        if isLastStep {
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                stopButton: stopButton
+            )
+        } else {
+            let secondaryButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
+                textColor: .white,
+                systemImageName: "forward.fill"
+            )
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                stopButton: stopButton,
+                secondaryButton: secondaryButton,
+                secondaryButtonBehavior: .custom
+            )
+        }
     }
-    let presentation = AlarmPresentation(alert: alert)
+
+    // v1.6 옵션 C 통합 — .timer(duration:) + Countdown/Paused presentation (pause API 호환).
+    let pauseButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "일시정지"),
+        textColor: .white,
+        systemImageName: "pause.fill"
+    )
+    let resumeButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "재개"),
+        textColor: .white,
+        systemImageName: "play.fill"
+    )
+    let countdownContent = AlarmPresentation.Countdown(
+        title: LocalizedStringResource(stringLiteral: alertTitle),
+        pauseButton: pauseButton
+    )
+    let pausedContent = AlarmPresentation.Paused(
+        title: LocalizedStringResource(stringLiteral: "일시정지됨"),
+        resumeButton: resumeButton
+    )
+    let presentation = AlarmPresentation(
+        alert: alert,
+        countdown: countdownContent,
+        paused: pausedContent
+    )
     let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,
         tintColor: Color.red
@@ -175,13 +209,24 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
     }
 
     let id = UUID()
-    let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata> = .alarm(
-        schedule: schedule,
-        attributes: attributes,
-        stopIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
-        secondaryIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
-        sound: alertSound
-    )
+    // v1.6 #13 — 마지막 step = secondaryIntent 제거. stopIntent: OpenAppDismissIntent 만 (밀어서 중단 → 앱 진입 + routine 정지).
+    let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
+    if isLastStep {
+        config = .timer(
+            duration: durationSec,
+            attributes: attributes,
+            stopIntent: OpenAppDismissIntent(routineId: snapshot.routineId),
+            sound: alertSound
+        )
+    } else {
+        config = .timer(
+            duration: durationSec,
+            attributes: attributes,
+            stopIntent: OpenAppDismissIntent(routineId: snapshot.routineId),
+            secondaryIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
+            sound: alertSound
+        )
+    }
     _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
     return id
 }
@@ -239,10 +284,9 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.completedStepIndices = prev
             snapshot.currentStepIndex = nextIdx
             snapshot.currentAlarmId = newId.uuidString
-            // v1.6 hotfix — autoCountdownSec 반영. 다음 step 종료 시점 = countdown + duration 후.
-            let countdownSec = max(0.0, min(60.0, snapshot.autoCountdownSec ?? 5.0))
+            // v1.6 — 5초 대기 제거. 다음 step 종료 시점 = duration 후.
             let nowMs = Date().timeIntervalSince1970 * 1000.0
-            snapshot.stepEndAt = nowMs + countdownSec * 1000.0 + snapshot.steps[nextIdx].durationSec * 1000.0
+            snapshot.stepEndAt = nowMs + snapshot.steps[nextIdx].durationSec * 1000.0
             snapshot.savedAt = nowMs
             writeSnapshot(snapshot)
             // 6. RN polling 측 'advance_done' 신호 (active 시 ar/LA 동기화)

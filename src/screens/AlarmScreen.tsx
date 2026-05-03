@@ -241,6 +241,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
           await deleteAlarmMetadata(m.alarmId).catch(() => {});
         }
       }
+      // v1.6 후속 hotfix — 시스템 측 잔존 alerting 알람 cleanup (= mapping table 측 ❌ 영역).
+      // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).
+      const alarms = await AlarmkitBridge.listAlarms();
+      for (const a of alarms) {
+        if (a.state === 'alerting') {
+          await AlarmkitBridge.cancelAlarm(a.id).catch(() => {});
+          await deleteAlarmMetadata(a.id).catch(() => {});
+        }
+      }
     } catch {}
     // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
     await Promise.all([

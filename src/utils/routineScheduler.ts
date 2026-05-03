@@ -387,10 +387,11 @@ export async function syncRollingSchedule(): Promise<void> {
   await saveNotifRecords([]);
 
   // v1.6 후속 hotfix — mapping table 측 stale 영역 cleanup (= 이전 빌드 측 예약 영역 = records 측 ❌ 영역).
-  // type 'prealert' / 'chain' 영역만 cancel (= 'timer_main' / 'confirm_prompt' = 활성 영역 보호).
+  // type 'prealert' / 'chain' / 'timer_main' 영역 cancel (= 'confirm_prompt' = 활성 영역 보호).
+  // 'timer_main' 추가 영역 = 사용자 측 종료 후도 울리는 영역 정정 (= AlarmScreen dismiss 시점 외 stale).
   const allMeta = await listAllAlarmMetadata();
   for (const meta of allMeta) {
-    if (meta.type === 'prealert' || meta.type === 'chain') {
+    if (meta.type === 'prealert' || meta.type === 'chain' || meta.type === 'timer_main') {
       await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
       await deleteAlarmMetadata(meta.alarmId).catch(() => {});
     }

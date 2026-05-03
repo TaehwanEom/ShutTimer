@@ -376,8 +376,25 @@ export async function syncRollingSchedule(): Promise<void> {
     for (const id of rec.notifIds) {
       await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
     }
+    // v1.6 후속 hotfix — AlarmKit 측 cancel 추가 (= records 측 알려진 영역).
+    if (rec.alarmKitIds) {
+      for (const id of rec.alarmKitIds) {
+        await AlarmkitBridge.cancelAlarm(id).catch(() => {});
+        await deleteAlarmMetadata(id).catch(() => {});
+      }
+    }
   }
   await saveNotifRecords([]);
+
+  // v1.6 후속 hotfix — mapping table 측 stale 영역 cleanup (= 이전 빌드 측 예약 영역 = records 측 ❌ 영역).
+  // type 'prealert' / 'chain' 영역만 cancel (= 'timer_main' / 'confirm_prompt' = 활성 영역 보호).
+  const allMeta = await listAllAlarmMetadata();
+  for (const meta of allMeta) {
+    if (meta.type === 'prealert' || meta.type === 'chain') {
+      await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
+      await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+    }
+  }
 
   // Phase 2 A: 다가오는 예약 시각 기준 정렬
   const now = new Date();

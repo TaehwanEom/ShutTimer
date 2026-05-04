@@ -173,8 +173,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
-    marginHorizontal: 4,
+    width: 80,
+    marginHorizontal: 10,
   },
   unitColumn: {
     flexDirection: 'row',

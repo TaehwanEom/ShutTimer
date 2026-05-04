@@ -156,7 +156,7 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
 export const WHEEL_CONSTANTS = { ITEM_HEIGHT, PICKER_HEIGHT, SIDE_PADDING };
 
 const wheelStyles = StyleSheet.create({
-  scroll: { height: PICKER_HEIGHT, width: 32 },
+  scroll: { height: PICKER_HEIGHT, width: 60 },
   item: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'flex-end' },
   text: { fontSize: 18, fontVariant: ['tabular-nums'] },
 });
@@ -211,8 +211,10 @@ export default function DurationWheelPicker(props: Props) {
                 onChange={setHours}
                 textColor={textColor}
                 dimColor={dimColor}
+                formatLabel={(v) => `${v}${hourLabel}`}
+                align="center"
+                width={100}
               />
-              <Text style={[styles.unit, { color: dimColor }]}>{hourLabel}</Text>
             </View>
             <View style={styles.column}>
               <Wheel
@@ -222,8 +224,10 @@ export default function DurationWheelPicker(props: Props) {
                 onChange={setMinutes}
                 textColor={textColor}
                 dimColor={dimColor}
+                formatLabel={(v) => `${v}${minuteLabel}`}
+                align="center"
+                width={100}
               />
-              <Text style={[styles.unit, { color: dimColor }]}>{minuteLabel}</Text>
             </View>
             <View style={styles.column}>
               <Wheel
@@ -233,8 +237,10 @@ export default function DurationWheelPicker(props: Props) {
                 onChange={setSeconds}
                 textColor={textColor}
                 dimColor={dimColor}
+                formatLabel={(v) => `${v}${secondLabel}`}
+                align="center"
+                width={100}
               />
-              <Text style={[styles.unit, { color: dimColor }]}>{secondLabel}</Text>
             </View>
           </View>
 
@@ -283,9 +289,9 @@ const styles = StyleSheet.create({
   column: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    width: 84,
-    marginHorizontal: 4,
+    justifyContent: 'center',
+    width: 100,
+    marginHorizontal: 10,
   },
   unit: {
     fontSize: 14,

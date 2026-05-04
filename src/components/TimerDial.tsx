@@ -25,11 +25,11 @@ const cx = 165;
 const cy = 165;
 const LABEL_RADIUS = 176;
 const SECTOR_RADIUS = 161; // 155 × 1.04
-const CENTER_RADIUS = 21; // 20 × 1.04
+const CENTER_RADIUS = 15;
 const TICK_OUTER_MAJOR = 161; // SECTOR_RADIUS와 일치
-const TICK_INNER_MAJOR = 114; // 110 × 1.04
+const TICK_INNER_MAJOR = 137; // 길이 30 → 24 (= 추가 20% 축소)
 const TICK_OUTER_MINOR = 161; // SECTOR_RADIUS와 일치
-const TICK_INNER_MINOR = 128; // 123 × 1.04
+const TICK_INNER_MINOR = 144; // 길이 21 → 17 (= 추가 20% 축소)
 
 const LABELS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -228,28 +228,33 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
         </Defs>
         <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill="url(#innerShadow)" />
 
-        {/* 6. 세모 — 다이얼 중간 지점 */}
+        {/* 6. 얇은 네모 침 — 다이얼 중간 지점 */}
         {(() => {
           const needleAngle = displayProgress * 360;
-          const side = 20;
-          const base = 15;
-          const h = side * Math.sqrt(3) / 2;
+          const length = 20 * Math.sqrt(3) / 2;  // 직전 세모 h 측 = 시각 길이 정합
+          const width = 3;                        // 얇은 너비
           const rad = (needleAngle - 90) * (Math.PI / 180);
           const perp = rad + Math.PI / 2;
           // 무게중심을 동그라미 테두리에 위치
           const gcx = cx + (CENTER_RADIUS + 4) * Math.cos(rad);
           const gcy = cy + (CENTER_RADIUS + 4) * Math.sin(rad);
-          const tipX = gcx + (h * 2 / 3) * Math.cos(rad);
-          const tipY = gcy + (h * 2 / 3) * Math.sin(rad);
-          const bcx = gcx - (h / 3) * Math.cos(rad);
-          const bcy = gcy - (h / 3) * Math.sin(rad);
-          const blX = bcx - (base / 2) * Math.cos(perp);
-          const blY = bcy - (base / 2) * Math.sin(perp);
-          const brX = bcx + (base / 2) * Math.cos(perp);
-          const brY = bcy + (base / 2) * Math.sin(perp);
+          // tip (= 외곽 끝) / base (= 안쪽 시작) 측 그대로 (= 직전 세모 시각 영역 정합)
+          const tipX = gcx + (length * 2 / 3) * Math.cos(rad);
+          const tipY = gcy + (length * 2 / 3) * Math.sin(rad);
+          const bcx = gcx - (length / 3) * Math.cos(rad);
+          const bcy = gcy - (length / 3) * Math.sin(rad);
+          // 직사각형 4점 = tip 좌/우 + base 좌/우 (= perp × width/2)
+          const tipLX = tipX - (width / 2) * Math.cos(perp);
+          const tipLY = tipY - (width / 2) * Math.sin(perp);
+          const tipRX = tipX + (width / 2) * Math.cos(perp);
+          const tipRY = tipY + (width / 2) * Math.sin(perp);
+          const baseLX = bcx - (width / 2) * Math.cos(perp);
+          const baseLY = bcy - (width / 2) * Math.sin(perp);
+          const baseRX = bcx + (width / 2) * Math.cos(perp);
+          const baseRY = bcy + (width / 2) * Math.sin(perp);
           return (
             <Path
-              d={`M ${tipX} ${tipY} L ${blX} ${blY} L ${brX} ${brY} Z`}
+              d={`M ${tipLX} ${tipLY} L ${tipRX} ${tipRY} L ${baseRX} ${baseRY} L ${baseLX} ${baseLY} Z`}
               fill={colors.onBackground}
             />
           );

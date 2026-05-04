@@ -366,7 +366,7 @@ export default function HistoryScreen({ navigation }: Props) {
           sessions.map((s) => (
             <View key={s.id} style={styles.sessionCard}>
               <View style={styles.sessionIconWrap}>
-                <MaterialIcons name={s.icon as any} size={20} color={colors.primary} />
+                <MaterialIcons name={((MaterialIcons as any).glyphMap?.[s.icon] ? s.icon : 'repeat') as any} size={20} color={colors.primary} />
               </View>
               <Text style={styles.sessionLabel}>
                 {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`, { defaultValue: s.icon })}

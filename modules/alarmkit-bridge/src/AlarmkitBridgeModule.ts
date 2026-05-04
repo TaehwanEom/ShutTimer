@@ -19,8 +19,10 @@ declare class AlarmkitBridgeModule extends NativeModule<AlarmkitBridgeEvents> {
   getAuthorizationState(): Promise<AuthorizationState>;
   /** 알람 등록 → alarm UUID 반환. */
   scheduleAlarm(params: ScheduleAlarmParams): Promise<string>;
-  /** alarm UUID 로 취소. */
+  /** alarm UUID 로 취소. v1.6 후속 hotfix — alerting 상태면 stop(id:), 그 외 cancel(id:). */
   cancelAlarm(alarmId: string): Promise<void>;
+  /** v1.6 후속 hotfix — alerting 상태 알람 명시적 정지 (= 사운드/진동/UI dismiss). */
+  stopAlarm(alarmId: string): Promise<void>;
   /** 현재 등록된 알람 목록 (id + state). v1.6 T1 — 콜드스타트 alerting filter 위해 state 포함. */
   listAlarms(): Promise<AlarmInfo[]>;
   /** v1.6 Phase 10-A — App Group UserDefaults write (LA Intent 동기화). value=null 시 삭제. */
@@ -43,6 +45,7 @@ try {
     getAuthorizationState: async () => 'unavailable' as AuthorizationState,
     scheduleAlarm: async () => '',
     cancelAlarm: async () => {},
+    stopAlarm: async () => {},
     listAlarms: async (): Promise<AlarmInfo[]> => [],
     writeAppGroupString: () => false,
     readAppGroupString: () => null,

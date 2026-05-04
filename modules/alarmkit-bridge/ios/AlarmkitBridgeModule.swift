@@ -238,7 +238,20 @@ public class AlarmkitBridgeModule: Module {
     AsyncFunction("cancelAlarm") { (alarmId: String) async throws in
       guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
-      try await AlarmManager.shared.cancel(id: uuid)
+      // v1.6 후속 hotfix — alerting 상태 알람 = stop(id:) (= 사운드/진동/UI dismiss).
+      // 그 외 (= scheduled / countdown / paused) = cancel(id:) (= 발화 전 cancel).
+      let alarms = try AlarmManager.shared.alarms
+      if let alarm = alarms.first(where: { $0.id == uuid }), alarm.state == .alerting {
+        try await AlarmManager.shared.stop(id: uuid)
+      } else {
+        try await AlarmManager.shared.cancel(id: uuid)
+      }
+    }
+
+    AsyncFunction("stopAlarm") { (alarmId: String) async throws in
+      guard #available(iOS 26.0, *) else { return }
+      guard let uuid = UUID(uuidString: alarmId) else { return }
+      try await AlarmManager.shared.stop(id: uuid)
     }
 
     // v1.6 Phase 10-A — App Group UserDefaults helper (LA Intent 동기화 통로)

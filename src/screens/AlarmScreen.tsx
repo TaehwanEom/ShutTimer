@@ -243,10 +243,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
       }
       // v1.6 후속 hotfix — 시스템 측 잔존 alerting 알람 cleanup (= mapping table 측 ❌ 영역).
       // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).
+      // alerting 상태 = stopAlarm(id:) 명시 호출 (= cancel(id:) ≠ stop(id:), Apple AlarmKit 공식).
       const alarms = await AlarmkitBridge.listAlarms();
       for (const a of alarms) {
         if (a.state === 'alerting') {
-          await AlarmkitBridge.cancelAlarm(a.id).catch(() => {});
+          await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
           await deleteAlarmMetadata(a.id).catch(() => {});
         }
       }

@@ -3,7 +3,22 @@
     "favorites": "收藏夹",
     "add": "添加",
     "start": "开始",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "报告错误",
+      "scenarioLabel": "场景",
+      "scenarioPlaceholder": "在什么情况下发生?",
+      "descLabel": "错误描述",
+      "descPlaceholder": "出了什么问题? 请描述预期行为和实际行为。",
+      "send": "发送",
+      "mailSubject": "ShutTimer 错误报告",
+      "deviceLabel": "设备信息",
+      "deviceInfoLabel": "自动附加",
+      "emptyTitle": "内容为空",
+      "emptyBody": "请输入场景或描述。",
+      "errorTitle": "未配置邮件应用",
+      "errorBody": "未配置邮件应用。请在设置中添加邮件账户后重试。"
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "工作日"
     },
     "label": {
-      "placeholder": "例如: 起床"
+      "placeholder": "例如: 起床",
+      "title": "标签"
     },
     "sound": {
-      "default": "默认"
+      "default": "默认",
+      "title": "声音"
     },
     "dismissMethod": {
       "title": "解除方式",
@@ -109,7 +126,23 @@
       "title": "需要确认",
       "time": "时间无效",
       "daysEmpty": "请至少选择一天"
-    }
+    },
+    "routineSection": {
+      "title": "添加例程",
+      "stepName": "步骤 {{n}}",
+      "add": "添加",
+      "setDuration": "设置时长",
+      "importFromRoutine": "从现有例程导入"
+    },
+    "import": {
+      "title": "选择要导入的例程",
+      "empty": {
+        "title": "没有例程",
+        "body": "请先在例程标签中创建例程。"
+      },
+      "stepCount": "{{count}}步"
+    },
+    "stepBadge": "{{count}}步"
   },
   "addTimer": {
     "editTitle": "编辑收藏",

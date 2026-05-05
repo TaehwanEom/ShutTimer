@@ -43,6 +43,7 @@ import {
   loadScheduleStatus,
   ScheduleStatus,
 } from '../utils/routineScheduler';
+import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import {
   pauseRoutine,
   resumeRoutine,
@@ -281,6 +282,8 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
 
   // swipe 양수 도달 시 편집 펜슬 클릭 가능 (pointerEvents 'auto'). isEditMode 와 OR.
   const [swipeRevealEdit, setSwipeRevealEdit] = useState(false);
+  // v1.7 — iOS Mail 패턴: swipe open 상태에서 카드 본체 tap = swipe 닫기 (= 토글 ❌).
+  const [swipeRevealTrash, setSwipeRevealTrash] = useState(false);
 
   // 편집 모드 중엔 스와이프 비활성
   const panResponder = useMemo(
@@ -312,17 +315,21 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
           if (trashByDist || (tx < 0 && trashByVel)) {
             Animated.spring(translateX, { toValue: -SWIPE_MAX, useNativeDriver: true, bounciness: 0 }).start();
             setSwipeRevealEdit(false);
+            setSwipeRevealTrash(true);
           } else if (editByDist || (tx > 0 && editByVel)) {
             Animated.spring(translateX, { toValue: EDIT_SLIDE_WIDTH, useNativeDriver: true, bounciness: 0 }).start();
             setSwipeRevealEdit(true);
+            setSwipeRevealTrash(false);
           } else {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
             setSwipeRevealEdit(false);
+            setSwipeRevealTrash(false);
           }
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
           setSwipeRevealEdit(false);
+          setSwipeRevealTrash(false);
         },
       }),
     [isEditMode, isActiveCard, translateX, t, onDelete]
@@ -354,6 +361,7 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
       translateX.setValue(0);
       swipeOffsetRef.current = 0;
       setSwipeRevealEdit(false);
+      setSwipeRevealTrash(false);
     }
   }, [isActiveCard, translateX]);
 
@@ -425,7 +433,7 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
       ref={wrapperRef}
       style={{ position: 'relative', marginHorizontal: 16, marginBottom: 12 }}
     >
-      {/* 휴지통 (뒤에 깔림, 스와이프 후 탭하면 삭제 확인 팝업) — 메인 카드 height 만 따라감.
+      {/* 휴지통 (뒤에 깔림, 스와이프 후 탭하면 삭제 확인 팝업) — touch area = reveal 영역 풀 / 시각 = 원형 56×56.
           진행 중 카드는 disabled 로 클릭 차단 (편집/삭제 양방향 차단). */}
       <TouchableOpacity
         activeOpacity={0.85}
@@ -461,11 +469,20 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
           width: SWIPE_MAX,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.error,
-          borderRadius: 14,
         }}
       >
-        <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: colors.error,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+        </View>
       </TouchableOpacity>
 
       {/* 편집 연필 카드 (왼쪽, 메인 카드와 동일 높이) — 진행 중 카드는 강제 비노출 */}
@@ -514,10 +531,18 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
           alignSelf: 'stretch',
         }}
       >
-        {/* 칸반 카드 — 카드 본체 누르면 펼침 토글 (즉시 실행은 ▶ 버튼) */}
+        {/* 칸반 카드 — 카드 본체 누르면 펼침 토글 (즉시 실행은 ▶ 버튼). v1.7 — swipe open 시 = 닫기 우선. */}
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={toggleExpanded}
+          onPress={() => {
+            if (swipeRevealTrash || swipeRevealEdit) {
+              Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+              setSwipeRevealTrash(false);
+              setSwipeRevealEdit(false);
+              return;
+            }
+            toggleExpanded();
+          }}
           onLayout={e => setMainCardHeight(e.nativeEvent.layout.height)}
           style={{
             alignSelf: 'stretch',
@@ -632,9 +657,17 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
             </View>
           )}
 
-          {/* v자 펼침/접힘 토글 — absolute bottom */}
+          {/* v자 펼침/접힘 토글 — absolute bottom. v1.7 — swipe open 시 = 닫기 우선. */}
           <TouchableOpacity
-            onPress={toggleExpanded}
+            onPress={() => {
+              if (swipeRevealTrash || swipeRevealEdit) {
+                Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+                setSwipeRevealTrash(false);
+                setSwipeRevealEdit(false);
+                return;
+              }
+              toggleExpanded();
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
             style={{
               position: 'absolute',
@@ -805,7 +838,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   // 외부 진입 (알람 응답 등) 으로 활성 routine 이 있으면 inline 진행 자동 마운트.
   // 한 방향 sync 만 — cleared 는 ActiveRoutineSection 의 onClose 에서 처리.
   // (cleared 분기 두면 ▶ trigger 직후 activeRoutine 이 아직 undefined 라 즉시 reset 되는 race 발생)
+  // v1.7 Phase 2-A — ad-hoc 알람 routine 측 = 본 화면 비노출 = state 오염 ❌. 가드.
   useEffect(() => {
+    if (activeRoutine?.routineId && isAdhocAlarmRoutine(activeRoutine.routineId)) return;
     if (activeRoutine?.routineId && activeManualRoutineId !== activeRoutine.routineId) {
       setActiveManualRoutineId(activeRoutine.routineId);
     }
@@ -813,9 +848,11 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   }, [activeRoutine?.routineId]);
 
   // 진행 중 루틴 감지 시: 해당 모드의 탭으로 자동 전환 + 카드 위치로 스크롤 (routineId 단위 1회)
+  // v1.7 Phase 2-A — ad-hoc 알람 routine 측 = 본 화면 카드 ❌ → 자동 탭 전환 / 스크롤 무의미 + silent fail. 가드.
   useEffect(() => {
     const id = activeRoutine?.routineId;
     if (!id) return;
+    if (isAdhocAlarmRoutine(id)) return;
     if (autoFocusedRef.current === id) return;
     if (!routines.length) return;
     const routine = routines.find(r => r.id === id);
@@ -847,8 +884,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     return () => clearTimeout(timer);
   }, [activeRoutine?.routineId, routines, activeTab]);
 
+  // v1.7 Phase 2-A — ad-hoc 알람 routine (= prefix 'aa_') 측 = 루틴 탭 비노출. UI 격리.
   const filteredRoutines = useMemo(
-    () => routines.filter(r => getRoutineMode(r) === activeTab),
+    () => routines.filter(r => !isAdhocAlarmRoutine(r.id) && getRoutineMode(r) === activeTab),
     [routines, activeTab],
   );
   const grouped = useMemo(() => groupByCategory(filteredRoutines, t), [filteredRoutines, t]);

@@ -3,7 +3,22 @@
     "favorites": "Favoriler",
     "add": "Ekle",
     "start": "BAŞLAT",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Hata bildir",
+      "scenarioLabel": "Senaryo",
+      "scenarioPlaceholder": "Hangi durumda oldu?",
+      "descLabel": "Açıklama",
+      "descPlaceholder": "Ne ters gitti? Beklenen ve gerçek davranışı açıklayın.",
+      "send": "Gönder",
+      "mailSubject": "ShutTimer Hata Raporu",
+      "deviceLabel": "Cihaz bilgisi",
+      "deviceInfoLabel": "Otomatik eklendi",
+      "emptyTitle": "Boş",
+      "emptyBody": "Lütfen bir senaryo veya açıklama girin.",
+      "errorTitle": "Posta uygulaması yok",
+      "errorBody": "Posta uygulaması yapılandırılmamış. Lütfen Ayarlar'dan bir posta hesabı ekleyip tekrar deneyin."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Hafta içi"
     },
     "label": {
-      "placeholder": "Örn: Uyan"
+      "placeholder": "Örn: Uyan",
+      "title": "Etiket"
     },
     "sound": {
-      "default": "Varsayılan"
+      "default": "Varsayılan",
+      "title": "Ses"
     },
     "dismissMethod": {
       "title": "Kapatma Yöntemi",
@@ -109,7 +126,23 @@
       "title": "Kontrol Gerekli",
       "time": "Geçersiz saat",
       "daysEmpty": "Lütfen en az bir gün seçin"
-    }
+    },
+    "routineSection": {
+      "title": "Rutin ekle",
+      "stepName": "Adım {{n}}",
+      "add": "Ekle",
+      "setDuration": "Süre ayarla",
+      "importFromRoutine": "Mevcut rutinden içe aktar"
+    },
+    "import": {
+      "title": "İçe aktarılacak rutini seç",
+      "empty": {
+        "title": "Rutin yok",
+        "body": "Önce Rutinler sekmesinde bir rutin oluşturun."
+      },
+      "stepCount": "{{count}} adım"
+    },
+    "stepBadge": "{{count}} adım"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",

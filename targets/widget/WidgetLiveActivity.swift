@@ -73,7 +73,7 @@ struct LockScreenView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
-                    Text("일시정지")
+                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
                         .monospacedDigit()
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
@@ -166,7 +166,7 @@ struct WatchView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
-                Text("일시정지")
+                Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -244,7 +244,7 @@ struct WidgetLiveActivity: Widget {
                                 .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
                         } else if context.state.paused {
-                            Text("일시정지")
+                            Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
                                 .monospacedDigit()
                                 .font(.title2.weight(.bold))
                         } else {

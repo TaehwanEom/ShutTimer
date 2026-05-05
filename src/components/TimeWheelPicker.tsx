@@ -209,8 +209,6 @@ const styles = StyleSheet.create({
   },
   inlineWrap: {
     paddingVertical: 8,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   column: {
     flexDirection: 'row',

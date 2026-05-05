@@ -7,6 +7,21 @@
     "timerBlocked": {
       "title": "Routine in progress",
       "body": "Stop the routine first to start a single timer."
+    },
+    "bugReport": {
+      "title": "Report Bug",
+      "scenarioLabel": "Scenario",
+      "scenarioPlaceholder": "What were you doing when the bug happened?",
+      "descLabel": "Description",
+      "descPlaceholder": "What went wrong? Please describe expected vs actual behavior.",
+      "send": "Send",
+      "mailSubject": "ShutTimer Bug Report",
+      "deviceLabel": "Device Info",
+      "deviceInfoLabel": "Auto-attached",
+      "emptyTitle": "Empty",
+      "emptyBody": "Please enter a scenario or description.",
+      "errorTitle": "No Mail App",
+      "errorBody": "No mail app configured. Please add a mail account in Settings and retry."
     }
   },
   "running": {
@@ -89,10 +104,12 @@
       "weekly": "Weekly"
     },
     "label": {
-      "placeholder": "e.g. Wake up"
+      "placeholder": "e.g. Wake up",
+      "title": "Label"
     },
     "sound": {
-      "default": "Default"
+      "default": "Default",
+      "title": "Sound"
     },
     "dismissMethod": {
       "title": "Dismiss Method",
@@ -113,7 +130,23 @@
       "title": "Check Required",
       "time": "Invalid time",
       "daysEmpty": "Please select at least one day"
-    }
+    },
+    "routineSection": {
+      "title": "Add Routine",
+      "stepName": "Step {{n}}",
+      "add": "Add",
+      "setDuration": "Set duration",
+      "importFromRoutine": "Import from existing routine"
+    },
+    "import": {
+      "title": "Select routine to import",
+      "empty": {
+        "title": "No routines",
+        "body": "Create a routine in the Routines tab first."
+      },
+      "stepCount": "{{count}} steps"
+    },
+    "stepBadge": "{{count}} steps"
   },
   "addTimer": {
     "editTitle": "Edit Favorite",

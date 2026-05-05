@@ -3,7 +3,22 @@
     "favorites": "收藏夾",
     "add": "新增",
     "start": "開始",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "回報錯誤",
+      "scenarioLabel": "情境",
+      "scenarioPlaceholder": "在什麼情況下發生?",
+      "descLabel": "錯誤描述",
+      "descPlaceholder": "出了什麼問題? 請描述預期行為和實際行為。",
+      "send": "傳送",
+      "mailSubject": "ShutTimer 錯誤回報",
+      "deviceLabel": "裝置資訊",
+      "deviceInfoLabel": "自動附加",
+      "emptyTitle": "內容為空",
+      "emptyBody": "請輸入情境或描述。",
+      "errorTitle": "未設定郵件應用",
+      "errorBody": "未設定郵件應用。請在設定中新增郵件帳戶後重試。"
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "工作日"
     },
     "label": {
-      "placeholder": "例如: 起床"
+      "placeholder": "例如: 起床",
+      "title": "標籤"
     },
     "sound": {
-      "default": "預設"
+      "default": "預設",
+      "title": "聲音"
     },
     "dismissMethod": {
       "title": "解除方式",
@@ -109,7 +126,23 @@
       "title": "需要確認",
       "time": "時間無效",
       "daysEmpty": "請至少選擇一天"
-    }
+    },
+    "routineSection": {
+      "title": "新增例程",
+      "stepName": "步驟 {{n}}",
+      "add": "新增",
+      "setDuration": "設定時長",
+      "importFromRoutine": "從現有例程匯入"
+    },
+    "import": {
+      "title": "選擇要匯入的例程",
+      "empty": {
+        "title": "沒有例程",
+        "body": "請先在例程標籤中建立例程。"
+      },
+      "stepCount": "{{count}}步"
+    },
+    "stepBadge": "{{count}}步"
   },
   "addTimer": {
     "editTitle": "編輯收藏",

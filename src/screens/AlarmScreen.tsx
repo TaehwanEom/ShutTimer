@@ -30,6 +30,8 @@ import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { stopRoutine } from '../utils/routineController';
+import { loadAlarms } from '../constants/alarms';
+import { startRoutineFromAlarm } from '../utils/alarmRoutineLink';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -313,6 +315,22 @@ export default function AlarmScreen({ navigation, route }: Props) {
       await stopRoutine().catch(() => {});
       navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
       return;
+    }
+    // v1.7 Phase 2-A — 알람 entity 측 dismiss 후 = alarm.steps 보유 시 ad-hoc routine 시작.
+    // 시작 결과 = AlarmList navigate (= UI 격리. 루틴 탭 ❌). expanded card 안 active section 노출 = Phase 2-B.
+    const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
+    if (alarmEntityId) {
+      try {
+        const alarms = await loadAlarms();
+        const a = alarms.find(x => x.id === alarmEntityId);
+        if (a && a.steps && a.steps.length > 0) {
+          await startRoutineFromAlarm(a).catch(() => {});
+          navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'AlarmList' }] });
+          return;
+        }
+      } catch {
+        // alarm 로드 / 시작 실패 = 일반 알람 흐름으로 fallback (= Home 복귀).
+      }
     }
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation, route.params]);

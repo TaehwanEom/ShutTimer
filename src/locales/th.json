@@ -3,7 +3,22 @@
     "favorites": "รายการโปรด",
     "add": "เพิ่ม",
     "start": "เริ่ม",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "รายงานข้อผิดพลาด",
+      "scenarioLabel": "สถานการณ์",
+      "scenarioPlaceholder": "เกิดขึ้นในสถานการณ์ใด?",
+      "descLabel": "คำอธิบาย",
+      "descPlaceholder": "เกิดอะไรขึ้น? โปรดอธิบายพฤติกรรมที่คาดหวังกับที่เกิดขึ้นจริง",
+      "send": "ส่ง",
+      "mailSubject": "รายงานข้อผิดพลาด ShutTimer",
+      "deviceLabel": "ข้อมูลอุปกรณ์",
+      "deviceInfoLabel": "แนบอัตโนมัติ",
+      "emptyTitle": "ว่างเปล่า",
+      "emptyBody": "กรุณาป้อนสถานการณ์หรือคำอธิบาย",
+      "errorTitle": "ไม่มีแอปเมล",
+      "errorBody": "ไม่ได้กำหนดแอปเมล กรุณาเพิ่มบัญชีเมลในการตั้งค่าแล้วลองใหม่"
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "วันธรรมดา"
     },
     "label": {
-      "placeholder": "เช่น ตื่นนอน"
+      "placeholder": "เช่น ตื่นนอน",
+      "title": "ป้ายชื่อ"
     },
     "sound": {
-      "default": "ค่าเริ่มต้น"
+      "default": "ค่าเริ่มต้น",
+      "title": "เสียง"
     },
     "dismissMethod": {
       "title": "วิธีปิด",
@@ -109,7 +126,23 @@
       "title": "ต้องตรวจสอบ",
       "time": "เวลาไม่ถูกต้อง",
       "daysEmpty": "กรุณาเลือกวันอย่างน้อยหนึ่งวัน"
-    }
+    },
+    "routineSection": {
+      "title": "เพิ่มกิจวัตร",
+      "stepName": "ขั้นตอน {{n}}",
+      "add": "เพิ่ม",
+      "setDuration": "ตั้งระยะเวลา",
+      "importFromRoutine": "นำเข้าจากกิจวัตรที่มีอยู่"
+    },
+    "import": {
+      "title": "เลือกกิจวัตรเพื่อนำเข้า",
+      "empty": {
+        "title": "ไม่มีกิจวัตร",
+        "body": "สร้างกิจวัตรในแท็บกิจวัตรก่อน"
+      },
+      "stepCount": "{{count}} ขั้นตอน"
+    },
+    "stepBadge": "{{count}} ขั้นตอน"
   },
   "addTimer": {
     "editTitle": "แก้ไขรายการโปรด",

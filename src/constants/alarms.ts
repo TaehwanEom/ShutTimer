@@ -2,6 +2,7 @@
 // 루틴 (routines.ts) 과 별개 entity. AlarmKit 단독 (iOS 26+).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RoutineStep } from './routines';
 
 export type AlarmRepeat = 'once' | 'daily' | 'weekly';
 export type AlarmDismissMethod = 'tap' | 'shake' | 'camera';
@@ -19,6 +20,11 @@ export type Alarm = {
   /** ALARM_SOUNDS.id */
   soundKey: string;
   createdAt: number;
+  /**
+   * v1.7 — 알람+루틴 통합. 발화 후 진행할 step 시퀀스. undefined / 빈 배열 = 단독 알람.
+   * Phase 2 측 = 알람 dismiss 후 step runner 진입 (= β architecture).
+   */
+  steps?: RoutineStep[];
 };
 
 export const ALARMS_KEY = 'shuttimer_alarms';
@@ -80,21 +86,39 @@ function isValidDismissMethod(m: any): m is AlarmDismissMethod {
   return m === 'tap' || m === 'shake' || m === 'camera';
 }
 
-export function isValidAlarm(a: any): a is Alarm {
+function isValidAlarmStep(s: any): boolean {
   return (
-    a &&
-    typeof a.id === 'string' &&
-    typeof a.time === 'string' &&
-    parseHHMM(a.time) !== null &&
-    isValidRepeat(a.repeat) &&
-    Array.isArray(a.days) &&
-    a.days.every((d: any) => typeof d === 'number' && d >= 0 && d <= 6) &&
-    typeof a.label === 'string' &&
-    typeof a.enabled === 'boolean' &&
-    isValidDismissMethod(a.dismissMethod) &&
-    typeof a.soundKey === 'string' &&
-    typeof a.createdAt === 'number'
+    s &&
+    typeof s.id === 'string' &&
+    typeof s.name === 'string' &&
+    typeof s.durationSeconds === 'number' &&
+    s.durationSeconds >= 0
   );
+}
+
+export function isValidAlarm(a: any): a is Alarm {
+  if (
+    !a ||
+    typeof a.id !== 'string' ||
+    typeof a.time !== 'string' ||
+    parseHHMM(a.time) === null ||
+    !isValidRepeat(a.repeat) ||
+    !Array.isArray(a.days) ||
+    !a.days.every((d: any) => typeof d === 'number' && d >= 0 && d <= 6) ||
+    typeof a.label !== 'string' ||
+    typeof a.enabled !== 'boolean' ||
+    !isValidDismissMethod(a.dismissMethod) ||
+    typeof a.soundKey !== 'string' ||
+    typeof a.createdAt !== 'number'
+  ) {
+    return false;
+  }
+  // steps 측 = optional. 존재 시 = 배열 + 모든 step valid.
+  if (a.steps !== undefined) {
+    if (!Array.isArray(a.steps)) return false;
+    if (!a.steps.every(isValidAlarmStep)) return false;
+  }
+  return true;
 }
 
 // ─── CRUD ───────────────────────────────────────────

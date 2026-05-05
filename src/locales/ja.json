@@ -3,7 +3,22 @@
     "favorites": "お気に入り",
     "add": "追加",
     "start": "スタート",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "バグ報告",
+      "scenarioLabel": "シナリオ",
+      "scenarioPlaceholder": "どの状況で発生しましたか？",
+      "descLabel": "バグの説明",
+      "descPlaceholder": "何が問題ですか？期待される動作と実際の動作を記入してください。",
+      "send": "送信",
+      "mailSubject": "ShutTimer バグ報告",
+      "deviceLabel": "デバイス情報",
+      "deviceInfoLabel": "自動添付",
+      "emptyTitle": "内容なし",
+      "emptyBody": "シナリオまたは説明を入力してください。",
+      "errorTitle": "メールアプリなし",
+      "errorBody": "メールアプリが設定されていません。設定でメールアカウントを追加してください。"
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "平日"
     },
     "label": {
-      "placeholder": "例: 起床"
+      "placeholder": "例: 起床",
+      "title": "ラベル"
     },
     "sound": {
-      "default": "デフォルト"
+      "default": "デフォルト",
+      "title": "サウンド"
     },
     "dismissMethod": {
       "title": "解除方法",
@@ -109,7 +126,23 @@
       "title": "確認必要",
       "time": "時刻が正しくありません",
       "daysEmpty": "曜日を選択してください"
-    }
+    },
+    "routineSection": {
+      "title": "ルーティンを追加",
+      "stepName": "ステップ {{n}}",
+      "add": "追加",
+      "setDuration": "時間を設定",
+      "importFromRoutine": "既存のルーティンから読み込み"
+    },
+    "import": {
+      "title": "読み込むルーティンを選択",
+      "empty": {
+        "title": "ルーティンがありません",
+        "body": "まずルーティンタブでルーティンを作成してください。"
+      },
+      "stepCount": "{{count}}ステップ"
+    },
+    "stepBadge": "{{count}}ステップ"
   },
   "addTimer": {
     "editTitle": "お気に入り編集",

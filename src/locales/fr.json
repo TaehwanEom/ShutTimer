@@ -3,7 +3,22 @@
     "favorites": "Favoris",
     "add": "Ajouter",
     "start": "DÉMARRER",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Signaler un bug",
+      "scenarioLabel": "Scénario",
+      "scenarioPlaceholder": "Dans quelle situation est-ce arrivé ?",
+      "descLabel": "Description",
+      "descPlaceholder": "Que s'est-il passé ? Décrivez le comportement attendu et réel.",
+      "send": "Envoyer",
+      "mailSubject": "Rapport de bug ShutTimer",
+      "deviceLabel": "Informations sur l'appareil",
+      "deviceInfoLabel": "Joint automatiquement",
+      "emptyTitle": "Vide",
+      "emptyBody": "Veuillez saisir un scénario ou une description.",
+      "errorTitle": "Pas d'application mail",
+      "errorBody": "Aucune application mail configurée. Ajoutez un compte mail dans les paramètres puis réessayez."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "En semaine"
     },
     "label": {
-      "placeholder": "ex: Réveil"
+      "placeholder": "ex: Réveil",
+      "title": "Étiquette"
     },
     "sound": {
-      "default": "Par défaut"
+      "default": "Par défaut",
+      "title": "Son"
     },
     "dismissMethod": {
       "title": "Méthode d'arrêt",
@@ -109,7 +126,23 @@
       "title": "Vérification requise",
       "time": "Heure invalide",
       "daysEmpty": "Sélectionnez au moins un jour"
-    }
+    },
+    "routineSection": {
+      "title": "Ajouter une routine",
+      "stepName": "Étape {{n}}",
+      "add": "Ajouter",
+      "setDuration": "Définir la durée",
+      "importFromRoutine": "Importer depuis une routine existante"
+    },
+    "import": {
+      "title": "Sélectionner la routine à importer",
+      "empty": {
+        "title": "Aucune routine",
+        "body": "Créez d'abord une routine dans l'onglet Routines."
+      },
+      "stepCount": "{{count}} étapes"
+    },
+    "stepBadge": "{{count}} étapes"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",

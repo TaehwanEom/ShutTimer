@@ -98,6 +98,7 @@ import {
   disableOnceAlarmIfNeeded,
   recordAlarmSession,
 } from './src/utils/alarmScheduler';
+import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 /*
   ═══════════════════════════════════════════════════════════
    @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
@@ -126,7 +127,7 @@ export type RootStackParamList = {
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
   Running: { mission: Mission | null; minutes: number };
-  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmSoundKey?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmSoundKey?: string; alarmEntityId?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
@@ -490,11 +491,13 @@ function AppNavigator() {
         await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
         if (currentRoute === 'Alarm') return;
         // 알람별 dismissMethod + soundKey lookup → navigate params 측 전달.
+        // v1.7 Phase 2-A — alarmEntityId 전달. AlarmScreen.goHome 측 alarm.steps 분기 사용.
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === meta.entityId);
         navigationRef.current?.navigate('Alarm', {
           endMethod: a?.dismissMethod ?? 'tap',
           alarmSoundKey: a?.soundKey,
+          alarmEntityId: meta.entityId,
         });
         return;
       }
@@ -503,16 +506,19 @@ function AppNavigator() {
         // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
         Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
         await setLiveActivityStage('manual_prompt').catch(() => {});
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm') return;
+        // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역. 루틴 탭 진입 ❌.
+        const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
+        const targetRoute = isAdhoc ? 'AlarmList' : 'RoutineList';
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm' || currentRoute === 'AlarmList') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
-          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
           return;
         }
         if (!navigationRef.current?.isReady()) return;
-        // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
-        navigationRef.current.navigate('RoutineList');
+        // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList. (v1.7 Phase 2-B — ad-hoc 측 AlarmList)
+        navigationRef.current.navigate(targetRoute);
       }
     });
     return () => sub.remove();
@@ -547,25 +553,30 @@ function AppNavigator() {
         if (meta.type === 'alarm_main') {
           await recordAlarmSession().catch(() => {});
           await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+          // v1.7 Phase 2-A — alarmEntityId 전달.
           const alarms = await loadAlarms();
           const a = alarms.find(x => x.id === meta.entityId);
           navigationRef.current?.navigate('Alarm', {
             endMethod: a?.dismissMethod ?? 'tap',
             alarmSoundKey: a?.soundKey,
+            alarmEntityId: meta.entityId,
           });
           return;
         }
         if (meta.type === 'confirm_prompt') {
           // v1.6 Phase 12 — cold-start AlarmKit alerting 경로도 LA stage 자동 전환
           await setLiveActivityStage('manual_prompt').catch(() => {});
+          // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역.
+          const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
+          const targetRoute = isAdhoc ? 'AlarmList' : 'RoutineList';
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === meta.entityId);
           if (!r) {
-            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
             return;
           }
-          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
-          navigationRef.current.navigate('RoutineList');
+          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList. (v1.7 Phase 2-B — ad-hoc 측 AlarmList)
+          navigationRef.current.navigate(targetRoute);
         }
       } catch {}
     }, 1500);
@@ -678,6 +689,10 @@ function AppNavigator() {
     syncAllAlarms().catch((e) => {
       Logger.warn('AppNavigator', `syncAllAlarms failed: ${e}`);
     });
+    // v1.7 Phase 2-A — 시작 시 잔존 ad-hoc routine (= 비정상 종료 / 다른 알람 fire 안 함) 정리.
+    cleanupStaleAdhocRoutines().catch((e) => {
+      Logger.warn('AppNavigator', `cleanupStaleAdhocRoutines failed: ${e}`);
+    });
     // 콜드 스타트 복원 — 약간 지연 후 navigationRef 준비되면 분기
     const timer = setTimeout(() => {
       if (!navigationRef.current?.isReady()) return;
@@ -689,21 +704,21 @@ function AppNavigator() {
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
           if (res.kind === 'run') {
-            // RoutineList 의 inline ActiveRoutineSection 이 active routine sync 로 자동 마운트
-            navigationRef.current.navigate('RoutineList');
+            // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역.
+            const targetRoute = isAdhocAlarmRoutine(res.routineId) ? 'AlarmList' : 'RoutineList';
+            navigationRef.current.navigate(targetRoute);
           } else if (res.kind === 'alarm') {
-            // 'alarm' kind 는 controller 의 advance_confirm 매핑 — endMethod 별 분기.
-            // tap/shake → RoutineList (inline ActiveRoutineSection 의 awaitingConfirm 분기에서 Modal alarm 표시).
-            // camera → RoutineAlarm (scan UI).
+            // 'alarm' kind = controller advance_confirm 매핑.
+            // v1.7 Phase 2-B — ad-hoc 측 AlarmList / 일반 routine 측 RoutineList.
+            const targetRoute = isAdhocAlarmRoutine(res.routineId) ? 'AlarmList' : 'RoutineList';
             const routines = await loadRoutines();
             const r = routines.find(x => x.id === res.routineId);
             if (!r) {
-              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
               return;
             }
             if (!navigationRef.current?.isReady()) return;
-            // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
-            navigationRef.current.navigate('RoutineList');
+            navigationRef.current.navigate(targetRoute);
           }
         })
         .catch((e) => Logger.warn('AppNavigator', `restoreRoutineState failed: ${e}`));

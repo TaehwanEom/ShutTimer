@@ -3,7 +3,22 @@
     "favorites": "Favorit",
     "add": "Tambah",
     "start": "MULAI",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Laporkan bug",
+      "scenarioLabel": "Skenario",
+      "scenarioPlaceholder": "Dalam situasi apa terjadi?",
+      "descLabel": "Deskripsi",
+      "descPlaceholder": "Apa yang salah? Jelaskan perilaku yang diharapkan dan yang sebenarnya.",
+      "send": "Kirim",
+      "mailSubject": "Laporan bug ShutTimer",
+      "deviceLabel": "Info perangkat",
+      "deviceInfoLabel": "Dilampirkan otomatis",
+      "emptyTitle": "Kosong",
+      "emptyBody": "Silakan masukkan skenario atau deskripsi.",
+      "errorTitle": "Tidak ada aplikasi email",
+      "errorBody": "Tidak ada aplikasi email yang dikonfigurasi. Tambahkan akun email di Pengaturan dan coba lagi."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Hari Kerja"
     },
     "label": {
-      "placeholder": "Contoh: Bangun"
+      "placeholder": "Contoh: Bangun",
+      "title": "Label"
     },
     "sound": {
-      "default": "Default"
+      "default": "Default",
+      "title": "Suara"
     },
     "dismissMethod": {
       "title": "Cara Matikan",
@@ -109,7 +126,23 @@
       "title": "Periksa",
       "time": "Waktu tidak valid",
       "daysEmpty": "Pilih setidaknya satu hari"
-    }
+    },
+    "routineSection": {
+      "title": "Tambah rutin",
+      "stepName": "Langkah {{n}}",
+      "add": "Tambah",
+      "setDuration": "Atur durasi",
+      "importFromRoutine": "Impor dari rutin yang ada"
+    },
+    "import": {
+      "title": "Pilih rutin untuk diimpor",
+      "empty": {
+        "title": "Tidak ada rutin",
+        "body": "Buat rutin di tab Rutin terlebih dahulu."
+      },
+      "stepCount": "{{count}} langkah"
+    },
+    "stepBadge": "{{count}} langkah"
   },
   "addTimer": {
     "editTitle": "Edit Favorit",

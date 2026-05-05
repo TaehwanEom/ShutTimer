@@ -3,7 +3,22 @@
     "favorites": "Favoritos",
     "add": "Añadir",
     "start": "INICIAR",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Informar de error",
+      "scenarioLabel": "Escenario",
+      "scenarioPlaceholder": "¿En qué situación ocurrió?",
+      "descLabel": "Descripción",
+      "descPlaceholder": "¿Qué salió mal? Describe el comportamiento esperado y el real.",
+      "send": "Enviar",
+      "mailSubject": "Informe de error de ShutTimer",
+      "deviceLabel": "Información del dispositivo",
+      "deviceInfoLabel": "Adjuntado automáticamente",
+      "emptyTitle": "Vacío",
+      "emptyBody": "Por favor introduce un escenario o descripción.",
+      "errorTitle": "Sin aplicación de correo",
+      "errorBody": "No hay aplicación de correo configurada. Añade una cuenta de correo en Ajustes y reintenta."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Entre semana"
     },
     "label": {
-      "placeholder": "Ej: Despertar"
+      "placeholder": "Ej: Despertar",
+      "title": "Etiqueta"
     },
     "sound": {
-      "default": "Predeterminado"
+      "default": "Predeterminado",
+      "title": "Sonido"
     },
     "dismissMethod": {
       "title": "Método de cierre",
@@ -109,7 +126,23 @@
       "title": "Verificación necesaria",
       "time": "Hora no válida",
       "daysEmpty": "Selecciona al menos un día"
-    }
+    },
+    "routineSection": {
+      "title": "Añadir rutina",
+      "stepName": "Paso {{n}}",
+      "add": "Añadir",
+      "setDuration": "Establecer duración",
+      "importFromRoutine": "Importar de rutina existente"
+    },
+    "import": {
+      "title": "Seleccionar rutina a importar",
+      "empty": {
+        "title": "Sin rutinas",
+        "body": "Crea primero una rutina en la pestaña Rutinas."
+      },
+      "stepCount": "{{count}} pasos"
+    },
+    "stepBadge": "{{count}} pasos"
   },
   "addTimer": {
     "editTitle": "Editar favorito",

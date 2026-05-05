@@ -32,6 +32,14 @@ import {
   createAlarmId,
 } from '../constants/alarms';
 import {
+  Routine,
+  RoutineStep,
+  loadRoutines,
+  createStepId,
+} from '../constants/routines';
+import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import DurationWheelPicker from '../components/DurationWheelPicker';
+import {
   scheduleAlarmMain,
   cancelAlarmsForEntity,
 } from '../utils/alarmScheduler';
@@ -48,7 +56,22 @@ type Props = {
 };
 
 const LABEL_MAX = 30;
+const STEP_NAME_MAX = 20;
+const MAX_STEPS = 20;
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/** step duration 표시용 formatter. 0 = fallback ("시간 설정") 표시. i18n 영영. */
+function formatStepDuration(sec: number, fallback: string, t: (k: string, opts?: any) => string): string {
+  if (sec <= 0) return fallback;
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}${t('routine.duration.hour', { defaultValue: '시간' })}`);
+  if (m > 0) parts.push(`${m}${t('routine.duration.minute', { defaultValue: '분' })}`);
+  if (s > 0) parts.push(`${s}${t('routine.duration.second', { defaultValue: '초' })}`);
+  return parts.join(' ');
+}
 
 /** 신규 알람 측 default 시각 = 현재 시각 (HH:MM). 사용자 측 휠 측 즉시 변경 가능. */
 function getCurrentTimeHHMM(): string {
@@ -85,6 +108,13 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
   const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [dismissMethod, setDismissMethod] = useState<AlarmDismissMethod>('tap');
   const [soundPickerVisible, setSoundPickerVisible] = useState(false);
+  // v1.7 Phase 1 — 알람+루틴 통합. steps[] 직접 보유. 0개 = 단독 알람 / 1개 이상 = 통합.
+  const [steps, setSteps] = useState<RoutineStep[]>([]);
+  const [durationPickerVisible, setDurationPickerVisible] = useState(false);
+  const [durationPickerStepIndex, setDurationPickerStepIndex] = useState<number | null>(null);
+  // 기존 루틴 불러오기 (= 복사 방식. 선택 시 steps[] 덮어쓰기 = replace).
+  const [importPickerVisible, setImportPickerVisible] = useState(false);
+  const [availableRoutines, setAvailableRoutines] = useState<Routine[]>([]);
 
   const originalCreatedAtRef = useRef<number | null>(null);
   const loadedRef = useRef(false);
@@ -95,6 +125,17 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
     return () => {
       isMountedRef.current = false;
     };
+  }, []);
+
+  // v1.7 Phase 1 — 불러오기 모달용 사용자 routine 로드.
+  // v1.7 Phase 2-A — ad-hoc 알람 routine (= prefix 'aa_') 필터.
+  useEffect(() => {
+    loadRoutines()
+      .then(rs => {
+        if (!isMountedRef.current) return;
+        setAvailableRoutines(rs.filter(r => !isAdhocAlarmRoutine(r.id)));
+      })
+      .catch(() => {});
   }, []);
 
   // 편집 모드: 기존 알람 로드
@@ -116,12 +157,74 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       setLabel(target.label);
       setSoundKey(target.soundKey);
       setDismissMethod(target.dismissMethod);
+      setSteps(target.steps ?? []);
       loadedRef.current = true;
     });
   }, [editingId]);
 
   const handleTimeConfirm = (hour: number, minute: number) => {
     setTime(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  };
+
+  // v1.7 Phase 1 — step 편집 handlers.
+  const handleStepNameChange = (idx: number, text: string) => {
+    setSteps(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], name: text };
+      return next;
+    });
+  };
+  const handleStepDurationTap = (idx: number) => {
+    setDurationPickerStepIndex(idx);
+    setDurationPickerVisible(true);
+  };
+  const handleDurationConfirm = (seconds: number) => {
+    if (durationPickerStepIndex === null) {
+      setDurationPickerVisible(false);
+      return;
+    }
+    const idx = durationPickerStepIndex;
+    setSteps(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], durationSeconds: seconds };
+      return next;
+    });
+    setDurationPickerVisible(false);
+    setDurationPickerStepIndex(null);
+  };
+  const handleDurationCancel = () => {
+    setDurationPickerVisible(false);
+    setDurationPickerStepIndex(null);
+  };
+  const handleAddStep = () => {
+    if (steps.length >= MAX_STEPS) return;
+    setSteps(prev => [...prev, { id: createStepId(), name: '', durationSeconds: 0 }]);
+  };
+  const handleDeleteStep = (idx: number) => {
+    setSteps(prev => prev.filter((_, i) => i !== idx));
+  };
+  // 기존 루틴 불러오기 (= 복사. step.id = 새로 발급).
+  const handleImportFromRoutine = () => {
+    if (availableRoutines.length === 0) {
+      Alert.alert(
+        t('alarm.import.empty.title', { defaultValue: '루틴 없음' }),
+        t('alarm.import.empty.body', {
+          defaultValue: '먼저 루틴 탭에서 루틴을 만들어주세요.',
+        })
+      );
+      return;
+    }
+    setImportPickerVisible(true);
+  };
+  const handleSelectRoutineToImport = (routine: Routine) => {
+    const copied = routine.steps.map(s => ({
+      id: createStepId(),
+      name: s.name,
+      durationSeconds: s.durationSeconds,
+      ...(s.icon ? { icon: s.icon } : {}),
+    }));
+    setSteps(copied);
+    setImportPickerVisible(false);
   };
 
   const toggleDay = (d: number) => {
@@ -190,6 +293,11 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       return;
     }
 
+    // v1.7 Phase 1 — steps[] 측 빈 이름 + duration 0 모두 trim. trim 후 0개 = 단독 알람.
+    const trimmedSteps = steps
+      .map(s => ({ ...s, name: s.name.trim() }))
+      .filter(s => s.name.length > 0 || s.durationSeconds > 0);
+
     const alarm: Alarm = {
       id: editingId ?? createAlarmId(),
       time,
@@ -200,6 +308,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       dismissMethod,
       soundKey,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
+      ...(trimmedSteps.length > 0 ? { steps: trimmedSteps } : {}),
     };
 
     // AlarmKit 권한 요청 (iOS 26+ 만)
@@ -277,27 +386,35 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* 시각 — 인라인 휠 다이얼 (= iOS 시스템 알람 패턴). ScrollView 외부 위치 = nested scroll 충돌 ❌. */}
-      <TimeWheelPicker
-        isVisible={true}
-        inline
-        initialHour={initialTime.h}
-        initialMinute={initialTime.m}
-        onConfirm={handleTimeConfirm}
-        onCancel={() => {}}
-        amLabel={t('common.am', { defaultValue: '오전' })}
-        pmLabel={t('common.pm', { defaultValue: '오후' })}
-        hourUnitLabel={t('common.hour', { defaultValue: '시' })}
-        minuteUnitLabel={t('common.minute', { defaultValue: '분' })}
-        confirmLabel={t('common.confirm', { defaultValue: '확인' })}
-        cancelLabel={t('common.cancel', { defaultValue: '취소' })}
-        textColor={colors.onBackground}
-        dimColor={colors.outlineVariant}
-        bgColor={colors.surfaceContainerLowest}
-        accentColor={colors.primary}
-      />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets={true}
+        nestedScrollEnabled={true}
+      >
+        {/* v1.7 — 시각 휠 + 콘텐츠 통합 ScrollView (= 사용자 명시). 휠 자체는 자체 wheel scroll, 부모 vertical scroll. */}
+        <TimeWheelPicker
+          isVisible={true}
+          inline
+          initialHour={initialTime.h}
+          initialMinute={initialTime.m}
+          onConfirm={handleTimeConfirm}
+          onCancel={() => {}}
+          amLabel={t('common.am', { defaultValue: '오전' })}
+          pmLabel={t('common.pm', { defaultValue: '오후' })}
+          hourUnitLabel={t('common.hour', { defaultValue: '시' })}
+          minuteUnitLabel={t('common.minute', { defaultValue: '분' })}
+          confirmLabel={t('common.confirm', { defaultValue: '확인' })}
+          cancelLabel={t('common.cancel', { defaultValue: '취소' })}
+          textColor={colors.onBackground}
+          dimColor={colors.outlineVariant}
+          bgColor={colors.surfaceContainerLowest}
+          accentColor={colors.primary}
+        />
 
-      <ScrollView contentContainerStyle={styles.content}>
+        {/* v1.7 — 시각 휠 ↔ 반복 섹션 구분 라인 (주황 = 브랜드) */}
+        <View style={styles.brandSeparator} />
 
         {/* 반복 */}
         <View style={styles.section}>
@@ -353,7 +470,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         {/* 라벨 */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-            {t('alarm.label', { defaultValue: '라벨' })}
+            {t('alarm.label.title', { defaultValue: '라벨' })}
           </Text>
           <TextInput
             style={styles.labelInput}
@@ -371,7 +488,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
           onPress={() => setSoundPickerVisible(v => !v)}
         >
           <Text style={styles.rowLabel}>
-            {t('alarm.sound', { defaultValue: '사운드' })}
+            {t('alarm.sound.title', { defaultValue: '사운드' })}
           </Text>
           <Text style={styles.rowValue}>{soundLabel(soundKey, t)}</Text>
         </TouchableOpacity>
@@ -444,6 +561,67 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
           </View>
         </View>
 
+        {/* v1.7 Phase 1 — 루틴 추가 (= alarm.steps[] 직접 편집) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            {t('alarm.routineSection.title', { defaultValue: '루틴 추가' })}
+          </Text>
+          {steps.map((step, idx) => (
+            <View key={step.id} style={styles.stepRow}>
+              <TextInput
+                style={styles.stepNameInput}
+                value={step.name}
+                onChangeText={text => handleStepNameChange(idx, text)}
+                placeholder={t('alarm.routineSection.stepName', {
+                  defaultValue: `루틴 ${String(idx + 1).padStart(2, '0')}`,
+                  n: String(idx + 1).padStart(2, '0'),
+                })}
+                placeholderTextColor={colors.outlineVariant}
+                maxLength={STEP_NAME_MAX}
+              />
+              <TouchableOpacity
+                style={styles.stepDurationBtn}
+                onPress={() => handleStepDurationTap(idx)}
+              >
+                <Text
+                  style={[
+                    styles.stepDurationText,
+                    step.durationSeconds <= 0 && styles.stepDurationEmpty,
+                  ]}
+                >
+                  {formatStepDuration(
+                    step.durationSeconds,
+                    t('alarm.routineSection.setDuration', { defaultValue: '시간 설정' }),
+                    t
+                  )}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleDeleteStep(idx)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialIcons name="remove-circle-outline" size={20} color={colors.secondary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+          {steps.length < MAX_STEPS && (
+            <TouchableOpacity style={styles.addStepBtn} onPress={handleAddStep}>
+              <MaterialIcons name="add" size={20} color={colors.primary} />
+              <Text style={styles.addStepText}>
+                {t('alarm.routineSection.add', { defaultValue: '추가' })}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.importBtn} onPress={handleImportFromRoutine}>
+            <MaterialIcons name="file-download" size={18} color={colors.primary} />
+            <Text style={styles.importBtnText}>
+              {t('alarm.routineSection.importFromRoutine', {
+                defaultValue: '기존 루틴 불러오기',
+              })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 삭제 (편집 모드만) */}
         {isEditMode && (
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
@@ -454,6 +632,65 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
       </ScrollView>
+
+      {/* v1.7 Phase 1 — Duration picker 모달 */}
+      <DurationWheelPicker
+        isVisible={durationPickerVisible}
+        initialSeconds={
+          durationPickerStepIndex !== null
+            ? steps[durationPickerStepIndex]?.durationSeconds ?? 0
+            : 0
+        }
+        onConfirm={handleDurationConfirm}
+        onCancel={handleDurationCancel}
+        hourLabel={t('common.hour', { defaultValue: '시간' })}
+        minuteLabel={t('common.minute', { defaultValue: '분' })}
+        secondLabel={t('common.second', { defaultValue: '초' })}
+        confirmLabel={t('common.confirm', { defaultValue: '확인' })}
+        cancelLabel={t('common.cancel', { defaultValue: '취소' })}
+        textColor={colors.onBackground}
+        dimColor={colors.outlineVariant}
+        bgColor={colors.surfaceContainerLowest}
+        accentColor={colors.primary}
+      />
+
+      {/* v1.7 Phase 1 — 루틴 불러오기 모달 */}
+      {importPickerVisible && (
+        <View style={styles.importModalOverlay}>
+          <View style={styles.importModalCard}>
+            <Text style={styles.importModalTitle}>
+              {t('alarm.import.title', { defaultValue: '불러올 루틴 선택' })}
+            </Text>
+            <ScrollView style={styles.importModalList}>
+              {availableRoutines.map(r => (
+                <TouchableOpacity
+                  key={r.id}
+                  style={styles.importModalItem}
+                  onPress={() => handleSelectRoutineToImport(r)}
+                >
+                  <Text style={styles.importModalItemText}>
+                    {r.name || r.category}
+                  </Text>
+                  <Text style={styles.importModalItemMeta}>
+                    {t('alarm.import.stepCount', {
+                      defaultValue: `${r.steps.length}단계`,
+                      count: r.steps.length,
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.importModalCancel}
+              onPress={() => setImportPickerVisible(false)}
+            >
+              <Text style={styles.importModalCancelText}>
+                {t('common.cancel', { defaultValue: '취소' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
     </SafeAreaView>
   );
@@ -491,7 +728,8 @@ const makeStyles = (colors: ThemeColors) => {
       fontWeight: '600',
     },
     content: {
-      paddingVertical: 8,
+      paddingTop: 8,
+      paddingBottom: 200,
     },
     row: {
       flexDirection: flexRow,
@@ -638,6 +876,128 @@ const makeStyles = (colors: ThemeColors) => {
     deleteBtnText: {
       fontSize: 15,
       color: '#c62828',
+      fontWeight: '500',
+    },
+    // v1.7 — 시각 휠 ↔ 반복 섹션 구분 라인 (= 브랜드 색).
+    brandSeparator: {
+      height: 0.5,
+      backgroundColor: colors.primary,
+    },
+    // v1.7 Phase 1 — 루틴 추가 영역 styles.
+    stepRow: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 8,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.outlineVariant,
+    },
+    stepNameInput: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.onBackground,
+      paddingVertical: 6,
+    },
+    stepDurationBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: colors.surfaceContainerLow,
+      borderRadius: 6,
+    },
+    stepDurationText: {
+      fontSize: 13,
+      color: colors.onBackground,
+      fontWeight: '500',
+    },
+    stepDurationEmpty: {
+      color: colors.secondary,
+      fontWeight: '400',
+    },
+    addStepBtn: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      marginTop: 8,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderStyle: 'dashed',
+      borderRadius: 8,
+      gap: 6,
+    },
+    addStepText: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '500',
+    },
+    importBtn: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      marginTop: 8,
+      gap: 6,
+    },
+    importBtnText: {
+      fontSize: 13,
+      color: colors.primary,
+      fontWeight: '500',
+    },
+    importModalOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    importModalCard: {
+      width: '100%',
+      maxWidth: 400,
+      maxHeight: '70%',
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    importModalTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.onBackground,
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+    },
+    importModalList: {
+      maxHeight: 360,
+    },
+    importModalItem: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderTopWidth: 0.5,
+      borderTopColor: colors.outlineVariant,
+    },
+    importModalItemText: {
+      fontSize: 15,
+      color: colors.onBackground,
+      fontWeight: '500',
+    },
+    importModalItemMeta: {
+      fontSize: 12,
+      color: colors.secondary,
+      marginTop: 2,
+    },
+    importModalCancel: {
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderTopWidth: 0.5,
+      borderTopColor: colors.outlineVariant,
+    },
+    importModalCancelText: {
+      fontSize: 15,
+      color: colors.primary,
       fontWeight: '500',
     },
   });

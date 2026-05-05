@@ -3,7 +3,22 @@
     "favorites": "Favoritos",
     "add": "Adicionar",
     "start": "INICIAR",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Reportar bug",
+      "scenarioLabel": "Cenário",
+      "scenarioPlaceholder": "Em que situação aconteceu?",
+      "descLabel": "Descrição",
+      "descPlaceholder": "O que deu errado? Descreva o comportamento esperado e o real.",
+      "send": "Enviar",
+      "mailSubject": "Relatório de bug ShutTimer",
+      "deviceLabel": "Info do dispositivo",
+      "deviceInfoLabel": "Anexado automaticamente",
+      "emptyTitle": "Vazio",
+      "emptyBody": "Por favor insira um cenário ou descrição.",
+      "errorTitle": "Sem app de email",
+      "errorBody": "Nenhum app de email configurado. Adicione uma conta de email em Ajustes e tente novamente."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Dias úteis"
     },
     "label": {
-      "placeholder": "Ex: Acordar"
+      "placeholder": "Ex: Acordar",
+      "title": "Rótulo"
     },
     "sound": {
-      "default": "Padrão"
+      "default": "Padrão",
+      "title": "Som"
     },
     "dismissMethod": {
       "title": "Método de parada",
@@ -109,7 +126,23 @@
       "title": "Verificação necessária",
       "time": "Hora inválida",
       "daysEmpty": "Selecione pelo menos um dia"
-    }
+    },
+    "routineSection": {
+      "title": "Adicionar rotina",
+      "stepName": "Etapa {{n}}",
+      "add": "Adicionar",
+      "setDuration": "Definir duração",
+      "importFromRoutine": "Importar de rotina existente"
+    },
+    "import": {
+      "title": "Selecionar rotina para importar",
+      "empty": {
+        "title": "Sem rotinas",
+        "body": "Crie uma rotina na aba Rotinas primeiro."
+      },
+      "stepCount": "{{count}} etapas"
+    },
+    "stepBadge": "{{count}} etapas"
   },
   "addTimer": {
     "editTitle": "Editar favorito",

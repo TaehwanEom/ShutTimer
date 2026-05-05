@@ -28,6 +28,7 @@ import { MISSIONS, MISSIONS_STORAGE_KEY, Mission } from '../constants/missions';
 import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
 import AdBanner from '../components/AdBanner';
+import BugReportModal from '../components/BugReportModal';
 import { SETTINGS_KEY, DialType } from '../constants/settings';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
@@ -276,6 +277,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   const NOTICES_READ_KEY = 'shuttimer_notices_read';
   const [notices, setNotices] = useState<{ id: string; date: string; title: string; message: string }[]>([]);
   const [hasUnread, setHasUnread] = useState(false);
+  // v1.7 — 버그 제보 모달.
+  const [bugReportVisible, setBugReportVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -1008,6 +1011,10 @@ export default function HomeScreen({ navigation, route }: Props) {
               )}
             </View>
           </TouchableOpacity>
+          {/* v1.7 — 버그 제보 메일 아이콘. tap → BugReportModal */}
+          <TouchableOpacity onPress={() => setBugReportVisible(true)}>
+            <MaterialIcons name="email" size={24} color={colors.secondary} style={{ opacity: 0.7 }} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -1126,6 +1133,11 @@ export default function HomeScreen({ navigation, route }: Props) {
       <View style={{ flex: 1 }} />
       <AdBanner />
       </ScrollView>
+      {/* v1.7 — 버그 제보 모달 */}
+      <BugReportModal
+        visible={bugReportVisible}
+        onClose={() => setBugReportVisible(false)}
+      />
     </SafeAreaView>
   );
 }

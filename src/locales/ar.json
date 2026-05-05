@@ -3,7 +3,22 @@
     "favorites": "المفضلة",
     "add": "إضافة",
     "start": "ابدأ",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "الإبلاغ عن خطأ",
+      "scenarioLabel": "السيناريو",
+      "scenarioPlaceholder": "في أي موقف حدث؟",
+      "descLabel": "وصف الخطأ",
+      "descPlaceholder": "ما الذي حدث؟ يرجى وصف السلوك المتوقع والفعلي.",
+      "send": "إرسال",
+      "mailSubject": "تقرير خطأ ShutTimer",
+      "deviceLabel": "معلومات الجهاز",
+      "deviceInfoLabel": "مرفق تلقائيًا",
+      "emptyTitle": "فارغ",
+      "emptyBody": "يرجى إدخال سيناريو أو وصف.",
+      "errorTitle": "لا يوجد تطبيق بريد",
+      "errorBody": "لم يتم تكوين تطبيق بريد. يرجى إضافة حساب بريد في الإعدادات وإعادة المحاولة."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "أيام الأسبوع"
     },
     "label": {
-      "placeholder": "مثال: استيقاظ"
+      "placeholder": "مثال: استيقاظ",
+      "title": "تسمية"
     },
     "sound": {
-      "default": "الافتراضي"
+      "default": "الافتراضي",
+      "title": "صوت"
     },
     "dismissMethod": {
       "title": "طريقة الإيقاف",
@@ -109,7 +126,23 @@
       "title": "تحقق مطلوب",
       "time": "وقت غير صالح",
       "daysEmpty": "يرجى اختيار يوم واحد على الأقل"
-    }
+    },
+    "routineSection": {
+      "title": "إضافة روتين",
+      "stepName": "خطوة {{n}}",
+      "add": "إضافة",
+      "setDuration": "تعيين المدة",
+      "importFromRoutine": "استيراد من روتين موجود"
+    },
+    "import": {
+      "title": "حدد الروتين للاستيراد",
+      "empty": {
+        "title": "لا توجد روتينات",
+        "body": "أنشئ روتينًا في علامة التبويب الروتينات أولاً."
+      },
+      "stepCount": "{{count}} خطوات"
+    },
+    "stepBadge": "{{count}} خطوات"
   },
   "addTimer": {
     "editTitle": "تعديل المفضلة",

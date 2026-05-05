@@ -3,7 +3,22 @@
     "favorites": "Preferiti",
     "add": "Aggiungi",
     "start": "AVVIA",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Segnala bug",
+      "scenarioLabel": "Scenario",
+      "scenarioPlaceholder": "In quale situazione è successo?",
+      "descLabel": "Descrizione",
+      "descPlaceholder": "Cosa è andato storto? Descrivi comportamento atteso e reale.",
+      "send": "Invia",
+      "mailSubject": "Segnalazione bug ShutTimer",
+      "deviceLabel": "Info dispositivo",
+      "deviceInfoLabel": "Allegato automaticamente",
+      "emptyTitle": "Vuoto",
+      "emptyBody": "Inserisci uno scenario o una descrizione.",
+      "errorTitle": "Nessuna app mail",
+      "errorBody": "Nessuna app mail configurata. Aggiungi un account mail nelle impostazioni e riprova."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Giorni feriali"
     },
     "label": {
-      "placeholder": "Es: Sveglia"
+      "placeholder": "Es: Sveglia",
+      "title": "Etichetta"
     },
     "sound": {
-      "default": "Predefinito"
+      "default": "Predefinito",
+      "title": "Suono"
     },
     "dismissMethod": {
       "title": "Metodo di arresto",
@@ -109,7 +126,23 @@
       "title": "Verifica richiesta",
       "time": "Ora non valida",
       "daysEmpty": "Seleziona almeno un giorno"
-    }
+    },
+    "routineSection": {
+      "title": "Aggiungi routine",
+      "stepName": "Passo {{n}}",
+      "add": "Aggiungi",
+      "setDuration": "Imposta durata",
+      "importFromRoutine": "Importa da routine esistente"
+    },
+    "import": {
+      "title": "Seleziona routine da importare",
+      "empty": {
+        "title": "Nessuna routine",
+        "body": "Crea prima una routine nella scheda Routine."
+      },
+      "stepCount": "{{count}} passi"
+    },
+    "stepBadge": "{{count}} passi"
   },
   "addTimer": {
     "editTitle": "Modifica preferito",

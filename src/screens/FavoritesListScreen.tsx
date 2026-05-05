@@ -37,6 +37,8 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
   const [swipeRevealEdit, setSwipeRevealEdit] = useState(false);
+  // v1.7 — iOS Mail 패턴: swipe open 상태에서 카드 본체 tap = swipe 닫기.
+  const [swipeRevealTrash, setSwipeRevealTrash] = useState(false);
   const [itemHeight, setItemHeight] = useState(0);
 
   const panResponder = useMemo(
@@ -62,17 +64,21 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
           if (trashByDist || (tx < 0 && trashByVel)) {
             Animated.spring(translateX, { toValue: -SWIPE_MAX, useNativeDriver: true, bounciness: 0 }).start();
             setSwipeRevealEdit(false);
+            setSwipeRevealTrash(true);
           } else if (editByDist || (tx > 0 && editByVel)) {
             Animated.spring(translateX, { toValue: EDIT_SLIDE_WIDTH, useNativeDriver: true, bounciness: 0 }).start();
             setSwipeRevealEdit(true);
+            setSwipeRevealTrash(false);
           } else {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
             setSwipeRevealEdit(false);
+            setSwipeRevealTrash(false);
           }
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
           setSwipeRevealEdit(false);
+          setSwipeRevealTrash(false);
         },
       }),
     [translateX]
@@ -110,7 +116,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
 
   return (
     <View style={{ marginBottom: 8, position: 'relative' }}>
-      {/* 휴지통 (뒤에 깔림, 우측) */}
+      {/* 휴지통 (뒤에 깔림, 우측) — touch area = reveal 영역 풀 / 시각 = 원형 56×56. */}
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={handleDeleteTap}
@@ -122,11 +128,20 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
           width: SWIPE_MAX,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: colors.error,
-          borderRadius: 12,
         }}
       >
-        <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: colors.error,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+        </View>
       </TouchableOpacity>
 
       {/* 편집 펜슬 (뒤에 깔림, 좌측) */}
@@ -164,7 +179,16 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
       >
         <TouchableOpacity
           style={[styles.itemRow, { backgroundColor: colors.surfaceContainerLow }]}
-          onPress={onSelect}
+          onPress={() => {
+            // v1.7 — iOS Mail 패턴: swipe open 시 = 닫기 우선. 그 외 = 선택.
+            if (swipeRevealTrash || swipeRevealEdit) {
+              Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+              setSwipeRevealTrash(false);
+              setSwipeRevealEdit(false);
+              return;
+            }
+            onSelect();
+          }}
           activeOpacity={0.7}
         >
           <MaterialIcons

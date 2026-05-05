@@ -3,7 +3,22 @@
     "favorites": "Favoriten",
     "add": "Hinzufügen",
     "start": "START",
-    "minutes": "MINUTES"
+    "minutes": "MINUTES",
+    "bugReport": {
+      "title": "Fehler melden",
+      "scenarioLabel": "Szenario",
+      "scenarioPlaceholder": "In welcher Situation ist es passiert?",
+      "descLabel": "Beschreibung",
+      "descPlaceholder": "Was ist schiefgelaufen? Bitte beschreiben Sie erwartetes vs. tatsächliches Verhalten.",
+      "send": "Senden",
+      "mailSubject": "ShutTimer Fehlerbericht",
+      "deviceLabel": "Geräteinfo",
+      "deviceInfoLabel": "Automatisch angehängt",
+      "emptyTitle": "Leer",
+      "emptyBody": "Bitte geben Sie ein Szenario oder eine Beschreibung ein.",
+      "errorTitle": "Keine Mail-App",
+      "errorBody": "Keine Mail-App konfiguriert. Bitte fügen Sie ein E-Mail-Konto in den Einstellungen hinzu und versuchen Sie es erneut."
+    }
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -85,10 +100,12 @@
       "weekly": "Wochentage"
     },
     "label": {
-      "placeholder": "z. B. Aufstehen"
+      "placeholder": "z. B. Aufstehen",
+      "title": "Bezeichnung"
     },
     "sound": {
-      "default": "Standard"
+      "default": "Standard",
+      "title": "Ton"
     },
     "dismissMethod": {
       "title": "Beenden",
@@ -109,7 +126,23 @@
       "title": "Prüfen",
       "time": "Ungültige Zeit",
       "daysEmpty": "Bitte mindestens einen Tag wählen"
-    }
+    },
+    "routineSection": {
+      "title": "Routine hinzufügen",
+      "stepName": "Schritt {{n}}",
+      "add": "Hinzufügen",
+      "setDuration": "Dauer festlegen",
+      "importFromRoutine": "Aus vorhandener Routine importieren"
+    },
+    "import": {
+      "title": "Zu importierende Routine auswählen",
+      "empty": {
+        "title": "Keine Routinen",
+        "body": "Erstellen Sie zuerst eine Routine im Tab Routinen."
+      },
+      "stepCount": "{{count}} Schritte"
+    },
+    "stepBadge": "{{count}} Schritte"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",

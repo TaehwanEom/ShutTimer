@@ -83,6 +83,8 @@ import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
 import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import FavoritesListScreen from './src/screens/FavoritesListScreen';
+import AlarmListScreen from './src/screens/AlarmListScreen';
+import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
@@ -90,6 +92,12 @@ import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
 import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
+import { loadAlarms } from './src/constants/alarms';
+import {
+  syncAllAlarms,
+  disableOnceAlarmIfNeeded,
+  recordAlarmSession,
+} from './src/utils/alarmScheduler';
 /*
   ═══════════════════════════════════════════════════════════
    @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
@@ -118,7 +126,7 @@ export type RootStackParamList = {
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
   Running: { mission: Mission | null; minutes: number };
-  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmSoundKey?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
@@ -140,12 +148,24 @@ export type RootStackParamList = {
   RoutineCategory: { current?: string } | undefined;
   RoutineDays: { current?: number[] } | undefined;
   RoutineSound: { current?: string } | undefined;
+  // v1.6+ 알람 기능
+  AlarmList: undefined;
+  AlarmEdit: { alarmId?: string } | undefined;
   // @v1.5-poc — 영구 유지. __DEV__ 가드로 production 빌드 런타임에서 접근 차단.
   PoCPhotoValidation: undefined;
 };
 
+// v1.6+ 알람 기능 — Tab generic 정의 (= 위험 #7 정정).
+export type MainTabParamList = {
+  HomeTab: undefined;
+  AlarmTab: undefined;
+  RoutineTab: undefined;
+  CalendarTab: undefined;
+  SettingsTab: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // v1.6 후속 — Calendar placeholder (= Phase A 샘플, Phase C 에서 신설 화면 교체).
 function CalendarPlaceholder() {
@@ -167,19 +187,23 @@ function MainTabsNavigator() {
       tabBarStyle: { backgroundColor: colors.surfaceContainerLowest, borderTopColor: colors.outlineVariant },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     }}>
-      <Tab.Screen name="HomeTab" component={HomeScreen} options={{
+      <Tab.Screen name="HomeTab" component={HomeScreen as any} options={{
         tabBarLabel: '타이머',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
       }} />
-      <Tab.Screen name="RoutineTab" component={RoutineListScreen} options={{
+      <Tab.Screen name="AlarmTab" component={AlarmListScreen as any} options={{
+        tabBarLabel: '알람',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="alarm" size={size} color={color} />,
+      }} />
+      <Tab.Screen name="RoutineTab" component={RoutineListScreen as any} options={{
         tabBarLabel: '루틴',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
       }} />
-      <Tab.Screen name="CalendarTab" component={HistoryScreen} options={{
+      <Tab.Screen name="CalendarTab" component={HistoryScreen as any} options={{
         tabBarLabel: '캘린더',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="calendar-today" size={size} color={color} />,
       }} />
-      <Tab.Screen name="SettingsTab" component={SettingsScreen} options={{
+      <Tab.Screen name="SettingsTab" component={SettingsScreen as any} options={{
         tabBarLabel: '설정',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="settings" size={size} color={color} />,
       }} />
@@ -458,13 +482,30 @@ function AppNavigator() {
         return;
       }
 
+      // v1.6+ 알람 entity 측 발화 분기 (= type='alarm_main').
+      if (meta.type === 'alarm_main') {
+        // sessions 기록 (= 결정 6-B, icon='alarm' 고정)
+        await recordAlarmSession().catch(() => {});
+        // 한 번만 모드 측 자동 비활성 (= 결정 5 + alarm.repeat='once' 시)
+        await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        if (currentRoute === 'Alarm') return;
+        // 알람별 dismissMethod + soundKey lookup → navigate params 측 전달.
+        const alarms = await loadAlarms();
+        const a = alarms.find(x => x.id === meta.entityId);
+        navigationRef.current?.navigate('Alarm', {
+          endMethod: a?.dismissMethod ?? 'tap',
+          alarmSoundKey: a?.soundKey,
+        });
+        return;
+      }
+
       if (meta.type === 'confirm_prompt') {
         // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
-        Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} routineId=${meta.routineId}`);
+        Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
         await setLiveActivityStage('manual_prompt').catch(() => {});
         if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm') return;
         const routines = await loadRoutines();
-        const r = routines.find(x => x.id === meta.routineId);
+        const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
           navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
           return;
@@ -502,11 +543,23 @@ function AppNavigator() {
           navigationRef.current?.navigate('Alarm');
           return;
         }
+        // v1.6+ cold-start 시 fire 된 알람 entity (= type='alarm_main').
+        if (meta.type === 'alarm_main') {
+          await recordAlarmSession().catch(() => {});
+          await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+          const alarms = await loadAlarms();
+          const a = alarms.find(x => x.id === meta.entityId);
+          navigationRef.current?.navigate('Alarm', {
+            endMethod: a?.dismissMethod ?? 'tap',
+            alarmSoundKey: a?.soundKey,
+          });
+          return;
+        }
         if (meta.type === 'confirm_prompt') {
           // v1.6 Phase 12 — cold-start AlarmKit alerting 경로도 LA stage 자동 전환
           await setLiveActivityStage('manual_prompt').catch(() => {});
           const routines = await loadRoutines();
-          const r = routines.find(x => x.id === meta.routineId);
+          const r = routines.find(x => x.id === meta.entityId);
           if (!r) {
             navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
             return;
@@ -621,6 +674,10 @@ function AppNavigator() {
     syncRollingSchedule().catch((e) => {
       Logger.warn('AppNavigator', `syncRollingSchedule failed: ${e}`);
     });
+    // v1.6+ 알람 측 = stale 'alarm_main' cleanup + enabled=true 알람 재예약
+    syncAllAlarms().catch((e) => {
+      Logger.warn('AppNavigator', `syncAllAlarms failed: ${e}`);
+    });
     // 콜드 스타트 복원 — 약간 지연 후 navigationRef 준비되면 분기
     const timer = setTimeout(() => {
       if (!navigationRef.current?.isReady()) return;
@@ -680,6 +737,8 @@ function AppNavigator() {
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
         <Stack.Screen name="RoutineSound" component={RoutineSoundScreen} />
         <Stack.Screen name="FavoritesList" component={FavoritesListScreen} />
+        <Stack.Screen name="AlarmList" component={AlarmListScreen} />
+        <Stack.Screen name="AlarmEdit" component={AlarmEditScreen} />
         {/*
           ═══════════════════════════════════════════════════════════
            @preserve @v1.5-poc — PoCPhotoValidation Stack.Screen

@@ -71,7 +71,45 @@
     "guide_pet": "Scatta una foto al tuo animale",
     "guide_bike": "Scatta una foto a una bicicletta",
     "guide_toothbrush": "Scatta una foto a uno spazzolino",
-    "guide_phone": "Scatta una foto a uno smartphone"
+    "guide_phone": "Scatta una foto a uno smartphone",
+    "title": "Sveglie",
+    "add": "Aggiungi sveglia",
+    "empty": "Nessuna sveglia",
+    "unsupported": "Le sveglie richiedono iOS 26 o successivo.",
+    "repeat": {
+      "title": "Ripeti",
+      "once": "Mai",
+      "daily": "Ogni giorno",
+      "weekday": "Giorni feriali",
+      "weekend": "Weekend",
+      "weekly": "Giorni feriali"
+    },
+    "label": {
+      "placeholder": "Es: Sveglia"
+    },
+    "sound": {
+      "default": "Predefinito"
+    },
+    "dismissMethod": {
+      "title": "Metodo di arresto",
+      "tap": "Tocca",
+      "shake": "Scuoti",
+      "camera": "Foto"
+    },
+    "delete": {
+      "title": "Elimina sveglia",
+      "body": "Eliminare questa sveglia?",
+      "confirm": "Elimina"
+    },
+    "edit": {
+      "editTitle": "Modifica sveglia",
+      "newTitle": "Aggiungi sveglia"
+    },
+    "validate": {
+      "title": "Verifica richiesta",
+      "time": "Ora non valida",
+      "daysEmpty": "Seleziona almeno un giorno"
+    }
   },
   "addTimer": {
     "editTitle": "Modifica preferito",
@@ -180,7 +218,8 @@
     "directions-bike": "Ciclismo",
     "spa": "Relax",
     "nightlight": "Pisolino",
-    "clean-hands": "Lavarsi"
+    "clean-hands": "Lavarsi",
+    "alarm": "Sveglia"
   },
   "sounds": {
     "alarm": "Allarme",
@@ -238,5 +277,12 @@
     "tooltipPlay": "Premi a lungo il pulsante play per fermare il timer",
     "tooltipFav": "Premi a lungo un preferito per modificarlo",
     "confirm": "Conferma"
+  },
+  "common": {
+    "save": "Salva",
+    "am": "AM",
+    "pm": "PM",
+    "hour": "h",
+    "minute": "m"
   }
 }

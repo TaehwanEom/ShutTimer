@@ -71,7 +71,45 @@
     "guide_pet": "請拍攝寵物",
     "guide_bike": "請拍攝自行車",
     "guide_toothbrush": "請拍攝牙刷",
-    "guide_phone": "請拍攝智慧型手機"
+    "guide_phone": "請拍攝智慧型手機",
+    "title": "鬧鐘",
+    "add": "新增鬧鐘",
+    "empty": "沒有鬧鐘",
+    "unsupported": "鬧鐘功能需要 iOS 26 或更高版本。",
+    "repeat": {
+      "title": "重複",
+      "once": "永不",
+      "daily": "每天",
+      "weekday": "工作日",
+      "weekend": "週末",
+      "weekly": "工作日"
+    },
+    "label": {
+      "placeholder": "例如: 起床"
+    },
+    "sound": {
+      "default": "預設"
+    },
+    "dismissMethod": {
+      "title": "解除方式",
+      "tap": "點擊",
+      "shake": "搖動",
+      "camera": "照片"
+    },
+    "delete": {
+      "title": "刪除鬧鐘",
+      "body": "刪除此鬧鐘?",
+      "confirm": "刪除"
+    },
+    "edit": {
+      "editTitle": "編輯鬧鐘",
+      "newTitle": "新增鬧鐘"
+    },
+    "validate": {
+      "title": "需要確認",
+      "time": "時間無效",
+      "daysEmpty": "請至少選擇一天"
+    }
   },
   "addTimer": {
     "editTitle": "編輯收藏",
@@ -180,7 +218,8 @@
     "directions-bike": "騎車",
     "spa": "休息",
     "nightlight": "午睡",
-    "clean-hands": "洗臉"
+    "clean-hands": "洗臉",
+    "alarm": "鬧鐘"
   },
   "sounds": {
     "alarm": "警報音",
@@ -238,5 +277,12 @@
     "tooltipPlay": "長按播放按鈕可以停止計時器",
     "tooltipFav": "長按收藏可以編輯",
     "confirm": "確認"
+  },
+  "common": {
+    "save": "儲存",
+    "am": "上午",
+    "pm": "下午",
+    "hour": "時",
+    "minute": "分"
   }
 }

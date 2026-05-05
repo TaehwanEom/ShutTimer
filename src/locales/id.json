@@ -71,7 +71,45 @@
     "guide_pet": "Ambil foto hewan peliharaan Anda",
     "guide_bike": "Ambil foto sepeda",
     "guide_toothbrush": "Ambil foto sikat gigi",
-    "guide_phone": "Ambil foto smartphone"
+    "guide_phone": "Ambil foto smartphone",
+    "title": "Alarm",
+    "add": "Tambah Alarm",
+    "empty": "Belum ada alarm",
+    "unsupported": "Fitur alarm memerlukan iOS 26 atau lebih baru.",
+    "repeat": {
+      "title": "Ulang",
+      "once": "Tidak",
+      "daily": "Setiap Hari",
+      "weekday": "Hari Kerja",
+      "weekend": "Akhir Pekan",
+      "weekly": "Hari Kerja"
+    },
+    "label": {
+      "placeholder": "Contoh: Bangun"
+    },
+    "sound": {
+      "default": "Default"
+    },
+    "dismissMethod": {
+      "title": "Cara Matikan",
+      "tap": "Ketuk",
+      "shake": "Goyang",
+      "camera": "Foto"
+    },
+    "delete": {
+      "title": "Hapus Alarm",
+      "body": "Hapus alarm ini?",
+      "confirm": "Hapus"
+    },
+    "edit": {
+      "editTitle": "Edit Alarm",
+      "newTitle": "Tambah Alarm"
+    },
+    "validate": {
+      "title": "Periksa",
+      "time": "Waktu tidak valid",
+      "daysEmpty": "Pilih setidaknya satu hari"
+    }
   },
   "addTimer": {
     "editTitle": "Edit Favorit",
@@ -180,7 +218,8 @@
     "directions-bike": "Bersepeda",
     "spa": "Istirahat",
     "nightlight": "Tidur siang",
-    "clean-hands": "Cuci Muka"
+    "clean-hands": "Cuci Muka",
+    "alarm": "Alarm"
   },
   "sounds": {
     "alarm": "Alarm",
@@ -238,5 +277,12 @@
     "tooltipPlay": "Tekan lama tombol play untuk menghentikan timer",
     "tooltipFav": "Tekan lama favorit untuk mengedit",
     "confirm": "Konfirmasi"
+  },
+  "common": {
+    "save": "Simpan",
+    "am": "AM",
+    "pm": "PM",
+    "hour": "j",
+    "minute": "m"
   }
 }

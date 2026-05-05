@@ -71,7 +71,45 @@
     "guide_pet": "Evcil hayvanınızın fotoğrafını çekin",
     "guide_bike": "Bisikletin fotoğrafını çekin",
     "guide_toothbrush": "Diş fırçasının fotoğrafını çekin",
-    "guide_phone": "Akıllı telefonun fotoğrafını çekin"
+    "guide_phone": "Akıllı telefonun fotoğrafını çekin",
+    "title": "Alarmlar",
+    "add": "Alarm Ekle",
+    "empty": "Alarm yok",
+    "unsupported": "Alarm özelliği iOS 26 veya üstünü gerektirir.",
+    "repeat": {
+      "title": "Tekrar",
+      "once": "Asla",
+      "daily": "Her gün",
+      "weekday": "Hafta içi",
+      "weekend": "Hafta sonu",
+      "weekly": "Hafta içi"
+    },
+    "label": {
+      "placeholder": "Örn: Uyan"
+    },
+    "sound": {
+      "default": "Varsayılan"
+    },
+    "dismissMethod": {
+      "title": "Kapatma Yöntemi",
+      "tap": "Dokun",
+      "shake": "Salla",
+      "camera": "Fotoğraf"
+    },
+    "delete": {
+      "title": "Alarmı Sil",
+      "body": "Bu alarmı silinsin mi?",
+      "confirm": "Sil"
+    },
+    "edit": {
+      "editTitle": "Alarmı Düzenle",
+      "newTitle": "Alarm Ekle"
+    },
+    "validate": {
+      "title": "Kontrol Gerekli",
+      "time": "Geçersiz saat",
+      "daysEmpty": "Lütfen en az bir gün seçin"
+    }
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -180,7 +218,8 @@
     "directions-bike": "Bisiklet",
     "spa": "Dinlenme",
     "nightlight": "Şekerleme",
-    "clean-hands": "Yıkanma"
+    "clean-hands": "Yıkanma",
+    "alarm": "Alarm"
   },
   "sounds": {
     "alarm": "Alarm",
@@ -238,5 +277,12 @@
     "tooltipPlay": "Oynat düğmesini uzun basarak zamanlayıcıyı durdur",
     "tooltipFav": "Bir favoriyi uzun basarak düzenle",
     "confirm": "Onayla"
+  },
+  "common": {
+    "save": "Kaydet",
+    "am": "ÖÖ",
+    "pm": "ÖS",
+    "hour": "s",
+    "minute": "d"
   }
 }

@@ -443,7 +443,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물 스캔 종료' });
       try {
         const id = await AlarmkitBridge.scheduleAlarm({
-          routineId,
+          entityId: routineId,
           title: alarmTitle,
           fireAt,
           stopLabel: t('home.timerStop', { defaultValue: '확인' }),
@@ -459,7 +459,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           console.warn('[timer] listAlarms after fail:', String(e));
         }
         if (id) {
-          await saveAlarmMetadata({ alarmId: id, type: 'timer_main', routineId });
+          await saveAlarmMetadata({ alarmId: id, type: 'timer_main', entityId: routineId });
           alarmkitIdRef.current = id;
           // v1.6 Phase 10-A — LA Intent 가 read 해 AlarmKit pause/resume/cancel 호출
           writeChainAlarms(routineId, [id]);

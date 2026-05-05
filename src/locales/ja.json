@@ -71,7 +71,45 @@
     "guide_pet": "ペットを撮影してください",
     "guide_bike": "自転車を撮影してください",
     "guide_toothbrush": "歯ブラシを撮影してください",
-    "guide_phone": "スマートフォンを撮影してください"
+    "guide_phone": "スマートフォンを撮影してください",
+    "title": "アラーム",
+    "add": "アラーム追加",
+    "empty": "登録されたアラームがありません",
+    "unsupported": "アラーム機能は iOS 26 以降で利用できます。",
+    "repeat": {
+      "title": "繰り返し",
+      "once": "しない",
+      "daily": "毎日",
+      "weekday": "平日",
+      "weekend": "週末",
+      "weekly": "平日"
+    },
+    "label": {
+      "placeholder": "例: 起床"
+    },
+    "sound": {
+      "default": "デフォルト"
+    },
+    "dismissMethod": {
+      "title": "解除方法",
+      "tap": "タップ",
+      "shake": "振る",
+      "camera": "写真"
+    },
+    "delete": {
+      "title": "アラーム削除",
+      "body": "このアラームを削除しますか?",
+      "confirm": "削除"
+    },
+    "edit": {
+      "editTitle": "アラーム編集",
+      "newTitle": "アラーム追加"
+    },
+    "validate": {
+      "title": "確認必要",
+      "time": "時刻が正しくありません",
+      "daysEmpty": "曜日を選択してください"
+    }
   },
   "addTimer": {
     "editTitle": "お気に入り編集",
@@ -180,7 +218,8 @@
     "directions-bike": "自転車",
     "spa": "リラックス",
     "nightlight": "昼寝",
-    "clean-hands": "洗顔"
+    "clean-hands": "洗顔",
+    "alarm": "アラーム"
   },
   "sounds": {
     "alarm": "アラーム",
@@ -238,5 +277,12 @@
     "tooltipPlay": "再生ボタンを長押しするとタイマーを停止できます",
     "tooltipFav": "お気に入りを長押しすると編集できます",
     "confirm": "確認"
+  },
+  "common": {
+    "save": "保存",
+    "am": "午前",
+    "pm": "午後",
+    "hour": "時",
+    "minute": "分"
   }
 }

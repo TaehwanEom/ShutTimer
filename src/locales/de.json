@@ -71,7 +71,45 @@
     "guide_pet": "Fotografiere dein Haustier",
     "guide_bike": "Fotografiere ein Fahrrad",
     "guide_toothbrush": "Fotografiere eine Zahnbürste",
-    "guide_phone": "Fotografiere ein Smartphone"
+    "guide_phone": "Fotografiere ein Smartphone",
+    "title": "Wecker",
+    "add": "Wecker hinzufügen",
+    "empty": "Keine Wecker eingestellt",
+    "unsupported": "Die Weckerfunktion erfordert iOS 26 oder neuer.",
+    "repeat": {
+      "title": "Wiederholen",
+      "once": "Nie",
+      "daily": "Täglich",
+      "weekday": "Wochentage",
+      "weekend": "Wochenende",
+      "weekly": "Wochentage"
+    },
+    "label": {
+      "placeholder": "z. B. Aufstehen"
+    },
+    "sound": {
+      "default": "Standard"
+    },
+    "dismissMethod": {
+      "title": "Beenden",
+      "tap": "Tippen",
+      "shake": "Schütteln",
+      "camera": "Foto"
+    },
+    "delete": {
+      "title": "Wecker löschen",
+      "body": "Diesen Wecker löschen?",
+      "confirm": "Löschen"
+    },
+    "edit": {
+      "editTitle": "Wecker bearbeiten",
+      "newTitle": "Wecker hinzufügen"
+    },
+    "validate": {
+      "title": "Prüfen",
+      "time": "Ungültige Zeit",
+      "daysEmpty": "Bitte mindestens einen Tag wählen"
+    }
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -180,7 +218,8 @@
     "directions-bike": "Radfahren",
     "spa": "Entspannung",
     "nightlight": "Nickerchen",
-    "clean-hands": "Waschen"
+    "clean-hands": "Waschen",
+    "alarm": "Wecker"
   },
   "sounds": {
     "alarm": "Alarm",
@@ -238,5 +277,12 @@
     "tooltipPlay": "Play-Taste lange drücken, um Timer zu stoppen",
     "tooltipFav": "Favoriten lange drücken zum Bearbeiten",
     "confirm": "Bestätigen"
+  },
+  "common": {
+    "save": "Speichern",
+    "am": "AM",
+    "pm": "PM",
+    "hour": "h",
+    "minute": "m"
   }
 }

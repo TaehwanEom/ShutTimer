@@ -31,14 +31,15 @@ struct OpenAppDismissIntent: LiveActivityIntent {
     static var supportedModes: IntentModes = [.foreground(.immediate)]
     static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
 
-    @Parameter(title: "Routine ID")
-    var routineId: String
+    @Parameter(title: "Entity ID")
+    var entityId: String
 
-    init() { self.routineId = "" }
-    init(routineId: String) { self.routineId = routineId }
+    init() { self.entityId = "" }
+    init(entityId: String) { self.entityId = entityId }
 
     func perform() async throws -> some IntentResult {
-        writeOpenAppDismissSignal(routineId: routineId)
+        // (= 카테고리 D 측 signal JSON key "routineId" 보존, 호출 시 값 = entityId)
+        writeOpenAppDismissSignal(routineId: entityId)
         return .result()
     }
 }

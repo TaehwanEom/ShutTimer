@@ -75,7 +75,45 @@
     "guide_pet": "Take a photo of your pet",
     "guide_bike": "Take a photo of a bicycle",
     "guide_toothbrush": "Take a photo of a toothbrush",
-    "guide_phone": "Take a photo of a smartphone"
+    "guide_phone": "Take a photo of a smartphone",
+    "title": "Alarms",
+    "add": "Add Alarm",
+    "empty": "No alarms set",
+    "unsupported": "Alarms require iOS 26 or later.",
+    "repeat": {
+      "title": "Repeat",
+      "once": "Never",
+      "daily": "Every Day",
+      "weekday": "Weekdays",
+      "weekend": "Weekends",
+      "weekly": "Weekly"
+    },
+    "label": {
+      "placeholder": "e.g. Wake up"
+    },
+    "sound": {
+      "default": "Default"
+    },
+    "dismissMethod": {
+      "title": "Dismiss Method",
+      "tap": "Tap",
+      "shake": "Shake",
+      "camera": "Photo"
+    },
+    "delete": {
+      "title": "Delete Alarm",
+      "body": "Delete this alarm?",
+      "confirm": "Delete"
+    },
+    "edit": {
+      "editTitle": "Edit Alarm",
+      "newTitle": "Add Alarm"
+    },
+    "validate": {
+      "title": "Check Required",
+      "time": "Invalid time",
+      "daysEmpty": "Please select at least one day"
+    }
   },
   "addTimer": {
     "editTitle": "Edit Favorite",
@@ -184,7 +222,8 @@
     "directions-bike": "Cycling",
     "spa": "Relax",
     "nightlight": "Nap",
-    "clean-hands": "Washing"
+    "clean-hands": "Washing",
+    "alarm": "Alarm"
   },
   "sounds": {
     "alarm": "Alarm",
@@ -245,7 +284,12 @@
   },
   "common": {
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "save": "Save",
+    "am": "AM",
+    "pm": "PM",
+    "hour": "h",
+    "minute": "m"
   },
   "routine": {
     "listTitle": "Routines",

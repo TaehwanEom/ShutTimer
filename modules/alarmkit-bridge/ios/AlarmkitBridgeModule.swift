@@ -193,6 +193,63 @@ public class AlarmkitBridgeModule: Module {
       )
 
       let id = UUID()
+
+      // v1.6+ — recurrence 옵션 (= type='alarm_main' 측) → .alarm(schedule:) factory 분기.
+      // OS 자동 반복 (= .relative(.weekly([...]))). 재예약 listener 불필요.
+      if let recurrence = params.recurrence, recurrence.mode != "never" {
+        let fireDate = Date(timeIntervalSince1970: params.fireAt / 1000.0)
+        let cal = Calendar.current
+        let comp = cal.dateComponents([.hour, .minute], from: fireDate)
+        guard let hour = comp.hour, let minute = comp.minute else {
+          throw NSError(
+            domain: "AlarmkitBridge",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "recurrence: invalid fireAt"]
+          )
+        }
+
+        let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
+
+        // JS days[] (0=일~6=토) → Locale.Weekday 변환.
+        let dayMap: [Int: Locale.Weekday] = [
+          0: .sunday, 1: .monday, 2: .tuesday, 3: .wednesday,
+          4: .thursday, 5: .friday, 6: .saturday
+        ]
+        let weekdays: [Locale.Weekday]
+        if recurrence.mode == "daily" {
+          weekdays = [.sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday]
+        } else { // "weekly"
+          let candidates = (recurrence.days ?? []).compactMap { dayMap[$0] }
+          if candidates.isEmpty {
+            throw NSError(
+              domain: "AlarmkitBridge",
+              code: 3,
+              userInfo: [NSLocalizedDescriptionKey: "recurrence: weekly requires days"]
+            )
+          }
+          weekdays = candidates
+        }
+
+        let recurrenceObj = Alarm.Schedule.Relative.Recurrence.weekly(weekdays)
+        let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrenceObj))
+
+        // .alarm(schedule:) presentation = alert 만 사용 (= countdown / paused 영역 ❌).
+        let alarmPresentation = AlarmPresentation(alert: alert)
+        let alarmAttributes = AlarmAttributes<ShutTimerAlarmMetadata>(
+          presentation: alarmPresentation,
+          tintColor: Color.red
+        )
+
+        let alarmConfig: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata> = .alarm(
+          schedule: schedule,
+          attributes: alarmAttributes,
+          stopIntent: OpenAppDismissIntent(entityId: params.entityId),
+          sound: alertSound
+        )
+        _ = try await AlarmManager.shared.schedule(id: id, configuration: alarmConfig)
+        return id.uuidString
+      }
+
       let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
       if params.type == "chain" {
         config = .timer(
@@ -205,29 +262,29 @@ public class AlarmkitBridgeModule: Module {
         config = .timer(
           duration: durationSecAll,
           attributes: timerAttributesAll,
-          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
+          stopIntent: OpenAppDismissIntent(entityId: params.entityId),
           sound: alertSound
         )
       } else if hasSecondary {
         config = .timer(
           duration: durationSecAll,
           attributes: timerAttributesAll,
-          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
-          secondaryIntent: AdvanceNextStepIntent(routineId: params.routineId),
+          stopIntent: OpenAppDismissIntent(entityId: params.entityId),
+          secondaryIntent: AdvanceNextStepIntent(entityId: params.entityId),
           sound: alertSound
         )
       } else if params.type == "confirm_prompt" {
         config = .timer(
           duration: durationSecAll,
           attributes: timerAttributesAll,
-          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
+          stopIntent: OpenAppDismissIntent(entityId: params.entityId),
           sound: alertSound
         )
       } else {
         config = .timer(
           duration: durationSecAll,
           attributes: timerAttributesAll,
-          stopIntent: OpenAppDismissIntent(routineId: params.routineId),
+          stopIntent: OpenAppDismissIntent(entityId: params.entityId),
           sound: alertSound
         )
       }
@@ -312,16 +369,25 @@ public class AlarmkitBridgeModule: Module {
   }
 }
 
+// v1.6+ — recurrence 옵션 (= AlarmKit `.relative(.weekly([...]))` 측 OS 자동 반복).
+struct RecurrenceParams: Record {
+  @Field var mode: String          // 'never' | 'daily' | 'weekly'
+  @Field var days: [Int]?          // mode='weekly' 시 0(일)~6(토)
+}
+
 struct ScheduleAlarmParams: Record {
-  @Field var routineId: String
+  // v1.6+ — entityId (= 카테고리 B 일반화, rename 결정 4-B). 루틴/타이머/알람 식별자 공통.
+  @Field var entityId: String
   @Field var title: String
   @Field var fireAt: Double
   @Field var stopLabel: String?
   @Field var soundName: String?
-  // v1.6 T1 신규 — chain/confirm_prompt 메타데이터 (JS mapping table 정공이라 Swift 본문 미사용)
-  @Field var type: String?              // 'prealert' | 'chain' | 'confirm_prompt'
+  // v1.6 T1 신규 — chain/confirm_prompt/alarm_main 메타데이터 (JS mapping table 정공이라 Swift 본문 미사용)
+  @Field var type: String?              // 'prealert' | 'chain' | 'confirm_prompt' | 'timer_main' | 'alarm_main'
   @Field var nextStepIndex: Int?
   @Field var endMethod: String?         // 'tap' | 'shake' | 'camera' | 'auto'
   // v1.6 hotfix — confirm_prompt 잠금 alerting UI 의 보조 버튼 라벨. 미전달 시 stop 버튼만 노출 (회귀 X)
   @Field var secondaryLabel: String?
+  // v1.6+ — recurrence 옵션 (= type='alarm_main' 측 사용). mode='daily'/'weekly' 시 .alarm(schedule:) 분기.
+  @Field var recurrence: RecurrenceParams?
 }

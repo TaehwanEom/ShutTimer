@@ -32,6 +32,11 @@ type Props = {
   dimColor: string;
   bgColor: string;
   accentColor: string;
+  /**
+   * v1.6+ 인라인 모드 (= 모달 wrap ❌, 화면 상단 직접 노출).
+   * iOS 시스템 알람 측 패턴. 값 변경 시 즉시 onConfirm 호출 (= 확인/취소 버튼 미노출).
+   */
+  inline?: boolean;
 };
 
 function hour24To12(h: number): { ampm: 0 | 1; hour12: number } {
@@ -55,14 +60,13 @@ export default function TimeWheelPicker(props: Props) {
     onCancel,
     amLabel,
     pmLabel,
-    hourUnitLabel,
-    minuteUnitLabel,
     confirmLabel,
     cancelLabel,
     textColor,
     dimColor,
     bgColor,
     accentColor,
+    inline,
   } = props;
 
   const initialAmPm = hour24To12(initialHour).ampm;
@@ -74,14 +78,16 @@ export default function TimeWheelPicker(props: Props) {
   const [seedKey, setSeedKey] = useState(0);
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible || inline) {
       const { ampm: a, hour12: h } = hour24To12(initialHour);
       setAmpm(a);
       setHour12(h);
       setMinute(initialMinute);
       setSeedKey(k => k + 1);
     }
-  }, [isVisible, initialHour, initialMinute]);
+    // inline 모드 측 = mount 시 1회 seed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isVisible]);
 
   const handleConfirm = () => {
     onConfirm(hour12To24(ampm, hour12), minute);
@@ -89,52 +95,81 @@ export default function TimeWheelPicker(props: Props) {
 
   const ampmLabel = (v: number) => (v === 0 ? amLabel : pmLabel);
 
+  // v1.6+ 인라인 모드 — 값 변경 시 즉시 onConfirm 호출 (= 확인 버튼 미노출).
+  // iOS 시스템 알람 측 패턴.
+  const handleInlineChange = (a: 0 | 1, h: number, m: number) => {
+    onConfirm(hour12To24(a, h), m);
+  };
+
+  const wheels = (
+    <View style={[styles.row, inline && styles.rowInline]}>
+      <View style={styles.column}>
+        <Wheel
+          key={`ampm-${seedKey}`}
+          count={2}
+          initial={ampm}
+          onChange={(v) => {
+            const next = v as 0 | 1;
+            setAmpm(next);
+            if (inline) handleInlineChange(next, hour12, minute);
+          }}
+          textColor={textColor}
+          dimColor={dimColor}
+          formatLabel={ampmLabel}
+          loop={false}
+          width={48}
+          align="center"
+        />
+      </View>
+      <View style={styles.column}>
+        <Wheel
+          key={`h-${seedKey}`}
+          count={12}
+          initial={hour12 - 1}
+          onChange={(v) => {
+            const next = v + 1;
+            setHour12(next);
+            if (inline) handleInlineChange(ampm, next, minute);
+          }}
+          textColor={textColor}
+          dimColor={dimColor}
+          formatLabel={(v) => String(v + 1)}
+          width={48}
+          align="center"
+        />
+      </View>
+      <View style={styles.column}>
+        <Wheel
+          key={`m-${seedKey}`}
+          count={60}
+          initial={minute}
+          onChange={(v) => {
+            setMinute(v);
+            if (inline) handleInlineChange(ampm, hour12, v);
+          }}
+          width={48}
+          align="center"
+          textColor={textColor}
+          dimColor={dimColor}
+          formatLabel={(v) => String(v).padStart(2, '0')}
+        />
+      </View>
+    </View>
+  );
+
+  if (inline) {
+    return (
+      <View style={[styles.inlineWrap, { backgroundColor: bgColor }]}>
+        {wheels}
+      </View>
+    );
+  }
+
   return (
     <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={[styles.sheet, { backgroundColor: bgColor }]}>
-          <View style={styles.row}>
-            <View style={styles.column}>
-              <Wheel
-                key={`ampm-${seedKey}`}
-                count={2}
-                initial={ampm}
-                onChange={(v) => setAmpm(v as 0 | 1)}
-                textColor={textColor}
-                dimColor={dimColor}
-                formatLabel={ampmLabel}
-                loop={false}
-                width={48}
-                align="center"
-              />
-            </View>
-            <View style={styles.column}>
-              <Wheel
-                key={`h-${seedKey}`}
-                count={12}
-                initial={hour12 - 1}
-                onChange={(v) => setHour12(v + 1)}
-                textColor={textColor}
-                dimColor={dimColor}
-                formatLabel={(v) => String(v + 1)}
-                width={48}
-                align="center"
-              />
-            </View>
-            <View style={styles.column}>
-              <Wheel
-                key={`m-${seedKey}`}
-                count={60}
-                initial={minute}
-                onChange={setMinute}
-                width={48}
-                align="center"
-                textColor={textColor}
-                dimColor={dimColor}
-                formatLabel={(v) => String(v).padStart(2, '0')}
-              />
-            </View>
-          </View>
+          {wheels}
 
           <View style={styles.actions}>
             <TouchableOpacity onPress={onCancel} style={styles.actionBtn}>
@@ -168,6 +203,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     height: PICKER_HEIGHT,
+  },
+  rowInline: {
+    paddingVertical: 8,
+  },
+  inlineWrap: {
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   column: {
     flexDirection: 'row',

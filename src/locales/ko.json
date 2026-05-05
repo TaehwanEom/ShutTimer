@@ -75,7 +75,45 @@
     "guide_pet": "반려동물을 찍어주세요",
     "guide_bike": "자전거를 찍어주세요",
     "guide_toothbrush": "칫솔을 찍어주세요",
-    "guide_phone": "스마트폰을 찍어주세요"
+    "guide_phone": "스마트폰을 찍어주세요",
+    "title": "알람",
+    "add": "알람 추가",
+    "empty": "등록된 알람이 없습니다",
+    "unsupported": "알람 기능은 iOS 26 이상에서 지원됩니다.",
+    "repeat": {
+      "title": "반복",
+      "once": "안 함",
+      "daily": "매일",
+      "weekday": "주중",
+      "weekend": "주말",
+      "weekly": "주중"
+    },
+    "label": {
+      "placeholder": "예: 기상"
+    },
+    "sound": {
+      "default": "기본"
+    },
+    "dismissMethod": {
+      "title": "해제 방식",
+      "tap": "탭",
+      "shake": "흔들기",
+      "camera": "사진"
+    },
+    "delete": {
+      "title": "알람 삭제",
+      "body": "이 알람을 삭제하시겠습니까?",
+      "confirm": "삭제"
+    },
+    "edit": {
+      "editTitle": "알람 편집",
+      "newTitle": "알람 추가"
+    },
+    "validate": {
+      "title": "확인 필요",
+      "time": "시각이 올바르지 않습니다",
+      "daysEmpty": "요일을 선택해주세요"
+    }
   },
   "addTimer": {
     "editTitle": "즐겨찾기 편집",
@@ -185,7 +223,8 @@
     "directions-bike": "자전거",
     "spa": "휴식",
     "nightlight": "낮잠",
-    "clean-hands": "세수"
+    "clean-hands": "세수",
+    "alarm": "알람"
   },
   "sounds": {
     "alarm": "경고음",
@@ -246,7 +285,12 @@
   },
   "common": {
     "cancel": "취소",
-    "confirm": "확인"
+    "confirm": "확인",
+    "save": "저장",
+    "am": "오전",
+    "pm": "오후",
+    "hour": "시",
+    "minute": "분"
   },
   "routine": {
     "listTitle": "루틴",

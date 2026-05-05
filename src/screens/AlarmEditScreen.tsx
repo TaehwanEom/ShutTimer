@@ -1,0 +1,644 @@
+// v1.6+ 알람 편집 화면.
+// 신규/편집 모드 통합. AlarmKit 단독 (iOS 26+).
+
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ScrollView,
+  TextInput,
+  Alert,
+  Linking,
+  I18nManager,
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import { RootStackParamList } from '../../App';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeColors } from '../constants/theme';
+import TimeWheelPicker from '../components/TimeWheelPicker';
+import {
+  Alarm,
+  AlarmRepeat,
+  AlarmDismissMethod,
+  loadAlarms,
+  upsertAlarm,
+  deleteAlarm,
+  createAlarmId,
+} from '../constants/alarms';
+import {
+  scheduleAlarmMain,
+  cancelAlarmsForEntity,
+} from '../utils/alarmScheduler';
+import {
+  requestAlarmKitAuthorizationIfNeeded,
+  isAlertShownThisCycle,
+  markAlertShown,
+} from '../utils/routineScheduler';
+import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'AlarmEdit'>;
+  route: RouteProp<RootStackParamList, 'AlarmEdit'>;
+};
+
+const LABEL_MAX = 30;
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/** 신규 알람 측 default 시각 = 현재 시각 (HH:MM). 사용자 측 휠 측 즉시 변경 가능. */
+function getCurrentTimeHHMM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function parseHHMM(s: string): { h: number; m: number } | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  if (!m) return null;
+  return { h: parseInt(m[1], 10), m: parseInt(m[2], 10) };
+}
+
+function soundLabel(soundKey: string, t: (k: string, opts?: any) => string): string {
+  const item = ALARM_SOUNDS.find(s => s.id === soundKey);
+  if (!item) return t('alarm.sound.default', { defaultValue: '기본' });
+  const num = item.id.split('_')[1] ?? '';
+  return item.id.startsWith('alarm_')
+    ? `${t('routine.sound.alarm', { defaultValue: '알람' })} ${num}`
+    : `${t('routine.sound.ringtone', { defaultValue: '벨소리' })} ${num}`;
+}
+
+export default function AlarmEditScreen({ navigation, route }: Props) {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+  const styles = makeStyles(colors);
+  const editingId = route.params?.alarmId ?? null;
+  const isEditMode = editingId !== null;
+
+  const [time, setTime] = useState<string>(() => getCurrentTimeHHMM());
+  const [repeat, setRepeat] = useState<AlarmRepeat>('once');
+  const [days, setDays] = useState<number[]>([]);
+  const [label, setLabel] = useState('');
+  const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
+  const [dismissMethod, setDismissMethod] = useState<AlarmDismissMethod>('tap');
+  const [soundPickerVisible, setSoundPickerVisible] = useState(false);
+
+  const originalCreatedAtRef = useRef<number | null>(null);
+  const loadedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // 편집 모드: 기존 알람 로드
+  useEffect(() => {
+    if (loadedRef.current || !editingId) {
+      loadedRef.current = true;
+      return;
+    }
+    loadAlarms().then(list => {
+      const target = list.find(a => a.id === editingId);
+      if (!target) {
+        loadedRef.current = true;
+        return;
+      }
+      originalCreatedAtRef.current = target.createdAt;
+      setTime(target.time);
+      setRepeat(target.repeat);
+      setDays(target.days);
+      setLabel(target.label);
+      setSoundKey(target.soundKey);
+      setDismissMethod(target.dismissMethod);
+      loadedRef.current = true;
+    });
+  }, [editingId]);
+
+  const handleTimeConfirm = (hour: number, minute: number) => {
+    setTime(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  };
+
+  const toggleDay = (d: number) => {
+    setDays(prev => {
+      const next = prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort();
+      // 요일 토글 측 = repeat 자동 detect (= 빈/전체/일반 weekly).
+      if (next.length === 0) setRepeat('once');
+      else if (next.length === 7) setRepeat('daily');
+      else setRepeat('weekly');
+      return next;
+    });
+  };
+
+  // 4개 버튼 (= 안 함 / 매일 / 주중 / 주말) 측 = 누름 시 days 자동 fill + repeat 동기화.
+  type DisplayMode = 'once' | 'daily' | 'weekday' | 'weekend';
+
+  const setMode = (mode: DisplayMode) => {
+    if (mode === 'once') {
+      setRepeat('once');
+      setDays([]);
+    } else if (mode === 'daily') {
+      setRepeat('daily');
+      setDays([0, 1, 2, 3, 4, 5, 6]);
+    } else if (mode === 'weekday') {
+      setRepeat('weekly');
+      setDays([1, 2, 3, 4, 5]);
+    } else {
+      // weekend
+      setRepeat('weekly');
+      setDays([0, 6]);
+    }
+  };
+
+  // 현재 (repeat + days) → display mode derive. 매칭 ❌ = null (= 4개 버튼 모두 unselected).
+  const getDisplayMode = (): DisplayMode | null => {
+    if (repeat === 'once') return 'once';
+    if (repeat === 'daily') return 'daily';
+    // weekly
+    if (days.length === 5 && [1, 2, 3, 4, 5].every(d => days.includes(d))) return 'weekday';
+    if (days.length === 2 && [0, 6].every(d => days.includes(d))) return 'weekend';
+    return null;
+  };
+
+  const currentMode = getDisplayMode();
+
+  const validate = (): { ok: boolean; error?: string } => {
+    if (parseHHMM(time) === null) {
+      return { ok: false, error: t('alarm.validate.time', { defaultValue: '시각이 올바르지 않습니다' }) };
+    }
+    if (repeat === 'weekly' && days.length === 0) {
+      return {
+        ok: false,
+        error: t('alarm.validate.daysEmpty', { defaultValue: '요일을 선택해주세요' }),
+      };
+    }
+    return { ok: true };
+  };
+
+  const handleSave = async () => {
+    const v = validate();
+    if (!v.ok) {
+      Alert.alert(
+        t('alarm.validate.title', { defaultValue: '확인 필요' }),
+        v.error ?? ''
+      );
+      return;
+    }
+
+    const alarm: Alarm = {
+      id: editingId ?? createAlarmId(),
+      time,
+      repeat,
+      days: repeat === 'weekly' ? days : [],
+      label: label.trim(),
+      enabled: true,
+      dismissMethod,
+      soundKey,
+      createdAt: originalCreatedAtRef.current ?? Date.now(),
+    };
+
+    // AlarmKit 권한 요청 (iOS 26+ 만)
+    const authState = await requestAlarmKitAuthorizationIfNeeded();
+    if (!isMountedRef.current) return;
+    if (authState === 'denied' && !isAlertShownThisCycle()) {
+      markAlertShown();
+      Alert.alert(
+        t('routine.alarmKit.permissionRequiredTitle', {
+          defaultValue: 'AlarmKit 권한 필요',
+        }),
+        t('routine.alarmKit.permissionRequiredBody', {
+          defaultValue: '설정 측 알림 권한 활성화 부탁드립니다.',
+        }),
+        [
+          {
+            text: t('routine.alarmKit.openSettings', { defaultValue: '설정 열기' }),
+            onPress: () => {
+              Linking.openURL('app-settings:').catch(() => {});
+            },
+          },
+          { text: t('common.confirm', { defaultValue: '확인' }), style: 'default' },
+        ]
+      );
+    }
+
+    // 기존 등록 cancel + 신규 schedule
+    await cancelAlarmsForEntity(alarm.id).catch(() => {});
+    await upsertAlarm(alarm);
+    await scheduleAlarmMain(alarm).catch(() => {});
+
+    if (!isMountedRef.current) return;
+    navigation.goBack();
+  };
+
+  const handleDelete = () => {
+    if (!editingId) return;
+    Alert.alert(
+      t('alarm.delete.title', { defaultValue: '알람 삭제' }),
+      t('alarm.delete.body', { defaultValue: '이 알람을 삭제하시겠습니까?' }),
+      [
+        { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel' },
+        {
+          text: t('alarm.delete.confirm', { defaultValue: '삭제' }),
+          style: 'destructive',
+          onPress: async () => {
+            await cancelAlarmsForEntity(editingId).catch(() => {});
+            await deleteAlarm(editingId);
+            if (isMountedRef.current) navigation.goBack();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClose = () => navigation.goBack();
+
+  const initialTime = parseHHMM(time) ?? { h: 7, m: 0 };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleClose}>
+          <MaterialIcons name="close" size={28} color={colors.onBackground} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {isEditMode
+            ? t('alarm.edit.editTitle', { defaultValue: '알람 편집' })
+            : t('alarm.edit.newTitle', { defaultValue: '알람 추가' })}
+        </Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={handleSave}>
+          <Text style={styles.headerSave}>
+            {t('common.save', { defaultValue: '저장' })}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 시각 — 인라인 휠 다이얼 (= iOS 시스템 알람 패턴). ScrollView 외부 위치 = nested scroll 충돌 ❌. */}
+      <TimeWheelPicker
+        isVisible={true}
+        inline
+        initialHour={initialTime.h}
+        initialMinute={initialTime.m}
+        onConfirm={handleTimeConfirm}
+        onCancel={() => {}}
+        amLabel={t('common.am', { defaultValue: '오전' })}
+        pmLabel={t('common.pm', { defaultValue: '오후' })}
+        hourUnitLabel={t('common.hour', { defaultValue: '시' })}
+        minuteUnitLabel={t('common.minute', { defaultValue: '분' })}
+        confirmLabel={t('common.confirm', { defaultValue: '확인' })}
+        cancelLabel={t('common.cancel', { defaultValue: '취소' })}
+        textColor={colors.onBackground}
+        dimColor={colors.outlineVariant}
+        bgColor={colors.surfaceContainerLowest}
+        accentColor={colors.primary}
+      />
+
+      <ScrollView contentContainerStyle={styles.content}>
+
+        {/* 반복 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            {t('alarm.repeat.title', { defaultValue: '반복' })}
+          </Text>
+          <View style={styles.repeatRow}>
+            {(['once', 'daily', 'weekday', 'weekend'] as DisplayMode[]).map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.repeatBtn, currentMode === m && styles.repeatBtnActive]}
+                onPress={() => setMode(m)}
+              >
+                <Text
+                  style={[
+                    styles.repeatBtnText,
+                    currentMode === m && styles.repeatBtnTextActive,
+                  ]}
+                >
+                  {m === 'once'
+                    ? t('alarm.repeat.once', { defaultValue: '안 함' })
+                    : m === 'daily'
+                      ? t('alarm.repeat.daily', { defaultValue: '매일' })
+                      : m === 'weekday'
+                        ? t('alarm.repeat.weekday', { defaultValue: '주중' })
+                        : t('alarm.repeat.weekend', { defaultValue: '주말' })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* 요일 row — 항상 노출. repeat='weekly' 시만 사용자 입력 의미 (= once/daily 시 = days 무시). */}
+          <View style={styles.daysRow}>
+            {WEEKDAY_KEYS.map((wk, idx) => (
+              <TouchableOpacity
+                key={wk}
+                style={[styles.dayBtn, days.includes(idx) && styles.dayBtnActive]}
+                onPress={() => toggleDay(idx)}
+              >
+                <Text
+                  style={[
+                    styles.dayBtnText,
+                    days.includes(idx) && styles.dayBtnTextActive,
+                  ]}
+                >
+                  {t(`routine.weekday.${wk}`, { defaultValue: wk })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* 라벨 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            {t('alarm.label', { defaultValue: '라벨' })}
+          </Text>
+          <TextInput
+            style={styles.labelInput}
+            placeholder={t('alarm.label.placeholder', { defaultValue: '예: 기상' })}
+            placeholderTextColor={colors.outlineVariant}
+            value={label}
+            onChangeText={setLabel}
+            maxLength={LABEL_MAX}
+          />
+        </View>
+
+        {/* 사운드 */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setSoundPickerVisible(v => !v)}
+        >
+          <Text style={styles.rowLabel}>
+            {t('alarm.sound', { defaultValue: '사운드' })}
+          </Text>
+          <Text style={styles.rowValue}>{soundLabel(soundKey, t)}</Text>
+        </TouchableOpacity>
+        {soundPickerVisible && (
+          <View style={styles.soundList}>
+            {ALARM_SOUNDS.map(s => (
+              <TouchableOpacity
+                key={s.id}
+                style={[
+                  styles.soundItem,
+                  soundKey === s.id && styles.soundItemActive,
+                ]}
+                onPress={() => {
+                  setSoundKey(s.id);
+                  setSoundPickerVisible(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.soundItemText,
+                    soundKey === s.id && styles.soundItemTextActive,
+                  ]}
+                >
+                  {soundLabel(s.id, t)}
+                </Text>
+                {soundKey === s.id && (
+                  <MaterialIcons name="check" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* 해제 방식 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            {t('alarm.dismissMethod.title', { defaultValue: '해제 방식' })}
+          </Text>
+          <View style={styles.dismissRow}>
+            {(['tap', 'shake', 'camera'] as AlarmDismissMethod[]).map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[
+                  styles.dismissBtn,
+                  dismissMethod === m && styles.dismissBtnActive,
+                ]}
+                onPress={() => setDismissMethod(m)}
+              >
+                <MaterialIcons
+                  name={
+                    m === 'tap' ? 'touch-app' : m === 'shake' ? 'vibration' : 'photo-camera'
+                  }
+                  size={22}
+                  color={dismissMethod === m ? colors.onPrimary : colors.onBackground}
+                />
+                <Text
+                  style={[
+                    styles.dismissBtnText,
+                    dismissMethod === m && styles.dismissBtnTextActive,
+                  ]}
+                >
+                  {m === 'tap'
+                    ? t('alarm.dismissMethod.tap', { defaultValue: '탭' })
+                    : m === 'shake'
+                      ? t('alarm.dismissMethod.shake', { defaultValue: '흔들기' })
+                      : t('alarm.dismissMethod.camera', { defaultValue: '사진' })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* 삭제 (편집 모드만) */}
+        {isEditMode && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+            <MaterialIcons name="delete-outline" size={20} color="#c62828" />
+            <Text style={styles.deleteBtnText}>
+              {t('alarm.delete.confirm', { defaultValue: '삭제' })}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
+    </SafeAreaView>
+  );
+}
+
+const makeStyles = (colors: ThemeColors) => {
+  // RTL 분기 — flexDirection 측 = RN 자동 mirror ❌, 명시 영영.
+  const flexRow: 'row' | 'row-reverse' = I18nManager.isRTL ? 'row-reverse' : 'row';
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.outlineVariant,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: colors.onBackground,
+    },
+    iconBtn: {
+      width: 60,
+      alignItems: 'center',
+    },
+    headerSave: {
+      fontSize: 16,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    content: {
+      paddingVertical: 8,
+    },
+    row: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: colors.surfaceContainerLowest,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.outlineVariant,
+    },
+    rowLabel: {
+      fontSize: 16,
+      color: colors.onBackground,
+    },
+    rowValue: {
+      fontSize: 16,
+      color: colors.secondary,
+    },
+    section: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: colors.surfaceContainerLowest,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.outlineVariant,
+    },
+    sectionLabel: {
+      fontSize: 14,
+      color: colors.secondary,
+      marginBottom: 12,
+    },
+    repeatRow: {
+      flexDirection: flexRow,
+      gap: 8,
+    },
+    repeatBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceContainerLow,
+      alignItems: 'center',
+    },
+    repeatBtnActive: {
+      backgroundColor: colors.primary,
+    },
+    repeatBtnText: {
+      fontSize: 14,
+      color: colors.onBackground,
+    },
+    repeatBtnTextActive: {
+      color: colors.onPrimary,
+      fontWeight: '600',
+    },
+    daysRow: {
+      flexDirection: flexRow,
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    dayBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.surfaceContainerLow,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayBtnActive: {
+      backgroundColor: colors.primary,
+    },
+    dayBtnText: {
+      fontSize: 13,
+      color: colors.onBackground,
+    },
+    dayBtnTextActive: {
+      color: colors.onPrimary,
+      fontWeight: '600',
+    },
+    labelInput: {
+      fontSize: 16,
+      color: colors.onBackground,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    soundList: {
+      backgroundColor: colors.surfaceContainerLow,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.outlineVariant,
+    },
+    soundItem: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+    },
+    soundItemActive: {
+      backgroundColor: colors.surfaceContainerLow,
+    },
+    soundItemText: {
+      fontSize: 15,
+      color: colors.onBackground,
+    },
+    soundItemTextActive: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    dismissRow: {
+      flexDirection: flexRow,
+      gap: 8,
+    },
+    dismissBtn: {
+      flex: 1,
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceContainerLow,
+      gap: 6,
+    },
+    dismissBtnActive: {
+      backgroundColor: colors.primary,
+    },
+    dismissBtnText: {
+      fontSize: 14,
+      color: colors.onBackground,
+    },
+    dismissBtnTextActive: {
+      color: colors.onPrimary,
+      fontWeight: '600',
+    },
+    deleteBtn: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      marginTop: 24,
+      marginHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceContainerLowest,
+      gap: 8,
+    },
+    deleteBtnText: {
+      fontSize: 15,
+      color: '#c62828',
+      fontWeight: '500',
+    },
+  });
+};

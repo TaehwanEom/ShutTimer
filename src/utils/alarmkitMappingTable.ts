@@ -11,7 +11,8 @@ const ALARM_METADATA_KEY = 'shuttimer_alarmkit_metadata';
 export type AlarmMetaRecord = {
   alarmId: string;
   type: AlarmKitType;
-  routineId: string;
+  /** v1.6+ — entityId (= 카테고리 B rename, 결정 4-B). 루틴/타이머/알람 식별자 공통. */
+  entityId: string;
   nextStepIndex?: number;
   endMethod?: AlarmKitEndMethod;
   createdAt: number;

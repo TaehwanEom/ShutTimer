@@ -71,7 +71,45 @@
     "guide_pet": "Toma una foto de tu mascota",
     "guide_bike": "Toma una foto de una bicicleta",
     "guide_toothbrush": "Toma una foto de un cepillo de dientes",
-    "guide_phone": "Toma una foto de un smartphone"
+    "guide_phone": "Toma una foto de un smartphone",
+    "title": "Alarmas",
+    "add": "Añadir alarma",
+    "empty": "No hay alarmas",
+    "unsupported": "Las alarmas requieren iOS 26 o posterior.",
+    "repeat": {
+      "title": "Repetir",
+      "once": "Nunca",
+      "daily": "Todos los días",
+      "weekday": "Entre semana",
+      "weekend": "Fin de semana",
+      "weekly": "Entre semana"
+    },
+    "label": {
+      "placeholder": "Ej: Despertar"
+    },
+    "sound": {
+      "default": "Predeterminado"
+    },
+    "dismissMethod": {
+      "title": "Método de cierre",
+      "tap": "Tocar",
+      "shake": "Agitar",
+      "camera": "Foto"
+    },
+    "delete": {
+      "title": "Eliminar alarma",
+      "body": "¿Eliminar esta alarma?",
+      "confirm": "Eliminar"
+    },
+    "edit": {
+      "editTitle": "Editar alarma",
+      "newTitle": "Añadir alarma"
+    },
+    "validate": {
+      "title": "Verificación necesaria",
+      "time": "Hora no válida",
+      "daysEmpty": "Selecciona al menos un día"
+    }
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -180,7 +218,8 @@
     "directions-bike": "Ciclismo",
     "spa": "Descanso",
     "nightlight": "Siesta",
-    "clean-hands": "Lavarse"
+    "clean-hands": "Lavarse",
+    "alarm": "Alarma"
   },
   "sounds": {
     "alarm": "Alarma",
@@ -238,5 +277,12 @@
     "tooltipPlay": "Mantén pulsado el botón de reproducción para detener",
     "tooltipFav": "Mantén pulsado un favorito para editarlo",
     "confirm": "Confirmar"
+  },
+  "common": {
+    "save": "Guardar",
+    "am": "AM",
+    "pm": "PM",
+    "hour": "h",
+    "minute": "m"
   }
 }

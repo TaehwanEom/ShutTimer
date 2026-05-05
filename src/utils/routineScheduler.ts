@@ -246,7 +246,7 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
       if (!fireDate) continue;
       try {
         const id = await AlarmkitBridge.scheduleAlarm({
-          routineId: routine.id,
+          entityId: routine.id,
           title,
           fireAt: fireDate.getTime(),
           stopLabel,
@@ -474,7 +474,7 @@ async function scheduleChainViaAlarmKit(
 ): Promise<string | null> {
   try {
     const id = await AlarmkitBridge.scheduleAlarm({
-      routineId,
+      entityId: routineId,
       title: i18n.t('routine.chainTitle', { defaultValue: '다음 루틴' }),
       fireAt: fireAt.getTime(),
       stopLabel: i18n.t('routine.chainStop', { defaultValue: '확인' }),
@@ -485,7 +485,7 @@ async function scheduleChainViaAlarmKit(
     await saveAlarmMetadata({
       alarmId: id,
       type: 'chain',
-      routineId,
+      entityId: routineId,
       nextStepIndex,
     });
     return id;
@@ -586,7 +586,7 @@ async function scheduleConfirmPromptViaAlarmKit(
     // v1.6 #13 — 마지막 step (nextStepName 미전달 = 1-step routine) 의 alerting UI = "밀어서 중단" 만 (secondary 제거).
     const isLastStep = !nextStepName;
     const id = await AlarmkitBridge.scheduleAlarm({
-      routineId,
+      entityId: routineId,
       title,
       fireAt: fireAt.getTime(),
       stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
@@ -600,7 +600,7 @@ async function scheduleConfirmPromptViaAlarmKit(
     await saveAlarmMetadata({
       alarmId: id,
       type: 'confirm_prompt',
-      routineId,
+      entityId: routineId,
     });
     return id;
   } catch (e) {

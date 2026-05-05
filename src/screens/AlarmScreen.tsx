@@ -498,7 +498,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     ]).then(([soundIdRaw, alarmRaw]) => {
       const alarmEnabled = alarmRaw !== 'false';
       if (!alarmEnabled) return;
-      const soundId = soundIdRaw ?? DEFAULT_SOUND_ID;
+      // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
+      // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
+      const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
+      const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
 
       // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
       const runFallback = () => {

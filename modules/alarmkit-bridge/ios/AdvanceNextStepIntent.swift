@@ -249,17 +249,26 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(entityId: String) { self.entityId = entityId }
 
     func perform() async throws -> some IntentResult {
-        // 1. snapshot 로드 (= 카테고리 A 측 RoutineSnapshot.routineId 보존, 비교만 entityId)
-        guard var snapshot = readSnapshot(),
-              snapshot.routineId == entityId else {
-            // snapshot 미존재 / mismatch — RN polling fallback (앱 active 시 처리)
+        // 1. snapshot 로드.
+        // v1.7 hotfix #11 — entityId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
+        // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.
+        // setting 측 fail 시 init() default entityId='' 잔존 → snapshot 매칭 ❌ → fallback signal 측 routineId='' write.
+        // → snapshot.routineId 측 신뢰 (= 활성 routine 측 단일 가정 정합).
+        guard var snapshot = readSnapshot() else {
+            writeAdvanceFallbackSignal(routineId: entityId)
+            return .result()
+        }
+        let effectiveEntityId = !entityId.isEmpty ? entityId : snapshot.routineId
+        if !entityId.isEmpty && snapshot.routineId != entityId {
             writeAdvanceFallbackSignal(routineId: entityId)
             return .result()
         }
 
-        // 2. 현재 alerting alarm stop (사운드 + 진동 + alerting UI dismiss)
+        // 2. 현재 alerting alarm stop (사운드 + 진동 + alerting UI dismiss).
+        // v1.7 hotfix — stop + cancel 둘 다 시도 (= state transition race 시 silent fail 회피).
         if let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
-            try? AlarmManager.shared.stop(id: currentUuid)
+            try? await AlarmManager.shared.stop(id: currentUuid)
+            try? await AlarmManager.shared.cancel(id: currentUuid)
         }
 
         let completedIdx = snapshot.currentStepIndex
@@ -276,11 +285,11 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             // v1.6 — 마지막 step LA 즉시 종료 (위젯 측 동일 패턴, RN polling 대기 ❌).
             // (= 카테고리 C 측 ShutTimerActivityAttributes.routineId 보존, 비교만 entityId)
             for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == entityId {
+                if activity.attributes.routineId == effectiveEntityId {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             }
-            writeAdvanceDoneSignal(routineId: entityId)
+            writeAdvanceDoneSignal(routineId: effectiveEntityId)
             return .result()
         }
 
@@ -304,7 +313,7 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             // (= 카테고리 C 측 routineId 보존, 비교만 entityId)
             let nextStepName = snapshot.steps[nextIdx].name
             for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == entityId {
+                if activity.attributes.routineId == effectiveEntityId {
                     var newState = activity.content.state
                     newState.currentStepName = nextStepName
                     newState.progress = 0
@@ -318,10 +327,10 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             }
 
             // 6. RN polling 측 'advance_done' 신호 (active 시 ar/LA 동기화)
-            writeAdvanceDoneSignal(routineId: entityId)
+            writeAdvanceDoneSignal(routineId: effectiveEntityId)
         } catch {
             // schedule 실패 — RN polling fallback
-            writeAdvanceFallbackSignal(routineId: entityId)
+            writeAdvanceFallbackSignal(routineId: effectiveEntityId)
         }
         return .result()
     }

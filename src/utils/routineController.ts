@@ -19,6 +19,7 @@ import { clearPreloadedSound } from './alarmSoundPreload';
 import {
   scheduleRoutineConfirmPrompt,
   cancelRoutineConfirmPrompt,
+  cancelRoutinePrealerts,
   requestAlarmKitAuthorizationIfNeeded,
 } from './routineScheduler';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
@@ -237,6 +238,12 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
   const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
   const routineName = routine.name ?? routine.category;
 
+  // v1.7 hotfix #4 — stage 파라미터 명시. 직전: stage 미전달 → native 측 fallback 'step' →
+  // alerting 시점에 setLiveActivityStage('manual_prompt') 호출했어도 다른 영역 update 호출이
+  // 'step' 으로 덮어쓰기 → 잠금화면 위젯 측 ❚❚ 표시 (= countdown stage 잔존). awaitingConfirm
+  // 측 = 알람 fire 시 true / 다음 step 시작 시 false → stage 정합.
+  const stage: 'step' | 'manual_prompt' = ar.awaitingConfirm ? 'manual_prompt' : 'step';
+
   if (currentLiveActivityId) {
     try {
       await LiveActivityBridge.update({
@@ -244,6 +251,7 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
         stepName: step.name,
         stepEndAt: ar.stepEndAt,
         progress,
+        stage,
         currentStepIndex: ar.currentStepIndex,
         totalSteps: routine.steps.length,
       });
@@ -261,6 +269,7 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
       stepName: step.name,
       stepEndAt: ar.stepEndAt,
       progress,
+      stage,
       currentStepIndex: ar.currentStepIndex,
       totalSteps: routine.steps.length,
     });
@@ -268,6 +277,19 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
   } catch {
     // 권한 거부 / 시스템 한도 등 — silent skip
   }
+}
+
+/**
+ * v1.7 hotfix #6 — alerting 시 ar.awaitingConfirm=true 동기 갱신.
+ * App.tsx onAlarmStateChange listener (= JS thread active 시점) 측 호출.
+ * 효과: 향후 startOrUpdateLiveActivity 호출 시 = ar.awaitingConfirm 기반 stage='manual_prompt' 보장 (= hotfix #4 정합).
+ * idempotent — 이미 awaitingConfirm=true 시 noop.
+ */
+export async function markAwaitingConfirm(entityId: string): Promise<void> {
+  const ar = await loadActiveRoutine();
+  if (!ar || ar.routineId !== entityId || ar.awaitingConfirm) return;
+  await saveActiveRoutine({ ...ar, awaitingConfirm: true });
+  Logger.warn('routine', `markAwaitingConfirm entityId=${entityId} OK`);
 }
 
 /**
@@ -413,6 +435,12 @@ export async function startRoutine(
 
   const existing = await loadActiveRoutine();
 
+  // v1.7 hotfix #3 — routine 시작 시 잔존 prealert 알람 일괄 cancel.
+  // 정기 일정 routine = 시작 30분/5분 전 prealert 발화 → 사용자 dismiss 안 한 채 시작 시간 도달 시
+  // = prealert (alerting) + 첫 step confirm_prompt (alerting) 둘 다 alerting → 중첩 ring.
+  // routine 진입 시점에 모든 잔존 prealert 정리 (= notifIds + alarmKitIds 둘 다 cancel + record 삭제).
+  await cancelRoutinePrealerts(routineId).catch(() => {});
+
   if (existing && existing.routineId === routineId) {
     if (Date.now() > existing.deadlineAt) {
       await fullCleanup();
@@ -473,6 +501,11 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
   if (!ar.awaitingConfirm) {
     const pending: ActiveRoutine = { ...ar, awaitingConfirm: true };
     await saveActiveRoutine(pending);
+    // v1.7 hotfix #9 — ar.awaitingConfirm=true 갱신 직후 LA stage='manual_prompt' 명시 갱신.
+    // ActiveRoutineSection timer-tick 측 호출 = JS active 시점 = startOrUpdateLiveActivity 호출 보장.
+    // fix #4 측 = ar.awaitingConfirm 기반 stage 결정 → 'manual_prompt' 보장 → 잠금화면 위젯 ▶▶ 노출.
+    // listener 측 setLiveActivityStage / markAwaitingConfirm 호출 ❌ 영역 (= AppState background 시) 보강.
+    await startOrUpdateLiveActivity(routine, pending);
     return { kind: 'advance_confirm', ar: pending, routine };
   }
   return { kind: 'advance_confirm', ar, routine };
@@ -554,6 +587,27 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
     await fullCleanup();
     return null;
   }
+
+  // v1.7 hotfix — alerting 상태 alarm 명시 cleanup.
+  // currentConfirmPromptId 측 cancelAlarm 만으로 부족 가능 (= 모듈 레벨 변수 stale 또는 미설정 시).
+  // (1) confirm_prompt = 정상 정리 (= 본 함수 의도).
+  // (2) prealert = 잔존 시 정리 (= 시작 30분/5분 전 fire 후 dismiss 안 된 영역. 중첩 ring 회피).
+  // (3) metadata 없는 alerting alarm = 안전망 (= prealert metadata 저장 누락 잔존 영역 또는 외부 영역).
+  try {
+    const alarms = await AlarmkitBridge.listAlarms();
+    const metas = await listAllAlarmMetadata();
+    for (const a of alarms) {
+      if (a.state !== 'alerting') continue;
+      const meta = metas.find(m => m.alarmId === a.id);
+      if (meta && (meta.type === 'confirm_prompt' || meta.type === 'prealert')) {
+        await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+        await deleteAlarmMetadata(a.id).catch(() => {});
+      } else if (!meta) {
+        // 안전망: metadata 없는 alerting alarm 잔존 = 의도 ❌ → stop.
+        await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+      }
+    }
+  } catch {}
 
   const nextIdx = ar.currentStepIndex + 1;
   if (nextIdx >= routine.steps.length) {
@@ -684,6 +738,10 @@ export async function restoreRoutineState(): Promise<RestoreResult> {
   await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
 
   if (ar.awaitingConfirm) {
+    // v1.7 hotfix #8 — cold-start 시 ar.awaitingConfirm=true 잔존 시 = 새 LA 측 stage='manual_prompt' 정합 갱신.
+    // 직전 line 716 endAll → currentLiveActivityId=null → start 호출 (= recreate).
+    // start 측 stage 인자 = ar.awaitingConfirm=true 기반 'manual_prompt' (= hotfix #4 정합).
+    await startOrUpdateLiveActivity(routine, ar);
     return { kind: 'alarm', routineId: routine.id };
   }
 

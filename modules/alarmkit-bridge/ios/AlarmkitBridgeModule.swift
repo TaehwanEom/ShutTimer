@@ -19,6 +19,21 @@ nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
   // ShutTimer 측에서 routineId 로 매칭하므로 metadata 자체는 비움
 }
 
+// v1.7 hotfix #5 — alerting 시 native 측 LA stage='manual_prompt' 자동 갱신용.
+// JS thread 측 background 정지 시 (= JS listener 측 setLiveActivityStage 호출 ❌) 영역 정합.
+// AdvanceNextStepIntent.swift 측 RoutineSnapshot 와 동일 정합 (= 일부 필드만 디코딩).
+private struct RoutineSnapshotMini: Codable {
+  let routineId: String
+  let currentAlarmId: String
+}
+
+private func readRoutineSnapshotMini() -> RoutineSnapshotMini? {
+  guard let defaults = UserDefaults(suiteName: "group.com.shuttimer.app") else { return nil }
+  guard let raw = defaults.string(forKey: "routine_snapshot"),
+        let data = raw.data(using: .utf8) else { return nil }
+  return try? JSONDecoder().decode(RoutineSnapshotMini.self, from: data)
+}
+
 public class AlarmkitBridgeModule: Module {
   // v1.6 T1 — alarmUpdates AsyncSequence 구독 Task 보관
   private var observerTask: Task<Void, Never>?
@@ -53,6 +68,28 @@ public class AlarmkitBridgeModule: Module {
                 "alarmId": alarm.id.uuidString,
                 "state": Self.alarmStateToString(alarm.state),
               ])
+
+              // v1.7 hotfix #5 — alerting 시점 native 측 LA stage='manual_prompt' 자동 갱신.
+              // JS thread 측 background 정지 시도 정합 (= App.tsx onAlarmStateChange listener →
+              // setLiveActivityStage 호출 ❌ 영역. JS 측 hotfix #4 = active 시점만 효과).
+              // 매칭 = snapshot.currentAlarmId vs alarm.id (= routine confirm_prompt 측 only).
+              // timer_main / alarm_main / prealert / chain 측 = snapshot.currentAlarmId 매칭 ❌ → 영향 ❌.
+              if alarm.state == .alerting,
+                 let snap = readRoutineSnapshotMini(),
+                 snap.currentAlarmId == alarm.id.uuidString {
+                let routineId = snap.routineId
+                Task {
+                  if #available(iOS 16.2, *) {
+                    for activity in Activity<ShutTimerActivityAttributes>.activities {
+                      if activity.attributes.routineId == routineId {
+                        var newState = activity.content.state
+                        newState.stage = "manual_prompt"
+                        await activity.update(.init(state: newState, staleDate: nil))
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
           lastStates = Dictionary(uniqueKeysWithValues: alarms.map { ($0.id, $0.state) })
@@ -295,13 +332,20 @@ public class AlarmkitBridgeModule: Module {
     AsyncFunction("cancelAlarm") { (alarmId: String) async throws in
       guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
-      // v1.6 후속 hotfix — alerting 상태 알람 = stop(id:) (= 사운드/진동/UI dismiss).
-      // 그 외 (= scheduled / countdown / paused) = cancel(id:) (= 발화 전 cancel).
-      let alarms = try AlarmManager.shared.alarms
-      if let alarm = alarms.first(where: { $0.id == uuid }), alarm.state == .alerting {
-        try await AlarmManager.shared.stop(id: uuid)
-      } else {
-        try await AlarmManager.shared.cancel(id: uuid)
+      // v1.7 hotfix #2 — Apple 공식: stop(id:) = alerting 전용, cancel(id:) = scheduled 전용.
+      // 정상 영역 = state check 분기. scheduled alarm 측 stop 호출 시 부작용 회피
+      //   (= 위젯 ✕ tap 시 cancelAlarm → stop trigger → 'open_app_dismiss' signal → 회귀 차단).
+      // alarms throw 시 = state 미상 → stop + cancel 둘 다 try? fallback (= alerting alarm 지속 ring 버그 의도 보존).
+      do {
+        let alarms = try AlarmManager.shared.alarms
+        if let alarm = alarms.first(where: { $0.id == uuid }), alarm.state == .alerting {
+          try? await AlarmManager.shared.stop(id: uuid)
+        } else {
+          try? await AlarmManager.shared.cancel(id: uuid)
+        }
+      } catch {
+        try? await AlarmManager.shared.stop(id: uuid)
+        try? await AlarmManager.shared.cancel(id: uuid)
       }
     }
 

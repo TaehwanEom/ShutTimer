@@ -340,16 +340,27 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
-        guard var snapshot = readRoutineSnapshot(),
-              snapshot.routineId == routineId else {
-            // snapshot 미존재 / mismatch — fallback: 'advance' signal (RN active 시 advanceRoutineFromLA)
+        // v1.7 hotfix #11 — routineId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
+        // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.
+        // 만약 setting 측 fail (= deserialize race) → init() default routineId='' 잔존 → snapshot 매칭 ❌.
+        // → snapshot.routineId 측 신뢰 (= 활성 routine 측 단일 가정 정합).
+        guard var snapshot = readRoutineSnapshot() else {
+            // snapshot 미존재 — fallback: 'advance' signal (RN active 시 advanceRoutineFromLA)
+            writeControlSignal(action: "advance", routineId: routineId)
+            return .result()
+        }
+        let effectiveRoutineId = !routineId.isEmpty ? routineId : snapshot.routineId
+        // routineId 명시 + snapshot mismatch 시 = 별 routine 측 의도 → fallback.
+        if !routineId.isEmpty && snapshot.routineId != routineId {
             writeControlSignal(action: "advance", routineId: routineId)
             return .result()
         }
 
-        // 1. 현재 alerting alarm stop (사운드/진동/UI dismiss)
+        // 1. 현재 alerting alarm stop (사운드/진동/UI dismiss).
+        // v1.7 hotfix — stop + cancel 둘 다 시도 (= state transition race 시 silent fail 회피).
         if let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
-            try? AlarmManager.shared.stop(id: currentUuid)
+            try? await AlarmManager.shared.stop(id: currentUuid)
+            try? await AlarmManager.shared.cancel(id: currentUuid)
         }
 
         let completedIdx = snapshot.currentStepIndex
@@ -365,11 +376,11 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             writeRoutineSnapshot(snapshot)
             // v1.6 hotfix B2-1 — LA 종료 (잠금/백그라운드 즉시 사라짐)
             for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == routineId {
+                if activity.attributes.routineId == effectiveRoutineId {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }
             }
-            writeControlSignal(action: "advance_done", routineId: routineId)
+            writeControlSignal(action: "advance_done", routineId: effectiveRoutineId)
             return .result()
         }
 
@@ -390,7 +401,7 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             // LA 즉시 갱신 — stage='step' 단일.
             let nextStepName = snapshot.steps[nextIdx].name
             for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == routineId {
+                if activity.attributes.routineId == effectiveRoutineId {
                     var newState = activity.content.state
                     newState.currentStepName = nextStepName
                     newState.progress = 0
@@ -403,10 +414,10 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
                 }
             }
 
-            writeControlSignal(action: "advance_done", routineId: routineId)
+            writeControlSignal(action: "advance_done", routineId: effectiveRoutineId)
         } catch {
             // schedule 실패 — RN polling fallback
-            writeControlSignal(action: "advance", routineId: routineId)
+            writeControlSignal(action: "advance", routineId: effectiveRoutineId)
         }
         return .result()
     }

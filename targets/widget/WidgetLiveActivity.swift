@@ -28,6 +28,15 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var currentStepIndex: Int = 0
         /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
         var totalSteps: Int = 1
+
+        /// v1.7 hotfix #10 — invalid range 가드 (= stepEndAt 측 stale 과거 시점 시 invalid range → blank 표시 회피).
+        /// active fire → 잠금 시점 측 = stepEndAt 도달 후 시간 경과 → endDate < now → invalid range.
+        /// 가드 = max(endDate, now + 0.01) → 항상 유효 range 보장 → "0:00" 표시 (= blank ❌).
+        var safeStepEndDate: Date {
+            let endDate = Date(timeIntervalSince1970: stepEndAt / 1000)
+            let nowPlus = Date().addingTimeInterval(0.01)
+            return max(endDate, nowPlus)
+        }
     }
 
     /** 루틴/타이머 이름 (불변) */
@@ -66,21 +75,21 @@ struct LockScreenView: View {
                         .minimumScaleFactor(0.6)
                 } else if context.state.stage == "pre_advance" {
                     // v1.6 hotfix — autoCountdownSec 카운트 표시. stepEndAt = 카운트 종료 시점.
-                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                    Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
-                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                    Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else {
-                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                    Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
@@ -166,11 +175,11 @@ struct WatchView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
-                Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                     .font(.system(size: 24, weight: .bold))
                     .monospacedDigit()
                     .foregroundColor(.white)
@@ -244,11 +253,11 @@ struct WidgetLiveActivity: Widget {
                                 .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
                         } else if context.state.paused {
-                            Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                            Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                                 .monospacedDigit()
                                 .font(.title2.weight(.bold))
                         } else {
-                            Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                            Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                                 .monospacedDigit()
                                 .font(.title2.weight(.bold))
                         }
@@ -312,7 +321,7 @@ struct WidgetLiveActivity: Widget {
                 if context.state.paused {
                     Image(systemName: "pause.fill").foregroundColor(.brand)
                 } else {
-                    Text(timerInterval: Date()...Date(timeIntervalSince1970: context.state.stepEndAt / 1000), countsDown: true)
+                    Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
                         .frame(maxWidth: 50)
                 }

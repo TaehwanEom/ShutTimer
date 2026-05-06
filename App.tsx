@@ -86,7 +86,7 @@ import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot } from './src/utils/routineController';
+import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot, markAwaitingConfirm } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
@@ -192,13 +192,13 @@ function MainTabsNavigator() {
         tabBarLabel: '타이머',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
       }} />
-      <Tab.Screen name="AlarmTab" component={AlarmListScreen as any} options={{
-        tabBarLabel: '알람',
-        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="alarm" size={size} color={color} />,
-      }} />
       <Tab.Screen name="RoutineTab" component={RoutineListScreen as any} options={{
         tabBarLabel: '루틴',
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
+      }} />
+      <Tab.Screen name="AlarmTab" component={AlarmListScreen as any} options={{
+        tabBarLabel: '알람',
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="alarm" size={size} color={color} />,
       }} />
       <Tab.Screen name="CalendarTab" component={HistoryScreen as any} options={{
         tabBarLabel: '캘린더',
@@ -453,7 +453,10 @@ function AppNavigator() {
       });
   }, []);
 
-  // v1.6 T1 — AlarmKit 알람 발화 listener (chain / confirm_prompt). prealert 는 mapping table 미저장 → 무시.
+  // v1.6 T1 + v1.7 hotfix #3 — AlarmKit 알람 발화 listener.
+  // 분기 type: chain / timer_main / alarm_main / confirm_prompt.
+  // prealert 측 = metadata 저장 (= cleanup lookup 용) but listener 분기 ❌ → silent skip
+  // (= 의도: prealert = 화면 전환 ❌, 알림만. routine 시작 시 cancelRoutinePrealerts 가 잔존 정리).
   useEffect(() => {
     const sub = AlarmkitBridge.addListener('onAlarmStateChange', async (event) => {
       console.warn('[onAlarmStateChange]', event.alarmId, event.state, 'AppState:', AppState.currentState);
@@ -506,19 +509,33 @@ function AppNavigator() {
         // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
         Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
         await setLiveActivityStage('manual_prompt').catch(() => {});
-        // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역. 루틴 탭 진입 ❌.
+        // v1.7 hotfix #6 — ar.awaitingConfirm=true 동기 갱신.
+        // JS thread active 시점 측 ar 갱신 → 향후 startOrUpdateLiveActivity 호출 시 stage='manual_prompt' 보장.
+        // JS thread 정지 시점 측은 native fix #5 가 보강.
+        await markAwaitingConfirm(meta.entityId).catch(() => {});
+        // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-        const targetRoute = isAdhoc ? 'AlarmList' : 'RoutineList';
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm' || currentRoute === 'AlarmList') return;
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
-          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
+          if (isAdhoc) {
+            navigationRef.current?.reset({
+              index: 0,
+              routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
+            });
+          } else {
+            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+          }
           return;
         }
         if (!navigationRef.current?.isReady()) return;
-        // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList. (v1.7 Phase 2-B — ad-hoc 측 AlarmList)
-        navigationRef.current.navigate(targetRoute);
+        // v1.6 A-1 — 모달 통일. 일반 routine = RoutineList. (v1.7 Phase 2-B — ad-hoc = AlarmTab nested)
+        if (isAdhoc) {
+          (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+        } else {
+          navigationRef.current.navigate('RoutineList');
+        }
       }
     });
     return () => sub.remove();
@@ -566,17 +583,29 @@ function AppNavigator() {
         if (meta.type === 'confirm_prompt') {
           // v1.6 Phase 12 — cold-start AlarmKit alerting 경로도 LA stage 자동 전환
           await setLiveActivityStage('manual_prompt').catch(() => {});
-          // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역.
+          // v1.7 hotfix #6 — cold-start 측 동일 ar 동기 갱신.
+          await markAwaitingConfirm(meta.entityId).catch(() => {});
+          // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (nested = tab bar 보존).
           const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-          const targetRoute = isAdhoc ? 'AlarmList' : 'RoutineList';
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === meta.entityId);
           if (!r) {
-            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
+            if (isAdhoc) {
+              navigationRef.current?.reset({
+                index: 0,
+                routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
+              });
+            } else {
+              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            }
             return;
           }
-          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList. (v1.7 Phase 2-B — ad-hoc 측 AlarmList)
-          navigationRef.current.navigate(targetRoute);
+          // v1.6 A-1 — 모달 통일. 일반 routine = RoutineList. (v1.7 Phase 2-B — ad-hoc = AlarmTab nested)
+          if (isAdhoc) {
+            (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+          } else {
+            navigationRef.current.navigate('RoutineList');
+          }
         }
       } catch {}
     }, 1500);
@@ -612,13 +641,26 @@ function AppNavigator() {
         } else {
           // routine 측 — pause/resume = LA Intent 가 이미 native 처리. RN 은 ar 동기화만.
           // 위험 #X 정정: signal.timestamp = LA Intent perform 시점 (실제 누름 시각). RN polling 시점 X.
-          // v1.6 B 영역 — 잠금 alerting "밀어서 중단" → OpenAppDismissIntent.perform → 앱 자동 진입 + routine 정지.
+          // v1.7 hotfix — 본 앱 = "앱 진입 → dismiss method (탭/흔들기/스캔미션)" 정공.
+          // 잠금 해제 시 iOS 시스템이 alerting alarm 을 자동 dismiss → stopIntent perform → 본 signal.
+          // 사용자 명시 누름 vs 시스템 자동 dismiss 구분 ❌ 영역. routine 정지 ❌가 사용자 의도.
+          // → stopRoutine() 호출 ❌. navigate 만 + routine 진행 보존. 명시적 정지는 위젯 ✕ 또는 휴지통.
           if (signal.action === 'open_app_dismiss') {
-            // v1.6 Fix 2 — emit try/finally 분리. throw 시에도 emit 보장.
-            try {
-              await stopRoutine();
-            } finally {
-              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+            if (navigationRef.current?.isReady()) {
+              const isAdhoc = isAdhocAlarmRoutine(signal.routineId);
+              const route = navigationRef.current.getCurrentRoute()?.name;
+              // v1.7 hotfix #2 — AlarmScreen 활성 시 (= 사용자 정상 dismiss flow 진행 중)
+              // navigate trigger 차단. cancelAlarm 측 stop 호출이 stopIntent perform 영역 측
+              // 'open_app_dismiss' signal 발생 → 종료 스크린 직후 강제 전환 회귀 차단.
+              if (isAdhoc) {
+                if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
+                  (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+                }
+              } else {
+                if (route !== 'Alarm' && route !== 'RoutineList') {
+                  navigationRef.current.navigate('RoutineList');
+                }
+              }
             }
           }
           else if (signal.action === 'pause') {
@@ -703,22 +745,37 @@ function AppNavigator() {
       restoreRoutineState()
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
+          const navigateTarget = (isAdhoc: boolean) => {
+            if (isAdhoc) {
+              // v1.7 Phase 2-B — ad-hoc = AlarmTab (nested = tab bar 보존).
+              (navigationRef.current as any)!.navigate('Home', { screen: 'AlarmTab' });
+            } else {
+              navigationRef.current!.navigate('RoutineList');
+            }
+          };
+          const resetTarget = (isAdhoc: boolean) => {
+            if (isAdhoc) {
+              navigationRef.current!.reset({
+                index: 0,
+                routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
+              });
+            } else {
+              navigationRef.current!.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            }
+          };
           if (res.kind === 'run') {
-            // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmList 영역.
-            const targetRoute = isAdhocAlarmRoutine(res.routineId) ? 'AlarmList' : 'RoutineList';
-            navigationRef.current.navigate(targetRoute);
+            navigateTarget(isAdhocAlarmRoutine(res.routineId));
           } else if (res.kind === 'alarm') {
             // 'alarm' kind = controller advance_confirm 매핑.
-            // v1.7 Phase 2-B — ad-hoc 측 AlarmList / 일반 routine 측 RoutineList.
-            const targetRoute = isAdhocAlarmRoutine(res.routineId) ? 'AlarmList' : 'RoutineList';
+            const isAdhoc = isAdhocAlarmRoutine(res.routineId);
             const routines = await loadRoutines();
             const r = routines.find(x => x.id === res.routineId);
             if (!r) {
-              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: targetRoute }] });
+              resetTarget(isAdhoc);
               return;
             }
             if (!navigationRef.current?.isReady()) return;
-            navigationRef.current.navigate(targetRoute);
+            navigateTarget(isAdhoc);
           }
         })
         .catch((e) => Logger.warn('AppNavigator', `restoreRoutineState failed: ${e}`));

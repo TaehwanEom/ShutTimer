@@ -229,6 +229,12 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   }, []);
 
   const startAlarmEffects = useCallback(async () => {
+    // v1.7 hotfix #13 — AlarmKit native 사운드 ↔ expo-av 사운드 중첩 회피.
+    // active 시점 측: AlarmKit fire → JS listener cancelAlarm → AlarmKit stop. 단 Apple 측 fade-out (= ms ~ 수백ms) 후도 사운드 잔존.
+    // 200ms 지연 후 expo-av 시작 → AlarmKit fade-out 완료 후 단독 출력 → 중첩 ❌.
+    // background 시점 측: JS thread 정지 → 본 호출 자체 ❌. AlarmKit 사운드 단독 정합.
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     const [soundId, alarmRaw, vibRaw] = await Promise.all([
       AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
       AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),

@@ -317,7 +317,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       return;
     }
     // v1.7 Phase 2-A — 알람 entity 측 dismiss 후 = alarm.steps 보유 시 ad-hoc routine 시작.
-    // 시작 결과 = AlarmList navigate (= UI 격리. 루틴 탭 ❌). expanded card 안 active section 노출 = Phase 2-B.
+    // 시작 결과 = AlarmTab (MainTabsNavigator 안) navigate (= tab bar 보존 + UI 격리). expanded card 안 active section 노출 = Phase 2-B.
     const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
     if (alarmEntityId) {
       try {
@@ -325,7 +325,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const a = alarms.find(x => x.id === alarmEntityId);
         if (a && a.steps && a.steps.length > 0) {
           await startRoutineFromAlarm(a).catch(() => {});
-          navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'AlarmList' }] });
+          navigation.reset({
+            index: 0,
+            routes: [{
+              name: 'Home',
+              state: { routes: [{ name: 'AlarmTab' }] },
+            }],
+          });
           return;
         }
       } catch {

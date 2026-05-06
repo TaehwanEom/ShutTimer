@@ -250,8 +250,19 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
           title,
           fireAt: fireDate.getTime(),
           stopLabel,
+          type: 'prealert',
         });
         alarmIds.push(id);
+        // v1.7 hotfix #3 — prealert metadata 저장. 직전: 저장 안 해서
+        // App.tsx onAlarmStateChange listener 가 fire 시 meta 못 찾음 → silent return →
+        // 첫 step confirm_prompt 와 동시 alerting 시 "다음 진행" 눌러도 prealert 잔존 ring.
+        if (id) {
+          await saveAlarmMetadata({
+            alarmId: id,
+            type: 'prealert',
+            entityId: routine.id,
+          });
+        }
       } catch {
         // 등록 실패 무시
       }
@@ -354,6 +365,9 @@ export async function cancelRoutinePrealerts(routineId: string): Promise<void> {
     if (target.alarmKitIds) {
       for (const id of target.alarmKitIds) {
         await AlarmkitBridge.cancelAlarm(id).catch(() => {});
+        // v1.7 hotfix #3 후속 — prealert metadata 신규 저장됨 (line 260) → cancel 시 mapping table 정리.
+        // 미정리 시 syncRollingSchedule 측 fallback (line 403~409) 까지 stale 누적.
+        await deleteAlarmMetadata(id).catch(() => {});
       }
     }
   }
@@ -555,7 +569,12 @@ export async function scheduleRoutineConfirmPrompt(
   // 마지막 step 종료 시점 = nextStepName undefined → 기본 "다음 루틴" 만 표시.
   nextStepName?: string
 ): Promise<string | null> {
-  if (fireAt.getTime() <= Date.now()) return null;
+  // v1.7 hotfix #12 — fireAt 측 과거 시 = 1초 future 강제 (= scheduleBackgroundNotif id=null 회귀 차단).
+  // 직전: fireAt < now 시 null 반환 → confirm_prompt alarm 등록 ❌ → 다음 step alarm fire ❌ → routine 진행 정지.
+  // 가능 원인: step duration 측 짧음 / confirmAndAdvance 측 race / syncRoutineFromSnapshot 측 지연.
+  if (fireAt.getTime() <= Date.now()) {
+    fireAt = new Date(Date.now() + 1000);
+  }
   const useAlarmKit = await shouldUseAlarmKit();
   if (useAlarmKit) {
     // v1.6 Phase 12 — AlarmKit 등록 실패 시 expo-notifications 폴백 (silent fail 방지).

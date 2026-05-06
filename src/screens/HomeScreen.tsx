@@ -40,6 +40,9 @@ import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
+import { stopRoutine } from '../utils/routineController';
+import { loadActiveRoutine } from '../constants/routines';
+import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 
 // v1.6 Phase 9 — 일반 타이머 AlarmKit 가용성 (file-local — 분리 정책 정공)
 async function shouldUseAlarmKitInTimer(): Promise<boolean> {
@@ -557,16 +560,40 @@ export default function HomeScreen({ navigation, route }: Props) {
   const handleStart = async () => {
     const total = selectedMinutes * 60 + selectedSeconds;
     if (total <= 0) return;
-    // 루틴 진행 중이면 단일 타이머 시작 차단 — 두 시스템 동시 진행 방지
+    // v1.7 hotfix #15 — 루틴 진행 중 + 단일 타이머 시작 시 = 사용자 측 선택권 부여 (= "취소" / "루틴 종료 후 시작").
+    // 직전: "확인" 1개 button + RoutineList stack push (= ad-hoc 측 비노출 + tab bar ❌).
+    // 본 fix: 2 button + isAdhoc 분기 (= AlarmTab / RoutineTab nested) + 종료 후 자동 시작.
     const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
     if (isRoutineActive === 'true') {
+      const ar = await loadActiveRoutine();
+      const isAdhoc = ar ? isAdhocAlarmRoutine(ar.routineId) : false;
       Alert.alert(
         t('home.timerBlocked.title', { defaultValue: '루틴 진행 중' }),
-        t('home.timerBlocked.body', { defaultValue: '루틴을 먼저 정지해야 단일 타이머를 시작할 수 있습니다.' }),
-        [{
-          text: t('common.confirm', { defaultValue: '확인' }),
-          onPress: () => navigation.navigate('RoutineList'),
-        }],
+        t('home.timerBlocked.body2', { defaultValue: '진행 중인 루틴을 종료하고 단일 타이머를 시작하시겠습니까?' }),
+        [
+          {
+            text: t('common.cancel', { defaultValue: '취소' }),
+            style: 'cancel',
+            onPress: () => {
+              // 사용자 = routine 유지. 진행 중 페이지 navigate (= ad-hoc → AlarmTab / 일반 → RoutineTab).
+              if (isAdhoc) {
+                (navigation as any).navigate('Home', { screen: 'AlarmTab' });
+              } else {
+                (navigation as any).navigate('Home', { screen: 'RoutineTab' });
+              }
+            },
+          },
+          {
+            text: t('home.timerBlocked.stopAndStart', { defaultValue: '루틴 종료 후 시작' }),
+            style: 'destructive',
+            onPress: async () => {
+              await stopRoutine().catch(() => {});
+              // stopRoutine → fullCleanup → AsyncStorage.removeItem('isRoutineActive').
+              // handleStart 재호출 → isRoutineActive 'false' / null → 정상 진입 → timer 시작.
+              await handleStart();
+            },
+          },
+        ],
       );
       return;
     }

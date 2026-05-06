@@ -82,12 +82,13 @@ struct LockScreenView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
-                    Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
-                        .monospacedDigit()
+                    // v1.7 hotfix #14 — paused 측 = Text(timerInterval:) 사용 ❌ (= Apple WidgetKit 시스템 자동 카운트다운 → 흘러감).
+                    // "일시정지됨" 텍스트 명시 → 사용자 인지 정합.
+                    Text("일시정지됨")
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                        .minimumScaleFactor(0.4)
                 } else {
                     Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
@@ -175,7 +176,8 @@ struct WatchView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
-                Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
+                // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= timerInterval ❌, 카운트다운 흘러감 회피).
+                Text("일시정지됨")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -253,8 +255,8 @@ struct WidgetLiveActivity: Widget {
                                 .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
                         } else if context.state.paused {
-                            Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
-                                .monospacedDigit()
+                            // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= Dynamic Island expanded).
+                            Text("일시정지됨")
                                 .font(.title2.weight(.bold))
                         } else {
                             Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)

@@ -616,6 +616,8 @@ export default function HomeScreen({ navigation, route }: Props) {
     // v1.6 Phase 9 — LiveActivity 시작 (iOS 16.2+ 권한 활성 시. 그 외 silent skip)
     try {
       if (LiveActivityBridge.areActivitiesEnabled()) {
+        // v1.7 hotfix — 일반 타이머 start 직전 = stale LA (= 종료된 루틴 / 이전 timer) 정리. LA 다중 영역 회피.
+        await LiveActivityBridge.endAll().catch(() => {});
         const routineId = timerRoutineIdRef.current;
         const stepName = t('home.timerName', { defaultValue: '타이머' });
         const id = await LiveActivityBridge.start({

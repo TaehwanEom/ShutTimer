@@ -38,6 +38,8 @@ import {
   createStepId,
 } from '../constants/routines';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SETTINGS_KEY } from '../constants/settings';
 import DurationWheelPicker from '../components/DurationWheelPicker';
 import {
   scheduleAlarmMain,
@@ -160,6 +162,19 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       setSteps(target.steps ?? []);
       loadedRef.current = true;
     });
+  }, [editingId]);
+
+  // v1.7 hotfix B1 — 새 알람 측 default = 글로벌 SETTINGS 측 ALARM_SOUND fallback.
+  // 편집 모드 (= editingId 영역) 측 = 기존 alarm.soundKey 영역 우선 = skip.
+  // ALARM_SOUNDS 측 valid 영역 시만 setSoundKey (= 글로벌 SETTINGS 측 stale 영역 회피).
+  useEffect(() => {
+    if (editingId) return;
+    AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND).then(v => {
+      if (!isMountedRef.current) return;
+      if (v && ALARM_SOUNDS.find(s => s.id === v)) {
+        setSoundKey(v);
+      }
+    }).catch(() => {});
   }, [editingId]);
 
   const handleTimeConfirm = (hour: number, minute: number) => {

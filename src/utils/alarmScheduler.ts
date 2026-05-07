@@ -21,6 +21,7 @@ import {
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Logger } from './logger';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
+import { SETTINGS_KEY } from '../constants/settings';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
 
@@ -47,9 +48,25 @@ async function isAlarmKitReady(): Promise<boolean> {
 
 // ─── 사운드 resolve ──────────────────────────────────────
 
-function resolveSoundName(soundKey: string): string | undefined {
+/**
+ * v1.7 hotfix B2 — 알람 entity 측 soundKey === DEFAULT_SOUND_ID ('alarm_01') 시 = 글로벌 SETTINGS 측 fallback.
+ * 출시 사용자 측 = 알람 만들 때 default = 'alarm_01' 영역 → 사용자분 측 = 글로벌 SETTINGS 측 변경 시 = 자동 follow.
+ * 사용자분 측 = 'alarm_01' 직접 선택 영역 + 글로벌 = 'alarm_01' 영역 시 = 동일 영역 = 영향 ❌.
+ * 사용자분 측 = 다른 사운드 직접 선택 영역 (= alarm_02 / ringtone_01 / ringtone_02) = 영역 그대로 (= 의도 보존).
+ */
+async function resolveSoundName(soundKey: string): Promise<string | undefined> {
+  let effectiveKey = soundKey;
+  // soundKey === DEFAULT_SOUND_ID 영역 시 = 글로벌 SETTINGS 측 fallback.
+  if (soundKey === DEFAULT_SOUND_ID) {
+    try {
+      const globalKey = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND);
+      if (globalKey && ALARM_SOUNDS.find(s => s.id === globalKey)) {
+        effectiveKey = globalKey;
+      }
+    } catch {}
+  }
   const item =
-    ALARM_SOUNDS.find(s => s.id === soundKey) ??
+    ALARM_SOUNDS.find(s => s.id === effectiveKey) ??
     ALARM_SOUNDS.find(s => s.id === DEFAULT_SOUND_ID);
   return (item as any)?.pushSound;
 }
@@ -72,10 +89,9 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   const fireAt = nextAlarmOccurrenceTime(alarm);
   if (fireAt === null) return null;
 
-  const soundName = resolveSoundName(alarm.soundKey);
+  const soundName = await resolveSoundName(alarm.soundKey);
   // v1.7 hotfix #DBG-D — soundKey → soundName 매핑 결과 출력 (= 사운드 ❌ / 다른 사운드 root cause 추적용).
-  // soundName=undefined 시 = ALARM_SOUNDS lookup ❌ → AlarmKit 측 .default fallback (= 시스템음).
-  // Logger.warn (= AsyncStorage 측 영역) 측 사용 (= TestFlight console 미라우팅 회피, logger.ts L36 정합).
+  // v1.7 hotfix B2 — soundKey === DEFAULT_SOUND_ID 영역 시 = 글로벌 SETTINGS 측 fallback 영역.
   Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundKey=${alarm.soundKey} → soundName=${soundName ?? '(undefined)'}`);
   const title = alarm.label || '알람';
 

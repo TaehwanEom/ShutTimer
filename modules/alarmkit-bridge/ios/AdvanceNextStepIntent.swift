@@ -30,6 +30,23 @@ private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"
 private let KEY_ROUTINE_SNAPSHOT = "routine_snapshot"
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper.
+fileprivate let NATIVE_DBG_KEY_ADV = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX_ADV = 300
+
+fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: APP_GROUP) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY_ADV) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX_ADV { lines = Array(lines.suffix(NATIVE_DBG_MAX_ADV)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY_ADV)
+}
+
 // MARK: - Snapshot decoding (RN 측 RoutineSnapshot 정합)
 
 private struct SnapshotStep: Codable {
@@ -249,6 +266,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(entityId: String) { self.entityId = entityId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Advance Intent perform 진입 (= alarmkit module = AlarmKit secondary button 측).
+        appendNativeDbg("Intent-DBG-AlarmKit", "AdvanceNextStepIntent.perform entityId=\(entityId)")
         // 1. snapshot 로드.
         // v1.7 hotfix #11 — entityId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
         // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.

@@ -459,16 +459,19 @@ function AppNavigator() {
   // (= 의도: prealert = 화면 전환 ❌, 알림만. routine 시작 시 cancelRoutinePrealerts 가 잔존 정리).
   useEffect(() => {
     const sub = AlarmkitBridge.addListener('onAlarmStateChange', async (event) => {
-      console.warn('[onAlarmStateChange]', event.alarmId, event.state, 'AppState:', AppState.currentState);
+      // v1.7 hotfix #DBG-C — listener 진입 + suppress flag (= banner 잔존 / banner 미노출 분기 추적용).
+      // Logger.warn (= AsyncStorage 영역 → 설정 측 "로그 공유" 측 조회 영역. TestFlight console 미라우팅 회피).
+      Logger.warn('onAlarmStateChange-DBG', `alarmId=${event.alarmId} state=${event.state} AppState=${AppState.currentState} suppressFlag=${SUPPRESS_ALARMKIT_BANNER_IN_FG}`);
       if (event.state !== 'alerting') return;
       // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
       if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active') {
+        Logger.warn('onAlarmStateChange-DBG', `suppressFlag 진입 → cancelAlarm ${event.alarmId}`);
         await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
       }
       const meta = await loadAlarmMetadata(event.alarmId);
       // v1.7 hotfix #26 — debug log: meta lookup 결과 (= 베너 미노출 추적용).
       // meta=null = mapping table 측 잔존 ❌ → silent skip 진입 = 사용자 측 모름.
-      console.warn('[onAlarmStateChange][meta]', event.alarmId, 'meta=', meta ? `${meta.type}/${meta.entityId}` : 'NULL');
+      Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${meta ? `${meta.type}/${meta.entityId}` : 'NULL'}`);
       if (!meta) return;
       if (!navigationRef.current?.isReady()) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;

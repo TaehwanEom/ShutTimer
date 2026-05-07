@@ -19,6 +19,25 @@ import Foundation
 import ActivityKit
 #endif
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper.
+// Widget target — LA Button perform() 측 = iPhone + Apple Watch Smart Stack 양쪽 호출 영역.
+fileprivate let NATIVE_DBG_GROUP_W = "group.com.shuttimer.app"
+fileprivate let NATIVE_DBG_KEY_W = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX_W = 300
+
+fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: NATIVE_DBG_GROUP_W) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY_W) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX_W { lines = Array(lines.suffix(NATIVE_DBG_MAX_W)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY_W)
+}
+
 #if canImport(AlarmKit)
 import AlarmKit
 import SwiftUI
@@ -122,6 +141,8 @@ struct PauseRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Pause Intent perform 진입 (= LA Button = iPhone + Apple Watch 양쪽).
+        appendNativeDbg("Intent-DBG-Widget", "PauseRoutineIntent.perform routineId=\(routineId)")
         // v1.6 #4-A — chain_alarms 영역 (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 처리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
@@ -160,6 +181,8 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Resume Intent perform 진입.
+        appendNativeDbg("Intent-DBG-Widget", "ResumeRoutineIntent.perform routineId=\(routineId)")
         // v1.6 #4-A — chain_alarms 영역 + snapshot.currentAlarmId 둘 다 처리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
@@ -198,6 +221,8 @@ struct StopRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Stop Intent perform 진입.
+        appendNativeDbg("Intent-DBG-Widget", "StopRoutineIntent.perform routineId=\(routineId)")
         // v1.6 #4-A — chain_alarms 영역 + snapshot.currentAlarmId 둘 다 cancel.
         // (chain_alarms 미사용 케이스 = snapshot 만 cancel → 다음 step alerting fire 차단)
         let alarmIds = readAlarmIds(routineId: routineId)
@@ -340,6 +365,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Advance Intent perform 진입 (= 위젯 "다음 진행" Button 측 = iPhone + Apple Watch).
+        appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform routineId=\(routineId)")
         // v1.7 hotfix #11 — routineId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
         // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.
         // 만약 setting 측 fail (= deserialize race) → init() default routineId='' 잔존 → snapshot 매칭 ❌.

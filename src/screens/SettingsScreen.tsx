@@ -599,6 +599,78 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* v1.7 hotfix #DBG — 17건 버그 추적용 임시 디버그 섹션. TestFlight console 미라우팅 회피.
+            JS 로그 (Logger.warn → AsyncStorage) + Native 로그 (NSLog → App Group UserDefaults "native_debug_log_v1") 합쳐 공유.
+            다중 기기 + Apple Watch (LA Smart Stack) 측 = 각 process 별 process prefix 로 식별.
+            정정 후 제거 부탁 영역. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>디버그 (v1.7 hotfix 임시)</Text>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              const jsLogs = await Logger.getLogs();
+              // Native 로그 = AlarmkitBridge.readAppGroupString (= App Group UserDefaults).
+              let nativeRaw = '';
+              try {
+                nativeRaw = (require('../../modules/alarmkit-bridge').default as any).readAppGroupString('native_debug_log_v1') ?? '';
+              } catch {}
+              const jsText = jsLogs.length === 0
+                ? '(JS 로그 없음)'
+                : jsLogs.map(l => `${l.timestamp.slice(11, 23)} [${l.tag}] ${l.message}`).join('\n');
+              const nativeText = nativeRaw || '(Native 로그 없음)';
+              const text = `=== JS 로그 (${jsLogs.length}개) ===\n${jsText}\n\n=== Native 로그 ===\n${nativeText}`;
+              try {
+                await Share.share({ message: text, title: 'ShutTimer 디버그 로그' });
+              } catch (e) {
+                Alert.alert('공유 실패', String(e));
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="bug-report" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>최근 로그 공유 (JS + Native, 복사 가능)</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              const jsLogs = await Logger.getLogs();
+              let nativeLines = 0;
+              try {
+                const raw = (require('../../modules/alarmkit-bridge').default as any).readAppGroupString('native_debug_log_v1') ?? '';
+                nativeLines = raw.length === 0 ? 0 : raw.split('\n').length;
+              } catch {}
+              Alert.alert('로그 갯수', `JS: ${jsLogs.length}개\nNative: ${nativeLines}줄`);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="info-outline" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>로그 갯수 확인</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.toggleRow}
+            onPress={async () => {
+              await Logger.clearLogs();
+              try {
+                (require('../../modules/alarmkit-bridge').default as any).removeAppGroupKey('native_debug_log_v1');
+              } catch {}
+              Alert.alert('완료', 'JS + Native 로그 클리어됨');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="delete-sweep" size={22} color={colors.onBackground} />
+              <Text style={styles.toggleLabel}>로그 클리어 (JS + Native)</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+        </View>
+
         {/*
           ═══════════════════════════════════════════════════════════
            @preserve — 디버그 섹션 (로그 공유 / 클리어)

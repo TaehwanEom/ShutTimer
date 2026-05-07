@@ -8,6 +8,35 @@ private extension Color {
     static let brand = Color(red: 1.0, green: 36.0 / 255.0, blue: 36.0 / 255.0)
 }
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper. (= AlarmkitBridgeModule.swift 정합)
+// 다중 기기 (= iPhone + Apple Watch Smart Stack) 측 = process 측 자체 storage → 각 device 측 앱 내 공유.
+// throttle 측 = 1초 (= compactView/WatchView render 폭주 회피).
+fileprivate let NATIVE_DBG_GROUP = "group.com.shuttimer.app"
+fileprivate let NATIVE_DBG_KEY = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX = 300
+fileprivate let NATIVE_DBG_THROTTLE_KEY = "native_debug_lastwrite_widget"
+fileprivate let NATIVE_DBG_THROTTLE_MS: Double = 1000
+
+fileprivate func appendNativeDbgWidget(_ tag: String, _ msg: String, throttle: Bool = false) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: NATIVE_DBG_GROUP) else { return }
+    if throttle {
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        let lastKey = "\(NATIVE_DBG_THROTTLE_KEY)_\(tag)"
+        let last = d.double(forKey: lastKey)
+        if nowMs - last < NATIVE_DBG_THROTTLE_MS { return }
+        d.set(nowMs, forKey: lastKey)
+    }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX { lines = Array(lines.suffix(NATIVE_DBG_MAX)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY)
+}
+
 // v1.6 T3 + Phase 10 + Phase 11 — ShutTimer routine/timer 진행 LiveActivity
 // (Lock Screen + Dynamic Island + Apple Watch Smart Stack)
 // 사용자 명시 디자인: Lock Screen [좌측 라벨+카운트다운(56pt 1줄)] [정지 ✕] [플레이/⏸ 토글]
@@ -160,6 +189,9 @@ struct WatchView: View {
     let context: ActivityViewContext<ShutTimerActivityAttributes>
 
     var body: some View {
+        // v1.7 hotfix #DBG-A — Apple Watch WatchView 진입 + 모든 state 영역 (= 사용자분 측 신규 부탁 영역).
+        // throttle=true → Smart Stack render 폭주 회피.
+        let _ = { appendNativeDbgWidget("LA-DBG-Watch", "WatchView render routineName=\(context.attributes.routineName) stage=\(context.state.stage) paused=\(context.state.paused) stepEndAt=\(context.state.stepEndAt) currentStepIndex=\(context.state.currentStepIndex)/\(context.state.totalSteps)", throttle: true) }()
         // v1.6 Phase 12 — 가로 직사각형 Smart Stack 카드 정합. HStack 가로 layout.
         HStack(spacing: 8) {
             // 좌측: 본 앱 식별 SF Symbol (brand 색). Asset image = grey square 버그 회피.
@@ -314,11 +346,16 @@ struct WidgetLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
+                // v1.7 hotfix #DBG-A — compactLeading 진입 + 값 (= LA compact 빈 영역 root cause 추적용).
+                // throttle=true → render 폭주 회피 (1초 1회).
+                let _ = { appendNativeDbgWidget("LA-DBG", "compactLeading routineName=\(context.attributes.routineName) stage=\(context.state.stage) paused=\(context.state.paused) stepEndAt=\(context.state.stepEndAt)", throttle: true) }()
                 Text(context.attributes.routineName)
                     .font(.caption2)
                     .foregroundColor(.brand)
                     .lineLimit(1)
             } compactTrailing: {
+                // v1.7 hotfix #DBG-A — compactTrailing 진입 + safeStepEndDate.
+                let _ = { appendNativeDbgWidget("LA-DBG", "compactTrailing paused=\(context.state.paused) stepEndAt=\(context.state.stepEndAt) safeEnd=\(context.state.safeStepEndDate.timeIntervalSince1970 * 1000) deltaMs=\(context.state.stepEndAt - Date().timeIntervalSince1970 * 1000)", throttle: true) }()
                 if context.state.paused {
                     Image(systemName: "pause.fill").foregroundColor(.brand)
                 } else {
@@ -327,6 +364,8 @@ struct WidgetLiveActivity: Widget {
                         .frame(maxWidth: 50)
                 }
             } minimal: {
+                // v1.7 hotfix #DBG-A — minimal 진입 + paused.
+                let _ = { appendNativeDbgWidget("LA-DBG", "minimal paused=\(context.state.paused)", throttle: true) }()
                 if context.state.paused {
                     Image(systemName: "pause.fill").foregroundColor(.brand)
                 } else {

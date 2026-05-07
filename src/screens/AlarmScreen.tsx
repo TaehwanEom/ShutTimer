@@ -30,6 +30,7 @@ import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { stopRoutine } from '../utils/routineController';
+import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
@@ -226,6 +227,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const handleAfterAdRef = useRef<() => void>(() => {});
 
   const stopAudioAndVibration = useCallback(async () => {
+    // v1.7 hotfix #DBG-C — stopAudioAndVibration 진입 (= dismiss 시점 + AlarmKit cleanup 결과 추적용).
+    // Logger.warn (= AsyncStorage 영역 → 설정 측 "로그 공유" 측 조회 영역. TestFlight console 미라우팅 회피).
+    Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration 진입 AppState=${AppState.currentState}`);
     Vibration.cancel();
     // v1.5: Vibration interval도 함께 정리 (dismiss 시 진동 재시작 방지)
     if (vibrationIntervalRef.current) {
@@ -237,6 +241,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // type='timer_main' 만 filter — 루틴 진행 중 일반 타이머 dismiss 시 routine 알람 보존.
     try {
       const metas = await listAllAlarmMetadata();
+      Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration metas.count=${metas.length}`);
       for (const m of metas) {
         if (m.type === 'timer_main') {
           await AlarmkitBridge.cancelAlarm(m.alarmId).catch(() => {});
@@ -247,13 +252,20 @@ export default function AlarmScreen({ navigation, route }: Props) {
       // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).
       // alerting 상태 = stopAlarm(id:) 명시 호출 (= cancel(id:) ≠ stop(id:), Apple AlarmKit 공식).
       const alarms = await AlarmkitBridge.listAlarms();
+      const alertingCount = alarms.filter(a => a.state === 'alerting').length;
+      Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration alarms.count=${alarms.length} alertingCount=${alertingCount}`);
       for (const a of alarms) {
         if (a.state === 'alerting') {
-          await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+          Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration stopAlarm id=${a.id}`);
+          await AlarmkitBridge.stopAlarm(a.id).catch((e: any) => {
+            Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration stopAlarm throw=${String(e)}`);
+          });
           await deleteAlarmMetadata(a.id).catch(() => {});
         }
       }
-    } catch {}
+    } catch (e) {
+      Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration outer throw=${String(e)}`);
+    }
     // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
     await Promise.all([
       Notifications.cancelAllScheduledNotificationsAsync().catch(() => {}),
@@ -294,12 +306,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
   // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
   useEffect(() => {
-    console.warn('[AlarmScreen] mount, AppState:', AppState.currentState);
+    // v1.7 hotfix #DBG-C — mount 시점 + route.params 영역 (= AlarmScreen 1초 사라짐 root cause 추적용).
+    Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})}`);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     // v1.7 hotfix — mount 시 = expo banner dismiss (= 백그라운드 → banner tap 진입 시 잔존 banner 영역 정리).
-    Notifications.dismissAllNotificationsAsync().catch(() => {});
+    Notifications.dismissAllNotificationsAsync()
+      .then(() => Logger.warn('AlarmScreen-DBG', 'mount dismissAllNotifications OK'))
+      .catch((e: any) => Logger.warn('AlarmScreen-DBG', `mount dismissAllNotifications throw=${String(e)}`));
     return () => {
-      console.warn('[AlarmScreen] unmount');
+      Logger.warn('AlarmScreen-DBG', 'unmount');
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});
     };
   }, []);
@@ -517,9 +532,65 @@ export default function AlarmScreen({ navigation, route }: Props) {
     });
   }, []);
 
-  // v1.7 hotfix — expo-av 사운드 제거 (= AlarmKit 측 banner + 사운드 = 자체 영역 충분).
-  // 나중에 revert 시 = 본 useEffect 본체 (= Audio.Sound.createAsync + playAsync 영역) 복원 영역.
+  // v1.5: 알람 사운드 재생을 별도 useEffect로 분리. 설정 로드(multiGet+미션 파싱) 대기 제거로 딜레이 단축.
+  //       HomeScreen.scheduleAlarm이 preloadAlarmSound를 호출했으면 consumeAlarmSound()로 즉시 playAsync.
+  //       preload 실패/콜드스타트 시 createAsync fallback.
+  // v1.7 hotfix — b8c7ce8 revert 영역. SUPPRESS_ALARMKIT_BANNER_IN_FG=true 정합 = AlarmScreen 측 expo-av 사운드 강제 영역.
   useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
+      AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
+    ]).then(([soundIdRaw, alarmRaw]) => {
+      const alarmEnabled = alarmRaw !== 'false';
+      if (!alarmEnabled) return;
+      // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
+      // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
+      const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
+      const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
+
+      // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
+      const runFallback = () => {
+        const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+        Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
+          if (resultEnteredRef.current || dismissedRef.current) {
+            sound.unloadAsync().catch(() => {});
+            return;
+          }
+          soundRef.current = sound;
+          sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
+        }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
+      };
+
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
+        .then(() => {
+          const preloaded = consumeAlarmSound();
+          if (!preloaded) {
+            runFallback();
+            return;
+          }
+          // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
+          preloaded.getStatusAsync().then((status: any) => {
+            if (resultEnteredRef.current || dismissedRef.current) {
+              preloaded.unloadAsync().catch(() => {});
+              return;
+            }
+            if (status?.isLoaded) {
+              soundRef.current = preloaded;
+              preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
+            } else {
+              appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
+              preloaded.unloadAsync().catch(() => {});
+              runFallback();
+            }
+          }).catch((e: any) => {
+            appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
+            preloaded.unloadAsync().catch(() => {});
+            runFallback();
+          });
+        })
+        .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
+    }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
+
     return () => {
       soundRef.current?.stopAsync().catch(() => {});
       soundRef.current?.unloadAsync().catch(() => {});

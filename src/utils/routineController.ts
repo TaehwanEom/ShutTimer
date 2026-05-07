@@ -132,6 +132,8 @@ async function mirrorRoutineSnapshot(r: Routine, ar: ActiveRoutine, alarmId: str
     const soundId = (await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND)) ?? DEFAULT_SOUND_ID;
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
     const pushSound = soundItem?.pushSound ?? '';
+    // v1.7 hotfix #DBG-D — routine 측 사운드 매핑 결과 (= 알람 사운드 ❌ / 다른 사운드 root cause 추적용).
+    Logger.warn('routine-DBG', `mirrorSnapshot soundId=${soundId} → pushSound=${pushSound || '(empty)'} routineId=${r.id}`);
 
     const steps: RoutineSnapshotStep[] = r.steps.map(s => ({
       name: s.name,

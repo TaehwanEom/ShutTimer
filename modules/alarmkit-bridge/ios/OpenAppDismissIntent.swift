@@ -15,6 +15,23 @@ import AlarmKit
 private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper. (= AlarmkitBridgeModule.swift 정합)
+fileprivate let NATIVE_DBG_KEY = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX = 300
+
+fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: APP_GROUP) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX { lines = Array(lines.suffix(NATIVE_DBG_MAX)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY)
+}
+
 private func writeOpenAppDismissSignal(routineId: String) {
     guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return }
     let signal: [String: Any] = [
@@ -41,6 +58,8 @@ struct OpenAppDismissIntent: LiveActivityIntent {
     init(entityId: String) { self.entityId = entityId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG-B — perform 진입 (= slide-to-stop 시점 + alerting alarm 갯수 추적용).
+        appendNativeDbg("OpenAppDismiss-DBG", "perform 진입 entityId=\(entityId)")
         // (= 카테고리 D 측 signal JSON key "routineId" 보존, 호출 시 값 = entityId)
         writeOpenAppDismissSignal(routineId: entityId)
 
@@ -50,9 +69,15 @@ struct OpenAppDismissIntent: LiveActivityIntent {
         // 패턴 = AlarmkitBridgeModule.cancelAlarm 측 동일 (= alerting state filter → stop, Apple AlarmKit 공식).
         #if canImport(AlarmKit)
         if let alarms = try? AlarmManager.shared.alarms {
+            // v1.7 hotfix #DBG-B — 전체 alarm + alerting filter 갯수 출력.
+            let alertingCount = alarms.filter { $0.state == .alerting }.count
+            appendNativeDbg("OpenAppDismiss-DBG", "alarms.count=\(alarms.count) alertingCount=\(alertingCount)")
             for alarm in alarms where alarm.state == .alerting {
+                appendNativeDbg("OpenAppDismiss-DBG", "stop alarmId=\(alarm.id.uuidString)")
                 try? await AlarmManager.shared.stop(id: alarm.id)
             }
+        } else {
+            appendNativeDbg("OpenAppDismiss-DBG", "AlarmManager.alarms throw — alerting cleanup skip")
         }
         #endif
 

@@ -5,6 +5,26 @@
 import ExpoModulesCore
 import Foundation
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper.
+// JS 측 SettingsScreen "최근 로그 공유" → AlarmkitBridge.readAppGroupString("native_debug_log_v1") 합쳐 영역.
+// 다중 기기 / Apple Watch 측 = 각 process 측 자체 storage → 각 device 측 앱 내 공유.
+fileprivate let NATIVE_DBG_GROUP = "group.com.shuttimer.app"
+fileprivate let NATIVE_DBG_KEY = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX = 300
+
+fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: NATIVE_DBG_GROUP) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX { lines = Array(lines.suffix(NATIVE_DBG_MAX)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY)
+}
+
 #if canImport(AlarmKit)
 import AlarmKit
 import SwiftUI
@@ -47,6 +67,8 @@ public class AlarmkitBridgeModule: Module {
     // v1.6 T1 — alarmUpdates AsyncSequence 구독 (Opt-A)
     OnStartObserving {
       self.observerTask?.cancel()
+      // v1.7 hotfix #DBG-B — observer 시작 진입 (= JS bridge 측 listener attach 추적용).
+      appendNativeDbg("AlarmKit-DBG", "observer OnStartObserving 진입 — alarmUpdates 구독 시작")
       self.observerTask = Task { [weak self] in
         guard #available(iOS 26.0, *) else { return }
         var lastStates: [UUID: Alarm.State] = [:]
@@ -55,6 +77,8 @@ public class AlarmkitBridgeModule: Module {
           let currentIds = Set(alarms.map { $0.id })
           // removed 감지
           for (id, _) in lastStates where !currentIds.contains(id) {
+            // v1.7 hotfix #DBG-B — removed 감지.
+            appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(id.uuidString) state=removed")
             self.sendEvent("onAlarmStateChange", [
               "alarmId": id.uuidString,
               "state": "removed",
@@ -64,6 +88,8 @@ public class AlarmkitBridgeModule: Module {
           for alarm in alarms {
             let prev = lastStates[alarm.id]
             if prev != alarm.state {
+              // v1.7 hotfix #DBG-B — state 변화 (= 진동/banner root cause 추적용).
+              appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(alarm.id.uuidString) prev=\(String(describing: prev)) → cur=\(Self.alarmStateToString(alarm.state))")
               self.sendEvent("onAlarmStateChange", [
                 "alarmId": alarm.id.uuidString,
                 "state": Self.alarmStateToString(alarm.state),
@@ -204,6 +230,8 @@ public class AlarmkitBridgeModule: Module {
       } else {
         alertSound = .default
       }
+      // v1.7 hotfix #DBG-D — sound 분기 결과 (= 알람 사운드 ❌ / 다른 사운드 root cause 추적용).
+      appendNativeDbg("AlarmKit-DBG", "sound entity=\(params.entityId) type=\(params.type ?? "?") soundName=\(params.soundName ?? "(nil)") branch=\((params.soundName?.isEmpty == false) ? "named" : "default")")
 
       // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
       // v1.6 hotfix — confirm_prompt + secondaryLabel 시 secondaryIntent 결합 (AdvanceNextStepIntent).

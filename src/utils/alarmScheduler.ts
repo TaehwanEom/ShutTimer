@@ -73,6 +73,10 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   if (fireAt === null) return null;
 
   const soundName = resolveSoundName(alarm.soundKey);
+  // v1.7 hotfix #DBG-D — soundKey → soundName 매핑 결과 출력 (= 사운드 ❌ / 다른 사운드 root cause 추적용).
+  // soundName=undefined 시 = ALARM_SOUNDS lookup ❌ → AlarmKit 측 .default fallback (= 시스템음).
+  // Logger.warn (= AsyncStorage 측 영역) 측 사용 (= TestFlight console 미라우팅 회피, logger.ts L36 정합).
+  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundKey=${alarm.soundKey} → soundName=${soundName ?? '(undefined)'}`);
   const title = alarm.label || '알람';
 
   try {

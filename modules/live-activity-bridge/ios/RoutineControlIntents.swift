@@ -11,6 +11,25 @@ import Foundation
 import ActivityKit
 #endif
 
+// v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper.
+// Main app target — Apple 표준 = LA Intent 측 perform() 측 app process 측 실행 영역.
+fileprivate let NATIVE_DBG_GROUP_LA = "group.com.shuttimer.app"
+fileprivate let NATIVE_DBG_KEY_LA = "native_debug_log_v1"
+fileprivate let NATIVE_DBG_MAX_LA = 300
+
+fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: NATIVE_DBG_GROUP_LA) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: NATIVE_DBG_KEY_LA) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > NATIVE_DBG_MAX_LA { lines = Array(lines.suffix(NATIVE_DBG_MAX_LA)) }
+    d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY_LA)
+}
+
 #if canImport(AlarmKit)
 import AlarmKit
 import SwiftUI
@@ -36,6 +55,8 @@ struct OpenAppDismissIntent: LiveActivityIntent {
     init(entityId: String) { self.entityId = entityId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — OpenAppDismiss Intent perform 진입 (= main app target 영역).
+        appendNativeDbg("Intent-DBG-LA", "OpenAppDismissIntent.perform entityId=\(entityId)")
         guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return .result() }
         let signal: [String: Any] = [
             "action": "open_app_dismiss",
@@ -112,6 +133,8 @@ struct PauseRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Pause Intent perform 진입 (= main app target = LA Apple Watch / iPhone Button 측 영역).
+        appendNativeDbg("Intent-DBG-LA", "PauseRoutineIntent.perform routineId=\(routineId)")
         // v1.7 hotfix #28 — debug log: 진입 시점.
         NSLog("[LA Pause] 진입 routineId=\(routineId)")
 
@@ -176,6 +199,8 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Resume Intent perform 진입 (= main app target).
+        appendNativeDbg("Intent-DBG-LA", "ResumeRoutineIntent.perform routineId=\(routineId)")
         // v1.7 hotfix #28 — debug log: 진입 시점.
         NSLog("[LA Resume] 진입 routineId=\(routineId)")
 
@@ -236,6 +261,8 @@ struct StopRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Stop Intent perform 진입 (= main app target).
+        appendNativeDbg("Intent-DBG-LA", "StopRoutineIntent.perform routineId=\(routineId)")
         // v1.6 #4-A — chain_alarms + snapshot.currentAlarmId 둘 다 cancel + snapshot 정리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {
@@ -451,6 +478,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #DBG — Advance Intent perform 진입 (= main app target).
+        appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform routineId=\(routineId)")
         // v1.7 hotfix #20 — main app process 측 perform 호출 시 = AlarmKit stop / Activity.update 동기화.
         // 직전: signal 작성만 → JS thread background 시 polling 처리 ❌ → 위젯/Apple Watch 표시 싱크 안맞음.
         guard var snapshot = readSnapshotFull() else {

@@ -8,6 +8,9 @@
 
 import AppIntents
 import Foundation
+#if canImport(AlarmKit)
+import AlarmKit
+#endif
 
 private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"
@@ -40,6 +43,19 @@ struct OpenAppDismissIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         // (= 카테고리 D 측 signal JSON key "routineId" 보존, 호출 시 값 = entityId)
         writeOpenAppDismissSignal(routineId: entityId)
+
+        // v1.7 hotfix #23 — AlarmKit alerting alarm 명시 stop 호출.
+        // 누락 시 = `.foreground(.immediate)` 모드는 앱 foreground 진입만 처리 = AlarmKit alarm 자체는 alerting 잔존
+        //   = iOS 시스템 측 alerting banner UI 잔존 (= 사용자 dismiss method 완료 시점까지 베너 안 사라짐).
+        // 패턴 = AlarmkitBridgeModule.cancelAlarm 측 동일 (= alerting state filter → stop, Apple AlarmKit 공식).
+        #if canImport(AlarmKit)
+        if let alarms = try? AlarmManager.shared.alarms {
+            for alarm in alarms where alarm.state == .alerting {
+                try? await AlarmManager.shared.stop(id: alarm.id)
+            }
+        }
+        #endif
+
         return .result()
     }
 }

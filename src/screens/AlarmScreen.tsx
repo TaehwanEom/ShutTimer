@@ -409,9 +409,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (dismissMethod === 'camera') {
       setResultState(result);
     }
+    // v1.7 hotfix #DBG-Ad — Interstitial show 직전 영역 (= 광고 ❌ root cause 추적용).
+    Logger.warn('Ad-DBG', `enterResult adLoaded=${adLoadedRef.current} interstitial=${!!interstitial} dismissMethod=${dismissMethod}`);
     if (adLoadedRef.current && interstitial) {
-      interstitial.show().catch(handleAfterAd);
+      Logger.warn('Ad-DBG', 'enterResult interstitial.show 호출');
+      interstitial.show().catch((e: any) => {
+        Logger.warn('Ad-DBG', `enterResult show throw=${String(e)}`);
+        handleAfterAd();
+      });
     } else {
+      Logger.warn('Ad-DBG', `enterResult skip → handleAfterAd 직접 (= 광고 ❌)`);
       handleAfterAd();
     }
   }, [stopAudioAndVibration, dismissMethod, handleAfterAd]);
@@ -420,9 +427,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (dismissedRef.current) return;
     await stopAudioAndVibration();
     afterAdActionRef.current = 'home';
+    // v1.7 hotfix #DBG-Ad — autoDismiss 측 Interstitial show 직전 영역.
+    Logger.warn('Ad-DBG', `autoDismissNoResult adLoaded=${adLoadedRef.current} interstitial=${!!interstitial}`);
     if (adLoadedRef.current && interstitial) {
-      interstitial.show().catch(goHome);
+      Logger.warn('Ad-DBG', 'autoDismissNoResult interstitial.show 호출');
+      interstitial.show().catch((e: any) => {
+        Logger.warn('Ad-DBG', `autoDismissNoResult show throw=${String(e)}`);
+        goHome();
+      });
     } else {
+      Logger.warn('Ad-DBG', `autoDismissNoResult skip → goHome 직접 (= 광고 ❌)`);
       goHome();
     }
   }, [stopAudioAndVibration, goHome]);
@@ -433,22 +447,34 @@ export default function AlarmScreen({ navigation, route }: Props) {
     dismissedRef.current = false;
     resultEnteredRef.current = false;
 
+    // v1.7 hotfix #DBG-Ad — useEffect 진입 영역 (= 광고 ❌ root cause 추적용).
+    Logger.warn('Ad-DBG', `useEffect 진입 isExpoGo=${isExpoGo} interstitial=${!!interstitial}`);
+
     // @preserve IAP — 원본: if (isAdFree || isExpoGo || !interstitial) return;
-    if (isExpoGo || !interstitial) return;
+    if (isExpoGo || !interstitial) {
+      Logger.warn('Ad-DBG', `useEffect skip (isExpoGo=${isExpoGo} interstitial=${!!interstitial})`);
+      return;
+    }
 
     try {
       const { AdEventType } = require('react-native-google-mobile-ads');
 
       const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
         adLoadedRef.current = true;
+        // v1.7 hotfix #DBG-Ad — LOADED 영역 도착 (= 광고 영역 ready 영역).
+        Logger.warn('Ad-DBG', 'LOADED event 도착');
       });
       const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+        Logger.warn('Ad-DBG', 'CLOSED event 도착');
         handleAfterAdRef.current();
       });
       const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
+        // v1.7 hotfix #DBG-Ad — ERROR 영역 (= no-fill / network / config 영역 영역).
+        Logger.warn('Ad-DBG', `ERROR event code=${error?.code} msg=${error?.message}`);
         console.warn('Interstitial ad failed:', error?.code, error?.message, error);
       });
 
+      Logger.warn('Ad-DBG', 'interstitial.load() 호출');
       interstitial.load();
 
       return () => {
@@ -457,6 +483,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
         unsubError();
       };
     } catch (e) {
+      Logger.warn('Ad-DBG', `AdEventType import 실패=${String(e)}`);
       console.warn('AdEventType failed to load:', e);
     }
     // @preserve IAP — deps 원본: [navigation, isAdFree, isExpoGo]

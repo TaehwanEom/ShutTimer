@@ -237,6 +237,8 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
   const elapsed = Math.max(0, stepDurationMs - remaining);
   const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
   const routineName = routine.name ?? routine.category;
+  // v1.7 hotfix #21 — LA stepEndAt debug log (= 위젯 0:00 root cause 추적용).
+  Logger.warn('LA', `startOrUpdate stepEndAt=${ar.stepEndAt} now=${Date.now()} delta=${ar.stepEndAt - Date.now()}ms stepIdx=${ar.currentStepIndex} duration=${step.durationSeconds}s laId=${currentLiveActivityId}`);
 
   // v1.7 hotfix #4 — stage 파라미터 명시. 직전: stage 미전달 → native 측 fallback 'step' →
   // alerting 시점에 setLiveActivityStage('manual_prompt') 호출했어도 다른 영역 update 호출이

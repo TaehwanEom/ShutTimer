@@ -25,6 +25,9 @@ public class LiveActivityBridgeModule: Module {
 
     AsyncFunction("start") { (params: StartParams) async throws -> String in
       if #available(iOS 16.2, *) {
+        // v1.7 hotfix #21 — debug log (= 위젯 0:00 root cause 추적용).
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        NSLog("[LA start] stepEndAt=%f now=%f delta=%f routineId=%@ stepName=%@", params.stepEndAt, nowMs, params.stepEndAt - nowMs, params.routineId, params.stepName)
         let attributes = ShutTimerActivityAttributes(
           routineName: params.routineName,
           routineId: params.routineId
@@ -56,6 +59,9 @@ public class LiveActivityBridgeModule: Module {
     AsyncFunction("update") { (params: UpdateParams) async throws in
       guard #available(iOS 16.2, *) else { return }
       guard let activity = self.activities[params.activityId] as? Activity<ShutTimerActivityAttributes> else { return }
+      // v1.7 hotfix #21 — debug log (= 위젯 0:00 root cause 추적용).
+      let nowMs = Date().timeIntervalSince1970 * 1000
+      NSLog("[LA update] stepEndAt=%f now=%f delta=%f stepName=%@ stage=%@", params.stepEndAt, nowMs, params.stepEndAt - nowMs, params.stepName, params.stage ?? "step")
       let contentState = ShutTimerActivityAttributes.ContentState(
         currentStepName: params.stepName,
         stepEndAt: params.stepEndAt,

@@ -112,25 +112,52 @@ struct PauseRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #28 — debug log: 진입 시점.
+        NSLog("[LA Pause] 진입 routineId=\(routineId)")
+
         // v1.6 #4-A — chain_alarms (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 pause.
         let alarmIds = readAlarmIds(routineId: routineId)
+        // v1.7 hotfix #28 — debug log: chain_alarms lookup 결과 (옵션 A 폐기 후 = 보통 빈 array).
+        NSLog("[LA Pause] chain_alarms count=\(alarmIds.count) ids=\(alarmIds.joined(separator: ","))")
+
+        // v1.7 hotfix #28 — try? silent fail 추적용. do/catch 분기 + state log.
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
-                try? AlarmManager.shared.pause(id: id)
+                let stateBefore = (try? AlarmManager.shared.alarms.first(where: { $0.id == id })?.state).flatMap { $0 }
+                do {
+                    try AlarmManager.shared.pause(id: id)
+                    NSLog("[LA Pause] chain pause OK id=\(idStr) stateBefore=\(String(describing: stateBefore))")
+                } catch {
+                    NSLog("[LA Pause] chain pause THROW id=\(idStr) stateBefore=\(String(describing: stateBefore)) error=\(error)")
+                }
             }
         }
+
         if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId),
            let currentUuid = UUID(uuidString: currentAlarmId) {
-            try? AlarmManager.shared.pause(id: currentUuid)
+            // v1.7 hotfix #28 — snapshot 측 currentAlarmId pause 호출 + state log.
+            let stateBefore = (try? AlarmManager.shared.alarms.first(where: { $0.id == currentUuid })?.state).flatMap { $0 }
+            do {
+                try AlarmManager.shared.pause(id: currentUuid)
+                NSLog("[LA Pause] snapshot pause OK id=\(currentAlarmId) stateBefore=\(String(describing: stateBefore))")
+            } catch {
+                NSLog("[LA Pause] snapshot pause THROW id=\(currentAlarmId) stateBefore=\(String(describing: stateBefore)) error=\(error)")
+            }
+        } else {
+            // v1.7 hotfix #28 — snapshot lookup 실패 영역 추적.
+            NSLog("[LA Pause] snapshot lookup ❌ (= currentAlarmId nil 또는 routineId 불일치)")
         }
 
+        var laUpdateCount = 0
         for activity in Activity<ShutTimerActivityAttributes>.activities {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
                 newState.paused = true
                 await activity.update(.init(state: newState, staleDate: nil))
+                laUpdateCount += 1
             }
         }
+        NSLog("[LA Pause] LA update count=\(laUpdateCount)")
 
         writeControlSignal(action: "pause", routineId: routineId)
         return .result()
@@ -149,25 +176,48 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
+        // v1.7 hotfix #28 — debug log: 진입 시점.
+        NSLog("[LA Resume] 진입 routineId=\(routineId)")
+
         // v1.6 #4-A — chain_alarms + snapshot.currentAlarmId 둘 다 resume.
         let alarmIds = readAlarmIds(routineId: routineId)
+        NSLog("[LA Resume] chain_alarms count=\(alarmIds.count) ids=\(alarmIds.joined(separator: ","))")
+
         for idStr in alarmIds {
             if let id = UUID(uuidString: idStr) {
-                try? AlarmManager.shared.resume(id: id)
+                let stateBefore = (try? AlarmManager.shared.alarms.first(where: { $0.id == id })?.state).flatMap { $0 }
+                do {
+                    try AlarmManager.shared.resume(id: id)
+                    NSLog("[LA Resume] chain resume OK id=\(idStr) stateBefore=\(String(describing: stateBefore))")
+                } catch {
+                    NSLog("[LA Resume] chain resume THROW id=\(idStr) stateBefore=\(String(describing: stateBefore)) error=\(error)")
+                }
             }
         }
+
         if let currentAlarmId = readSnapshotCurrentAlarmId(routineId: routineId),
            let currentUuid = UUID(uuidString: currentAlarmId) {
-            try? AlarmManager.shared.resume(id: currentUuid)
+            let stateBefore = (try? AlarmManager.shared.alarms.first(where: { $0.id == currentUuid })?.state).flatMap { $0 }
+            do {
+                try AlarmManager.shared.resume(id: currentUuid)
+                NSLog("[LA Resume] snapshot resume OK id=\(currentAlarmId) stateBefore=\(String(describing: stateBefore))")
+            } catch {
+                NSLog("[LA Resume] snapshot resume THROW id=\(currentAlarmId) stateBefore=\(String(describing: stateBefore)) error=\(error)")
+            }
+        } else {
+            NSLog("[LA Resume] snapshot lookup ❌ (= currentAlarmId nil 또는 routineId 불일치)")
         }
 
+        var laUpdateCount = 0
         for activity in Activity<ShutTimerActivityAttributes>.activities {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
                 newState.paused = false
                 await activity.update(.init(state: newState, staleDate: nil))
+                laUpdateCount += 1
             }
         }
+        NSLog("[LA Resume] LA update count=\(laUpdateCount)")
 
         writeControlSignal(action: "resume", routineId: routineId)
         return .result()

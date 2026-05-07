@@ -83,7 +83,7 @@ struct LockScreenView: View {
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
                     // v1.7 hotfix #14 — paused 측 = "일시정지됨" 텍스트 명시 (= timerInterval ❌, 카운트다운 흘러감 회피).
-                    Text("일시정지됨")
+                    Text("일시정지")
                         .font(.system(size: 56, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -176,7 +176,7 @@ struct WatchView: View {
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
                 // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= timerInterval ❌).
-                Text("일시정지됨")
+                Text("일시정지")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
@@ -255,7 +255,7 @@ struct WidgetLiveActivity: Widget {
                                 .foregroundColor(.white)
                         } else if context.state.paused {
                             // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= Dynamic Island expanded).
-                            Text("일시정지됨")
+                            Text("일시정지")
                                 .font(.title2.weight(.bold))
                         } else {
                             Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)

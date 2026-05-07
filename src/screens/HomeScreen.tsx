@@ -576,6 +576,9 @@ export default function HomeScreen({ navigation, route }: Props) {
             style: 'cancel',
             onPress: () => {
               // 사용자 = routine 유지. 진행 중 페이지 navigate (= ad-hoc → AlarmTab / 일반 → RoutineTab).
+              // v1.7 hotfix — dial 초기화 (= 루틴 탭 진입 후 다시 HomeScreen 진입 시 dial 잔존 영역 회피).
+              setSelectedMinutes(0);
+              setSelectedSeconds(0);
               if (isAdhoc) {
                 (navigation as any).navigate('Home', { screen: 'AlarmTab' });
               } else {

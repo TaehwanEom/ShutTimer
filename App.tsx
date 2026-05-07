@@ -706,16 +706,24 @@ function AppNavigator() {
               }
               const isAdhoc = isAdhocAlarmRoutine(signal.routineId);
               const route = navigationRef.current.getCurrentRoute()?.name;
-              // v1.7 hotfix #31 — confirm_prompt alerting 시 밀어서 중지 = routine 정지 의도.
-              // ar.awaitingConfirm === true 시 = stopRoutine 호출 + RoutineList navigate (= 정지 화면).
+              // v1.7 hotfix #31 — confirm_prompt alerting 시 밀어서 종료 (= Slide to Stop) = routine 정지 의도.
+              // ar.awaitingConfirm === true 시 = stopRoutine 호출 + navigate (= 정지 화면).
               // false 시 = 기존 흐름 (= 일반 step alerting 측 진행 보존).
-              // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측) 영역 시 = 분기 ❌. 위로 밀어 잠금 해제 = open_app_dismiss signal 동일 → routine 강제 정지 회귀 영역. AlarmTab navigate 측 (= L720-723) 진입 영역.
+              // v1.7 hotfix — b967967 측 추측 회귀 정정 (= "위로 밀어 잠금 해제 = OpenAppDismiss" 가정 ❌).
+              // 정공 = OpenAppDismissIntent perform = "밀어서 종료 (Slide to Stop)" 측만 호출 = 사용자 명시 정지 의도.
+              // adhoc + non-adhoc 모두 = stopRoutine 영역. navigate 영역만 분기 (= adhoc → AlarmTab / non-adhoc → RoutineList).
               const arRaw2 = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
               let arParsed: any = null;
               try { arParsed = arRaw2 ? JSON.parse(arRaw2) : null; } catch {}
-              if (arParsed?.awaitingConfirm === true && !isAdhoc) {
+              if (arParsed?.awaitingConfirm === true) {
                 await stopRoutine().catch(() => {});
-                if (route !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+                if (isAdhoc) {
+                  if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
+                    (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+                  }
+                } else {
+                  if (route !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+                }
                 return;
               }
               // v1.7 hotfix #2 — AlarmScreen 활성 시 (= 사용자 정상 dismiss flow 진행 중)

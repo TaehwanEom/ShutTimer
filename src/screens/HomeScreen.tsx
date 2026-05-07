@@ -789,6 +789,12 @@ export default function HomeScreen({ navigation, route }: Props) {
             await LiveActivityBridge.endAll().catch(() => {});
           }
         } catch {}
+        // v1.7 hotfix #18 — 이전 세션 측 단일 타이머 expo 알림 stale cleanup.
+        // 직전 시점 AlarmKit 등록 실패 → expo 폴백 (= 0/60/120s offset 3단계 등록) +
+        // 비정상 종료로 cancel 누락 시 = 시스템 큐 잔존 → 알람 entity / 신규 timer 시점 에 fire.
+        // 가드: routine ❌ (직전 분기 처리) + timer ❌ → AlarmKit 측 routine/alarm entity 측
+        // expo 등록 ❌ (= AlarmKit only) → wipe 안전 (= stale 단일 타이머 expo 알림만 정리).
+        await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
         return;
       }
       let t: ActiveTimer;

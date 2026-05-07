@@ -61,12 +61,14 @@ public class LiveActivityBridgeModule: Module {
       guard let activity = self.activities[params.activityId] as? Activity<ShutTimerActivityAttributes> else { return }
       // v1.7 hotfix #21 — debug log (= 위젯 0:00 root cause 추적용).
       let nowMs = Date().timeIntervalSince1970 * 1000
-      NSLog("[LA update] stepEndAt=%f now=%f delta=%f stepName=%@ stage=%@", params.stepEndAt, nowMs, params.stepEndAt - nowMs, params.stepName, params.stage ?? "step")
+      NSLog("[LA update] stepEndAt=%f now=%f delta=%f stepName=%@ stage=%@ paused=%@", params.stepEndAt, nowMs, params.stepEndAt - nowMs, params.stepName, params.stage ?? "step", String(describing: params.paused ?? false))
+      // v1.7 hotfix #30 — paused field 영역. JS 측 = ar.pausedAt !== null 검증 후 전달.
+      // 누락 시 = false (= 기존 호환 보존).
       let contentState = ShutTimerActivityAttributes.ContentState(
         currentStepName: params.stepName,
         stepEndAt: params.stepEndAt,
         progress: params.progress,
-        paused: false,
+        paused: params.paused ?? false,
         stage: params.stage ?? "step",
         currentStepIndex: params.currentStepIndex ?? 0,
         totalSteps: params.totalSteps ?? 1
@@ -114,6 +116,8 @@ struct UpdateParams: Record {
   @Field var stage: String?
   @Field var currentStepIndex: Int?
   @Field var totalSteps: Int?
+  /** v1.7 hotfix #30 — paused field. JS 측 ar.pausedAt !== null 시 true 전달. 누락 시 false 보존. */
+  @Field var paused: Bool?
 }
 
 struct EndParams: Record {

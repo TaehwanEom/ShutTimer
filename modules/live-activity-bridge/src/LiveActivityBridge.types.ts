@@ -30,6 +30,8 @@ export type LiveActivityUpdateParams = {
   /** v1.6 hotfix — 위젯 "stepName(N/M)" 표시용 */
   currentStepIndex?: number;
   totalSteps?: number;
+  /** v1.7 hotfix #30 — paused field. ar.pausedAt !== null 시 true 전달. 누락 시 false 보존. */
+  paused?: boolean;
 };
 
 export type LiveActivityDismissalPolicy = 'immediate' | 'default';

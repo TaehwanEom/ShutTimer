@@ -256,6 +256,8 @@ async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): P
         stage,
         currentStepIndex: ar.currentStepIndex,
         totalSteps: routine.steps.length,
+        // v1.7 hotfix #30 — paused 측 동기화 (= ar 측 진실 영역).
+        paused: ar.pausedAt !== null,
       });
       return;
     } catch {
@@ -707,6 +709,14 @@ export async function resumeRoutineFromLA(resumeTimestamp: number): Promise<Acti
     pausedAt: null,
   };
   await saveActiveRoutine(resumed);
+  // v1.7 hotfix #29 — LA 측 stepEndAt shift update (= 위젯 0:00 정정 root cause).
+  // 직전 = ar 측 stepEndAt shift + LA update ❌ → LA 측 stepEndAt = 과거 시점 잔존 →
+  //   resume 후 paused:false 갱신 (= LA Intent native) → countdown 분기 진입 →
+  //   safeStepEndDate (= max(end, now+0.01)) → 0.01초 → 위젯 0:00 표시.
+  const routine = await findRoutine(ar.routineId);
+  if (routine) {
+    await startOrUpdateLiveActivity(routine, resumed);
+  }
   return resumed;
 }
 

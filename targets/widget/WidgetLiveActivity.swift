@@ -82,13 +82,10 @@ struct LockScreenView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
-                    // v1.7 hotfix #14 — paused 측 = Text(timerInterval:) 사용 ❌ (= Apple WidgetKit 시스템 자동 카운트다운 → 흘러감).
-                    // "일시정지됨" 텍스트 명시 → 사용자 인지 정합.
-                    Text("일시정지됨")
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.4)
+                    // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
+                    // 직전 #14 = "일시정지됨" 추가 = 사용자 의도 미확인 임의 해석 회귀 정정.
+                    // 사용자 인지 = 우측 play.fill button + compactTrailing pause icon 의존.
+                    EmptyView()
                 } else {
                     Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
@@ -176,10 +173,9 @@ struct WatchView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
-                // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= timerInterval ❌, 카운트다운 흘러감 회피).
-                Text("일시정지됨")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
+                // 사용자 인지 = 우측 play.fill button 의존.
+                EmptyView()
             } else {
                 Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                     .font(.system(size: 24, weight: .bold))
@@ -255,9 +251,9 @@ struct WidgetLiveActivity: Widget {
                                 .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
                         } else if context.state.paused {
-                            // v1.7 hotfix #14 — paused 측 = "일시정지됨" 명시 (= Dynamic Island expanded).
-                            Text("일시정지됨")
-                                .font(.title2.weight(.bold))
+                            // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
+                            // 사용자 인지 = 우측 play.circle.fill button 의존.
+                            EmptyView()
                         } else {
                             Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                                 .monospacedDigit()

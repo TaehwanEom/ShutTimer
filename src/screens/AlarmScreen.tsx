@@ -31,7 +31,7 @@ import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { stopRoutine } from '../utils/routineController';
 import { loadAlarms } from '../constants/alarms';
-import { startRoutineFromAlarm } from '../utils/alarmRoutineLink';
+import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -283,7 +283,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (!arRaw) return;
       try {
         const ar = JSON.parse(arRaw);
-        if (ar?.routineId) {
+        // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측 영역) 시 = RoutineList 강제 이동 ❌ → AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
+        if (ar?.routineId && !isAdhocAlarmRoutine(ar.routineId)) {
           navigation.replace('RoutineList');
         }
       } catch {}

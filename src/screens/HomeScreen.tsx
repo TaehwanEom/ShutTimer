@@ -730,6 +730,11 @@ export default function HomeScreen({ navigation, route }: Props) {
             AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, pausedAt: signal.timestamp })).catch(() => {});
           } catch {}
         });
+        // v1.7 hotfix — 위젯 측 pause 시 = expo notif fallback (= 3단계 알람) cancel (= 시간 완료 시점 측 = 과거 푸시 발화 회피).
+        for (const oldId of notificationIdsRef.current) {
+          Notifications.cancelScheduledNotificationAsync(oldId).catch(() => {});
+        }
+        notificationIdsRef.current = [];
       } else if (signal.action === 'resume' && isPausedRef.current && isRunning) {
         // 위험 #X 정정: pauseDuration = resume signal.timestamp - 실제 pausedAt
         const pauseDuration = Math.max(0, signal.timestamp - (pausedAtRef.current ?? signal.timestamp));

@@ -39,8 +39,7 @@ public class LiveActivityBridgeModule: Module {
           paused: false,
           stage: params.stage ?? "step",
           currentStepIndex: params.currentStepIndex ?? 0,
-          totalSteps: params.totalSteps ?? 1,
-          pausedAt: 0
+          totalSteps: params.totalSteps ?? 1
         )
         let activity = try Activity<ShutTimerActivityAttributes>.request(
           attributes: attributes,
@@ -70,8 +69,7 @@ public class LiveActivityBridgeModule: Module {
         paused: false,
         stage: params.stage ?? "step",
         currentStepIndex: params.currentStepIndex ?? 0,
-        totalSteps: params.totalSteps ?? 1,
-        pausedAt: 0
+        totalSteps: params.totalSteps ?? 1
       )
       await activity.update(.init(state: contentState, staleDate: nil))
     }

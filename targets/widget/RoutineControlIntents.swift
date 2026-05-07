@@ -139,7 +139,6 @@ struct PauseRoutineIntent: LiveActivityIntent {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
                 newState.paused = true
-                newState.pausedAt = Date().timeIntervalSince1970 * 1000
                 await activity.update(.init(state: newState, staleDate: nil))
             }
         }
@@ -178,7 +177,6 @@ struct ResumeRoutineIntent: LiveActivityIntent {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
                 newState.paused = false
-                newState.pausedAt = 0
                 await activity.update(.init(state: newState, staleDate: nil))
             }
         }

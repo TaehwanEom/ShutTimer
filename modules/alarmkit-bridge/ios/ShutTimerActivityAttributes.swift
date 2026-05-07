@@ -17,8 +17,6 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var stage: String = "step"
         var currentStepIndex: Int = 0
         var totalSteps: Int = 1
-        /** v1.7 hotfix #20 — pause 시점 ms (paused=false 시 = 0). SwiftUI Text(timerInterval:pauseTime:) 측 = 시간 정지 처리용. */
-        var pausedAt: Double = 0
     }
 
     var routineName: String

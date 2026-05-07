@@ -129,6 +129,19 @@ public class AlarmkitBridgeModule: Module {
         )
       }
 
+      // v1.7 hotfix #26 — debug log: scheduleAlarm 진입 시점.
+      // 베너 미노출 root cause 추적용. fireAt = 절대 시각 (ms) → 디바이스 측 console 시각 비교.
+      // recurrence ❌ = nil log / recurrence ✅ = mode + days log.
+      let nowDebugMs = Date().timeIntervalSince1970 * 1000.0
+      let fireDeltaMs = params.fireAt - nowDebugMs
+      let recDebug: String = {
+        if let r = params.recurrence {
+          return "\(r.mode)/\(r.days?.map(String.init).joined(separator: ",") ?? "-")"
+        }
+        return "nil"
+      }()
+      NSLog("[AlarmKit][schedule] 진입 entity=\(params.entityId) type=\(params.type ?? "?") fireAt=\(params.fireAt) deltaMs=\(Int(fireDeltaMs)) recurrence=\(recDebug)")
+
       // v1.6 Phase 5 — iOS 26.1+ 에서 stopButton deprecated. #available 분기.
       // v1.6 hotfix — confirm_prompt 타입 + secondaryLabel 전달 시 secondary button 결합.
       // AdvanceNextStepIntent 가 App Group "la_control_signal" 에 advance 작성 → RN polling 처리.
@@ -284,6 +297,8 @@ public class AlarmkitBridgeModule: Module {
           sound: alertSound
         )
         _ = try await AlarmManager.shared.schedule(id: id, configuration: alarmConfig)
+        // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (recurrence 영역).
+        NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=alarm(schedule:)")
         return id.uuidString
       }
 
@@ -326,6 +341,8 @@ public class AlarmkitBridgeModule: Module {
         )
       }
       _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
+      // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (timer 영역).
+      NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=timer(duration:) durationSec=\(durationSecAll)")
       return id.uuidString
     }
 

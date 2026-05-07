@@ -466,6 +466,9 @@ function AppNavigator() {
         await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
       }
       const meta = await loadAlarmMetadata(event.alarmId);
+      // v1.7 hotfix #26 — debug log: meta lookup 결과 (= 베너 미노출 추적용).
+      // meta=null = mapping table 측 잔존 ❌ → silent skip 진입 = 사용자 측 모름.
+      console.warn('[onAlarmStateChange][meta]', event.alarmId, 'meta=', meta ? `${meta.type}/${meta.entityId}` : 'NULL');
       if (!meta) return;
       if (!navigationRef.current?.isReady()) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
@@ -610,6 +613,33 @@ function AppNavigator() {
       } catch {}
     }, 1500);
     return () => clearTimeout(timer);
+  }, []);
+
+  // v1.7 hotfix #26 — debug log: AlarmKit alarm 측 주기 polling (= 베너 미노출 추적용).
+  // 30s 주기 = listAlarms 측 모든 alarm + state log. paused/scheduled/alerting 잔존 영역 추적.
+  // 사용자 측 디바이스 console.app / Xcode console = '[ListAlarms]' filter → 캡처 → root cause 분석.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const alarms = await AlarmkitBridge.listAlarms();
+        if (alarms.length === 0) {
+          console.warn('[ListAlarms] count=0');
+        } else {
+          const summary = alarms.map(a => `${a.id.slice(0, 8)}/${a.state}`).join(', ');
+          console.warn(`[ListAlarms] count=${alarms.length} ${summary}`);
+        }
+      } catch (e: any) {
+        console.warn('[ListAlarms] error', e?.message || e);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   // v1.6 Phase 10-D — LA control signal polling (App Group ↔ RN 동기화)

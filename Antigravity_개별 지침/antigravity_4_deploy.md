@@ -1,117 +1,117 @@
-# Antigravity QA + 배포 창 운영 규칙 — ShutTimer
+# Antigravity QA + Deploy Window Rules — ShutTimer
 
-**공통 규칙:** antigravity_0_common.md 참조
-**역할:** 실기기 QA 검증 + 빌드 + 앱스토어 제출 전용. 코드 수정 금지.
+**Common rules:** see `antigravity_0_common.md`
+**Role:** Device QA + build + App Store/Play submission only. Code modification forbidden.
 
-⚠️ **앱스토어 배포는 롤백 불가.** 심사 통과 후 배포된 버전은 즉시 롤백 불가. 배포 전 QA가 절대적으로 중요하다.
+⚠️ **Store deployment is irreversible.** A version released after review cannot be rolled back. QA before deployment is therefore absolutely critical.
 
 ---
 
-# 1부: QA 단계 (구현 창 완료 후)
+# Part 1: QA Stage (After Build window completes)
 
-## QA 절차 (4단계)
+## QA Procedure (4 Steps)
 
-### QA-1: 테스트 케이스 작성
+### QA-1: Test case authoring
 
-구현 창 완료 보고 수신 후 TC 작성. 형식:
-
-```
-[TC-XX] 시나리오 이름
-플랫폼: iOS / Android / 공통
-재현 경로:
-1. [동작]
-2. [동작]
-기대 결과: [구체적 상태]
-FAIL 조건: [구체적 상태]
-```
-
-### QA-2: 실기기 테스트 실행
-
-- **Expo Go**로 iOS + Android 양쪽 실행
-- 핵심 흐름 전체 반드시 포함: 미션 선택 → 타이머 시작 → 카운트다운 → 알람 → 카메라 촬영 → 종료
-- 앱 상태별 알람 동작 확인: foreground / background / killed
-
-### QA-3: PASS/FAIL 판정 규칙
-
-- **PASS**: 실기기에서 직접 확인 + 기대 결과 일치
-- **FAIL**: 기대 결과와 불일치. 재현 경로 + 정확한 에러 메시지 포함.
-- **UNTESTED**: 환경 제약으로 직접 확인 불가. PASS로 표시 금지. 사유 명시.
-- 확인 안 한 항목 PASS 처리 = 거짓 보고
-
-### QA-4: 결과 보고
+After receiving the Build window's completion report, write TCs:
 
 ```
-[작업명] QA 결과
+[TC-XX] Scenario name
+Platform: iOS / Android / Common
+Reproduction:
+1. [step]
+2. [step]
+Expected: [concrete state]
+FAIL condition: [concrete state]
+```
 
-환경: Expo Go (실기기)
-결과: XX/XX PASS
+### QA-2: Device test execution
 
-| TC | 시나리오 | iOS | Android | 비고 |
+- Run **Expo Go** on iOS + Android
+- Core flow MUST be included: mission select → start → countdown → alarm → camera → end
+- Verify alarm behavior across app states: foreground / background / killed
+
+### QA-3: PASS/FAIL Rules
+
+- **PASS:** verified directly on device + matches expected
+- **FAIL:** does not match expected. Include reproduction + exact error message.
+- **UNTESTED:** could not verify directly due to environment constraints. Do NOT mark as PASS. State the reason.
+- Marking unverified items as PASS = false reporting
+
+### QA-4: Result report
+
+```
+[Task] QA result
+
+Environment: Expo Go (real device)
+Result: XX/XX PASS
+
+| TC | Scenario | iOS | Android | Note |
 |----|----------|-----|---------|------|
 | 01 | ... | PASS | PASS | |
-| 02 | ... | FAIL | - | [상세] |
+| 02 | ... | FAIL | - | [details] |
 
-UNTESTED 항목:
-- TC-XX: 사유
+UNTESTED:
+- TC-XX: reason
 
-FAIL 상세:
-- TC-XX 재현 경로: ...
-- 실제 결과: ...
-- 기대 결과: ...
+FAIL details:
+- TC-XX repro: ...
+- Actual: ...
+- Expected: ...
 ```
 
-**FAIL 1개라도 있으면 배포 단계 진행 금지. 구현 창으로 반환.**
+**If any FAIL exists, do not proceed to deploy. Return to Build window.**
 
 ---
 
-## ShutTimer 기본 TC 목록
+## ShutTimer Default TC List
 
-| TC | 시나리오 | 플랫폼 |
-|----|----------|--------|
-| TC-01 | 앱 실행 → 메인 화면 렌더링 | 공통 |
-| TC-02 | 미션 선택 (8종 전부) | 공통 |
-| TC-03 | 시작 버튼 → 타이머 실행 화면 전환 | 공통 |
-| TC-04 | 카운트다운 애니메이션 (부채꼴 줄어듦) | 공통 |
-| TC-05 | 일시정지 / 재개 | 공통 |
-| TC-06 | 취소 → 메인 화면 복귀 | 공통 |
-| TC-07 | 타이머 종료 → 알람 울림 (foreground) | 공통 |
-| TC-08 | 타이머 종료 → 알람 울림 (background) | iOS/Android 각각 |
-| TC-09 | 알람 화면 → 카메라 실행 | 공통 |
-| TC-10 | 카메라 촬영 → 알람 종료 | 공통 |
-| TC-11 | 앱 재실행 후 상태 정상 복구 | 공통 |
+| TC | Scenario | Platform |
+|----|----------|----------|
+| TC-01 | App launch → main screen renders | Common |
+| TC-02 | Mission selection (all 8) | Common |
+| TC-03 | Start button → timer screen transition | Common |
+| TC-04 | Countdown animation (sector shrinks) | Common |
+| TC-05 | Pause / resume | Common |
+| TC-06 | Cancel → return to main | Common |
+| TC-07 | Timer end → alarm rings (foreground) | Common |
+| TC-08 | Timer end → alarm rings (background) | iOS / Android each |
+| TC-09 | Alarm screen → camera launch | Common |
+| TC-10 | Camera capture → alarm end | Common |
+| TC-11 | App relaunch → state restored | Common |
 
 ---
 
-# 2부: 배포 단계 (QA 전체 PASS 후)
+# Part 2: Deployment Stage (After full QA PASS)
 
-## 배포 절차 (7단계 — 순서 건너뛰기 금지)
+## Deployment Procedure (7 Steps — No Skipping)
 
-### Step 0: 배포 전제조건 확인
+### Step 0: Prerequisite check
 
-- 계획서 8번 항목 "배포 전제조건" 확인
-- **하나라도 미완료 시 배포 절대 금지**
+- Check item 8 "Deployment prerequisites" from the plan
+- **If any are incomplete, deployment is strictly forbidden**
 
 ```
-| 전제조건 | 완료 여부 |
-|---------|----------|
+| Prerequisite | Status |
+|--------------|--------|
 ```
 
-### Step 1: 유저 승인
+### Step 1: User approval
 
-- QA 전체 PASS 결과 보고 → 유저 "배포해" 승인 후에만 진행
-- 승인 없이 배포 절대 금지
+- Report full QA PASS → proceed only after user "deploy" approval
+- No deployment without approval
 
-### Step 2: 관련 파일만 커밋
+### Step 2: Commit only relevant files
 
-- 해당 작업 파일만 `git add` + `git commit`
-- 무관한 파일 포함 금지
-- 커밋 메시지에 작업번호 포함
+- `git add` + `git commit` only the relevant files for this task
+- Unrelated files MUST NOT be included
+- Include the task ID in the commit message
 
-### Step 3: 버전 태그 생성
+### Step 3: Version tag
 
 - `git tag v[X.Y.Z]`
 - `git push origin v[X.Y.Z]`
-- app.json의 `version`, `buildNumber`(iOS), `versionCode`(Android) 업데이트
+- Bump `version`, `buildNumber` (iOS), `versionCode` (Android) in `app.json`
 
 ### Step 4: EAS Build
 
@@ -119,110 +119,110 @@ FAIL 상세:
 eas build --platform all
 ```
 
-- 빌드 완료까지 대기
-- 빌드 실패 시 즉시 중단 + 원인 보고
+- Wait for build completion
+- On build failure: stop immediately + report cause
 
-### Step 5: 앱스토어 제출
+### Step 5: Store submission
 
 ```bash
 eas submit --platform ios
 eas submit --platform android
 ```
 
-- 심사 상태 확인 후 보고
+- Confirm review status and report
 
-### Step 6: 배포 후 검증 + 이력 업데이트
+### Step 6: Post-deploy verification + history update
 
-심사 통과 후:
-- [ ] App Store / Google Play 직접 다운로드
-- [ ] 핵심 흐름 전체 동작 확인
-- [ ] iOS / Android 양쪽 확인
-
-```
-배포 이력:
-| 버전 | 날짜 | 내용 | iOS | Android |
-|------|------|------|-----|---------|
-```
-
----
-
-## 커밋 메시지 규칙
+After review pass:
+- [ ] Download from App Store / Google Play directly
+- [ ] Verify full core flow
+- [ ] Verify both iOS and Android
 
 ```
-feat: 새 기능 추가
-fix: 버그 수정
-refactor: 코드 구조 변경 (기능 동일)
-style: UI 변경
-docs: 문서 수정
-chore: 설정/빌드 변경
+Deploy history:
+| Version | Date | Content | iOS | Android |
+|---------|------|---------|-----|---------|
 ```
 
 ---
 
-## 롤백 절차
-
-- **심사 중 발견 시:** App Store Connect / Google Play 콘솔에서 제출 취소
-- **배포 후 발견 시:** 긴급 수정 버전 빌드 → 즉시 재제출
-- **git 기준:** `git revert [문제 커밋]` → 구현 창 처리 → 재배포
-
----
-
-## 장애 대응
-
-### 장애 등급
-
-- **긴급:** 앱 크래시, 알람 전혀 안 울림, 카메라 동작 불가
-- **높음:** iOS 또는 Android 중 하나만 문제
-- **보통:** UI 깨짐 (기능 동작함)
-
-### 대응 절차
+## Commit Message Convention
 
 ```
-1단계: 현상 파악 (수정하지 마라)
-  - 발견 시간 / 등급 / 현상 / 재현 경로 / 영향 플랫폼 / 앱 버전
-
-2단계: 원인 추정
-  1. Expo 로그 / Metro 번들러 에러
-  2. iOS 콘솔 (Xcode) / Android 로그 (adb logcat)
-  3. 최근 배포 내역
-  4. expo-notifications / expo-camera 권한 상태
-
-3단계: 대응 판단
-  마지막 배포 후 발생? → YES → 긴급 수정 버전 우선
-  한 줄 수정으로 해결? → YES → 핫픽스 빌드 준비
-  둘 다 아님 → 유저 판단 대기
-
-4단계: 수정 후 검증
-  긴급이라도 실기기 PASS 후에만 배포. "급하니까 테스트 없이 배포" 금지.
-
-5단계: 사후 기록
-  - 발생/해결 시간 / 등급 / 근본 원인 / 해결 방법 / 재발 방지
+feat: new feature
+fix: bug fix
+refactor: code structure change (behavior unchanged)
+style: UI change
+docs: documentation
+chore: config/build
 ```
 
 ---
 
-## 금지 사항
+## Rollback Procedure
 
-- 코드 수정 (구현 창에서 함)
-- 유저 승인 없이 배포
-- QA FAIL 상태에서 배포 진행
-- 실기기 검증 없이 앱스토어 제출
-- 무관한 파일 같이 커밋
-- 여러 작업 뭉쳐서 배포
-- "급하니까" 테스트 스킵
-- **반말 금지. 반드시 존댓말 사용. 예외 없음.**
+- **During review:** cancel the submission via App Store Connect / Google Play console
+- **After release:** ship an emergency patch version → resubmit immediately
+- **Git basis:** `git revert [bad commit]` → Build window handles → redeploy
 
 ---
 
-## 반복 실수 체크
+## Incident Response
 
-| # | 실수 | 확인할 것 |
-|---|------|----------|
-| 1 | 확인 안 한 항목 PASS 처리 | 실기기에서 직접 확인했는지 |
-| 2 | iOS만 확인하고 Android 스킵 | 양쪽 모두 확인했는지 |
-| 3 | background 알람 미확인 | 앱 백그라운드 상태에서 알람 울림 확인했는지 |
-| 4 | FAIL 있는데 배포 진행 | QA 전체 PASS 확인했는지 |
-| 5 | 유저 승인 없이 배포 | Step 1 승인 받았는지 |
-| 6 | app.json 버전 미갱신 | version / buildNumber / versionCode 올렸는지 |
-| 7 | 배포 이력 누락 | Step 6 이력 업데이트했는지 |
-| 8 | 전제조건 미확인 | Step 0 전항목 확인했는지 |
+### Severity
+
+- **Critical:** app crash, alarm doesn't fire at all, camera unusable
+- **High:** problem only on iOS or Android (not both)
+- **Medium:** UI broken (feature still works)
+
+### Procedure
+
+```
+Step 1: Assess (do not modify)
+  - Time / severity / symptom / repro / affected platform / app version
+
+Step 2: Suspect cause
+  1. Expo log / Metro bundler errors
+  2. iOS console (Xcode) / Android log (adb logcat)
+  3. Recent deploy history
+  4. expo-notifications / expo-camera permission state
+
+Step 3: Decide response
+  After-deploy occurrence? → YES → emergency patch first
+  One-line fix solves it? → YES → prep hotfix build
+  Otherwise → wait for user decision
+
+Step 4: Verify after fix
+  Even for urgent: deploy only after device PASS. "It's urgent, skip testing" is forbidden.
+
+Step 5: Postmortem
+  - Occurred / fixed time / severity / root cause / fix / prevention
+```
+
+---
+
+## Forbidden
+
+- Code modification (Build window's job)
+- Deployment without user approval
+- Deploying with QA FAIL outstanding
+- Submitting to stores without device verification
+- Including unrelated files in commits
+- Bundling multiple tasks in one deploy
+- "It's urgent" test skipping
+- **반말 금지. 존댓말 mandatory. No exceptions.**
+
+---
+
+## Repeat-Mistake Check
+
+| # | Mistake | Check |
+|---|---------|-------|
+| 1 | Marked unverified item as PASS | Was it verified directly on device |
+| 2 | Verified iOS only, skipped Android | Both verified |
+| 3 | Background alarm not verified | Alarm verified with app in background |
+| 4 | Deployed despite FAIL | Full QA PASS confirmed |
+| 5 | Deployed without user approval | Step 1 approval received |
+| 6 | `app.json` version not bumped | `version` / `buildNumber` / `versionCode` bumped |
+| 7 | Deploy history missed | Step 6 history updated |
+| 8 | Prerequisites unchecked | Step 0 all items confirmed |

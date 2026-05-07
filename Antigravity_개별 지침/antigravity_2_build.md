@@ -1,171 +1,171 @@
-# Antigravity 구현 창 운영 규칙 — ShutTimer
+# Antigravity Build Window Rules — ShutTimer
 
-**공통 규칙:** antigravity_0_common.md 참조
-**역할:** 승인된 계획만 코드 구현. 테스트/배포 절대 금지.
-
----
-
-## 코드 수정 전 자기 점검 (매 수정마다)
-
-- [ ] 요청된 것만 수정하는가? 관련 없는 코드 건드리지 않는가?
-- [ ] 원인을 정확히 파악했는가? 추측 수정 아닌가?
-- [ ] 승인받았는가? 보고만 하라고 한 건 아닌가?
-- [ ] 관련 화면/컴포넌트 모두 수정했는가? 빠뜨린 파일 없는가?
-- [ ] 전수 검사라면 진짜 전수인가? 빠뜨린 파일 없는가?
-- [ ] 유저에게 불필요한 질문/변명하고 있지 않은가?
-- [ ] v1 범위 밖의 기능을 추가하려 하지는 않는가?
+**Common rules:** see `antigravity_0_common.md`
+**Role:** Implement only approved plans. Testing/deployment strictly forbidden.
 
 ---
 
-## 외부 패키지/네이티브 의존성 사용 원칙 [Critical]
+## Self-Check Before Modifying Code (Every Edit)
 
-**배경:** 반복된 빌드 실패 (v1.5 스파이크 2026-04-17):
-- `react-native-fast-tflite` v3 API 추측 구현 → 크래시
-- `react-native-worklets-core` babel plugin 요구사항 미확인 → 빌드 실패
-- `react-native-fast-tflite` CoreML delegate의 Expo config plugin 요구사항 누락 → 런타임 실패
-- `vision-camera-resize-plugin` 공식 `buffer.slice()` 패턴 미준수 → 잠재 버그
-
-**원칙 (예외 없음):**
-
-1. **공식 패키지 API 사용 시 → 반드시 공식 README/문서 확인 후 코드 작성**
-   - node_modules/{패키지}/README.md 직접 읽기
-   - 공식 예제 코드 그대로 모사 (추측으로 변형 금지)
-
-2. **추측으로 코드 작성 금지**
-   - 타입 정의(.d.ts)만 보고 코드 작성 금지
-   - 실제 사용 예제 확인 필수
-
-3. **네이티브 의존성 추가 시 → Expo config plugin 요구사항 여부 확인 필수**
-   - `npm install` 외 추가 설정 필요 여부 확인
-   - app.json `plugins` 배열에 등록 필요 여부 확인
-   - CoreML/GPU delegate 등 특수 기능은 별도 설정 요구 가능성
-
-4. **빌드 관련 설정 (Podfile, babel 등) → 공식 설치 가이드 전체 읽고 반영**
-   - README의 "Installation" 섹션 끝까지 읽기
-   - babel.config.js plugin 요구사항 확인
-   - Podfile 커스텀 변수 (`$EnableCoreMLDelegate` 등) 확인
-
-**위반 시 결과:** 빌드 실패 → 재빌드 → 디버깅 반복으로 사용자 시간 낭비.
-
-**Critical 판정:** 이 원칙 위반은 "추측 기반 수정" 금지 규칙 위반과 동일. 반복 발생 시 즉시 작업 중단.
+- [ ] Am I modifying only what was requested? Not touching adjacent code?
+- [ ] Did I find the actual root cause? Not a guess-fix?
+- [ ] Was this approved? Or was it just "report only"?
+- [ ] Did I cover every related screen/component? Any missed file?
+- [ ] If this is a sweep, is it actually exhaustive? Anything missed?
+- [ ] Am I asking the user unnecessary questions / making excuses?
+- [ ] Am I trying to add v1-out-of-scope features?
 
 ---
 
-## 강제 워크플로우 (5단계 — 순서 건너뛰기 금지)
+## External Package / Native Dependency Rules [Critical]
 
-### Step 1: 영향 범위 분석
+**Background:** repeated build failures (v1.5 spike, 2026-04-17):
+- `react-native-fast-tflite` v3 API guess implementation → crash
+- `react-native-worklets-core` babel plugin requirement missed → build failure
+- `react-native-fast-tflite` CoreML delegate Expo config plugin requirement missed → runtime failure
+- `vision-camera-resize-plugin` official `buffer.slice()` pattern not followed → potential bug
 
-전달문을 받으면 바로 코딩하지 말고:
+**Rules (no exceptions):**
 
-1. 수정 대상 파일/컴포넌트의 **현재 코드 읽기**
-2. 이 컴포넌트를 사용하는 곳(caller) grep
-3. 이 컴포넌트가 사용하는 것(callee) 확인
-4. 상태(state/context) 변경 시: 영향받는 다른 컴포넌트 목록 확인
-5. 네이티브 API 변경 시: 권한 설정(app.json) 및 iOS/Android 동작 차이 확인
-6. 알람 관련 시: 앱 상태(foreground/background/killed)별 동작 확인
+1. **Using a public package's API → MUST verify against its official README/docs first**
+   - Read `node_modules/{package}/README.md` directly
+   - Mirror official examples literally (no guess-based variants)
 
-### Step 2: 파급 분석 보고 (코드 수정 전 필수)
+2. **No guess-based code**
+   - Don't write code from `.d.ts` typings alone
+   - Verify with actual usage examples
 
-보고 없이 코드 수정 진행 금지. 유저 승인 메시지 올 때까지 대기.
+3. **Adding a native dependency → check Expo config plugin requirements**
+   - Confirm whether anything beyond `npm install` is needed
+   - Check whether registration in `app.json` `plugins` is needed
+   - Special features (CoreML / GPU delegate) may require extra setup
 
-```
-[파급 분석 보고]
-수정 대상: 파일명 + 컴포넌트/함수명
-호출자(caller): 목록
-피호출자(callee): 목록
-상태 전파: 변경되는 state/context가 영향을 주는 컴포넌트
-영향받는 기존 기능: 구체적 나열
-iOS/Android 차이: 있음/없음 (있으면 내용 명시)
-위험 요소: 파급으로 깨질 수 있는 것
+4. **Build-related setup (Podfile, babel, etc.) → read the entire official install guide**
+   - Read README's "Installation" section to the end
+   - Check `babel.config.js` plugin requirements
+   - Check Podfile custom variables (e.g., `$EnableCoreMLDelegate`)
 
-[네이티브 API 관련 시 추가]
-권한 설정(app.json) 변경 필요 여부:
-앱 상태(foreground/background/killed)별 동작 차이:
+**Violation cost:** build failure → rebuild → debug loop = wasted user time.
 
-→ 유저 승인 후 Step 3 진행
-```
+**Critical:** violating this rule equals violating the "no guess-based modification" rule. On repeat violation, stop work immediately.
 
-### Step 3: 코드 수정
+---
 
-- 승인된 범위만 수정, 한 번에 하나
-- v1 범위 밖 기능 추가 절대 금지
+## Mandatory Workflow (5 Steps — No Skipping)
 
-### Step 4: 자체 검증
+### Step 1: Impact analysis
 
-- [ ] 수정한 기능 Expo Go에서 직접 동작 확인
-- [ ] Step 2 영향 목록 항목 1:1 확인
-- [ ] ShutTimer 핵심 흐름 확인: 미션 선택 → 타이머 시작 → 카운트다운 → 알람 → 카메라 촬영 → 종료
-- [ ] iOS / Android 양쪽 확인 (또는 차이 없음 명시)
-- [ ] 콘솔 에러 0건
-- [ ] 전달문 파일 목록 vs 실제 수정 파일 1:1 대조
+When you receive a handoff, do not start coding. Instead:
 
-하나라도 깨지면 완료 보고 금지. 원인 파악 후 수정 먼저.
+1. **Read the current code** of the target file/component
+2. grep callers
+3. Inspect callees
+4. State/context change → list affected components
+5. Native API change → confirm permission setup (`app.json`) and iOS/Android behavior differences
+6. Alarm-related → confirm behavior across foreground/background/killed
 
-### Step 5: 완료 보고
+### Step 2: Impact report (mandatory before code modification)
 
-```
-[작업명] 구현 완료
-
-수정 파일:
-| 파일 | 변경 내용 |
-|------|-----------|
-
-수정하지 않은 파일: (전달문 기준)
-
-전달문 대조:
-| 전달문 파일 | diff 존재 | 비고 |
-|------------|----------|------|
-
-자체 검증:
-| 항목 | 결과 |
-|------|------|
-| 수정 기능 동작 | OK/FAIL |
-| 파급 영향 (Step 2 목록) | OK/FAIL |
-| 핵심 흐름 (미션→타이머→알람→카메라→종료) | OK/FAIL |
-| iOS 확인 | OK/FAIL/미확인 |
-| Android 확인 | OK/FAIL/미확인 |
-| 콘솔 에러 | 0건/N건 |
-
-미커밋 변경: Y/N
-```
-
-완료 보고 후 QA 창 전달용 요약 출력:
+No coding before this report. Wait for user approval.
 
 ```
-[QA 창 전달용]
-작업: [작업번호]
-수정 파일: [파일 목록 + 변경 내용 요약]
-확인 방법: [Expo Go 테스트 항목]
-iOS/Android 각각 확인 필요 여부: [Y/N]
+[Impact analysis]
+Target: file + component/function
+Callers: list
+Callees: list
+State propagation: components affected by state/context changes
+Affected existing features: concrete list
+iOS/Android divergence: yes/no (if yes, describe)
+Risks: things that could break due to propagation
+
+[Native API additions]
+app.json permission changes needed:
+App-state (foreground/background/killed) behavior differences:
+
+→ Proceed to Step 3 after user approval
+```
+
+### Step 3: Code modification
+
+- Only the approved scope, one change at a time
+- v1-out-of-scope features strictly forbidden
+
+### Step 4: Self-verification
+
+- [ ] Modified feature works in Expo Go (direct check)
+- [ ] Step 2 impact list verified 1:1
+- [ ] ShutTimer core flow verified: mission select → start → countdown → alarm → photo → end
+- [ ] iOS / Android both verified (or "no divergence" stated explicitly)
+- [ ] 0 console errors
+- [ ] Handoff file list vs actually modified files: 1:1 reconciled
+
+If anything breaks, do not report complete. Find the cause and fix first.
+
+### Step 5: Completion report
+
+```
+[Task] Implementation complete
+
+Modified files:
+| File | Change |
+|------|--------|
+
+Files not modified: (per handoff)
+
+Handoff reconciliation:
+| Handoff file | diff exists | note |
+|--------------|-------------|------|
+
+Self-verification:
+| Item | Result |
+|------|--------|
+| Modified feature works | OK / FAIL |
+| Impact (Step 2 list) | OK / FAIL |
+| Core flow (mission → timer → alarm → camera → end) | OK / FAIL |
+| iOS check | OK / FAIL / Unverified |
+| Android check | OK / FAIL / Unverified |
+| Console errors | 0 / N |
+
+Uncommitted changes: Y/N
+```
+
+After completion, output a QA-window handoff:
+
+```
+[QA window handoff]
+Task: [task ID]
+Modified files: [files + change summary]
+Verification: [Expo Go test items]
+iOS/Android each required: [Y/N]
 ```
 
 ---
 
-## QA 피드백 대응
+## QA Feedback Response
 
-1. 전체 FAIL 목록 먼저 읽기 — 일부만 보고 수정 시작 금지
-2. 같은 근본 원인 항목 묶기 — 근본 원인 1회 수정
-3. 수정 후 FAIL 목록 전체 자체 검증 (Step 4 반복)
-4. 추가 파급 확인 — 수정이 다른 기능 깨지 않는지
-
----
-
-## 요구사항 이해 규칙
-
-- 애매하면 반드시 확인. 임의 해석 금지.
-- 요구사항을 자기 말로 바꿔 보고 → 유저 확인 후 구현
+1. Read the full FAIL list first — don't start fixing from a partial view
+2. Group items by shared root cause — fix root cause once
+3. After fixes, re-run Step 4 across the full FAIL list
+4. Additional impact check — make sure fixes don't break adjacent features
 
 ---
 
-## 반복 실수 체크
+## Requirement Understanding
 
-| # | 실수 | 확인할 것 |
-|---|------|----------|
-| 1 | 관련 파일 누락 | grep으로 관련 컴포넌트/화면 전부 찾았는지 |
-| 2 | iOS/Android 차이 미확인 | 양쪽 모두 확인했는지 (또는 차이 없음 명시) |
-| 3 | 앱 상태별 동작 미확인 | 알람 관련 시 foreground/background/killed 상태 확인했는지 |
-| 4 | 권한 설정 누락 | 카메라/알람 권한 app.json에 추가했는지 |
-| 5 | 거짓 완료 보고 | 전달문 항목 전체 vs 실제 수정 1:1 대조했는지 |
-| 6 | 수정이 새 버그 생성 | 파급 영역 Expo Go에서 확인했는지 |
-| 7 | 요구사항 임의 해석 | 애매한 부분 유저에게 확인 없이 구현하지 않았는지 |
-| 8 | v2 기능 v1에 포함 | 스펙 v1 범위 안에서만 구현했는지 |
+- If ambiguous, confirm with the user. No arbitrary interpretation.
+- Restate requirements in your own words → confirm with user → implement
+
+---
+
+## Repeat-Mistake Check
+
+| # | Mistake | Check |
+|---|---------|-------|
+| 1 | Missed related file | Did grep find every related component/screen |
+| 2 | iOS/Android divergence missed | Both checked (or "no divergence" stated) |
+| 3 | App-state behavior missed | For alarm-related, foreground/background/killed checked |
+| 4 | Permission missed | Camera/alarm permissions added to `app.json` |
+| 5 | False completion report | Handoff items vs actual modifications 1:1 reconciled |
+| 6 | Fix introduced new bug | Impact area verified in Expo Go |
+| 7 | Arbitrary interpretation | Ambiguities confirmed with user before coding |
+| 8 | v2 feature in v1 | Implementation strictly within v1 scope |

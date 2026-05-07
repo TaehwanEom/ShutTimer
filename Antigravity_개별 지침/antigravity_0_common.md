@@ -1,122 +1,119 @@
-# Antigravity 공통 규칙 — ShutTimer
+# Antigravity Common Rules — ShutTimer
 
-**최종 수정:** 2026-04-07
-**이 문서는 모든 창(플랜/구현/QA/배포)에 공통 적용됩니다.**
-**각 창을 열 때 반드시 읽기: 이 문서 + 해당 창 전문 문서**
-
----
-
-## 프로젝트 개요
-
-- **앱 이름:** ShutTimer
-- **플랫폼:** iOS + Android
-- **개발 스택:** Expo (React Native) + TypeScript
-- **서버:** 없음 (로컬 전용)
-- **로그인:** 없음
-- **데이터 저장:** AsyncStorage (로컬)
-- **스펙 문서:** `timer_app_spec.md`
+**Last updated:** 2026-04-07
+**This document applies to all windows (Plan / Build / QA / Deploy).**
+**When opening any window, read: this document + the corresponding window's guide.**
 
 ---
 
-## 기술 스택 상세
+## Project Overview
 
-| 항목 | 라이브러리 |
-|------|-----------|
-| 프레임워크 | Expo (React Native) |
-| 타이머 백그라운드 | expo-notifications (로컬 푸시 예약 방식) |
-| 알람 | expo-notifications |
-| 카메라 | expo-camera |
-| 로컬 저장 | @react-native-async-storage/async-storage |
-| 테스트 | Expo Go (실기기) |
-
----
-
-## v1 범위 (확정)
-
-- 60분 고정 타이머
-- 미션 선택 (8종: TV시청, 목욕, 독서, 공부, 양치, 놀이, 게임, 요리)
-- 타이머 실행 → 알람 → 사진 촬영 → 종료
-- 아이/어른 구분 없음, 단일 앱
-
-## v2 이후 (범위 밖 — 현재 건드리지 않음)
-
-- 커스텀 시간 설정 (0~60분)
-- 무음/진동 선택
-- 종료 5분 전 사전 알림
-- 커스텀 알람 사운드
+- **App name:** ShutTimer
+- **Platforms:** iOS + Android
+- **Stack:** Expo (React Native) + TypeScript
+- **Server:** None (local only)
+- **Login:** None
+- **Storage:** AsyncStorage (local)
+- **Spec doc:** `timer_app_spec.md`
 
 ---
 
-## 화면 구조 (3개)
+## Tech Stack Detail
 
-1. **메인 화면** — 미션 선택 + 아날로그 타이머 UI (60분 고정) + 시작 버튼
-2. **타이머 실행 화면** — 카운트다운 애니메이션 + 남은 시간 + 일시정지/취소
-3. **종료 미션 화면** — 알람 + 카메라 촬영 → 종료
-
----
-
-## 4개 레이어
-
-모든 작업에서 관련 레이어만 확인. 관련 없는 레이어는 절대 건드리지 마.
-
-1. **UI 레이어** — 화면 컴포넌트, 스타일, 애니메이션
-2. **로직 레이어** — 타이머 상태, 카운트다운, 앱 상태 관리
-3. **네이티브 API 레이어** — expo-notifications, expo-camera, AsyncStorage
-4. **설정 레이어** — app.json, 권한 설정, 앱스토어 메타데이터
+| Item | Library |
+|------|---------|
+| Framework | Expo (React Native) |
+| Background timer | `expo-notifications` (local push scheduling) |
+| Alarm | `expo-notifications` |
+| Camera | `expo-camera` |
+| Local storage | `@react-native-async-storage/async-storage` |
+| Test | Expo Go (real device) |
 
 ---
 
-## 전체 워크플로우 흐름
+## v1 Scope (Confirmed)
+
+- Fixed 60-min timer
+- Mission selection (8 types: TV, bath, reading, study, brushing, play, game, cooking)
+- Timer run → alarm → photo capture → end
+- No child/adult split, single app
+
+## v2+ (Out of scope — do not touch now)
+
+- Custom time setting (0–60 min)
+- Mute / vibration option
+- Pre-alert 5 minutes before end
+- Custom alarm sound
+
+---
+
+## Screen Structure (3)
+
+1. **Main screen** — mission selection + analog timer UI (60 min fixed) + start button
+2. **Timer running screen** — countdown animation + remaining time + pause/cancel
+3. **End mission screen** — alarm + camera capture → end
+
+---
+
+## 4 Layers
+
+For every task, only touch the relevant layer. Do not touch unrelated layers.
+
+1. **UI layer** — screen components, styles, animations
+2. **Logic layer** — timer state, countdown, app state management
+3. **Native API layer** — `expo-notifications`, `expo-camera`, AsyncStorage
+4. **Config layer** — `app.json`, permissions, App Store metadata
+
+---
+
+## Workflow
 
 ```
-[1. 플랜 창] 분석 + 계획 출력
+[1. Plan window] Analyze + plan
     ↓
-승인
+Approval
     ↓
-[2. 구현 창] 코드 작성/수정
+[2. Build window] Code modification
     ↓
-[3. QA 창] Expo Go 실기기 테스트
+[3. QA window] Expo Go device testing
     ↓
-PASS → [4. 배포 창] 빌드 + 앱스토어 제출
-FAIL → [2. 구현 창] 수정 → [3] 재검증
+PASS → [4. Deploy window] Build + store submission
+FAIL → [2. Build window] Fix → [3] re-verify
 ```
 
 ---
 
-## 절대 금지 사항
+## Forbidden Actions
 
-- **각 창은 자기 역할 외 행위 절대 금지. 선넘으면 즉시 중단.**
-  - 플랜 창: 코드 수정/빌드/배포 금지
-  - 구현 창: 테스트/배포 금지
-  - QA 창: 코드 수정/배포 금지
-  - 배포 창: 코드 수정 금지
-- 요청하지 않은 기능 추가/변경 금지
-- 요청 범위 밖의 코드 수정 금지
-- v2 범위 기능을 v1에서 구현하려는 시도 금지
-- 추측 기반 수정 금지 (모르면 질문할 것)
-- 여러 작업을 한 번에 묶어서 수정 금지 (하나씩)
-- 커밋하지 않은 변경사항을 "완료"로 보고 금지
-- **반말 금지. 모든 창에서 유저에게 반드시 존댓말 사용. 예외 없음.**
+- **Each window stays strictly within its role. Cross the line → stop immediately.**
+  - Plan: no code modification / build / deployment
+  - Build: no testing / deployment
+  - QA: no code modification / deployment
+  - Deploy: no code modification
+- v2-scope features in v1 implementation forbidden
+- **반말 금지. All windows must use 존댓말 to the user. No exceptions.**
+
+(Note: rules on assumptions, scope creep, semantic commits, "code exists ≠ feature works", running tests before completion are unified under `CLAUDE.md` "Behavioral Guidelines".)
 
 ---
 
-## 거짓 보고 방지 (모든 창 강제 적용)
+## False-Reporting Prevention (Enforced in All Windows)
 
-| # | 규칙 | 위반 시 |
-|---|------|---------|
-| 1 | 완료 보고 시 **전체 목록 대비 완료/미완료 1:1 대조표 필수.** | 보고 반려 |
-| 2 | **부분 완료 상태에서 다음 단계 진행 유도 금지.** | 반복실수 기록 |
-| 3 | **미완료를 안 말하는 것도 거짓 보고.** | 반복실수 기록 |
-| 4 | **확인 안 한 항목은 "미확인"으로 기록.** | 보고 반려 |
-| 5 | **코드 존재 ≠ 기능 동작.** 실행 확인 후에만 PASS. | 반복실수 기록 |
+| # | Rule | On violation |
+|---|------|--------------|
+| 1 | Completion report MUST include a 1:1 done/not-done table against the full handoff list. | Report rejected |
+| 2 | **Do not push to next step while partially complete.** | Recorded as repeat mistake |
+| 3 | **Hiding incompletes = false reporting.** | Recorded as repeat mistake |
+| 4 | **Items not verified = mark as "unverified".** | Report rejected |
+| 5 | **Code existence ≠ feature working.** PASS only after execution check. | Recorded as repeat mistake |
 
 ---
 
-## 창 역할 요약
+## Window Role Summary
 
-| 창 | 역할 | 금지 |
-|---|---|---|
-| 1. 플랜 | 분석 + 계획 | 코드 수정/실행 |
-| 2. 구현 | 코드 작성/수정 | 테스트/배포 |
-| 3. QA | Expo Go 실기기 테스트 | 코드 수정/배포 |
-| 4. 배포 | 빌드 + 앱스토어 제출 | 코드 수정 |
+| Window | Role | Forbidden |
+|--------|------|-----------|
+| 1. Plan | Analyze + plan | Code modification / execution |
+| 2. Build | Code modification | Testing / deployment |
+| 3. QA | Expo Go device testing | Code modification / deployment |
+| 4. Deploy | Build + store submission | Code modification |

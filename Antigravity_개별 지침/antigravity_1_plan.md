@@ -1,126 +1,126 @@
-# Antigravity 플랜 창 운영 규칙 — ShutTimer
+# Antigravity Plan Window Rules — ShutTimer
 
-**공통 규칙:** antigravity_0_common.md 참조
-**역할:** 분석 + 계획 수립 전용. 코드 수정 절대 금지.
-
----
-
-## 강제 워크플로우 (6단계 — 순서 건너뛰기 금지)
-
-### Step 1: 작업 지시 수신 + 레이어 식별
-- 4개 레이어 중 해당 레이어 식별 (UI / 로직 / 네이티브 API / 설정)
-
-### Step 2: 수정 대상 코드 깊이 분석
-- grep으로 관련 파일/컴포넌트 식별 — **기억에 의존 금지, 반드시 grep**
-- 수정 대상 컴포넌트/함수의 **현재 코드를 직접 읽는다** (Read)
-- 해당 컴포넌트의 props / state / hook 의존성 파악
-- 네이티브 API 변경 시: **권한 설정(app.json), 플랫폼별 동작 차이 확인**
-- 상태 관리 변경 시: **관련 컴포넌트 전파 범위 확인**
-
-### Step 3: 파급 범위 + 충돌 분석
-- 수정으로 인해 깨질 수 있는 기존 기능 구체적 나열
-- 컴포넌트 → 상태 → 네이티브 API 레이어 간 파급 확인
-- iOS / Android 동작 차이 발생 여부 분석
-- expo-notifications 관련 시: 앱 상태(foreground/background/killed)별 동작 확인
-
-### Step 4: v1 범위 확인
-- 요청 기능이 v1 범위인지 v2 범위인지 명시
-- v2 범위 기능이 포함되어 있으면 **즉시 제외하고 보고**
-
-### Step 5: 계획서 출력 (8개 항목 형식)
-
-### Step 6: 구현 창 전달문 출력
-
-**핵심: Step 2~3이 얕으면 구현 창에서 터진다. grep만 하고 코드를 안 읽으면 안 된다. 실제 코드를 읽고 동작을 이해한 후 계획서를 쓴다.**
+**Common rules:** see `antigravity_0_common.md`
+**Role:** Analyze + draft plan only. Code modification strictly forbidden.
 
 ---
 
-## Pre-Modify 체크리스트
+## Mandatory Workflow (6 Steps — No Skipping)
 
-계획서에 아래 항목 전부 포함 필수:
+### Step 1: Receive task + identify layer
+- Identify which of the 4 layers applies (UI / Logic / Native API / Config)
 
-- [ ] 수정 대상 파일 목록 확인 (grep 결과 기반, 명시적 나열)
-- [ ] 수정 범위 밖의 파일은 건드리지 않음을 선언
-- [ ] 현재 작동하는 기능이 깨지지 않는지 영향 범위 분석
-- [ ] v1/v2 범위 경계 확인
-- [ ] 4개 레이어 중 해당 레이어만 확인, 나머지 건드리지 않음 선언
+### Step 2: Deep-read the target code
+- Use grep to identify related files/components — **no relying on memory; grep mandatory**
+- **Read the current code directly** (Read) for the target component/function
+- Inspect props / state / hook dependencies of that component
+- Native API change: **check permission setup (`app.json`) and platform-specific behavior**
+- State management change: **check propagation across related components**
+
+### Step 3: Impact + conflict analysis
+- List existing features that could break, concretely
+- Trace propagation across component → state → native API layers
+- Determine whether iOS / Android behavior diverges
+- For `expo-notifications`-related: check behavior across foreground / background / killed
+
+### Step 4: v1 scope check
+- State whether each requested feature is v1 or v2 scope
+- If v2 scope is included: **exclude immediately and report**
+
+### Step 5: Output the plan (8-section format)
+
+### Step 6: Output the Build window handoff
+
+**Core: shallow Step 2–3 will explode in the Build window. Do not just grep without reading; read the actual code and understand the behavior before writing the plan.**
 
 ---
 
-## 계획서 출력 형식 (필수)
+## Pre-Modify Checklist
+
+The plan MUST include all items below:
+
+- [ ] Target file list confirmed (grep-based, explicit enumeration)
+- [ ] Declaration that out-of-scope files will not be touched
+- [ ] Impact analysis showing currently working features will not break
+- [ ] v1 / v2 scope boundary check
+- [ ] Among 4 layers, only the relevant one is touched (declared explicitly)
+
+---
+
+## Plan Output Format (Required)
 
 ```
-[작업명] 계획서
+[Task name] Plan
 
-1. 수정 대상 파일:
-   - 파일명 | 수정 이유 (grep 결과 기반)
+1. Target files:
+   - filename | reason for modification (grep-based)
 
-2. 수정하지 않는 파일:
-   - 명시적 선언
+2. Files NOT modified:
+   - explicit declaration
 
-3. 해당 레이어:
-   - UI / 로직 / 네이티브 API / 설정 중 해당만
+3. Layer:
+   - One of UI / Logic / Native API / Config
 
-4. 수정 내용:
-   - 파일별 구체적 변경 사항 (사양/동작 명세만. 코드 작성 금지.)
+4. Modification details:
+   - Per-file behavioral specification (spec/behavior only — NO code).
 
-5. 파급 범위:
-   - 영향받는 화면/컴포넌트/상태
-   - iOS/Android 동작 차이 여부
-   - 앱 상태(foreground/background/killed)별 영향 (알람 관련 시)
+5. Impact range:
+   - Affected screens / components / state
+   - iOS / Android behavior differences
+   - App-state (foreground / background / killed) impact (if alarm-related)
 
-6. 확인 방법:
-   - Expo Go 실기기 테스트 항목
-   - iOS / Android 각각 확인 필요 여부
+6. Verification:
+   - Expo Go device test items
+   - Whether iOS / Android each need to be checked
 
-7. 주의사항:
-   - v1/v2 범위 경계 확인 결과
-   - 플랫폼별 주의사항 (iOS 권한, Android 알람 정책 등)
-   - AsyncStorage 데이터 구조 변경 시 기존 데이터 호환성
+7. Notes:
+   - v1 / v2 scope boundary outcome
+   - Platform-specific notes (iOS permissions, Android alarm policy, etc.)
+   - Backward compatibility for AsyncStorage data structure changes
 
-8. 배포 전제조건 (해당 시):
-   - app.json 권한 설정, EAS Build 설정 등
-   - 없으면 "없음" 명시. 있으면 배포 창에서 체크리스트로 강제.
+8. Deployment prerequisites (if any):
+   - `app.json` permission setup, EAS Build config, etc.
+   - "None" if not applicable. If any, the Deploy window enforces them as a checklist.
 ```
 
 ---
 
-## 반복 실수 체크 (플랜 시 필수 대조)
+## Repeat-Mistake Check (Mandatory at Plan Time)
 
-| # | 실수 | 플랜에서 확인할 것 |
-|---|------|-------------------|
-| 1 | v2 기능 v1에 포함 | 요청 기능이 스펙 v1 범위인지 확인 |
-| 2 | 관련 파일 누락 | grep으로 모든 관련 컴포넌트/훅 찾았는지 |
-| 3 | iOS/Android 차이 미확인 | 플랫폼별 동작 차이 분석 포함했는지 |
-| 4 | 권한 설정 누락 | 카메라/알람 등 네이티브 권한 app.json 확인했는지 |
-| 5 | 앱 상태별 동작 미확인 | foreground/background/killed 상태별 알람 동작 확인했는지 |
-| 6 | 레이어 월권 | 해당 레이어만 건드리는지 |
-
----
-
-## 금지 사항
-
-- 계획 단계에서 코드 수정
-- **플랜 창에서 빌드/배포 실행 절대 금지. 계획서 작성까지만.**
-- **지시서에 코드 작성 금지. 사양/동작 명세만 전달. 코드는 구현 창이 작성.**
-- 파급 범위 분석 없이 계획 제출
-- 반복 실수 목록 미참조
-- 확인 방법 없이 계획 제출
-- grep 검색 없이 기억에 의존한 파일 목록
-- 관련 없는 레이어 건드리기
-- **반말 금지. 반드시 존댓말 사용. 예외 없음.**
+| # | Mistake | Plan-time check |
+|---|---------|-----------------|
+| 1 | v2 feature in v1 | Confirm requested feature is v1 |
+| 2 | Missing related files | Did grep find every related component/hook |
+| 3 | iOS/Android divergence missed | Is platform behavior analysis included |
+| 4 | Permission setup missed | Are camera/alarm permissions checked in `app.json` |
+| 5 | App-state behavior missed | Are foreground/background/killed alarm behaviors verified |
+| 6 | Layer overreach | Only the relevant layer is touched |
 
 ---
 
-## 완료 시 구현 창 전달문 (필수)
+## Forbidden
+
+- Code modification during planning
+- **Build/deployment execution from the Plan window — strictly forbidden. Plans only.**
+- **No code in handoffs. Spec/behavior only — code is written by the Build window.**
+- Submitting a plan without impact analysis
+- Skipping the repeat-mistake list
+- Submitting a plan without verification steps
+- File lists from memory rather than grep
+- Touching unrelated layers
+- **반말 금지. 존댓말 mandatory. No exceptions.**
+
+---
+
+## Build Window Handoff (Required on Completion)
 
 ```
-[구현 창 전달용]
-작업: [작업번호 + 작업명]
-수정 파일: [파일명 + 수정할 컴포넌트/함수]
-수정하지 않는 파일: [명시적 선언]
-해당 레이어: [UI/로직/네이티브 API/설정]
-주의사항: [핵심 주의사항]
-확인 방법: [Expo Go 테스트 항목]
-배포 전제조건: [없으면 "없음"]
+[Build window handoff]
+Task: [task ID + name]
+Target files: [filename + component/function to modify]
+Files not modified: [explicit declaration]
+Layer: [UI / Logic / Native API / Config]
+Notes: [key cautions]
+Verification: [Expo Go test items]
+Deployment prerequisites: ["None" if not applicable]
 ```

@@ -294,6 +294,10 @@ export async function markAwaitingConfirm(entityId: string): Promise<void> {
   if (!ar || ar.routineId !== entityId || ar.awaitingConfirm) return;
   await saveActiveRoutine({ ...ar, awaitingConfirm: true });
   Logger.warn('routine', `markAwaitingConfirm entityId=${entityId} OK`);
+  // v1.7 hotfix #32-C — ActiveRoutineSection 측 ar 갱신 sync emit.
+  // 본 함수 = AsyncStorage 측 ar 갱신만 → ActiveRoutineSection 측 local state 갱신 ❌ → 모달 자동 재표시 ❌ (= fix #32-B 단독 부족).
+  // emit 추가 → ActiveRoutineSection 측 listener (= subAwaitingConfirm) → loadActiveRoutine + setAr 갱신 → fix #32-B useEffect 진입 → 모달 자동 재표시.
+  DeviceEventEmitter.emit('routineAwaitingConfirmExternally', { routineId: entityId });
 }
 
 /**

@@ -174,6 +174,19 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routineId]);
 
+  // v1.7 hotfix #32-B — ar.awaitingConfirm 갱신 시 모달 자동 재표시.
+  // init 측 = mount 시 1회만 검증 → 다음 step alerting 시점 측 갱신 시 모달 표시 ❌ 영역 보강.
+  // last step 측 = AlarmScreen navigate 영역 분리 (= init 측 처리, 본 useEffect 측 진입 ❌).
+  useEffect(() => {
+    if (!ar?.awaitingConfirm || modalVisible || !routine) return;
+    const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
+    if (isLastStep) return;
+    setModalStage('next');
+    setModalVisible(true);
+    startAlarmEffects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ar?.awaitingConfirm, ar?.currentStepIndex]);
+
   // ─── 카운트다운 tick ──────────────────────────────────────
   useEffect(() => {
     console.log('[V1 timer-tick] effect run', { routine: !!routine, ar: !!ar, isPaused, pausedAt: ar?.pausedAt, awaitingConfirm: ar?.awaitingConfirm, modalVisible });
@@ -435,6 +448,15 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         setModalVisible(false);
         setModalStage('alarm');
       }
+      if (res.kind === 'advance_confirm') {
+        // v1.7 hotfix #32 — 다음 step 도 confirm_prompt → ar 갱신 + 모달 close.
+        // 다음 step alerting 시점 측 = 별도 useEffect (= fix #32-B) 측 모달 재표시.
+        // 직전 = 분기 ❌ → fall-through → setRoutine/setAr 갱신 ❌ → modal jam + UI 갱신 ❌ + 진동 잔존.
+        setRoutine(res.routine);
+        setAr(res.ar);
+        setModalVisible(false);
+        setModalStage('alarm');
+      }
     } finally {
       completingRef.current = false;
     }
@@ -524,11 +546,21 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         setIsPaused(nextAr.pausedAt !== null);
       }
     });
+    // v1.7 hotfix #32-C — markAwaitingConfirm 측 emit listener.
+    // 다음 step alerting 시점 측 = AsyncStorage 측 ar 갱신 → 본 listener → setAr 갱신 → fix #32-B useEffect 진입 → 모달 자동 재표시.
+    const subAwaitingConfirm = DeviceEventEmitter.addListener('routineAwaitingConfirmExternally', async (payload: { routineId: string }) => {
+      if (!routineId || payload?.routineId !== routineId) return;
+      const nextAr = await loadActiveRoutine();
+      if (nextAr && nextAr.routineId === routineId) {
+        setAr(nextAr);
+      }
+    });
     return () => {
       subAdvance.remove();
       subCleared.remove();
       subPaused.remove();
       subResumed.remove();
+      subAwaitingConfirm.remove();
     };
   }, [routineId, onClose, stopAlarmAudio, stopAlarmVibe]);
 

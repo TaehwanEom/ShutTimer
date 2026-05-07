@@ -703,6 +703,17 @@ function AppNavigator() {
               }
               const isAdhoc = isAdhocAlarmRoutine(signal.routineId);
               const route = navigationRef.current.getCurrentRoute()?.name;
+              // v1.7 hotfix #31 — confirm_prompt alerting 시 밀어서 중지 = routine 정지 의도.
+              // ar.awaitingConfirm === true 시 = stopRoutine 호출 + RoutineList navigate (= 정지 화면).
+              // false 시 = 기존 흐름 (= 일반 step alerting 측 진행 보존).
+              const arRaw2 = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
+              let arParsed: any = null;
+              try { arParsed = arRaw2 ? JSON.parse(arRaw2) : null; } catch {}
+              if (arParsed?.awaitingConfirm === true) {
+                await stopRoutine().catch(() => {});
+                if (route !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+                return;
+              }
               // v1.7 hotfix #2 — AlarmScreen 활성 시 (= 사용자 정상 dismiss flow 진행 중)
               // navigate trigger 차단. cancelAlarm 측 stop 호출이 stopIntent perform 영역 측
               // 'open_app_dismiss' signal 발생 → 종료 스크린 직후 강제 전환 회귀 차단.

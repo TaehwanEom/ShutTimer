@@ -103,17 +103,27 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         return;
       }
       if (res.kind === 'needs_timer_override') {
-        // v1.6 hotfix — popup 통일: 1버튼 [확인] + 진행 중 타이머 화면(Home, 자동 복원) 이동.
-        // 기존 override 즉시 시작 패턴 폐기 — 사용자가 직접 timer stop 결정 (안전성 우선).
+        // v1.7 hotfix — popup 2 button 정합 (= HomeScreen 측 패턴 동일).
+        // 취소 → Home navigate (= 일반 타이머 그대로) / 타이머 종료 후 시작 → overrideTimer:true retry.
         Alert.alert(
           t('routine.timerConflictTitle', { defaultValue: '진행 중인 타이머' }),
-          t('routine.timerConflictBody', { defaultValue: '단일 타이머를 먼저 정지해야 루틴을 시작할 수 있습니다.' }),
-          [{
-            text: t('common.confirm', { defaultValue: '확인' }),
-            onPress: () => navigation.navigate('Home'),
-          }],
+          t('routine.timerConflictBody', { defaultValue: '진행 중인 단일 타이머를 종료하고 루틴을 시작하시겠습니까?' }),
+          [
+            {
+              text: t('common.cancel', { defaultValue: '취소' }),
+              style: 'cancel',
+              onPress: () => { navigation.navigate('Home'); onClose(); },
+            },
+            {
+              text: t('routine.timerConflictStopAndStart', { defaultValue: '타이머 종료 후 시작' }),
+              style: 'destructive',
+              onPress: async () => {
+                const retry = await startRoutine(routineId, { overrideTimer: true });
+                applyStart(retry);
+              },
+            },
+          ],
         );
-        onClose();
         return;
       }
       if (res.kind === 'needs_override') {

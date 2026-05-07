@@ -295,6 +295,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
   useEffect(() => {
     console.warn('[AlarmScreen] mount, AppState:', AppState.currentState);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
+    // v1.7 hotfix — mount 시 = expo banner dismiss (= 백그라운드 → banner tap 진입 시 잔존 banner 영역 정리).
+    Notifications.dismissAllNotificationsAsync().catch(() => {});
     return () => {
       console.warn('[AlarmScreen] unmount');
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});

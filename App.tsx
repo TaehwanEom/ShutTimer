@@ -87,7 +87,7 @@ import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
 import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot, markAwaitingConfirm } from './src/utils/routineController';
-import { readControlSignal, clearControlSignal } from './src/utils/appGroupSync';
+import { readControlSignal, clearControlSignal, readRoutineSnapshot } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
@@ -468,10 +468,23 @@ function AppNavigator() {
         Logger.warn('onAlarmStateChange-DBG', `suppressFlag 진입 → cancelAlarm ${event.alarmId}`);
         await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
       }
-      const meta = await loadAlarmMetadata(event.alarmId);
+      const metaRaw = await loadAlarmMetadata(event.alarmId);
       // v1.7 hotfix #26 — debug log: meta lookup 결과 (= 베너 미노출 추적용).
       // meta=null = mapping table 측 잔존 ❌ → silent skip 진입 = 사용자 측 모름.
-      Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${meta ? `${meta.type}/${meta.entityId}` : 'NULL'}`);
+      Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${metaRaw ? `${metaRaw.type}/${metaRaw.entityId}` : 'NULL'}`);
+      // v1.7 hotfix #34 — meta=NULL 시 = routine_snapshot 측 fallback (= confirm_prompt 분기 정합).
+      // root cause = AdvanceNextStepIntent native 측 = 다음 step alarm schedule 시 mapping table saveAlarmMetadata ❌ →
+      //   다음 step alerting 시 listener 측 meta lookup NULL → silent skip → ar.awaitingConfirm 갱신 ❌ →
+      //   X 버튼 시 stopRoutine 분기 진입 ❌ → routine 종료 ❌ 회귀 영역.
+      // 정정 = readRoutineSnapshot 측 currentAlarmId 매칭 시 = confirm_prompt + entityId=routineId fallback 영역.
+      let meta = metaRaw;
+      if (!meta) {
+        const snap = readRoutineSnapshot();
+        if (snap && snap.currentAlarmId === event.alarmId) {
+          meta = { alarmId: event.alarmId, type: 'confirm_prompt', entityId: snap.routineId, createdAt: Date.now() };
+          Logger.warn('onAlarmStateChange-DBG', `meta NULL fallback from snapshot routineId=${snap.routineId}`);
+        }
+      }
       if (!meta) return;
       if (!navigationRef.current?.isReady()) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
@@ -679,13 +692,19 @@ function AppNavigator() {
           // 사용자 명시 누름 vs 시스템 자동 dismiss 구분 ❌ 영역. routine 정지 ❌가 사용자 의도.
           // → stopRoutine() 호출 ❌. navigate 만 + routine 진행 보존. 명시적 정지는 위젯 ✕ 또는 휴지통.
           if (signal.action === 'open_app_dismiss') {
+            // v1.7 hotfix #DBG-LA — open_app_dismiss signal 진입 (= 이중 이동 / 종료 ❌ root cause 추적용).
+            Logger.warn('LAControl-DBG', `open_app_dismiss 분기 진입 routineId=${signal.routineId}`);
             // v1.7 hotfix #16 — AlarmScreen mount race 회귀 차단.
             // 알람 entity banner 터치 시 stopIntent (OpenAppDismissIntent) perform → signal 작성 →
             // polling 처리 시점 = AlarmScreen mount 진행 중 = currentRoute='Home' → 가드 통과 →
             // navigate('RoutineList'/'AlarmTab') 강제 호출 → AlarmScreen 잠깐 표시 후 강제 전환.
             // fix: isAlarmActive AsyncStorage 검사 + 200ms 지연 후 currentRoute 재확인.
             const isAlarmActiveRaw = await AsyncStorage.getItem('isAlarmActive');
-            if (isAlarmActiveRaw === 'true') return;
+            Logger.warn('LAControl-DBG', `isAlarmActive=${isAlarmActiveRaw}`);
+            if (isAlarmActiveRaw === 'true') {
+              Logger.warn('LAControl-DBG', 'isAlarmActive=true → return');
+              return;
+            }
 
             // v1.7 hotfix #33 — adhoc + awaitingConfirm 측 = setTimeout 200ms 우회 (= 즉시 stopRoutine).
             // 본 영역 = AlarmScreen mount 영역 ❌ (= AlarmTab 측 모달 영역만) → setTimeout race 회피 영역 영역 ❌.
@@ -694,19 +713,32 @@ function AppNavigator() {
             let arParsedFast: any = null;
             try { arParsedFast = arRawFast ? JSON.parse(arRawFast) : null; } catch {}
             const isAdhocFast = isAdhocAlarmRoutine(signal.routineId);
+            const routeNameFast = navigationRef.current?.getCurrentRoute()?.name;
+            Logger.warn('LAControl-DBG', `fast 분기 검사 awaitingConfirm=${arParsedFast?.awaitingConfirm} isAdhoc=${isAdhocFast} route=${routeNameFast} navReady=${navigationRef.current?.isReady()}`);
             if (arParsedFast?.awaitingConfirm === true && navigationRef.current?.isReady()) {
+              Logger.warn('LAControl-DBG', 'fast 분기 진입 → stopRoutine 호출');
               await stopRoutine().catch(() => {});
               const routeFast = navigationRef.current.getCurrentRoute()?.name;
+              Logger.warn('LAControl-DBG', `fast stopRoutine OK route=${routeFast} isAdhoc=${isAdhocFast}`);
               if (isAdhocFast) {
                 if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab' && routeFast !== 'AlarmList') {
+                  Logger.warn('LAControl-DBG', `fast adhoc navigate AlarmTab (route=${routeFast})`);
                   (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+                } else {
+                  Logger.warn('LAControl-DBG', `fast adhoc navigate skip (route=${routeFast})`);
                 }
               } else {
-                if (routeFast !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+                if (routeFast !== 'RoutineList') {
+                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineList (route=${routeFast})`);
+                  navigationRef.current.navigate('RoutineList');
+                } else {
+                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate skip (route=${routeFast})`);
+                }
               }
               return;
             }
 
+            Logger.warn('LAControl-DBG', 'fast 분기 skip → setTimeout 200ms 진입');
             await new Promise(resolve => setTimeout(resolve, 200));
             if (navigationRef.current?.isReady()) {
               // v1.7 hotfix #22 — alarm entity 측 = AlarmScreen navigate (= 베너 터치 무반응 정정).
@@ -736,14 +768,25 @@ function AppNavigator() {
               const arRaw2 = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
               let arParsed: any = null;
               try { arParsed = arRaw2 ? JSON.parse(arRaw2) : null; } catch {}
+              Logger.warn('LAControl-DBG', `standard 분기 검사 awaitingConfirm=${arParsed?.awaitingConfirm} isAdhoc=${isAdhoc} route=${route}`);
               if (arParsed?.awaitingConfirm === true) {
+                Logger.warn('LAControl-DBG', 'standard 분기 진입 → stopRoutine 호출');
                 await stopRoutine().catch(() => {});
+                Logger.warn('LAControl-DBG', `standard stopRoutine OK route=${route} isAdhoc=${isAdhoc}`);
                 if (isAdhoc) {
                   if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
+                    Logger.warn('LAControl-DBG', `standard adhoc navigate AlarmTab (route=${route})`);
                     (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+                  } else {
+                    Logger.warn('LAControl-DBG', `standard adhoc navigate skip (route=${route})`);
                   }
                 } else {
-                  if (route !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+                  if (route !== 'RoutineList') {
+                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineList (route=${route})`);
+                    navigationRef.current.navigate('RoutineList');
+                  } else {
+                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate skip (route=${route})`);
+                  }
                 }
                 return;
               }

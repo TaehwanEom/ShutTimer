@@ -395,7 +395,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     }, [route?.params?.selectedFavoriteId])
   );
 
-  const scheduleAlarm = async (seconds: number) => {
+  const scheduleAlarm = async (seconds: number, opts?: { skipAlarmKit?: boolean }) => {
     // v1.6 hotfix — AlarmKit 권한 미결정 시 명시 요청.
     // 권한 grant 시 AlarmKit alerting fire = silent/Focus 우회 자동.
     // 미요청 상태로 expo 폴백만 등록되면 silent mode 시 kill 상태 무음.
@@ -428,7 +428,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     // v1.6 Phase 9 — AlarmKit 분기 (iOS 26+ + 권한 + 알람 ON). 성공 시 expo-notifications 경로 skip.
     // alarmEnabled=false 시 AlarmKit 미사용 (사용자 무음 의도 ↔ AlarmKit silent 우회 강제 충돌).
     const useAlarmKit = alarmEnabled && (await shouldUseAlarmKitInTimer());
-    if (useAlarmKit) {
+    if (useAlarmKit && !opts?.skipAlarmKit) {
       // 기존 AlarmKit alarm cleanup
       if (alarmkitIdRef.current) {
         await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
@@ -749,6 +749,10 @@ export default function HomeScreen({ navigation, route }: Props) {
             AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, endAt: endAtRef.current, pausedAt: null })).catch(() => {});
           } catch {}
         });
+        // v1.7 hotfix — 위젯 측 resume 시 = expo notif fallback 재등록 (= AlarmKit 측 ❌ 시 백업 영역).
+        // skipAlarmKit:true 측 = AlarmKit 측 = native pause/resume 영역 정공 + 중복 등록 회피.
+        const remainingSec = Math.max(1, Math.floor((endAtRef.current - Date.now()) / 1000));
+        scheduleAlarm(remainingSec, { skipAlarmKit: true }).catch(() => {});
       } else if (signal.action === 'stop') {
         // LA Intent 가 이미 AlarmKit cancel + Activity end 처리. handleCancel = state 정리 (cancelAlarms / endLiveActivity 가 noop 호환).
         handleCancel();

@@ -13,7 +13,42 @@ import ActivityKit
 
 #if canImport(AlarmKit)
 import AlarmKit
+import SwiftUI
 #endif
+
+// v1.7 hotfix #20 — 외부 symbol 정의 추가 (= AlarmkitBridge module + Widget target 동등 정의).
+// AdvanceNextStepIntent 동기화 측 scheduleNextStepAlarmLA + stopIntent 측 사용.
+@available(iOS 26.0, *)
+nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
+    // ShutTimer 측 = routineId 로 매칭. metadata 자체는 비움.
+}
+
+@available(iOS 26.0, *)
+struct OpenAppDismissIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "앱에서 종료"
+    static var supportedModes: IntentModes = [.foreground(.immediate)]
+    static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+    @Parameter(title: "Entity ID")
+    var entityId: String
+
+    init() { self.entityId = "" }
+    init(entityId: String) { self.entityId = entityId }
+
+    func perform() async throws -> some IntentResult {
+        guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return .result() }
+        let signal: [String: Any] = [
+            "action": "open_app_dismiss",
+            "timestamp": Date().timeIntervalSince1970 * 1000,
+            "routineId": entityId
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: signal),
+           let str = String(data: data, encoding: .utf8) {
+            defaults.set(str, forKey: KEY_SIGNAL)
+        }
+        return .result()
+    }
+}
 
 private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"
@@ -180,7 +215,180 @@ struct StopRoutineIntent: LiveActivityIntent {
     }
 }
 
-// v1.6 Phase 12 — 위젯 "다음 진행" Button. D-3 양쪽 동일 정의.
+// v1.7 hotfix #20 — AdvanceNextStepIntent 동기화 (= AlarmkitBridge module 측 + Widget target 측 동등 동작).
+// 직전: 본 모듈 측 perform = signal 작성만 → AlarmKit stop / Activity.update 누락 →
+// system 측 main app process 측 호출 시 동기화 안 맞음 (= 사용자 보고 = 위젯/Apple Watch 표시 싱크 ❌).
+// fix: snapshot 읽기 + AlarmKit stop + 다음 step alarm 등록 + Activity.update + advance_done signal.
+
+private struct LASnapshotStep: Codable {
+    let name: String
+    let durationSec: Double
+    let soundName: String
+}
+
+private struct LARoutineSnapshotFull: Codable {
+    let routineId: String
+    let routineName: String
+    var currentStepIndex: Int
+    let totalSteps: Int
+    let steps: [LASnapshotStep]
+    var currentAlarmId: String
+    var stepEndAt: Double
+    let i18nConfirmPromptTitle: String
+    let i18nConfirmPromptStop: String
+    let i18nAdvanceLabel: String
+    var savedAt: Double
+    var autoCountdownSec: Double?
+    var completedStepIndices: [Int]?
+    var routineEnded: Bool?
+    var i18nRoutineCompleteTitle: String?
+}
+
+private func readSnapshotFull() -> LARoutineSnapshotFull? {
+    guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return nil }
+    guard let raw = defaults.string(forKey: KEY_ROUTINE_SNAPSHOT),
+          let data = raw.data(using: .utf8) else { return nil }
+    return try? JSONDecoder().decode(LARoutineSnapshotFull.self, from: data)
+}
+
+private func writeSnapshotFull(_ snapshot: LARoutineSnapshotFull) {
+    guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return }
+    guard let data = try? JSONEncoder().encode(snapshot),
+          let str = String(data: data, encoding: .utf8) else { return }
+    defaults.set(str, forKey: KEY_ROUTINE_SNAPSHOT)
+}
+
+private func writeAdvanceDoneSignal(routineId: String) {
+    guard let defaults = UserDefaults(suiteName: APP_GROUP) else { return }
+    let signal: [String: Any] = [
+        "action": "advance_done",
+        "timestamp": Date().timeIntervalSince1970 * 1000,
+        "routineId": routineId
+    ]
+    if let data = try? JSONSerialization.data(withJSONObject: signal),
+       let str = String(data: data, encoding: .utf8) {
+        defaults.set(str, forKey: KEY_SIGNAL)
+    }
+}
+
+#if canImport(AlarmKit)
+
+@available(iOS 26.0, *)
+private func scheduleNextStepAlarmLA(snapshot: LARoutineSnapshotFull, nextStepIdx: Int) async throws -> UUID {
+    let nextStep = snapshot.steps[nextStepIdx]
+    let durationSec = max(0.001, nextStep.durationSec)
+    let isLastStep = nextStepIdx + 1 >= snapshot.totalSteps
+    let alertTitle: String
+    if isLastStep {
+        alertTitle = snapshot.i18nRoutineCompleteTitle ?? "루틴 완료"
+    } else {
+        alertTitle = snapshot.i18nConfirmPromptTitle + " " + snapshot.steps[nextStepIdx + 1].name
+    }
+
+    let alert: AlarmPresentation.Alert
+    if #available(iOS 26.1, *) {
+        if isLastStep {
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle)
+            )
+        } else {
+            let secondaryButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
+                textColor: .white,
+                systemImageName: "forward.fill"
+            )
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                secondaryButton: secondaryButton,
+                secondaryButtonBehavior: .custom
+            )
+        }
+    } else {
+        let stopButton = AlarmButton(
+            text: LocalizedStringResource(stringLiteral: snapshot.i18nConfirmPromptStop),
+            textColor: .white,
+            systemImageName: "stop.fill"
+        )
+        if isLastStep {
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                stopButton: stopButton
+            )
+        } else {
+            let secondaryButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
+                textColor: .white,
+                systemImageName: "forward.fill"
+            )
+            alert = AlarmPresentation.Alert(
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                stopButton: stopButton,
+                secondaryButton: secondaryButton,
+                secondaryButtonBehavior: .custom
+            )
+        }
+    }
+
+    let pauseButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "일시정지"),
+        textColor: .white,
+        systemImageName: "pause.fill"
+    )
+    let resumeButton = AlarmButton(
+        text: LocalizedStringResource(stringLiteral: "재개"),
+        textColor: .white,
+        systemImageName: "play.fill"
+    )
+    let countdownContent = AlarmPresentation.Countdown(
+        title: LocalizedStringResource(stringLiteral: alertTitle),
+        pauseButton: pauseButton
+    )
+    let pausedContent = AlarmPresentation.Paused(
+        title: LocalizedStringResource(stringLiteral: "일시정지됨"),
+        resumeButton: resumeButton
+    )
+    let presentation = AlarmPresentation(
+        alert: alert,
+        countdown: countdownContent,
+        paused: pausedContent
+    )
+    let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
+        presentation: presentation,
+        tintColor: Color.red
+    )
+
+    let alertSound: AlertConfiguration.AlertSound
+    if !nextStep.soundName.isEmpty {
+        alertSound = .named(nextStep.soundName)
+    } else {
+        alertSound = .default
+    }
+
+    let id = UUID()
+    let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
+    if isLastStep {
+        config = .timer(
+            duration: durationSec,
+            attributes: attributes,
+            stopIntent: OpenAppDismissIntent(entityId: snapshot.routineId),
+            sound: alertSound
+        )
+    } else {
+        config = .timer(
+            duration: durationSec,
+            attributes: attributes,
+            stopIntent: OpenAppDismissIntent(entityId: snapshot.routineId),
+            secondaryIntent: AdvanceNextStepIntent(routineId: snapshot.routineId),
+            sound: alertSound
+        )
+    }
+    _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
+    return id
+}
+
+#endif
+
+// v1.6 Phase 12 — 위젯 "다음 진행" Button. v1.7 hotfix #20 — AlarmkitBridge module 측 + Widget target 측 동등 동작 동기화.
 @available(iOS 26.0, *)
 struct AdvanceNextStepIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "다음 진행"
@@ -193,7 +401,78 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
-        writeControlSignal(action: "advance", routineId: routineId)
+        // v1.7 hotfix #20 — main app process 측 perform 호출 시 = AlarmKit stop / Activity.update 동기화.
+        // 직전: signal 작성만 → JS thread background 시 polling 처리 ❌ → 위젯/Apple Watch 표시 싱크 안맞음.
+        guard var snapshot = readSnapshotFull() else {
+            // snapshot 미존재 fallback — RN active 시 polling 처리.
+            writeControlSignal(action: "advance", routineId: routineId)
+            return .result()
+        }
+        let effectiveRoutineId = !routineId.isEmpty ? routineId : snapshot.routineId
+        if !routineId.isEmpty && snapshot.routineId != routineId {
+            writeControlSignal(action: "advance", routineId: routineId)
+            return .result()
+        }
+
+        // 1. 현재 alerting alarm stop (사운드 + 진동 + alerting UI dismiss).
+        if let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
+            try? await AlarmManager.shared.stop(id: currentUuid)
+            try? await AlarmManager.shared.cancel(id: currentUuid)
+        }
+
+        let completedIdx = snapshot.currentStepIndex
+        let nextIdx = snapshot.currentStepIndex + 1
+
+        // 2. 마지막 step → routineEnded=true + LA end + advance_done signal.
+        if nextIdx >= snapshot.totalSteps {
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
+            snapshot.routineEnded = true
+            snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
+            writeSnapshotFull(snapshot)
+            for activity in Activity<ShutTimerActivityAttributes>.activities {
+                if activity.attributes.routineId == effectiveRoutineId {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
+            }
+            writeAdvanceDoneSignal(routineId: effectiveRoutineId)
+            return .result()
+        }
+
+        // 3. 다음 step alarm 등록 + snapshot 갱신 + LA 즉시 update.
+        do {
+            let newId = try await scheduleNextStepAlarmLA(snapshot: snapshot, nextStepIdx: nextIdx)
+            var prev = snapshot.completedStepIndices ?? []
+            prev.append(completedIdx)
+            snapshot.completedStepIndices = prev
+            snapshot.currentStepIndex = nextIdx
+            snapshot.currentAlarmId = newId.uuidString
+            let nowMs = Date().timeIntervalSince1970 * 1000.0
+            snapshot.stepEndAt = nowMs + snapshot.steps[nextIdx].durationSec * 1000.0
+            snapshot.savedAt = nowMs
+            writeSnapshotFull(snapshot)
+
+            let nextStepName = snapshot.steps[nextIdx].name
+            for activity in Activity<ShutTimerActivityAttributes>.activities {
+                if activity.attributes.routineId == effectiveRoutineId {
+                    var newState = activity.content.state
+                    newState.currentStepName = nextStepName
+                    newState.progress = 0
+                    newState.paused = false
+                    newState.currentStepIndex = nextIdx
+                    newState.totalSteps = snapshot.totalSteps
+                    newState.stage = "step"
+                    newState.stepEndAt = snapshot.stepEndAt
+                    await activity.update(.init(state: newState, staleDate: nil))
+                }
+            }
+
+            writeAdvanceDoneSignal(routineId: effectiveRoutineId)
+        } catch {
+            // schedule 실패 — RN polling fallback.
+            writeControlSignal(action: "advance", routineId: effectiveRoutineId)
+        }
         return .result()
     }
 }

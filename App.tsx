@@ -646,7 +646,31 @@ function AppNavigator() {
           // 사용자 명시 누름 vs 시스템 자동 dismiss 구분 ❌ 영역. routine 정지 ❌가 사용자 의도.
           // → stopRoutine() 호출 ❌. navigate 만 + routine 진행 보존. 명시적 정지는 위젯 ✕ 또는 휴지통.
           if (signal.action === 'open_app_dismiss') {
+            // v1.7 hotfix #16 — AlarmScreen mount race 회귀 차단.
+            // 알람 entity banner 터치 시 stopIntent (OpenAppDismissIntent) perform → signal 작성 →
+            // polling 처리 시점 = AlarmScreen mount 진행 중 = currentRoute='Home' → 가드 통과 →
+            // navigate('RoutineList'/'AlarmTab') 강제 호출 → AlarmScreen 잠깐 표시 후 강제 전환.
+            // fix: isAlarmActive AsyncStorage 검사 + 200ms 지연 후 currentRoute 재확인.
+            const isAlarmActiveRaw = await AsyncStorage.getItem('isAlarmActive');
+            if (isAlarmActiveRaw === 'true') return;
+            await new Promise(resolve => setTimeout(resolve, 200));
             if (navigationRef.current?.isReady()) {
+              // v1.7 hotfix #22 — alarm entity 측 = AlarmScreen navigate (= 베너 터치 무반응 정정).
+              // OpenAppDismissIntent.perform 측 routineId = alarm.id (= alarmScheduler.ts entityId).
+              // 일반 routine 분기 진입 전 = alarms lookup → 매칭 시 AlarmScreen navigate.
+              const alarms = await loadAlarms();
+              const alarmEntity = alarms.find(x => x.id === signal.routineId);
+              if (alarmEntity) {
+                const route = navigationRef.current.getCurrentRoute()?.name;
+                if (route !== 'Alarm') {
+                  navigationRef.current.navigate('Alarm', {
+                    endMethod: alarmEntity.dismissMethod ?? 'tap',
+                    alarmSoundKey: alarmEntity.soundKey,
+                    alarmEntityId: alarmEntity.id,
+                  } as never);
+                }
+                return;
+              }
               const isAdhoc = isAdhocAlarmRoutine(signal.routineId);
               const route = navigationRef.current.getCurrentRoute()?.name;
               // v1.7 hotfix #2 — AlarmScreen 활성 시 (= 사용자 정상 dismiss flow 진행 중)

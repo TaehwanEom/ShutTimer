@@ -514,64 +514,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     });
   }, []);
 
-  // v1.5: 알람 사운드 재생을 별도 useEffect로 분리. 설정 로드(multiGet+미션 파싱) 대기 제거로 딜레이 단축.
-  //       HomeScreen.scheduleAlarm이 preloadAlarmSound를 호출했으면 consumeAlarmSound()로 즉시 playAsync.
-  //       preload 실패/콜드스타트 시 createAsync fallback.
+  // v1.7 hotfix — expo-av 사운드 제거 (= AlarmKit 측 banner + 사운드 = 자체 영역 충분).
+  // 나중에 revert 시 = 본 useEffect 본체 (= Audio.Sound.createAsync + playAsync 영역) 복원 영역.
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
-    ]).then(([soundIdRaw, alarmRaw]) => {
-      const alarmEnabled = alarmRaw !== 'false';
-      if (!alarmEnabled) return;
-      // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
-      // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
-      const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
-      const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
-
-      // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
-      const runFallback = () => {
-        const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
-        Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
-          if (resultEnteredRef.current || dismissedRef.current) {
-            sound.unloadAsync().catch(() => {});
-            return;
-          }
-          soundRef.current = sound;
-          sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
-        }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
-      };
-
-      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
-        .then(() => {
-          const preloaded = consumeAlarmSound();
-          if (!preloaded) {
-            runFallback();
-            return;
-          }
-          // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
-          preloaded.getStatusAsync().then((status: any) => {
-            if (resultEnteredRef.current || dismissedRef.current) {
-              preloaded.unloadAsync().catch(() => {});
-              return;
-            }
-            if (status?.isLoaded) {
-              soundRef.current = preloaded;
-              preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
-            } else {
-              appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
-              preloaded.unloadAsync().catch(() => {});
-              runFallback();
-            }
-          }).catch((e: any) => {
-            appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
-            preloaded.unloadAsync().catch(() => {});
-            runFallback();
-          });
-        })
-        .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
-    }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
-
     return () => {
       soundRef.current?.stopAsync().catch(() => {});
       soundRef.current?.unloadAsync().catch(() => {});

@@ -590,8 +590,11 @@ export default function HomeScreen({ navigation, route }: Props) {
             text: t('home.timerBlocked.stopAndStart', { defaultValue: '루틴 종료 후 시작' }),
             style: 'destructive',
             onPress: async () => {
+              const clearedRoutineId = ar?.routineId;
               await stopRoutine().catch(() => {});
               // stopRoutine → fullCleanup → AsyncStorage.removeItem('isRoutineActive').
+              // v1.7 hotfix — RoutineListScreen 측 activeManualRoutineId 정리 트리거 (= 다시 루틴 탭 진입 시 잔존 ActiveRoutineSection 영역 회피).
+              DeviceEventEmitter.emit('routineClearedExternally', { routineId: clearedRoutineId });
               // handleStart 재호출 → isRoutineActive 'false' / null → 정상 진입 → timer 시작.
               await handleStart();
             },

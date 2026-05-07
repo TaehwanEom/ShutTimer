@@ -23,6 +23,8 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var currentStepIndex: Int = 0
         /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
         var totalSteps: Int = 1
+        /** v1.7 hotfix #20 — pause 시점 ms (paused=false 시 = 0). SwiftUI Text(timerInterval:pauseTime:) 측 = 시간 정지 처리용. */
+        var pausedAt: Double = 0
     }
 
     /** 루틴 이름 (불변) */

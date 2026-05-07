@@ -28,6 +28,8 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var currentStepIndex: Int = 0
         /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
         var totalSteps: Int = 1
+        /** v1.7 hotfix #20 — pause 시점 ms (paused=false 시 = 0). SwiftUI Text(timerInterval:pauseTime:) 측 = 시간 정지 처리용. */
+        var pausedAt: Double = 0
 
         /// v1.7 hotfix #10 — invalid range 가드 (= stepEndAt 측 stale 과거 시점 시 invalid range → blank 표시 회피).
         /// active fire → 잠금 시점 측 = stepEndAt 도달 후 시간 경과 → endDate < now → invalid range.
@@ -82,10 +84,17 @@ struct LockScreenView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 } else if context.state.paused {
-                    // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
-                    // 직전 #14 = "일시정지됨" 추가 = 사용자 의도 미확인 임의 해석 회귀 정정.
-                    // 사용자 인지 = 우측 play.fill button + compactTrailing pause icon 의존.
-                    EmptyView()
+                    // v1.7 hotfix #20 — paused 측 = pauseTime parameter 측 = SwiftUI system 자동 정지 처리.
+                    Text(timerInterval: Date()...context.state.safeStepEndDate,
+                         pauseTime: context.state.pausedAt > 0
+                           ? Date(timeIntervalSince1970: context.state.pausedAt / 1000)
+                           : Date(),
+                         countsDown: true)
+                        .monospacedDigit()
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
                 } else {
                     Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()
@@ -173,9 +182,14 @@ struct WatchView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             } else if context.state.paused {
-                // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
-                // 사용자 인지 = 우측 play.fill button 의존.
-                EmptyView()
+                // v1.7 hotfix #20 — paused 측 = pauseTime parameter + caption + secondary 흐릿한 스타일 (= 3c94082 정합).
+                Text(timerInterval: Date()...context.state.safeStepEndDate,
+                     pauseTime: context.state.pausedAt > 0
+                       ? Date(timeIntervalSince1970: context.state.pausedAt / 1000)
+                       : Date(),
+                     countsDown: true)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             } else {
                 Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                     .font(.system(size: 24, weight: .bold))
@@ -251,9 +265,14 @@ struct WidgetLiveActivity: Widget {
                                 .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
                         } else if context.state.paused {
-                            // v1.7 hotfix #19 — paused 측 = EmptyView (= 사용자 명시 텍스트 제거).
-                            // 사용자 인지 = 우측 play.circle.fill button 의존.
-                            EmptyView()
+                            // v1.7 hotfix #20 — paused 측 = pauseTime parameter 측 = SwiftUI system 자동 정지 처리.
+                            Text(timerInterval: Date()...context.state.safeStepEndDate,
+                                 pauseTime: context.state.pausedAt > 0
+                                   ? Date(timeIntervalSince1970: context.state.pausedAt / 1000)
+                                   : Date(),
+                                 countsDown: true)
+                                .monospacedDigit()
+                                .font(.title2.weight(.bold))
                         } else {
                             Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                                 .monospacedDigit()

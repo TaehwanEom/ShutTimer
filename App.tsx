@@ -686,6 +686,27 @@ function AppNavigator() {
             // fix: isAlarmActive AsyncStorage 검사 + 200ms 지연 후 currentRoute 재확인.
             const isAlarmActiveRaw = await AsyncStorage.getItem('isAlarmActive');
             if (isAlarmActiveRaw === 'true') return;
+
+            // v1.7 hotfix #33 — adhoc + awaitingConfirm 측 = setTimeout 200ms 우회 (= 즉시 stopRoutine).
+            // 본 영역 = AlarmScreen mount 영역 ❌ (= AlarmTab 측 모달 영역만) → setTimeout race 회피 영역 영역 ❌.
+            // 200ms 단축 + AppState change wake-up + stopRoutine 영역 = 사용자분 측 체감 딜레이 영역 단축.
+            const arRawFast = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
+            let arParsedFast: any = null;
+            try { arParsedFast = arRawFast ? JSON.parse(arRawFast) : null; } catch {}
+            const isAdhocFast = isAdhocAlarmRoutine(signal.routineId);
+            if (arParsedFast?.awaitingConfirm === true && navigationRef.current?.isReady()) {
+              await stopRoutine().catch(() => {});
+              const routeFast = navigationRef.current.getCurrentRoute()?.name;
+              if (isAdhocFast) {
+                if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab' && routeFast !== 'AlarmList') {
+                  (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+                }
+              } else {
+                if (routeFast !== 'RoutineList') navigationRef.current.navigate('RoutineList');
+              }
+              return;
+            }
+
             await new Promise(resolve => setTimeout(resolve, 200));
             if (navigationRef.current?.isReady()) {
               // v1.7 hotfix #22 — alarm entity 측 = AlarmScreen navigate (= 베너 터치 무반응 정정).

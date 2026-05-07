@@ -68,12 +68,16 @@ const appendAlarmAudioLog = async (msg: string) => {
 // iOS: ca-app-pub-3043284478228309/6510839159
 // Android: ca-app-pub-3043284478228309/6667370376
 let interstitial: any = null;
+// v1.7 hotfix H1 — module-level 측 광고 ready boolean (= preload 영역 + CLOSED 시 자동 다음 load 영역).
+// 본 영역 = AlarmScreen 측 useEffect 측 mount 시 load 호출 영역 ❌ (= 사용자분 측 dismiss 시점 = LOADED 도착 ❌).
+// 정공 영역 = 앱 시작 시 1회 load + LOADED listener attach + CLOSED 시 다음 load = 항상 ready 영역 보장.
+let interstitialLoaded = false;
 if (!isExpoGo) {
   (async () => {
     try {
       const attStatus = await AsyncStorage.getItem('attStatus');
       const npa = attStatus === 'granted' ? false : true;
-      const { InterstitialAd } = require('react-native-google-mobile-ads');
+      const { InterstitialAd, AdEventType } = require('react-native-google-mobile-ads');
       const INTERSTITIAL_UNIT_ID = Platform.select({
         ios: 'ca-app-pub-3043284478228309/6510839159',
         android: 'ca-app-pub-3043284478228309/6667370376',
@@ -81,6 +85,21 @@ if (!isExpoGo) {
       interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
         requestNonPersonalizedAdsOnly: npa,
       });
+      // v1.7 hotfix H1 — module-level 측 LOADED / ERROR / CLOSED listener attach.
+      // AlarmScreen useEffect 측 listener (= mount 시 attach 영역) 영역 영역 = handleAfterAdRef 측 = 별도 영역.
+      interstitial.addAdEventListener(AdEventType.LOADED, () => {
+        interstitialLoaded = true;
+      });
+      interstitial.addAdEventListener(AdEventType.ERROR, () => {
+        interstitialLoaded = false;
+      });
+      interstitial.addAdEventListener(AdEventType.CLOSED, () => {
+        interstitialLoaded = false;
+        // 다음 광고 preload (= 표준 패턴 영역).
+        try { interstitial.load(); } catch {}
+      });
+      // 앱 시작 시 1회 preload (= AlarmScreen mount 시 LOADED 영역 보장).
+      try { interstitial.load(); } catch {}
     } catch (e) {
       console.warn('InterstitialAd failed to initialize:', e);
     }
@@ -409,9 +428,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (dismissMethod === 'camera') {
       setResultState(result);
     }
-    // v1.7 hotfix #DBG-Ad — Interstitial show 직전 영역 (= 광고 ❌ root cause 추적용).
-    Logger.warn('Ad-DBG', `enterResult adLoaded=${adLoadedRef.current} interstitial=${!!interstitial} dismissMethod=${dismissMethod}`);
-    if (adLoadedRef.current && interstitial) {
+    // v1.7 hotfix H1 — module-level interstitialLoaded 측 검사 (= preload 영역 정합).
+    // 본 영역 = adLoadedRef.current 측 = AlarmScreen useEffect 측 listener attach 영역 영역.
+    // module-level interstitialLoaded 측 = 앱 시작 시 1회 load + CLOSED 시 다음 load = 항상 ready 영역 영역.
+    Logger.warn('Ad-DBG', `enterResult interstitialLoaded=${interstitialLoaded} interstitial=${!!interstitial} dismissMethod=${dismissMethod}`);
+    if (interstitialLoaded && interstitial) {
       Logger.warn('Ad-DBG', 'enterResult interstitial.show 호출');
       interstitial.show().catch((e: any) => {
         Logger.warn('Ad-DBG', `enterResult show throw=${String(e)}`);
@@ -427,9 +448,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (dismissedRef.current) return;
     await stopAudioAndVibration();
     afterAdActionRef.current = 'home';
-    // v1.7 hotfix #DBG-Ad — autoDismiss 측 Interstitial show 직전 영역.
-    Logger.warn('Ad-DBG', `autoDismissNoResult adLoaded=${adLoadedRef.current} interstitial=${!!interstitial}`);
-    if (adLoadedRef.current && interstitial) {
+    // v1.7 hotfix H1 — module-level interstitialLoaded 측 검사 (= preload 영역 정합).
+    Logger.warn('Ad-DBG', `autoDismissNoResult interstitialLoaded=${interstitialLoaded} interstitial=${!!interstitial}`);
+    if (interstitialLoaded && interstitial) {
       Logger.warn('Ad-DBG', 'autoDismissNoResult interstitial.show 호출');
       interstitial.show().catch((e: any) => {
         Logger.warn('Ad-DBG', `autoDismissNoResult show throw=${String(e)}`);
@@ -441,14 +462,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }
   }, [stopAudioAndVibration, goHome]);
 
-  // 전면 광고 로드
+  // 전면 광고 CLOSED listener (= AlarmScreen 측 handleAfterAd 호출 영역).
+  // v1.7 hotfix H1 — LOADED / ERROR listener + load() 호출 = module-level 측 영역 (= preload 정합).
+  // 본 useEffect 측 = handleAfterAdRef 측 = AlarmScreen 측 ref 영역만 = CLOSED listener 측만 attach 영역.
   useEffect(() => {
-    adLoadedRef.current = false;
     dismissedRef.current = false;
     resultEnteredRef.current = false;
 
     // v1.7 hotfix #DBG-Ad — useEffect 진입 영역 (= 광고 ❌ root cause 추적용).
-    Logger.warn('Ad-DBG', `useEffect 진입 isExpoGo=${isExpoGo} interstitial=${!!interstitial}`);
+    Logger.warn('Ad-DBG', `useEffect 진입 isExpoGo=${isExpoGo} interstitial=${!!interstitial} interstitialLoaded=${interstitialLoaded}`);
 
     // @preserve IAP — 원본: if (isAdFree || isExpoGo || !interstitial) return;
     if (isExpoGo || !interstitial) {
@@ -459,28 +481,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
     try {
       const { AdEventType } = require('react-native-google-mobile-ads');
 
-      const unsubLoaded = interstitial.addAdEventListener(AdEventType.LOADED, () => {
-        adLoadedRef.current = true;
-        // v1.7 hotfix #DBG-Ad — LOADED 영역 도착 (= 광고 영역 ready 영역).
-        Logger.warn('Ad-DBG', 'LOADED event 도착');
-      });
       const unsubClosed = interstitial.addAdEventListener(AdEventType.CLOSED, () => {
-        Logger.warn('Ad-DBG', 'CLOSED event 도착');
+        Logger.warn('Ad-DBG', 'CLOSED event 도착 (AlarmScreen-level)');
         handleAfterAdRef.current();
       });
-      const unsubError = interstitial.addAdEventListener(AdEventType.ERROR, (error: any) => {
-        // v1.7 hotfix #DBG-Ad — ERROR 영역 (= no-fill / network / config 영역 영역).
-        Logger.warn('Ad-DBG', `ERROR event code=${error?.code} msg=${error?.message}`);
-        console.warn('Interstitial ad failed:', error?.code, error?.message, error);
-      });
-
-      Logger.warn('Ad-DBG', 'interstitial.load() 호출');
-      interstitial.load();
 
       return () => {
-        unsubLoaded();
         unsubClosed();
-        unsubError();
       };
     } catch (e) {
       Logger.warn('Ad-DBG', `AdEventType import 실패=${String(e)}`);

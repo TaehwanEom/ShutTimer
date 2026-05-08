@@ -732,9 +732,12 @@ function AppNavigator() {
                   Logger.warn('LAControl-DBG', `fast adhoc navigate skip (route=${routeFast})`);
                 }
               } else {
+                // v1.7 hotfix #routine-tab-unify Phase 2 — 단일 변환. fast 분기 측 'open_app_dismiss' non-adhoc 영역.
+                // Bottom Tab 'RoutineTab' 단일 진입 경로 통합 영역 (= 사용자분 측 = "또다른 루틴 페이지" 정합).
+                // 본 commit = 본 1줄만 변환. 다른 navigate 측 = 다음 phase 영역.
                 if (routeFast !== 'RoutineList') {
-                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineList (route=${routeFast})`);
-                  navigationRef.current.navigate('RoutineList');
+                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineTab (route=${routeFast})`);
+                  (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                 } else {
                   Logger.warn('LAControl-DBG', `fast non-adhoc navigate skip (route=${routeFast})`);
                 }

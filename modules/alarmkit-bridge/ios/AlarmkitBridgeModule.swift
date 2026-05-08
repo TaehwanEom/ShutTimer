@@ -95,10 +95,12 @@ public class AlarmkitBridgeModule: Module {
                 "state": Self.alarmStateToString(alarm.state),
               ])
 
-              // v1.7 hotfix #DBG-Sound (B4) — alerting 시점 alarm.attributes 추적.
-              // sound 측 metadata 측 caching/divergence 식별용 (= AlertConfiguration.AlertSound 측 internal API 영역).
+              // v1.7 hotfix #DBG-Sound (B4) — alerting 시점 alarm 측 schedule + countdownDuration 추적.
+              // Apple 공식 (= AlarmKit Alarm struct 측 = id / state / schedule / countdownDuration 4개 멤버 영역).
+              // sound 측 metadata 영역 = AlarmAttributes 측 영역 = Alarm instance 측 미노출 (= internal API).
+              // = schedule + countdownDuration 측 출력 = alerting 시점 fire 정보 영역 (= 사운드 fire 시점 + duration root cause 영역).
               if alarm.state == .alerting {
-                appendNativeDbg("AlarmKit-DBG", "alerting alarmId=\(alarm.id.uuidString) attributes=\(String(describing: alarm.attributes))")
+                appendNativeDbg("AlarmKit-DBG", "alerting alarmId=\(alarm.id.uuidString) schedule=\(String(describing: alarm.schedule)) countdownDuration=\(String(describing: alarm.countdownDuration))")
               }
 
               // v1.7 hotfix #5 — alerting 시점 native 측 LA stage='manual_prompt' 자동 갱신.

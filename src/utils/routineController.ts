@@ -88,8 +88,12 @@ function createFreshAr(r: Routine): ActiveRoutine {
 /**
  * v1.6 Phase 12 — 현재 step 종료 시점에 발화할 confirm_prompt 알림 예약 (수동 모드).
  * 'auto' endMethod 영구 제거 — 모든 routine = confirm_prompt.
+ *
+ * v1.7 hotfix #DBG-DupSched — callerHint param 추가. 이중 schedule (= 동일 step 0.2초 차이 두 번 등록)
+ * root cause 추적용. 6개 call site 측 hint 명시 → 다음 빌드 시 두 번째 호출 caller 정확 식별.
  */
-async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine): Promise<void> {
+async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine, callerHint?: string): Promise<void> {
+  Logger.warn('routine-DBG', `schedBgNotif ENTER caller=${callerHint ?? '(unknown)'} routineId=${r.id} stepIdx=${ar.currentStepIndex} pausedAt=${ar.pausedAt} prevConfirmPromptId=${currentConfirmPromptId ?? '(null)'}`);
   if (currentConfirmPromptId) {
     await cancelRoutineConfirmPrompt(currentConfirmPromptId);
     currentConfirmPromptId = null;
@@ -457,13 +461,13 @@ export async function startRoutine(
       const fresh = createFreshAr(target);
       await saveActiveRoutine(fresh);
       await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
-      await scheduleBackgroundNotif(target, fresh);
+      await scheduleBackgroundNotif(target, fresh, 'startRoutine-deadline-expired');
       await startOrUpdateLiveActivity(target, fresh);
       return { kind: 'started', ar: fresh, routine: target };
     }
     await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
     if (existing.pausedAt === null && !existing.awaitingConfirm) {
-      await scheduleBackgroundNotif(target, existing);
+      await scheduleBackgroundNotif(target, existing, 'startRoutine-resumed');
       await startOrUpdateLiveActivity(target, existing);
     }
     return { kind: 'resumed', ar: existing, routine: target };
@@ -477,7 +481,7 @@ export async function startRoutine(
   const fresh = createFreshAr(target);
   await saveActiveRoutine(fresh);
   await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
-  await scheduleBackgroundNotif(target, fresh);
+  await scheduleBackgroundNotif(target, fresh, 'startRoutine-fresh');
   await startOrUpdateLiveActivity(target, fresh);
   return { kind: 'started', ar: fresh, routine: target };
 }
@@ -636,7 +640,7 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
     awaitingConfirm: false,
   };
   await saveActiveRoutine(nextAr);
-  await scheduleBackgroundNotif(routine, nextAr);
+  await scheduleBackgroundNotif(routine, nextAr, 'confirmAndAdvance');
   await startOrUpdateLiveActivity(routine, nextAr);
   return { kind: 'advance_auto', ar: nextAr, routine };
 }
@@ -671,7 +675,7 @@ export async function resumeRoutine(): Promise<ActiveRoutine | null> {
     pausedAt: null,
   };
   await saveActiveRoutine(resumed);
-  await scheduleBackgroundNotif(routine, resumed);
+  await scheduleBackgroundNotif(routine, resumed, 'resumeRoutineFromLA');
   await startOrUpdateLiveActivity(routine, resumed);
   return resumed;
 }
@@ -778,7 +782,7 @@ export async function restoreRoutineState(): Promise<RestoreResult> {
     cur = result.ar;
   }
 
-  await scheduleBackgroundNotif(routine, cur);
+  await scheduleBackgroundNotif(routine, cur, 'restoreRoutineState');
   await startOrUpdateLiveActivity(routine, cur);
   return { kind: 'run', routineId: routine.id };
 }

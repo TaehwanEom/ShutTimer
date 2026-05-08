@@ -901,7 +901,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
 
   // ActiveRoutineSection onClose — useCallback 으로 stable. 매 부모 리렌더마다 새 inline arrow 가
   // 자식 useCallback (handleAutoNow 등) dep cascade 트리거하던 문제 차단 → auto countdown setTimeout 정상 fire.
+  // v1.7 hotfix #DBG-StopNav — onClose 호출 진입 디버그 추가. dep 영역 추가 ❌ (= 자식 useCallback dep cascade 회귀 차단).
   const handleActiveRoutineClose = useCallback(() => {
+    console.warn(`[StopNav-DBG] RoutineListScreen.handleActiveRoutineClose ENTER (= 앱 안 정지 진입 시점)`);
     setActiveManualRoutineId(null);
     refreshAll();
   }, [refreshAll]);

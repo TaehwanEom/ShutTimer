@@ -331,7 +331,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
   useEffect(() => {
     // v1.7 hotfix #DBG-C — mount 시점 + route.params 영역 (= AlarmScreen 1초 사라짐 root cause 추적용).
-    Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})}`);
+    // v1.7 hotfix #DBG-Remount — 사용자 보고 "광고 도중 갑자기 알람" root cause 추적용. mount stack trace 추가.
+    const stack = new Error().stack;
+    const stackTop = stack?.split('\n').slice(1, 6).join(' | ') ?? '(no stack)';
+    Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})} stack=${stackTop}`);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     // v1.7 hotfix — mount 시 = expo banner dismiss (= 백그라운드 → banner tap 진입 시 잔존 banner 영역 정리).
     Notifications.dismissAllNotificationsAsync()

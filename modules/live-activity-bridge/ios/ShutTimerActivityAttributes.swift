@@ -23,6 +23,9 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var currentStepIndex: Int = 0
         /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
         var totalSteps: Int = 1
+        /** v1.7 hotfix — 일시정지 시점 timestamp (ms). Resume 시 native 측 stepEndAt shift 직접 계산용.
+            optional default nil = 기존 LA 디코딩 호환. */
+        var pausedAt: Double? = nil
     }
 
     /** 루틴 이름 (불변) */

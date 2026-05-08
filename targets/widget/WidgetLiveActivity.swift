@@ -57,6 +57,9 @@ struct ShutTimerActivityAttributes: ActivityAttributes {
         var currentStepIndex: Int = 0
         /** v1.6 hotfix — 총 step 수. default 1 = 단일 step 표시 폴백 */
         var totalSteps: Int = 1
+        /** v1.7 hotfix — 일시정지 시점 timestamp (ms). Resume 시 native 측 stepEndAt shift 직접 계산용.
+            optional default nil = 기존 LA 디코딩 호환. */
+        var pausedAt: Double? = nil
 
         /// v1.7 hotfix #10 — invalid range 가드 (= stepEndAt 측 stale 과거 시점 시 invalid range → blank 표시 회피).
         /// active fire → 잠금 시점 측 = stepEndAt 도달 후 시간 경과 → endDate < now → invalid range.

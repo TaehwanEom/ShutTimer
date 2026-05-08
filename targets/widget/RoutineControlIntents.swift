@@ -156,10 +156,13 @@ struct PauseRoutineIntent: LiveActivityIntent {
             try? AlarmManager.shared.pause(id: currentUuid)
         }
 
+        // v1.7 hotfix — Pause 시점 timestamp 측 LA state 측 저장. Resume 시 native 측 stepEndAt shift 계산용.
+        let pauseNowMs = Date().timeIntervalSince1970 * 1000
         for activity in Activity<ShutTimerActivityAttributes>.activities {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
                 newState.paused = true
+                newState.pausedAt = pauseNowMs
                 await activity.update(.init(state: newState, staleDate: nil))
             }
         }
@@ -196,9 +199,23 @@ struct ResumeRoutineIntent: LiveActivityIntent {
             try? AlarmManager.shared.resume(id: currentUuid)
         }
 
+        // v1.7 hotfix — Resume 시 native 측 stepEndAt 직접 shift (= RN polling 의존 ❌ 영역).
+        // 이전 = paused=false 만 토글 → stepEndAt = 일시정지 직전 시각 잔존 → 위젯 = safeStepEndDate (= max(end, now+0.01))
+        //   = now+0.01 → 0:00 표시. RN polling (= AppState 'active' 1초) 측 = resumeRoutineFromLA 측 ar.stepEndAt shift +
+        //   LA startOrUpdate 측 정정 영역. background 시 polling skip → foreground 진입 시점까지 0:00 잔존.
+        // 정정 = native 측 = pausedAt → 즉시 stepEndAt += (now - pausedAt) shift + pausedAt=nil + paused=false 갱신.
+        let resumeNowMs = Date().timeIntervalSince1970 * 1000
         for activity in Activity<ShutTimerActivityAttributes>.activities {
             if activity.attributes.routineId == routineId {
                 var newState = activity.content.state
+                if let p = newState.pausedAt {
+                    let shift = max(0, resumeNowMs - p)
+                    newState.stepEndAt += shift
+                    appendNativeDbg("Intent-DBG-Widget", "Resume stepEndAt shift=\(Int(shift))ms pausedAt=\(p) now=\(resumeNowMs) newStepEndAt=\(newState.stepEndAt)")
+                } else {
+                    appendNativeDbg("Intent-DBG-Widget", "Resume pausedAt=nil → shift skip (= JS pause 경로 또는 LA 재시작 영역)")
+                }
+                newState.pausedAt = nil
                 newState.paused = false
                 await activity.update(.init(state: newState, staleDate: nil))
             }

@@ -320,9 +320,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       try {
         const ar = JSON.parse(arRaw);
         // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측 영역) 시 = RoutineList 강제 이동 ❌ → AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
-        // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 측 통합.
         if (ar?.routineId && !isAdhocAlarmRoutine(ar.routineId)) {
-          (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] });
+          navigation.replace('RoutineList');
         }
       } catch {}
     }).catch(() => {});
@@ -352,12 +351,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
       clearTimeout(autoResultTimeoutRef.current);
       autoResultTimeoutRef.current = null;
     }
-    // v1.6 #12 — 마지막 step 진입한 경우 routine 정상 종료 + RoutineTab 복귀.
-    // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 측 통합.
+    // v1.6 #12 — 마지막 step 진입한 경우 routine 정상 종료 + RoutineList 복귀.
     const fromRoutine = (route.params as { fromRoutine?: string } | undefined)?.fromRoutine;
     if (fromRoutine === 'last_step') {
       await stopRoutine().catch(() => {});
-      (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] });
+      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
       return;
     }
     // v1.7 Phase 2-A — 알람 entity 측 dismiss 후 = alarm.steps 보유 시 ad-hoc routine 시작.

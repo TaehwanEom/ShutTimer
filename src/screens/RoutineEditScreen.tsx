@@ -417,10 +417,9 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       await cancelRoutinePrealerts(routine.id);
     }
     if (!isMountedRef.current) return;
-    // v1.7 hotfix — Stack 'RoutineList' 측 통합 (= Bottom Tab 'RoutineTab' 단일 경로).
-    // RoutineEdit 측 = Stack 측 영역 → goBack 영역 측 = stack 측 자동 pop. + Tab 'RoutineTab' 측 initialTab 측 갱신 영역.
-    navigation.goBack();
-    (navigation as any).navigate('Home', { screen: 'RoutineTab', params: { initialTab: mode } });
+    // RoutineEdit 을 stack 에서 제거하면서 RoutineList 의 initialTab 으로 복귀
+    // navigate 사용 시 RoutineEdit 위에 RoutineList 새 인스턴스가 push 되어 뒤로가기 시 RoutineEdit 노출되는 버그 회피
+    navigation.dispatch(StackActions.popTo('RoutineList', { initialTab: mode }));
   };
 
   const handleDelete = () => {

@@ -55,11 +55,9 @@ import {
 } from '../constants/categories';
 import AdBanner from '../components/AdBanner';
 
-// v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 측 진입 영역.
-// navigation type 측 = nested navigator 측 영역 측 = `any` 영역 (= TypeScript 측 nested route props 측 단순화 영역).
 type Props = {
-  navigation: any;
-  route: { params?: { initialTab?: 'scheduled' | 'manual' } };
+  navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineList'>;
+  route: RouteProp<RootStackParamList, 'RoutineList'>;
 };
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];

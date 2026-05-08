@@ -163,10 +163,13 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
             }
           } else {
             // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
+            // v1.7 hotfix #StartAlarmEffectsRace — init 측 startAlarmEffects 호출 제거.
+            //   사유: useEffect-awaitingConfirm (= line 205) 측 deps `[ar?.awaitingConfirm, ar?.currentStepIndex]` 측 = mount 시점 첫 값 trigger 보장 (= React 표준).
+            //   본 영역 측 호출 = 두 useEffect 측 같은 시점 trigger → 200ms 지연 race → 두 사운드 동시 fire 회귀 (= sound 중첩).
+            //   modal 표시 영역 = useEffect-awaitingConfirm 측 통합 영역.
             setModalStage('next');
             setModalVisible(true);
-            Logger.warn('SOUND-DBG', `startAlarmEffects call from=init awaitingConfirm=${r.ar?.awaitingConfirm} stepIdx=${r.ar?.currentStepIndex}`);
-            startAlarmEffects();
+            Logger.warn('SOUND-DBG', `init mount = useEffect-awaitingConfirm 측 trigger 위임 awaitingConfirm=${r.ar?.awaitingConfirm} stepIdx=${r.ar?.currentStepIndex}`);
           }
         }
       }
@@ -248,6 +251,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
   // ─── 알람 효과 (refs) ─────────────────────────────────────
   const soundRef = useRef<Audio.Sound | null>(null);
+  // v1.7 hotfix #StartAlarmEffectsRace — startAlarmEffects 측 200ms 지연 + Audio.createAsync 영역 측 = init useEffect + useEffect-awaitingConfirm 측 같은 시점 호출 race 회피.
+  const inProgressRef = useRef(false);
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accelSubRef = useRef<{ remove: () => void } | null>(null);
   const shakeCountRef = useRef(0);
@@ -274,12 +279,19 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   }, []);
 
   const startAlarmEffects = useCallback(async () => {
-    // v1.7 hotfix #13 — AlarmKit native 사운드 ↔ expo-av 사운드 중첩 회피.
-    // active 시점 측: AlarmKit fire → JS listener cancelAlarm → AlarmKit stop. 단 Apple 측 fade-out (= ms ~ 수백ms) 후도 사운드 잔존.
-    // 200ms 지연 후 expo-av 시작 → AlarmKit fade-out 완료 후 단독 출력 → 중첩 ❌.
-    // background 시점 측: JS thread 정지 → 본 호출 자체 ❌. AlarmKit 사운드 단독 정합.
-    Logger.warn('SOUND-DBG', `startAlarmEffects ENTER soundRef=${soundRef.current ? 'EXISTS' : 'null'} time=${Date.now()}`);
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // v1.7 hotfix #StartAlarmEffectsRace — inProgressRef guard 추가. 200ms 지연 + Audio.createAsync 영역 측 = 같은 시점 두 호출 race 시 두번째 측 skip → 1회 fire 보장.
+    if (inProgressRef.current) {
+      Logger.warn('SOUND-DBG', 'startAlarmEffects SKIP — inProgress');
+      return;
+    }
+    inProgressRef.current = true;
+    try {
+      // v1.7 hotfix #13 — AlarmKit native 사운드 ↔ expo-av 사운드 중첩 회피.
+      // active 시점 측: AlarmKit fire → JS listener cancelAlarm → AlarmKit stop. 단 Apple 측 fade-out (= ms ~ 수백ms) 후도 사운드 잔존.
+      // 200ms 지연 후 expo-av 시작 → AlarmKit fade-out 완료 후 단독 출력 → 중첩 ❌.
+      // background 시점 측: JS thread 정지 → 본 호출 자체 ❌. AlarmKit 사운드 단독 정합.
+      Logger.warn('SOUND-DBG', `startAlarmEffects ENTER soundRef=${soundRef.current ? 'EXISTS' : 'null'} time=${Date.now()}`);
+      await new Promise(resolve => setTimeout(resolve, 200));
 
     const [soundId, alarmRaw, vibRaw] = await Promise.all([
       AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
@@ -325,6 +337,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     if (vibrationEnabled) {
       Vibration.vibrate();
       vibrationIntervalRef.current = setInterval(() => Vibration.vibrate(), 1000);
+    }
+    } finally {
+      inProgressRef.current = false;
     }
   }, []);
 

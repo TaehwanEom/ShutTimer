@@ -770,12 +770,27 @@ export default function SettingsScreen({ navigation }: Props) {
                     <MaterialIcons name="play-circle-outline" size={22} color={colors.secondary} style={{ opacity: 0.7 }} />
                     <Text style={[styles.toggleLabel, selectedSoundId === item.id && { color: colors.primary }]}>{`${t('sounds.alarm')} ${item.id.split('_')[1]}`}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleSoundSelect(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <MaterialIcons
-                      name={selectedSoundId === item.id ? 'check' : 'radio-button-unchecked'}
-                      size={22}
-                      color={selectedSoundId === item.id ? colors.primary : colors.secondary}
-                    />
+                  <TouchableOpacity
+                    onPress={() => handleSoundSelect(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                      backgroundColor: selectedSoundId === item.id ? colors.primary : 'transparent',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: selectedSoundId === item.id ? colors.onPrimary : colors.primary,
+                    }}>
+                      {selectedSoundId === item.id
+                        ? t('settings.selected', { defaultValue: '선택됨' })
+                        : t('settings.select', { defaultValue: '선택' })}
+                    </Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}
@@ -791,12 +806,27 @@ export default function SettingsScreen({ navigation }: Props) {
                     <MaterialIcons name="play-circle-outline" size={22} color={colors.secondary} style={{ opacity: 0.7 }} />
                     <Text style={[styles.toggleLabel, selectedSoundId === item.id && { color: colors.primary }]}>{`${t('sounds.ringtone')} ${item.id.split('_')[1]}`}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleSoundSelect(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <MaterialIcons
-                      name={selectedSoundId === item.id ? 'check' : 'radio-button-unchecked'}
-                      size={22}
-                      color={selectedSoundId === item.id ? colors.primary : colors.secondary}
-                    />
+                  <TouchableOpacity
+                    onPress={() => handleSoundSelect(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                      backgroundColor: selectedSoundId === item.id ? colors.primary : 'transparent',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      fontWeight: '700',
+                      color: selectedSoundId === item.id ? colors.onPrimary : colors.primary,
+                    }}>
+                      {selectedSoundId === item.id
+                        ? t('settings.selected', { defaultValue: '선택됨' })
+                        : t('settings.select', { defaultValue: '선택' })}
+                    </Text>
                   </TouchableOpacity>
                 </TouchableOpacity>
               ))}

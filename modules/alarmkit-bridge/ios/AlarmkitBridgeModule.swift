@@ -34,22 +34,10 @@ import SwiftUI
 import ActivityKit
 #endif
 
-@available(iOS 26.0, *)
-nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
-  // v1.7 hotfix #LAUnify Phase 2 — AlarmKit framework 자동 LA Activity 측 = AlarmAttributes<ShutTimerAlarmMetadata>
-  // 측 ContentState 측 = AlarmPresentationState (= alert/countdown/paused mode 만, framework 측 고정).
-  // step 데이터 영역 측 = metadata 영역 (= schedule 시점 1회 명시 + runtime immutable).
-  // widget extension 측 AlarmAttributes layout 측 = 본 metadata 측 사용 → step / progress 표시 영역.
-  // 모든 필드 = optional + default 값 영역 (= 기존 디코딩 호환 + AlarmAttributes init metadata=nil 호환).
-  var currentStepName: String? = nil
-  var currentStepIndex: Int = 0
-  var totalSteps: Int = 1
-  var stage: String = "step"
-  var paused: Bool = false
-  var pausedAt: Double? = nil
-  var routineId: String? = nil
-  var routineName: String? = nil
-}
+// v1.7 hotfix #LAUnify Phase 9-B — ShutTimerAlarmMetadata struct 정의 제거.
+// 단일 정의 = `targets/widget/ShutTimerAlarmMetadata.swift` 측 두 target 측 file membership share.
+// 직전 = 두 target 측 별도 file 측 별도 정의 → Swift module 측 별도 type → AlarmKit framework lookup mismatch
+// → widget body 호출 ❌ + framework system fallback UI 표시 (= "검정 바" root cause).
 
 // v1.7 hotfix #5 — alerting 시 native 측 LA stage='manual_prompt' 자동 갱신용.
 // JS thread 측 background 정지 시 (= JS listener 측 setLiveActivityStage 호출 ❌) 영역 정합.

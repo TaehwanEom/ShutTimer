@@ -365,8 +365,17 @@ private func scheduleNextStepAlarmLA(snapshot: LARoutineSnapshotFull, nextStepId
     let alert: AlarmPresentation.Alert
     if #available(iOS 26.1, *) {
         if isLastStep {
+            // v1.7 hotfix #LastStepBanner — iOS 26.1 측 마지막 step 측 = title only 측 = banner 노출 ❌ 가능성.
+            // secondaryButton 추가 → AlarmKit 측 alerting banner 정합 표시.
+            let secondaryButton = AlarmButton(
+                text: LocalizedStringResource(stringLiteral: snapshot.i18nAdvanceLabel),
+                textColor: .white,
+                systemImageName: "forward.fill"
+            )
             alert = AlarmPresentation.Alert(
-                title: LocalizedStringResource(stringLiteral: alertTitle)
+                title: LocalizedStringResource(stringLiteral: alertTitle),
+                secondaryButton: secondaryButton,
+                secondaryButtonBehavior: .custom
             )
         } else {
             let secondaryButton = AlarmButton(
@@ -479,16 +488,20 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         // v1.7 hotfix #DBG — Advance Intent perform 진입 (= main app target).
-        appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform routineId=\(routineId)")
+        appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform routineId=\(routineId) emptyEntry=\(routineId.isEmpty)")
         // v1.7 hotfix #20 — main app process 측 perform 호출 시 = AlarmKit stop / Activity.update 동기화.
         // 직전: signal 작성만 → JS thread background 시 polling 처리 ❌ → 위젯/Apple Watch 표시 싱크 안맞음.
         guard var snapshot = readSnapshotFull() else {
             // snapshot 미존재 fallback — RN active 시 polling 처리.
+            appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform — snapshot nil → signal fallback routineId=\(routineId)")
             writeControlSignal(action: "advance", routineId: routineId)
             return .result()
         }
         let effectiveRoutineId = !routineId.isEmpty ? routineId : snapshot.routineId
+        // v1.7 hotfix #AdvanceIntentDbg — entryRoutineId / snapshotRoutineId / effective 추적 (= 빈 entryRoutineId root cause 식별용).
+        appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform — entryRoutineId=\(routineId) snapshotRoutineId=\(snapshot.routineId) effective=\(effectiveRoutineId) fallback=\(routineId.isEmpty ? "yes" : "no")")
         if !routineId.isEmpty && snapshot.routineId != routineId {
+            appendNativeDbg("Intent-DBG-LA", "AdvanceNextStepIntent.perform — routineId mismatch → signal fallback routineId=\(routineId) snapshot=\(snapshot.routineId)")
             writeControlSignal(action: "advance", routineId: routineId)
             return .result()
         }

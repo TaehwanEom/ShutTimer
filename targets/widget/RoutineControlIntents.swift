@@ -383,19 +383,23 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         // v1.7 hotfix #DBG — Advance Intent perform 진입 (= 위젯 "다음 진행" Button 측 = iPhone + Apple Watch).
-        appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform routineId=\(routineId)")
+        appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform routineId=\(routineId) emptyEntry=\(routineId.isEmpty)")
         // v1.7 hotfix #11 — routineId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
         // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.
         // 만약 setting 측 fail (= deserialize race) → init() default routineId='' 잔존 → snapshot 매칭 ❌.
         // → snapshot.routineId 측 신뢰 (= 활성 routine 측 단일 가정 정합).
         guard var snapshot = readRoutineSnapshot() else {
             // snapshot 미존재 — fallback: 'advance' signal (RN active 시 advanceRoutineFromLA)
+            appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform — snapshot nil → signal fallback routineId=\(routineId)")
             writeControlSignal(action: "advance", routineId: routineId)
             return .result()
         }
         let effectiveRoutineId = !routineId.isEmpty ? routineId : snapshot.routineId
+        // v1.7 hotfix #AdvanceIntentDbg — entryRoutineId / snapshotRoutineId / effective 추적 (= 빈 entryRoutineId root cause 식별용).
+        appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform — entryRoutineId=\(routineId) snapshotRoutineId=\(snapshot.routineId) effective=\(effectiveRoutineId) fallback=\(routineId.isEmpty ? "yes" : "no")")
         // routineId 명시 + snapshot mismatch 시 = 별 routine 측 의도 → fallback.
         if !routineId.isEmpty && snapshot.routineId != routineId {
+            appendNativeDbg("Intent-DBG-Widget", "AdvanceNextStepIntent.perform — routineId mismatch → signal fallback routineId=\(routineId) snapshot=\(snapshot.routineId)")
             writeControlSignal(action: "advance", routineId: routineId)
             return .result()
         }

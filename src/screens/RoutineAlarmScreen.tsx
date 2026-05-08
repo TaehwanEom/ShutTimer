@@ -158,7 +158,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       // 이중 가드 — endMethod !== 'camera' 면 RoutineList 로 redirect (inline 진행).
       // (App.tsx 알림 핸들러/콜드 스타트가 이미 분기하지만, 예측 못한 경로 fallback)
       if (target.endMethod !== 'camera') {
-        navigation.replace('RoutineList');
+        // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 통합.
+        (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] });
         return;
       }
 
@@ -167,9 +168,10 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       if (!existing.awaitingConfirm) {
         const res = await completeCurrentMission();
         if (res && res.kind === 'end') {
-          // 마지막 step 완료 → 루틴이 속한 탭 (예약/일반) 으로 RoutineList 복귀
+          // 마지막 step 완료 → 루틴이 속한 탭 (예약/일반) 으로 RoutineTab 복귀.
+          // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 통합.
           const tab = getRoutineMode(target);
-          navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params: { initialTab: tab } }] });
+          (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab', params: { initialTab: tab } }] } }] });
           return;
         }
         existing = await loadActiveRoutine();
@@ -286,7 +288,9 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         stopAudio();
         stopVibe();
         const tab = routine ? getRoutineMode(routine) : undefined;
-        navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params: tab ? { initialTab: tab } : undefined }] });
+        // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 통합.
+        const tabParams = tab ? { initialTab: tab } : undefined;
+        (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab', params: tabParams }] } }] });
         return;
       }
       if (dismissed || !routine) return;
@@ -529,24 +533,20 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     const res = await confirmAndAdvance();
     const tab = routine ? getRoutineMode(routine) : undefined;
     const params = tab ? { initialTab: tab } : undefined;
+    // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 통합. 모든 분기 동일 정합.
+    const resetTo = { index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab', params }] } }] };
     if (!res) {
-      // fallback — 루틴이 속한 탭으로 RoutineList 복귀
-      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
+      // fallback — 루틴이 속한 탭으로 RoutineTab 복귀
+      (navigation as any).reset(resetTo);
       return;
     }
     if (res.kind === 'end') {
-      // 마지막 step 완료 → 루틴이 속한 탭으로 RoutineList 복귀
-      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
+      // 마지막 step 완료 → 루틴이 속한 탭으로 RoutineTab 복귀
+      (navigation as any).reset(resetTo);
       return;
     }
     // advance_auto — 다음 step 부터는 RoutineList 의 inline 진행 영역에서 처리
-    navigation.reset({
-      index: 1,
-      routes: [
-        { name: 'Home' },
-        { name: 'RoutineList', params },
-      ],
-    });
+    (navigation as any).reset(resetTo);
   }, [navigation, routine]);
 
   // ─── 정리 헬퍼 ───────────────────────────────────────────
@@ -573,7 +573,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     await stopRoutine();
     const tab = routine ? getRoutineMode(routine) : undefined;
     const params = tab ? { initialTab: tab } : undefined;
-    navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList', params }] });
+    // v1.7 hotfix — Stack 'RoutineList' 제거 → Bottom Tab 'RoutineTab' 통합.
+    (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab', params }] } }] });
   }, [navigation, routine]);
 
   if (!routine || !ar) {

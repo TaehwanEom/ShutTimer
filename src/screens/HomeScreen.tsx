@@ -21,7 +21,7 @@ import { useFocusEffect, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Notifications from 'expo-notifications';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList, MainTabParamList } from '../../App';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 import { MISSIONS, MISSIONS_STORAGE_KEY, Mission } from '../constants/missions';
@@ -58,9 +58,11 @@ async function shouldUseAlarmKitInTimer(): Promise<boolean> {
   }
 }
 
+// v1.7 hotfix — Home 측 NavigatorScreenParams 측 변환 후 = route 측 = HomeTab 측 child 영역 정합.
+// navigation 측 = stack 측 영역 보존 (= navigate('Running', ...) 등 stack 호출 영역).
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
-  route?: RouteProp<RootStackParamList, 'Home'>;
+  route?: RouteProp<MainTabParamList, 'HomeTab'>;
 };
 
 // 진행 중인 타이머 영속화 (cold start 복원용)
@@ -375,7 +377,8 @@ export default function HomeScreen({ navigation, route }: Props) {
             setSelectedMinutes(list[idx].defaultMinutes ?? 60);
             setSelectedSeconds(0);
             // route.params 소비 후 정리 (재진입 시 동일 favorite 재적용 회피)
-            navigation.setParams({ selectedFavoriteId: undefined });
+            // v1.7 hotfix — nested navigation 측 type 측 영역 측 cast (= stack 측 'Home' route 측 setParams 측 nested params 측 영역 측 측 측).
+            (navigation as any).setParams({ selectedFavoriteId: undefined });
             return;
           }
         }

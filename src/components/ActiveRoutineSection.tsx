@@ -28,6 +28,7 @@ import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import { Routine, ActiveRoutine, loadActiveRoutine, loadRoutines } from '../constants/routines';
+import { Logger } from '../utils/logger';
 import {
   startRoutine,
   completeCurrentMission,
@@ -164,6 +165,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
             // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
             setModalStage('next');
             setModalVisible(true);
+            Logger.warn('SOUND-DBG', `startAlarmEffects call from=init awaitingConfirm=${r.ar?.awaitingConfirm} stepIdx=${r.ar?.currentStepIndex}`);
             startAlarmEffects();
           }
         }
@@ -202,6 +204,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     //  stale 케이스 측 = restoreRoutineState (= cold-start / foreground 복귀) 측 sync 처리 영역.)
     setModalStage('next');
     setModalVisible(true);
+    Logger.warn('SOUND-DBG', `startAlarmEffects call from=useEffect-awaitingConfirm awaitingConfirm=${ar?.awaitingConfirm} stepIdx=${ar?.currentStepIndex} modalVisible=${modalVisible}`);
     startAlarmEffects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ar?.awaitingConfirm, ar?.currentStepIndex]);
@@ -275,6 +278,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // active 시점 측: AlarmKit fire → JS listener cancelAlarm → AlarmKit stop. 단 Apple 측 fade-out (= ms ~ 수백ms) 후도 사운드 잔존.
     // 200ms 지연 후 expo-av 시작 → AlarmKit fade-out 완료 후 단독 출력 → 중첩 ❌.
     // background 시점 측: JS thread 정지 → 본 호출 자체 ❌. AlarmKit 사운드 단독 정합.
+    Logger.warn('SOUND-DBG', `startAlarmEffects ENTER soundRef=${soundRef.current ? 'EXISTS' : 'null'} time=${Date.now()}`);
     await new Promise(resolve => setTimeout(resolve, 200));
 
     const [soundId, alarmRaw, vibRaw] = await Promise.all([
@@ -303,6 +307,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
           staysActiveInBackground: true,
           interruptionModeIOS: InterruptionModeIOS.DoNotMix,
         });
+        Logger.warn('SOUND-DBG', `createAsync soundId=${item.id} time=${Date.now()}`);
         const { sound } = await Audio.Sound.createAsync(item.source, {
           isLooping: true,
           shouldPlay: true,   // create 와 동시에 즉시 재생 (별도 playAsync 불필요)
@@ -364,6 +369,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
         setModalStage('next');
         setModalVisible(true);
+        Logger.warn('SOUND-DBG', `startAlarmEffects call from=handleMissionEnd`);
         startAlarmEffects();
         return;
       }

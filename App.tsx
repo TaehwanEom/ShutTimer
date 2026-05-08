@@ -377,12 +377,14 @@ function AppNavigator() {
 
       if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
         if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_prealert currentRoute=${currentRoute}`);
         navigationRef.current?.navigate('RoutineList');
         return;
       }
       if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
         // 자동 진행 체인 — RoutineList 의 inline 진행이 active routine sync 로 자동 마운트
         if (currentRoute === 'RoutineList') return;
+        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_chain currentRoute=${currentRoute}`);
         navigationRef.current?.navigate('RoutineList');
         return;
       }
@@ -396,11 +398,13 @@ function AppNavigator() {
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === data.routineId);
         if (!r) {
+          Logger.warn('NAV-DBG', `reset target=RoutineList source=notif-response/routine_confirm_prompt-noRoutine currentRoute=${currentRoute}`);
           navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
           return;
         }
         if (!navigationRef.current?.isReady()) return;
         // v1.6 A-1 — 모달 통일. 모든 endMethod (tap/shake/camera) = RoutineList → ActiveRoutineSection modal.
+        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_confirm_prompt-routine currentRoute=${currentRoute}`);
         navigationRef.current.navigate('RoutineList');
         return;
       }
@@ -423,10 +427,12 @@ function AppNavigator() {
         if (!response) return;
         const data = (response?.notification?.request?.content?.data ?? {}) as any;
         if (data?.type === 'routine_prealert') {
+          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_prealert`);
           navigationRef.current?.navigate('RoutineList');
           return;
         }
         if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
+          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_chain`);
           navigationRef.current?.navigate('RoutineList');
           return;
         }
@@ -437,10 +443,12 @@ function AppNavigator() {
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === data.routineId);
           if (!r) {
+            Logger.warn('NAV-DBG', `reset target=RoutineList source=cold-start/routine_confirm_prompt-noRoutine`);
             navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
             return;
           }
           if (!navigationRef.current?.isReady()) return;
+          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_confirm_prompt-routine`);
           navigationRef.current.navigate('RoutineList');
           return;
         }
@@ -561,6 +569,7 @@ function AppNavigator() {
               routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
             });
           } else {
+            Logger.warn('NAV-DBG', `reset target=RoutineList source=onAlarmStateChange/confirm_prompt-noRoutine currentRoute=${currentRoute}`);
             navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
           }
           return;
@@ -570,6 +579,7 @@ function AppNavigator() {
         if (isAdhoc) {
           (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
         } else {
+          Logger.warn('NAV-DBG', `navigate target=RoutineList source=onAlarmStateChange/confirm_prompt-routine currentRoute=${currentRoute}`);
           navigationRef.current.navigate('RoutineList');
         }
       }
@@ -632,6 +642,7 @@ function AppNavigator() {
                 routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
               });
             } else {
+              Logger.warn('NAV-DBG', `reset target=RoutineList source=cold-start-1.5s/listAlarms-confirm_prompt-noRoutine`);
               navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
             }
             return;
@@ -640,6 +651,7 @@ function AppNavigator() {
           if (isAdhoc) {
             (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
           } else {
+            Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start-1.5s/listAlarms-confirm_prompt-routine`);
             navigationRef.current.navigate('RoutineList');
           }
         }
@@ -809,6 +821,7 @@ function AppNavigator() {
                 } else {
                   if (route !== 'RoutineList') {
                     Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineList (route=${route})`);
+                    Logger.warn('NAV-DBG', `navigate target=RoutineList source=la-control/open_app_dismiss-standard-stopRoutine currentRoute=${route}`);
                     navigationRef.current.navigate('RoutineList');
                   } else {
                     Logger.warn('LAControl-DBG', `standard non-adhoc navigate skip (route=${route})`);
@@ -825,6 +838,7 @@ function AppNavigator() {
                 }
               } else {
                 if (route !== 'Alarm' && route !== 'RoutineList') {
+                  Logger.warn('NAV-DBG', `navigate target=RoutineList source=la-control/open_app_dismiss-standard-default currentRoute=${route}`);
                   navigationRef.current.navigate('RoutineList');
                 }
               }

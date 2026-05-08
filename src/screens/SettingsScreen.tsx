@@ -189,6 +189,16 @@ export default function SettingsScreen({ navigation }: Props) {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
   }, []);
 
+  // v1.7 hotfix #PreviewUnmountCleanup — screen unmount 시 미리듣기 정지 (= 설정창 빠져나와도 사운드 잔존 정정).
+  // 직전 = closeSoundModal 측만 stopPreview 호출 → screen 자체 측 unmount 시 (= 뒤로 가기, tab 이동) 측 잔존.
+  useEffect(() => {
+    return () => {
+      previewSoundRef.current?.stopAsync().catch(() => {});
+      previewSoundRef.current?.unloadAsync().catch(() => {});
+      previewSoundRef.current = null;
+    };
+  }, []);
+
   // 미션 선택 카운트 — 화면 포커스 시 재로드 (MissionSelectScreen 다녀오면 최신값 반영)
   useFocusEffect(
     useCallback(() => {
@@ -282,7 +292,8 @@ export default function SettingsScreen({ navigation }: Props) {
     const item = ALARM_SOUNDS.find(s => s.id === soundId);
     if (!item) return;
     await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-    const { sound } = await Audio.Sound.createAsync(item.source, { isLooping: true });
+    // v1.7 hotfix #PreviewLoopFix — isLooping: false (= 한 번 재생 후 자동 정지). 직전 = isLooping: true → 무한 루프.
+    const { sound } = await Audio.Sound.createAsync(item.source, { isLooping: false });
     previewSoundRef.current = sound;
     await sound.playAsync();
   };

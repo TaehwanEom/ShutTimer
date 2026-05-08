@@ -361,6 +361,11 @@ struct WidgetLiveActivity: Widget {
                 let _ = { appendNativeDbgWidget("LA-DBG", "compactTrailing paused=\(context.state.paused) stepEndAt=\(context.state.stepEndAt) safeEnd=\(context.state.safeStepEndDate.timeIntervalSince1970 * 1000) deltaMs=\(context.state.stepEndAt - Date().timeIntervalSince1970 * 1000)", throttle: true) }()
                 if context.state.paused {
                     Image(systemName: "pause.fill").foregroundColor(.brand)
+                } else if context.state.stage == "manual_prompt" {
+                    // v1.7 hotfix #ManualPromptCompact — 마지막 step alerting 후 stage 측 = ▶▶ 아이콘.
+                    // 다른 view (LockScreen/WatchView/Dynamic Island expanded) 측 = manual_prompt 분기 영역 정합.
+                    // compactTrailing 측 = 본 분기 누락 영역 → stepEndAt 과거 시점 측 safeStepEndDate=now+0.01 → "0:01" 표시 회귀.
+                    Image(systemName: "forward.fill").foregroundColor(.brand)
                 } else {
                     Text(timerInterval: Date()...context.state.safeStepEndDate, countsDown: true)
                         .monospacedDigit()

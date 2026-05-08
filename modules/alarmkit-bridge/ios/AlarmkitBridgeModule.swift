@@ -309,8 +309,21 @@ public class AlarmkitBridgeModule: Module {
         countdown: countdownAll,
         paused: pausedAll
       )
+      // v1.7 hotfix #LAUnify Phase 3 — metadata 측 step 데이터 명시 영역.
+      //   widget extension 측 AlarmAttributes layout (= Phase 6 영역) 측 = 본 metadata 측 사용 → step 표시 영역.
+      let metadataAll = ShutTimerAlarmMetadata(
+        currentStepName: params.laStepName,
+        currentStepIndex: params.laStepIndex ?? 0,
+        totalSteps: params.laTotalSteps ?? 1,
+        stage: params.laStage ?? "step",
+        paused: params.laPaused ?? false,
+        pausedAt: params.laPausedAt,
+        routineId: params.laRoutineId ?? params.entityId,
+        routineName: params.laRoutineName ?? params.title
+      )
       let timerAttributesAll = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: timerPresentationAll,
+        metadata: metadataAll,
         tintColor: Color.red
       )
 
@@ -356,9 +369,11 @@ public class AlarmkitBridgeModule: Module {
         let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrenceObj))
 
         // .alarm(schedule:) presentation = alert 만 사용 (= countdown / paused 영역 ❌).
+        // v1.7 hotfix #LAUnify Phase 3 — metadata 측 = step 데이터 명시 (= alarm_main 측 단순 영역. routine ❌).
         let alarmPresentation = AlarmPresentation(alert: alert)
         let alarmAttributes = AlarmAttributes<ShutTimerAlarmMetadata>(
           presentation: alarmPresentation,
+          metadata: metadataAll,
           tintColor: Color.red
         )
 
@@ -535,4 +550,15 @@ struct ScheduleAlarmParams: Record {
   @Field var secondaryLabel: String?
   // v1.6+ — recurrence 옵션 (= type='alarm_main' 측 사용). mode='daily'/'weekly' 시 .alarm(schedule:) 분기.
   @Field var recurrence: RecurrenceParams?
+  // v1.7 hotfix #LAUnify Phase 3 — AlarmKit framework 자동 LA Activity 측 = AlarmAttributes metadata
+  // 측 step 데이터 표시 영역. JS 측 = scheduleAlarm 호출 시 = step 데이터 전달 (= Phase 5 측 영역).
+  // 미전달 시 = nil / default → metadata 측 default 값 영역 (= 호환).
+  @Field var laStepName: String?
+  @Field var laStepIndex: Int?
+  @Field var laTotalSteps: Int?
+  @Field var laStage: String?
+  @Field var laPaused: Bool?
+  @Field var laPausedAt: Double?
+  @Field var laRoutineId: String?
+  @Field var laRoutineName: String?
 }

@@ -51,6 +51,20 @@ export type ScheduleAlarmParams = {
    * mode='never' 또는 미지정 = 기존 `.timer(duration:)` 분기 유지.
    */
   recurrence?: AlarmRecurrence;
+  /**
+   * v1.7 hotfix #LAUnify Phase 3 — AlarmKit framework 자동 LA Activity 측 = AlarmAttributes
+   * metadata 측 step 데이터 표시 영역. widget extension 측 AlarmAttributes layout (= Phase 6 영역)
+   * 측 = 본 metadata 측 사용 → step / progress 표시.
+   * 미전달 시 = native 측 default 영역 (= 호환).
+   */
+  laStepName?: string;
+  laStepIndex?: number;
+  laTotalSteps?: number;
+  laStage?: string;
+  laPaused?: boolean;
+  laPausedAt?: number;
+  laRoutineId?: string;
+  laRoutineName?: string;
 };
 
 /** v1.6 T1 — alarmUpdates AsyncSequence state 변화를 JS 측에 emit */

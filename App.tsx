@@ -718,8 +718,12 @@ function AppNavigator() {
             if (arParsedFast?.awaitingConfirm === true && navigationRef.current?.isReady()) {
               Logger.warn('LAControl-DBG', 'fast 분기 진입 → stopRoutine 호출');
               await stopRoutine().catch(() => {});
+              // v1.7 hotfix O1 — routineClearedExternally emit (= RoutineList / AlarmList / ActiveRoutineSection listener trigger).
+              // 패턴 정합 = "stop" signal 측 (= L757 영역) + HomeScreen 측 = stopRoutine + emit 영역.
+              // 직전 = emit ❌ → listener trigger ❌ → UI 갱신 ❌ → 사용자분 측 "중단 ❌" 회귀 영역.
+              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
               const routeFast = navigationRef.current.getCurrentRoute()?.name;
-              Logger.warn('LAControl-DBG', `fast stopRoutine OK route=${routeFast} isAdhoc=${isAdhocFast}`);
+              Logger.warn('LAControl-DBG', `fast stopRoutine + emit OK route=${routeFast} isAdhoc=${isAdhocFast}`);
               if (isAdhocFast) {
                 if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab' && routeFast !== 'AlarmList') {
                   Logger.warn('LAControl-DBG', `fast adhoc navigate AlarmTab (route=${routeFast})`);
@@ -772,7 +776,9 @@ function AppNavigator() {
               if (arParsed?.awaitingConfirm === true) {
                 Logger.warn('LAControl-DBG', 'standard 분기 진입 → stopRoutine 호출');
                 await stopRoutine().catch(() => {});
-                Logger.warn('LAControl-DBG', `standard stopRoutine OK route=${route} isAdhoc=${isAdhoc}`);
+                // v1.7 hotfix O1 — routineClearedExternally emit (= 패턴 정합 영역).
+                DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
+                Logger.warn('LAControl-DBG', `standard stopRoutine + emit OK route=${route} isAdhoc=${isAdhoc}`);
                 if (isAdhoc) {
                   if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
                     Logger.warn('LAControl-DBG', `standard adhoc navigate AlarmTab (route=${route})`);

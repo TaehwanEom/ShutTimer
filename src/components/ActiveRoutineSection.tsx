@@ -180,7 +180,19 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   useEffect(() => {
     if (!ar?.awaitingConfirm || modalVisible || !routine) return;
     const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
-    if (isLastStep) return;
+    if (isLastStep) {
+      // v1.7 hotfix #LastStepAutoEnd — 마지막 step alerting + AppState=active 시점 측 자동 종료.
+      // AlarmScreen navigate 측 발생 ❌ 영역 (= AppState=active) → 자동 confirmAndAdvance 호출 누락 → "00:01" 측 멈춤.
+      // confirmAndAdvance 측 line 640-643 = 마지막 step → fullCleanup + 'end' → LA + AlarmKit 자동 종료.
+      (async () => {
+        const res = await confirmAndAdvance();
+        if (!res || res.kind === 'end') onClose();
+      })();
+      return;
+    }
+    // 일반 step alerting → modal 표시 + JS 사운드/진동 시작.
+    // (#StaleAwaitingConfirm hasAlerting 검증 제거 = active 시점 측 App.tsx listener cancelAlarm 으로 alerting=false → false negative → 모달 미표시 회귀 회피.
+    //  stale 케이스 측 = restoreRoutineState (= cold-start / foreground 복귀) 측 sync 처리 영역.)
     setModalStage('next');
     setModalVisible(true);
     startAlarmEffects();

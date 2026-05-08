@@ -172,7 +172,11 @@ export default function RunningScreen({ navigation, route }: Props) {
 
   const getNotifSound = async (): Promise<string> => {
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? 'alarm_01';
-    return soundId.startsWith('ringtone_') ? 'notification_ringtone.wav' : 'notification_alarm.wav';
+    const resolved = soundId.startsWith('ringtone_') ? 'notification_ringtone.wav' : 'notification_alarm.wav';
+    // v1.7 hotfix #DBG-Sound (C3) — expo-notifications fallback 측 분기 결과 출력.
+    // 본 분기 = sounds.ts mapping 측 우회 영역 (= startsWith 'ringtone_' / else). 사용자 측 ringtone_05/ringtone_12 → notification_ringtone.wav 영역 정합.
+    Logger.warn('RunningScreen-DBG', `getNotifSound storedId=${soundId} → resolved=${resolved} (= mapping 우회)`);
+    return resolved;
   };
 
   const scheduleAlarms = async (seconds: number) => {

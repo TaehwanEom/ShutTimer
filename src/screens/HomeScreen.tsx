@@ -413,6 +413,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     // v1.6 hotfix — 사용자 설정 사운드 사전 로드 (AlarmKit + expo 양쪽 사용).
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+    // v1.7 hotfix #DBG-Sound (C2) — timer_main 측 사운드 매핑 출력 (= storedId → matchedId → pushSound).
+    // mismatch 시 = ALARM_SOUNDS[0] fallback → matchedId 영역 측 storedId 와 다름 (= root cause 식별).
+    console.warn(`[timer-DBG] sound storedId=${soundId} → matchedId=${soundItem.id} pushSound=${soundItem.pushSound}`);
     const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmEnabledRaw !== 'false';
 

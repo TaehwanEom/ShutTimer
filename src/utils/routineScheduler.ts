@@ -596,6 +596,9 @@ async function scheduleConfirmPromptViaAlarmKit(
     // v1.6 hotfix — confirm_prompt 사운드 통일. 사용자 설정 사운드 (단일 timer 와 동일 정책).
     const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+    // v1.7 hotfix #DBG-Sound (C1) — confirm_prompt 측 사운드 매핑 출력 (= soundId → soundItem.id → pushSound).
+    // soundId 영역 측 = AsyncStorage. soundItem.id 영역 측 = ALARM_SOUNDS 측 매칭 결과 (= mismatch 시 fallback to ALARM_SOUNDS[0]).
+    Logger.warn('routine-DBG', `confirm_prompt sound storedId=${soundId} → matchedId=${soundItem.id} pushSound=${soundItem.pushSound} routineId=${routineId}`);
 
     // v1.6 hotfix B1 — title 동적 생성 ("다음 루틴 {nextStepName}" / 마지막 step (1-step routine) 시 "루틴 완료")
     const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });

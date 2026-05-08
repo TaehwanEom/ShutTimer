@@ -26,7 +26,13 @@ yarn-error.*
 *.aab
 build/
 build */
-ios/
+# v1.7 hotfix #DBG-Sound — AppDelegate.swift 측 native 디버그 hook 영역 git 보존 영역.
+# 영구 디버그 영역 (= 심사용 빌드 시 별도 제거). prebuild 측 overwrite 영역 측 본 파일 측 = 명시적 git 추적 영역.
+# parent 디렉터리 (`ios/`) 측 통째 ignore 영역 측 = sub-file negation 영역 측 통과 ❌ → pattern 분해 영역.
+ios/*
+!ios/ShutTimer
+ios/ShutTimer/*
+!ios/ShutTimer/AppDelegate.swift
 !modules/**/ios/
 
 # 작업 자료 / 백업 / 개인 IDE 상태

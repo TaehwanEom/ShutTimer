@@ -95,6 +95,12 @@ public class AlarmkitBridgeModule: Module {
                 "state": Self.alarmStateToString(alarm.state),
               ])
 
+              // v1.7 hotfix #DBG-Sound (B4) — alerting 시점 alarm.attributes 추적.
+              // sound 측 metadata 측 caching/divergence 식별용 (= AlertConfiguration.AlertSound 측 internal API 영역).
+              if alarm.state == .alerting {
+                appendNativeDbg("AlarmKit-DBG", "alerting alarmId=\(alarm.id.uuidString) attributes=\(String(describing: alarm.attributes))")
+              }
+
               // v1.7 hotfix #5 — alerting 시점 native 측 LA stage='manual_prompt' 자동 갱신.
               // JS thread 측 background 정지 시도 정합 (= App.tsx onAlarmStateChange listener →
               // setLiveActivityStage 호출 ❌ 영역. JS 측 hotfix #4 = active 시점만 효과).
@@ -158,6 +164,7 @@ public class AlarmkitBridgeModule: Module {
       // v1.7 hotfix #26 — debug log: scheduleAlarm 진입 시점.
       // 베너 미노출 root cause 추적용. fireAt = 절대 시각 (ms) → 디바이스 측 console 시각 비교.
       // recurrence ❌ = nil log / recurrence ✅ = mode + days log.
+      // v1.7 hotfix #DBG-Sound — NSLog → appendNativeDbg 변환 (= App Group 통합 영역 정합).
       let nowDebugMs = Date().timeIntervalSince1970 * 1000.0
       let fireDeltaMs = params.fireAt - nowDebugMs
       let recDebug: String = {
@@ -166,7 +173,7 @@ public class AlarmkitBridgeModule: Module {
         }
         return "nil"
       }()
-      NSLog("[AlarmKit][schedule] 진입 entity=\(params.entityId) type=\(params.type ?? "?") fireAt=\(params.fireAt) deltaMs=\(Int(fireDeltaMs)) recurrence=\(recDebug)")
+      appendNativeDbg("AlarmKit-DBG", "schedule 진입 entity=\(params.entityId) type=\(params.type ?? "?") fireAt=\(params.fireAt) deltaMs=\(Int(fireDeltaMs)) recurrence=\(recDebug) soundName=\(params.soundName ?? "(nil)")")
 
       // v1.6 Phase 5 — iOS 26.1+ 에서 stopButton deprecated. #available 분기.
       // v1.6 hotfix — confirm_prompt 타입 + secondaryLabel 전달 시 secondary button 결합.
@@ -229,9 +236,32 @@ public class AlarmkitBridgeModule: Module {
         alertSound = .named(name)
       } else {
         alertSound = .default
+        // v1.7 hotfix #DBG-Sound (B3) — default fallback 진입 측 WARN.
+        // soundName 측 nil/empty 도달 시점 = 사용자 측 사운드 선택 측 누락 경로 영역.
+        appendNativeDbg("AlarmKit-DBG-WARN", "sound default fallback 진입 entity=\(params.entityId) type=\(params.type ?? "?") soundName=\(params.soundName ?? "(nil)")")
       }
       // v1.7 hotfix #DBG-D — sound 분기 결과 (= 알람 사운드 ❌ / 다른 사운드 root cause 추적용).
       appendNativeDbg("AlarmKit-DBG", "sound entity=\(params.entityId) type=\(params.type ?? "?") soundName=\(params.soundName ?? "(nil)") branch=\((params.soundName?.isEmpty == false) ? "named" : "default")")
+
+      // v1.7 hotfix #DBG-Sound (B2) — sound 분기 직후 bundle path resolve sanity check.
+      // .named(name) 측 = OS 측 internal API. bundle 측 동일 stem (= .wav 가정 + 확장자 미포함 영역) path/size 직접 검증.
+      // 미존재 시 = OS 측 default fallback 출력 영역 (= 사용자분 측 "알람 01 출력" root cause 후보).
+      if let name = params.soundName, !name.isEmpty {
+        let stem = (name as NSString).deletingPathExtension
+        let ext = ((name as NSString).pathExtension.isEmpty) ? "wav" : (name as NSString).pathExtension
+        if let path = Bundle.main.path(forResource: stem, ofType: ext) {
+          let size = ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int) ?? -1
+          var first16hex = "(read fail)"
+          if let fh = FileHandle(forReadingAtPath: path) {
+            let data = fh.readData(ofLength: 16)
+            first16hex = data.map { String(format: "%02x", $0) }.joined()
+            fh.closeFile()
+          }
+          appendNativeDbg("AlarmKit-DBG", "sound resolve OK name=\(name) → path=\(path) size=\(size) first16=\(first16hex)")
+        } else {
+          appendNativeDbg("AlarmKit-DBG-WARN", "sound resolve FAIL name=\(name) stem=\(stem).\(ext) NOT FOUND in bundle (= OS default fallback 가능)")
+        }
+      }
 
       // v1.6 Phase 5-Lite — chain alarm 만 stopIntent 전달.
       // v1.6 hotfix — confirm_prompt + secondaryLabel 시 secondaryIntent 결합 (AdvanceNextStepIntent).
@@ -381,14 +411,19 @@ public class AlarmkitBridgeModule: Module {
       // 정상 영역 = state check 분기. scheduled alarm 측 stop 호출 시 부작용 회피
       //   (= 위젯 ✕ tap 시 cancelAlarm → stop trigger → 'open_app_dismiss' signal → 회귀 차단).
       // alarms throw 시 = state 미상 → stop + cancel 둘 다 try? fallback (= alerting alarm 지속 ring 버그 의도 보존).
+      // v1.7 hotfix #DBG-Sound (B5) — cancelAlarm 진입 = state + alarmId 추적 (= 사운드 종료 root cause 영역).
       do {
         let alarms = try AlarmManager.shared.alarms
         if let alarm = alarms.first(where: { $0.id == uuid }), alarm.state == .alerting {
+          appendNativeDbg("AlarmKit-DBG", "cancelAlarm 진입 alarmId=\(alarmId) state=alerting → stop()")
           try? await AlarmManager.shared.stop(id: uuid)
         } else {
+          let foundState = alarms.first(where: { $0.id == uuid }).map { Self.alarmStateToString($0.state) } ?? "(not in list)"
+          appendNativeDbg("AlarmKit-DBG", "cancelAlarm 진입 alarmId=\(alarmId) state=\(foundState) → cancel()")
           try? await AlarmManager.shared.cancel(id: uuid)
         }
       } catch {
+        appendNativeDbg("AlarmKit-DBG-WARN", "cancelAlarm 진입 alarmId=\(alarmId) alarms throw=\(error) → stop+cancel fallback")
         try? await AlarmManager.shared.stop(id: uuid)
         try? await AlarmManager.shared.cancel(id: uuid)
       }
@@ -397,6 +432,8 @@ public class AlarmkitBridgeModule: Module {
     AsyncFunction("stopAlarm") { (alarmId: String) async throws in
       guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
+      // v1.7 hotfix #DBG-Sound (B6) — stopAlarm 진입 = alarmId 추적.
+      appendNativeDbg("AlarmKit-DBG", "stopAlarm 진입 alarmId=\(alarmId)")
       try await AlarmManager.shared.stop(id: uuid)
     }
 
@@ -426,6 +463,9 @@ public class AlarmkitBridgeModule: Module {
     AsyncFunction("listAlarms") { () async throws -> [[String: String]] in
       guard #available(iOS 26.0, *) else { return [] }
       let alarms = try AlarmManager.shared.alarms
+      // v1.7 hotfix #DBG-Sound (B7) — listAlarms 진입 = count + state per alarm.
+      let stateSummary = alarms.map { "\($0.id.uuidString.prefix(8))=\(Self.alarmStateToString($0.state))" }.joined(separator: ",")
+      appendNativeDbg("AlarmKit-DBG", "listAlarms 진입 count=\(alarms.count) [\(stateSummary)]")
       return alarms.map { alarm in
         [
           "id": alarm.id.uuidString,

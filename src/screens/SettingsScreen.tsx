@@ -585,19 +585,7 @@ export default function SettingsScreen({ navigation }: Props) {
           ═══════════════════════════════════════════════════════════
         */}
 
-        {/* 위젯 — v2 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.widget')}</Text>
-          <View style={[styles.toggleRow, styles.disabledRow]}>
-            <View style={styles.toggleLeft}>
-              <MaterialIcons name="widgets" size={22} color={colors.secondary} style={{ opacity: 0.4 }} />
-              <Text style={[styles.toggleLabel, styles.disabledText]}>{t('settings.homeWidget')}</Text>
-            </View>
-            <View style={styles.comingSoonBadge}>
-              <Text style={styles.comingSoonText}>{t('settings.comingSoon')}</Text>
-            </View>
-          </View>
-        </View>
+        {/* v1.7 hotfix — 홈 화면 위젯 섹션 제거 (= v2 미구현 + 사용자 명시 불필요 영역). */}
 
         {/* v1.7 hotfix #DBG — 17건 버그 추적용 임시 디버그 섹션. TestFlight console 미라우팅 회피.
             JS 로그 (Logger.warn → AsyncStorage) + Native 로그 (NSLog → App Group UserDefaults "native_debug_log_v1") 합쳐 공유.

@@ -532,6 +532,22 @@ function AppNavigator() {
         // JS thread active 시점 측 ar 갱신 → 향후 startOrUpdateLiveActivity 호출 시 stage='manual_prompt' 보장.
         // JS thread 정지 시점 측은 native fix #5 가 보강.
         await markAwaitingConfirm(meta.entityId).catch(() => {});
+        // v1.7 hotfix #LastStepDirectNavigate — 마지막 step 측 = AlarmScreen navigate 직접.
+        // listener 측 navigate('RoutineList') / ('AlarmTab') 측 = 마지막 step 측 = 시각 race
+        // (= RoutineList → AlarmScreen 잠깐 표시) 회피.
+        const snap = readRoutineSnapshot();
+        if (snap && snap.routineId === meta.entityId && snap.currentStepIndex + 1 >= snap.totalSteps) {
+          if (currentRoute !== 'Alarm') {
+            const lastRoutines = await loadRoutines();
+            const lastR = lastRoutines.find(x => x.id === meta.entityId);
+            navigationRef.current?.navigate('Alarm', {
+              fromRoutine: 'last_step',
+              routineId: meta.entityId,
+              endMethod: lastR?.endMethod ?? 'tap',
+            });
+          }
+          return;
+        }
         // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
         if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;

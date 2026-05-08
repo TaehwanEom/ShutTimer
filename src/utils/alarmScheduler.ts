@@ -165,6 +165,37 @@ export async function syncAllAlarms(): Promise<void> {
   }
 }
 
+/**
+ * 콜드 스타트 시점 호출. AlarmKit framework 측 영속 alarm 중 = JS mapping table 측 등록 ❌ alarm cleanup.
+ * 이전 빌드 측 잔존 / mapping 손상 영역 측 유령 알람 정리.
+ * syncAllAlarms 후 호출 = mapping 측 정상 alarm = scheduleAlarm 후 saveAlarmMetadata 등록 보존 영역.
+ */
+export async function cleanupGhostAlarms(): Promise<number> {
+  if (!isAlarmKitAvailableSync()) return 0;
+
+  try {
+    const frameworkAlarms = await AlarmkitBridge.listAlarms();
+    const allMeta = await listAllAlarmMetadata();
+    const knownIds = new Set(allMeta.map(m => m.alarmId));
+    const ghostIds: string[] = frameworkAlarms
+      .map(a => a.id)
+      .filter(id => !knownIds.has(id));
+
+    Logger.warn(
+      'GhostCleanup',
+      `frameworkCount=${frameworkAlarms.length} mappingCount=${allMeta.length} ghostCount=${ghostIds.length} ids=[${ghostIds.join(',')}]`
+    );
+
+    for (const ghostId of ghostIds) {
+      await AlarmkitBridge.cancelAlarm(ghostId).catch(() => {});
+    }
+    return ghostIds.length;
+  } catch (e) {
+    Logger.warn('GhostCleanup', `error=${String(e)}`);
+    return 0;
+  }
+}
+
 // ─── 한 번만 비활성 ──────────────────────────────────────
 
 /**

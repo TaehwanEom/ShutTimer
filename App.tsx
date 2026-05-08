@@ -97,6 +97,7 @@ import {
   syncAllAlarms,
   disableOnceAlarmIfNeeded,
   recordAlarmSession,
+  cleanupGhostAlarms,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 /*
@@ -893,10 +894,16 @@ function AppNavigator() {
     syncRollingSchedule().catch((e) => {
       Logger.warn('AppNavigator', `syncRollingSchedule failed: ${e}`);
     });
-    // v1.6+ 알람 측 = stale 'alarm_main' cleanup + enabled=true 알람 재예약
-    syncAllAlarms().catch((e) => {
-      Logger.warn('AppNavigator', `syncAllAlarms failed: ${e}`);
-    });
+    // v1.6+ 알람 측 = stale 'alarm_main' cleanup + enabled=true 알람 재예약.
+    // v1.7 hotfix #GhostAlarmCleanup — syncAllAlarms 후 = framework 측 mapping table 측 등록 ❌ 유령 알람 cleanup. 순차 호출 (= race 회피).
+    (async () => {
+      try {
+        await syncAllAlarms();
+        await cleanupGhostAlarms();
+      } catch (e) {
+        Logger.warn('AppNavigator', `syncAllAlarms / cleanupGhostAlarms failed: ${String(e)}`);
+      }
+    })();
     // v1.7 Phase 2-A — 시작 시 잔존 ad-hoc routine (= 비정상 종료 / 다른 알람 fire 안 함) 정리.
     cleanupStaleAdhocRoutines().catch((e) => {
       Logger.warn('AppNavigator', `cleanupStaleAdhocRoutines failed: ${e}`);

@@ -285,6 +285,8 @@ export default function SettingsScreen({ navigation }: Props) {
     // v1.5: preload는 이전 사운드로 로드된 상태 → AlarmScreen에서 최신 선택을 반영하도록 무효화.
     //       HomeScreen이 다음 scheduleAlarm에서 새 사운드로 다시 preload함.
     clearPreloadedSound().catch(() => {});
+    // v1.7 hotfix #SoundSelectAutoClose — 선택 즉시 모달 close + 미리듣기 stop.
+    closeSoundModal();
   };
 
   const handlePreview = async (soundId: string) => {
@@ -770,7 +772,7 @@ export default function SettingsScreen({ navigation }: Props) {
                   </View>
                   <TouchableOpacity onPress={() => handleSoundSelect(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <MaterialIcons
-                      name={selectedSoundId === item.id ? 'check-circle' : 'radio-button-unchecked'}
+                      name={selectedSoundId === item.id ? 'check' : 'radio-button-unchecked'}
                       size={22}
                       color={selectedSoundId === item.id ? colors.primary : colors.secondary}
                     />
@@ -791,7 +793,7 @@ export default function SettingsScreen({ navigation }: Props) {
                   </View>
                   <TouchableOpacity onPress={() => handleSoundSelect(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                     <MaterialIcons
-                      name={selectedSoundId === item.id ? 'check-circle' : 'radio-button-unchecked'}
+                      name={selectedSoundId === item.id ? 'check' : 'radio-button-unchecked'}
                       size={22}
                       color={selectedSoundId === item.id ? colors.primary : colors.secondary}
                     />

@@ -72,6 +72,11 @@ let interstitial: any = null;
 // 본 영역 = AlarmScreen 측 useEffect 측 mount 시 load 호출 영역 ❌ (= 사용자분 측 dismiss 시점 = LOADED 도착 ❌).
 // 정공 영역 = 앱 시작 시 1회 load + LOADED listener attach + CLOSED 시 다음 load = 항상 ready 영역 보장.
 let interstitialLoaded = false;
+// v1.7 hotfix #InterstitialCooldown — AlarmScreen remount 측 광고 재호출 차단.
+// 사용자 보고 = "광고 도중 갑자기 알람" root cause = AlarmScreen 1ms 사이 unmount + remount → resultEnteredRef reset → enterResult 다시 진입 → interstitial.show 두 번 호출 영역.
+// module-level timestamp 측 = AlarmScreen 측 lifecycle 무관 보존 → cooldown 내 재호출 시 = handleAfterAd 직접 진입 (= 광고 skip).
+let lastInterstitialShowAt = 0;
+const INTERSTITIAL_COOLDOWN_MS = 60000;
 if (!isExpoGo) {
   (async () => {
     try {
@@ -447,8 +452,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // 본 영역 = adLoadedRef.current 측 = AlarmScreen useEffect 측 listener attach 영역 영역.
     // module-level interstitialLoaded 측 = 앱 시작 시 1회 load + CLOSED 시 다음 load = 항상 ready 영역 영역.
     Logger.warn('Ad-DBG', `enterResult interstitialLoaded=${interstitialLoaded} interstitial=${!!interstitial} dismissMethod=${dismissMethod}`);
+    // v1.7 hotfix #InterstitialCooldown — AlarmScreen remount 측 광고 재호출 차단 (= module-level timestamp 가드).
+    const sinceLastShow = Date.now() - lastInterstitialShowAt;
+    if (sinceLastShow < INTERSTITIAL_COOLDOWN_MS) {
+      Logger.warn('Ad-DBG', `enterResult SKIP cooldown (= 직전 ${sinceLastShow}ms < ${INTERSTITIAL_COOLDOWN_MS}ms) → handleAfterAd 직접`);
+      handleAfterAd();
+      return;
+    }
     if (interstitialLoaded && interstitial) {
       Logger.warn('Ad-DBG', 'enterResult interstitial.show 호출');
+      lastInterstitialShowAt = Date.now();
       interstitial.show().catch((e: any) => {
         Logger.warn('Ad-DBG', `enterResult show throw=${String(e)}`);
         handleAfterAd();
@@ -465,8 +478,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     afterAdActionRef.current = 'home';
     // v1.7 hotfix H1 — module-level interstitialLoaded 측 검사 (= preload 영역 정합).
     Logger.warn('Ad-DBG', `autoDismissNoResult interstitialLoaded=${interstitialLoaded} interstitial=${!!interstitial}`);
+    // v1.7 hotfix #InterstitialCooldown — AlarmScreen remount 측 광고 재호출 차단 (= module-level timestamp 가드).
+    const sinceLastShow = Date.now() - lastInterstitialShowAt;
+    if (sinceLastShow < INTERSTITIAL_COOLDOWN_MS) {
+      Logger.warn('Ad-DBG', `autoDismissNoResult SKIP cooldown (= 직전 ${sinceLastShow}ms < ${INTERSTITIAL_COOLDOWN_MS}ms) → goHome 직접`);
+      goHome();
+      return;
+    }
     if (interstitialLoaded && interstitial) {
       Logger.warn('Ad-DBG', 'autoDismissNoResult interstitial.show 호출');
+      lastInterstitialShowAt = Date.now();
       interstitial.show().catch((e: any) => {
         Logger.warn('Ad-DBG', `autoDismissNoResult show throw=${String(e)}`);
         goHome();

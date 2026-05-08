@@ -17,9 +17,14 @@ public class LiveActivityBridgeModule: Module {
     Name("LiveActivityBridge")
 
     Function("areActivitiesEnabled") { () -> Bool in
-      if #available(iOS 16.2, *) {
-        return ActivityAuthorizationInfo().areActivitiesEnabled
-      }
+      // v1.7 hotfix #LAUnify Phase 7 — false 강제 영역.
+      //   AlarmKit framework 측 .timer(duration:attributes:) factory → Activity<AlarmAttributes<...>>
+      //   자동 시작 영역 + 직전 LiveActivityBridge.start 측 별도 LA 시작 = 두 LA 동시 → 시스템 측
+      //   한 개만 표시 / 충돌 영역 (= 카운터 시각 ❌ root cause).
+      //   본 commit = areActivitiesEnabled false 강제 → JS 측 LiveActivityBridge.start 호출 측 가드 통과 ❌ →
+      //   AlarmKit framework 측 자체 LA Activity 측만 단독 활성 → widget extension 측 AlarmAttributes
+      //   layout (= Phase 6 등록) 단독 표시 → 카운터 정상.
+      //   update / end / endAll 측 = activities 측 빈 영역 → no-op 영역 정합 (= 별도 변경 ❌).
       return false
     }
 

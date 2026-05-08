@@ -8,7 +8,7 @@ export const ALARM_SOUNDS: SoundItem[] = [
   { id: 'alarm_01', source: require('../../assets/sounds/notification_alarm.wav'), pushSound: 'notification_alarm.wav' },
   { id: 'alarm_02', source: require('../../assets/sounds/notification_alarm01.wav'), pushSound: 'notification_alarm01.wav' },
   { id: 'ringtone_01', source: require('../../assets/sounds/ringtone_05.wav'), pushSound: 'ringtone_05.wav' },
-  { id: 'ringtone_02', source: require('../../assets/sounds/ringtone_05.wav'), pushSound: 'ringtone_05.wav' },
+  { id: 'ringtone_02', source: require('../../assets/sounds/notification_ringtone.wav'), pushSound: 'notification_ringtone.wav' },
 ];
 
 export const DEFAULT_SOUND_ID = 'alarm_01';

@@ -376,16 +376,16 @@ function AppNavigator() {
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
       if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
-        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
-        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_prealert currentRoute=${currentRoute}`);
-        navigationRef.current?.navigate('RoutineList');
+        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_prealert currentRoute=${currentRoute}`);
+        (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
         return;
       }
       if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
         // 자동 진행 체인 — RoutineList 의 inline 진행이 active routine sync 로 자동 마운트
-        if (currentRoute === 'RoutineList') return;
-        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_chain currentRoute=${currentRoute}`);
-        navigationRef.current?.navigate('RoutineList');
+        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab') return;
+        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_chain currentRoute=${currentRoute}`);
+        (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
         return;
       }
       if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
@@ -394,18 +394,18 @@ function AppNavigator() {
         // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
         // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
         // camera → RoutineAlarm (scan UI).
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm') return;
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === data.routineId);
         if (!r) {
-          Logger.warn('NAV-DBG', `reset target=RoutineList source=notif-response/routine_confirm_prompt-noRoutine currentRoute=${currentRoute}`);
-          navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+          Logger.warn('NAV-DBG', `reset target=RoutineTab source=notif-response/routine_confirm_prompt-noRoutine currentRoute=${currentRoute}`);
+          navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
           return;
         }
         if (!navigationRef.current?.isReady()) return;
         // v1.6 A-1 — 모달 통일. 모든 endMethod (tap/shake/camera) = RoutineList → ActiveRoutineSection modal.
-        Logger.warn('NAV-DBG', `navigate target=RoutineList source=notif-response/routine_confirm_prompt-routine currentRoute=${currentRoute}`);
-        navigationRef.current.navigate('RoutineList');
+        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_confirm_prompt-routine currentRoute=${currentRoute}`);
+        (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
         return;
       }
 
@@ -427,13 +427,13 @@ function AppNavigator() {
         if (!response) return;
         const data = (response?.notification?.request?.content?.data ?? {}) as any;
         if (data?.type === 'routine_prealert') {
-          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_prealert`);
-          navigationRef.current?.navigate('RoutineList');
+          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_prealert`);
+          (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
           return;
         }
         if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
-          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_chain`);
-          navigationRef.current?.navigate('RoutineList');
+          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_chain`);
+          (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
           return;
         }
         if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
@@ -443,13 +443,13 @@ function AppNavigator() {
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === data.routineId);
           if (!r) {
-            Logger.warn('NAV-DBG', `reset target=RoutineList source=cold-start/routine_confirm_prompt-noRoutine`);
-            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            Logger.warn('NAV-DBG', `reset target=RoutineTab source=cold-start/routine_confirm_prompt-noRoutine`);
+            navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
             return;
           }
           if (!navigationRef.current?.isReady()) return;
-          Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start/routine_confirm_prompt-routine`);
-          navigationRef.current.navigate('RoutineList');
+          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_confirm_prompt-routine`);
+          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
           return;
         }
         // 기본 알람 경로 — routine 진행 중이면 차단
@@ -559,7 +559,7 @@ function AppNavigator() {
         }
         // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
+        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
@@ -569,8 +569,8 @@ function AppNavigator() {
               routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
             });
           } else {
-            Logger.warn('NAV-DBG', `reset target=RoutineList source=onAlarmStateChange/confirm_prompt-noRoutine currentRoute=${currentRoute}`);
-            navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+            Logger.warn('NAV-DBG', `reset target=RoutineTab source=onAlarmStateChange/confirm_prompt-noRoutine currentRoute=${currentRoute}`);
+            navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
           }
           return;
         }
@@ -579,8 +579,8 @@ function AppNavigator() {
         if (isAdhoc) {
           (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
         } else {
-          Logger.warn('NAV-DBG', `navigate target=RoutineList source=onAlarmStateChange/confirm_prompt-routine currentRoute=${currentRoute}`);
-          navigationRef.current.navigate('RoutineList');
+          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=onAlarmStateChange/confirm_prompt-routine currentRoute=${currentRoute}`);
+          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
         }
       }
     });
@@ -599,7 +599,7 @@ function AppNavigator() {
         if (!meta) return;
         const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
         // 다른 알림 핸들러가 이미 navigate 했으면 skip
-        if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
 
         if (meta.type === 'chain') {
           // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). cold-start 잔존 mapping silent cleanup.
@@ -642,8 +642,8 @@ function AppNavigator() {
                 routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
               });
             } else {
-              Logger.warn('NAV-DBG', `reset target=RoutineList source=cold-start-1.5s/listAlarms-confirm_prompt-noRoutine`);
-              navigationRef.current?.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+              Logger.warn('NAV-DBG', `reset target=RoutineTab source=cold-start-1.5s/listAlarms-confirm_prompt-noRoutine`);
+              navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
             }
             return;
           }
@@ -651,8 +651,8 @@ function AppNavigator() {
           if (isAdhoc) {
             (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
           } else {
-            Logger.warn('NAV-DBG', `navigate target=RoutineList source=cold-start-1.5s/listAlarms-confirm_prompt-routine`);
-            navigationRef.current.navigate('RoutineList');
+            Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start-1.5s/listAlarms-confirm_prompt-routine`);
+            (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
           }
         }
       } catch {}
@@ -764,7 +764,7 @@ function AppNavigator() {
                 // v1.7 hotfix #routine-tab-unify Phase 2 — 단일 변환. fast 분기 측 'open_app_dismiss' non-adhoc 영역.
                 // Bottom Tab 'RoutineTab' 단일 진입 경로 통합 영역 (= 사용자분 측 = "또다른 루틴 페이지" 정합).
                 // 본 commit = 본 1줄만 변환. 다른 navigate 측 = 다음 phase 영역.
-                if (routeFast !== 'RoutineList') {
+                if (routeFast !== 'RoutineList' && (routeFast as string) !== 'RoutineTab') {
                   Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineTab (route=${routeFast})`);
                   (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                 } else {
@@ -819,10 +819,10 @@ function AppNavigator() {
                     Logger.warn('LAControl-DBG', `standard adhoc navigate skip (route=${route})`);
                   }
                 } else {
-                  if (route !== 'RoutineList') {
-                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineList (route=${route})`);
-                    Logger.warn('NAV-DBG', `navigate target=RoutineList source=la-control/open_app_dismiss-standard-stopRoutine currentRoute=${route}`);
-                    navigationRef.current.navigate('RoutineList');
+                  if (route !== 'RoutineList' && (route as string) !== 'RoutineTab') {
+                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineTab (route=${route})`);
+                    Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-stopRoutine currentRoute=${route}`);
+                    (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                   } else {
                     Logger.warn('LAControl-DBG', `standard non-adhoc navigate skip (route=${route})`);
                   }
@@ -837,9 +837,9 @@ function AppNavigator() {
                   (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
                 }
               } else {
-                if (route !== 'Alarm' && route !== 'RoutineList') {
-                  Logger.warn('NAV-DBG', `navigate target=RoutineList source=la-control/open_app_dismiss-standard-default currentRoute=${route}`);
-                  navigationRef.current.navigate('RoutineList');
+                if (route !== 'Alarm' && route !== 'RoutineList' && (route as string) !== 'RoutineTab') {
+                  Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-default currentRoute=${route}`);
+                  (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                 }
               }
             }
@@ -928,7 +928,7 @@ function AppNavigator() {
       // L331 getLastNotificationResponseAsync 핸들러가 이미 RoutineList/RoutineAlarm 로 navigate 했으면 skip
       // (알림 탭으로 앱 진입 시 양쪽 모두 fire → RoutineAlarm 2개 stack 되는 회귀 차단)
       const currentRoute = navigationRef.current.getCurrentRoute()?.name;
-      if (currentRoute === 'RoutineList' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+      if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
       restoreRoutineState()
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
@@ -937,7 +937,7 @@ function AppNavigator() {
               // v1.7 Phase 2-B — ad-hoc = AlarmTab (nested = tab bar 보존).
               (navigationRef.current as any)!.navigate('Home', { screen: 'AlarmTab' });
             } else {
-              navigationRef.current!.navigate('RoutineList');
+              (navigationRef.current as any)!.navigate('Home', { screen: 'RoutineTab' });
             }
           };
           const resetTarget = (isAdhoc: boolean) => {
@@ -947,7 +947,7 @@ function AppNavigator() {
                 routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
               });
             } else {
-              navigationRef.current!.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+              navigationRef.current!.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
             }
           };
           if (res.kind === 'run') {

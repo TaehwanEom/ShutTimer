@@ -352,10 +352,17 @@ export default function AlarmScreen({ navigation, route }: Props) {
       autoResultTimeoutRef.current = null;
     }
     // v1.6 #12 — 마지막 step 진입한 경우 routine 정상 종료 + RoutineList 복귀.
+    // v1.7 hotfix #StopNav — adhoc routine (= aa_ prefix) 측 = AlarmTab 진입 정합 (= 알람 entity 등록 영역 = 메뉴바 보존).
+    // non-adhoc routine 측 = 기존 RoutineList 복귀 (= 일반 루틴 영역). 사용자 보고 = "알람 루틴 → 메뉴바 없는 페이지 전환" root cause 정정.
     const fromRoutine = (route.params as { fromRoutine?: string } | undefined)?.fromRoutine;
+    const routeRoutineId = (route.params as { routineId?: string } | undefined)?.routineId;
     if (fromRoutine === 'last_step') {
       await stopRoutine().catch(() => {});
-      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+      if (routeRoutineId && isAdhocAlarmRoutine(routeRoutineId)) {
+        (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }] });
+      } else {
+        navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+      }
       return;
     }
     // v1.7 Phase 2-A — 알람 entity 측 dismiss 후 = alarm.steps 보유 시 ad-hoc routine 시작.

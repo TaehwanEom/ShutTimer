@@ -38,6 +38,20 @@ fileprivate func appendNativeDbgWidget(_ tag: String, _ msg: String, throttle: B
     d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY)
 }
 
+// v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmPresentationState.Mode 측 String 변환 helper.
+// dbg log 측 mode 분기 + associated value 핵심 데이터 명시용.
+@available(iOS 26.0, *)
+fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
+    switch mode {
+    case .countdown(let c):
+        return "countdown(fire=\(Int(c.fireDate.timeIntervalSince1970 * 1000)))"
+    case .paused(let p):
+        return "paused(total=\(p.totalCountdownDuration) elapsed=\(p.previouslyElapsedDuration))"
+    case .alert:
+        return "alert"
+    }
+}
+
 // v1.6 T3 + Phase 10 + Phase 11 — ShutTimer routine/timer 진행 LiveActivity
 // (Lock Screen + Dynamic Island + Apple Watch Smart Stack)
 // 사용자 명시 디자인: Lock Screen [좌측 라벨+카운트다운(56pt 1줄)] [정지 ✕] [플레이/⏸ 토글]
@@ -442,6 +456,9 @@ struct AlarmKitLockScreenView: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
     var body: some View {
+        // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmKit LA widget body 진입 + state.mode 값 native log.
+        // 사용자분 보고 = paused 시 "검정 바만 표시" → 본 widget body 호출 여부 + mode 분기 확인용.
+        let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitLockScreenView render mode=\(akModeString(context.state.mode)) routineName=\(context.attributes.metadata?.routineName ?? "nil") routineId=\(context.attributes.metadata?.routineId ?? "nil")", throttle: true) }()
         HStack(spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -485,6 +502,7 @@ struct AlarmKitCountdownText: View {
     let fontStyle: Font
 
     var body: some View {
+        let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitCountdownText render mode=\(akModeString(context.state.mode))", throttle: true) }()
         switch context.state.mode {
         case .countdown(let countdown):
             Text(timerInterval: countdown.startDate...countdown.fireDate, countsDown: true)
@@ -550,6 +568,7 @@ struct AlarmKitPauseResumeButton: View {
 
     var body: some View {
         let routineId = context.attributes.metadata?.routineId ?? ""
+        let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitPauseResumeButton render mode=\(akModeString(context.state.mode)) routineId=\(routineId)", throttle: true) }()
         switch context.state.mode {
         case .paused:
             Button(intent: ResumeRoutineIntent(routineId: routineId)) {

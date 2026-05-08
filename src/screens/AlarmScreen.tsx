@@ -308,6 +308,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // v1.6 #12 — 마지막 step camera 정공 진입은 redirect ❌ (의도된 navigate).
     const fromRoutine = (route.params as { fromRoutine?: string } | undefined)?.fromRoutine;
     if (fromRoutine === 'last_step') return;
+    // v1.7 hotfix N1 — alarm entity 측 발화 (= alarmEntityId 영역) 시 = redirect skip 영역.
+    // 의도 = "routine 진행 중 단일 timer 잘못 진입" 영역만 redirect. 알람 entity 측 발화 = AlarmScreen 정상 진입 영역 (= tap / shake / scan 영역).
+    // 직전 = isRoutineActive=true + non-adhoc routine 측 영역 시 = 알람 entity 측 AlarmScreen mount → 약 0.3초 후 강제 unmount → 사용자 dismiss method 진입 ❌ 회귀.
+    const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
+    if (alarmEntityId) return;
     AsyncStorage.getItem('isRoutineActive').then(async v => {
       if (v !== 'true') return;
       const arRaw = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);

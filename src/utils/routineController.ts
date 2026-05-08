@@ -47,6 +47,11 @@ const IS_TIMER_ACTIVE_KEY = 'isTimerActive';
 let currentConfirmPromptId: string | null = null;
 // v1.6 T3 Phase 4: 활성 LiveActivity id — 잠금화면/다이내믹 아일랜드 표시용.
 let currentLiveActivityId: string | null = null;
+// v1.7 hotfix #DupSched — 이중 schedule 차단 가드.
+// root cause = startRoutineFromAlarm → startRoutine-fresh (#1) → AlarmListScreen mount → ActiveRoutineSection.init → startRoutine-resumed (#2)
+// 동일 routineId + stepIdx + stepEndAt key 측 1초 이내 재호출 시 skip. 정상 호출 (= stepEndAt 다른 영역 = 다음 step / pause shift / cold restart) 측 영향 ❌.
+let lastScheduleKey: string | null = null;
+let lastScheduleAt = 0;
 
 // ─── 결과 타입 ───────────────────────────────────────────────
 
@@ -94,6 +99,15 @@ function createFreshAr(r: Routine): ActiveRoutine {
  */
 async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine, callerHint?: string): Promise<void> {
   Logger.warn('routine-DBG', `schedBgNotif ENTER caller=${callerHint ?? '(unknown)'} routineId=${r.id} stepIdx=${ar.currentStepIndex} pausedAt=${ar.pausedAt} prevConfirmPromptId=${currentConfirmPromptId ?? '(null)'}`);
+  // v1.7 hotfix #DupSched — 동일 schedule 1초 이내 재호출 차단.
+  // key = routineId:stepIdx:stepEndAt. 정상 호출 (다음 step / pause-resume / 콜드 스타트) 측 = stepEndAt 다른 영역 → key 다름 → 진입 정상.
+  const key = `${r.id}:${ar.currentStepIndex}:${ar.stepEndAt}`;
+  if (lastScheduleKey === key && Date.now() - lastScheduleAt < 1000) {
+    Logger.warn('routine-DBG', `schedBgNotif SKIP duplicate caller=${callerHint ?? '(unknown)'} key=${key}`);
+    return;
+  }
+  lastScheduleKey = key;
+  lastScheduleAt = Date.now();
   if (currentConfirmPromptId) {
     await cancelRoutineConfirmPrompt(currentConfirmPromptId);
     currentConfirmPromptId = null;

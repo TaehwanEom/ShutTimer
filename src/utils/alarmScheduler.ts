@@ -84,6 +84,16 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundKey=${alarm.soundKey} → soundName=${soundName ?? '(undefined)'}`);
   const title = alarm.label || '알람';
 
+  // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.
+  //   알람 = 단순 영역 (= 1 step), routineName = label 영역.
+  const laMeta = {
+    laStepName: title,
+    laStepIndex: 0,
+    laTotalSteps: 1,
+    laStage: 'step',
+    laRoutineId: alarm.id,
+    laRoutineName: title,
+  } as const;
   try {
     let id: string;
     if (alarm.repeat === 'once') {
@@ -93,6 +103,7 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
         fireAt,
         type: 'alarm_main',
         soundName,
+        ...laMeta,
       });
     } else {
       id = await AlarmkitBridge.scheduleAlarm({
@@ -105,6 +116,7 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
           alarm.repeat === 'daily'
             ? { mode: 'daily' }
             : { mode: 'weekly', days: alarm.days },
+        ...laMeta,
       });
     }
     if (!id) return null;

@@ -459,6 +459,14 @@ export default function HomeScreen({ navigation, route }: Props) {
           stopLabel: t('home.timerStop', { defaultValue: '확인' }),
           type: 'timer_main',
           soundName: soundItem.pushSound, // v1.6 hotfix — 사용자 설정 사운드 풀스크린 발화
+          // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.
+          //   단일 타이머 = totalSteps=1, stepIndex=0, stepName="타이머".
+          laStepName: t('home.timerName', { defaultValue: '타이머' }),
+          laStepIndex: 0,
+          laTotalSteps: 1,
+          laStage: 'step',
+          laRoutineId: routineId,
+          laRoutineName: t('home.timerName', { defaultValue: '타이머' }),
         });
         console.warn('[timer] scheduled id:', id);
         // Phase E 진단 — 등록 직후 system 측 alarm 상태

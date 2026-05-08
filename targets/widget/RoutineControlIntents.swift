@@ -44,10 +44,19 @@ import SwiftUI
 #endif
 
 // v1.6 hotfix — main app target 의 ShutTimerAlarmMetadata (AlarmkitBridgeModule.swift) 와 동일 정의.
-// metadata 자체가 비어있어 두 target 정의 동일 = Codable 호환.
+// v1.7 hotfix #LAUnify Phase 2 — step 데이터 필드 추가 (= main app target 측 정의 정합 영역 = Codable 호환).
+//   AlarmKit framework 자동 LA Activity 측 = AlarmAttributes<ShutTimerAlarmMetadata> 측 사용.
+//   widget extension 측 AlarmAttributes layout 측 = 본 metadata 측 데이터 사용 영역.
 @available(iOS 26.0, *)
 nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
-    // 비어있음 — main app target 정의와 정합
+    var currentStepName: String? = nil
+    var currentStepIndex: Int = 0
+    var totalSteps: Int = 1
+    var stage: String = "step"
+    var paused: Bool = false
+    var pausedAt: Double? = nil
+    var routineId: String? = nil
+    var routineName: String? = nil
 }
 
 private let APP_GROUP = "group.com.shuttimer.app"

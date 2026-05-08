@@ -181,13 +181,20 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     if (!ar?.awaitingConfirm || modalVisible || !routine) return;
     const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
     if (isLastStep) {
-      // v1.7 hotfix #LastStepAutoEnd — 마지막 step alerting + AppState=active 시점 측 자동 종료.
-      // AlarmScreen navigate 측 발생 ❌ 영역 (= AppState=active) → 자동 confirmAndAdvance 호출 누락 → "00:01" 측 멈춤.
-      // confirmAndAdvance 측 line 640-643 = 마지막 step → fullCleanup + 'end' → LA + AlarmKit 자동 종료.
-      (async () => {
-        const res = await confirmAndAdvance();
-        if (!res || res.kind === 'end') onClose();
-      })();
+      // v1.7 hotfix #LastStepNavigateRestore — 마지막 step alerting → AlarmScreen navigate (= 종료 스크린 표시).
+      // 사용자분 의도 = 모달 ❌ + AlarmScreen 측 endMethod 분기 (= tap / shake / camera) 측 종료 흐름.
+      // 직전 #LastStepAutoEnd 측 = confirmAndAdvance + onClose 자동 종료 → AlarmScreen navigate ❌ → 종료 스크린 ❌.
+      // handleMissionEnd 측 line 354-365 패턴 정합.
+      const sig = `${routine.id}-${ar.currentStepIndex}`;
+      const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
+      if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
+        lastStepNavigatedFor = sig;
+        navigation.navigate('Alarm', {
+          fromRoutine: 'last_step',
+          routineId: routine.id,
+          endMethod: routine.endMethod,
+        });
+      }
       return;
     }
     // 일반 step alerting → modal 표시 + JS 사운드/진동 시작.

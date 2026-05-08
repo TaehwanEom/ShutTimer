@@ -371,6 +371,8 @@ public class AlarmkitBridgeModule: Module {
           sound: alertSound
         )
       } else if params.type == "timer_main" {
+        // v1.7 hotfix #LADbgTimer — timer_main 측 AlarmPresentation 명시 + LA 자동 표시 추적 영역.
+        appendNativeDbg("AlarmKit-DBG", "scheduleAlarm timer_main entity=\(params.entityId) presentation=alert+countdown+paused durationSec=\(durationSecAll) sound=\(params.soundName ?? "default")")
         config = .timer(
           duration: durationSecAll,
           attributes: timerAttributesAll,

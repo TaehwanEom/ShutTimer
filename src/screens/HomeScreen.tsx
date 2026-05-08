@@ -623,12 +623,16 @@ export default function HomeScreen({ navigation, route }: Props) {
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
     // v1.6 Phase 9 — LiveActivity 시작 (iOS 16.2+ 권한 활성 시. 그 외 silent skip)
+    // v1.7 hotfix #LADbgTimer — 단일 타이머 LA 표시 ❌ root cause 추적 디버그 로그.
     try {
-      if (LiveActivityBridge.areActivitiesEnabled()) {
+      const areEnabled = LiveActivityBridge.areActivitiesEnabled();
+      console.warn(`[LA-DBG] timer start areEnabled=${areEnabled}`);
+      if (areEnabled) {
         // v1.7 hotfix — 일반 타이머 start 직전 = stale LA (= 종료된 루틴 / 이전 timer) 정리. LA 다중 영역 회피.
         await LiveActivityBridge.endAll().catch(() => {});
         const routineId = timerRoutineIdRef.current;
         const stepName = t('home.timerName', { defaultValue: '타이머' });
+        console.warn(`[LA-DBG] timer start.start ENTER routineId=${routineId} stepEndAt=${endAtRef.current} now=${Date.now()}`);
         const id = await LiveActivityBridge.start({
           routineId,
           routineName: stepName,
@@ -636,10 +640,13 @@ export default function HomeScreen({ navigation, route }: Props) {
           stepEndAt: endAtRef.current,
           progress: 0,
         });
+        console.warn(`[LA-DBG] timer start.start RESULT id=${id ?? 'null'}`);
         activeLiveActivityIdRef.current = id || null;
+      } else {
+        console.warn('[LA-DBG] timer start SKIP — areActivitiesEnabled=false');
       }
-    } catch {
-      // 권한 / 시스템 한도 — silent skip
+    } catch (e) {
+      console.warn(`[LA-DBG] timer start THROW ${String(e)}`);
     }
     // 영속화 (cold start 복원용)
     AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({

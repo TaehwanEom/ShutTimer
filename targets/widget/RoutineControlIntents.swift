@@ -351,8 +351,20 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
         countdown: countdownContent,
         paused: pausedContent
     )
+    // v1.7 hotfix #LAUnify Phase 4 — metadata 측 step 데이터 명시 영역.
+    let metadata = ShutTimerAlarmMetadata(
+        currentStepName: nextStep.name,
+        currentStepIndex: nextStepIdx,
+        totalSteps: snapshot.totalSteps,
+        stage: "step",
+        paused: false,
+        pausedAt: nil,
+        routineId: snapshot.routineId,
+        routineName: snapshot.routineName
+    )
     let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,
+        metadata: metadata,
         tintColor: Color.red
     )
 

@@ -369,7 +369,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (routeRoutineId && isAdhocAlarmRoutine(routeRoutineId)) {
         (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }] });
       } else {
-        navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'RoutineList' }] });
+        // v1.7 hotfix #NavigateRoutineTab-AlarmScreens — Tab Navigator 측 RoutineTab 측 진입 (= 메뉴바 ✅).
+        (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] });
       }
       return;
     }

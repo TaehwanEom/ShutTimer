@@ -473,11 +473,15 @@ export async function pauseRoutine(): Promise<ActiveRoutine | null> {
   if (!ar || ar.pausedAt !== null) return ar;
   const paused: ActiveRoutine = { ...ar, pausedAt: Date.now() };
   await saveActiveRoutine(paused);
-  await cancelBackgroundNotif();
-  // v1.6 #4-D — pause 시 snapshot 명시적 cleanup (위젯 측 perform() race 방지).
-  // cancelBackgroundNotif 가 이미 clearRoutineSnapshot 호출하지만 idempotent.
-  clearRoutineSnapshot();
-  // v1.7 hotfix #LAUnify Phase 10-G1 — endLiveActivity 호출 제거. AlarmKit framework가 alarm cancel 시 LA 자동 종료.
+  // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .pause(id:) 직접 호출.
+  // 직전 = cancelBackgroundNotif() 측 = chain/confirm_prompt 모두 cancel → AlarmKit framework 측 paused state 진입 ❌
+  //   + LA Activity 종료 ⚠️ (= 사용자분 측 "앱에서 일시정지하면 LA 안나오는 문제" root cause).
+  // 정정 = readRoutineSnapshot() 측 currentAlarmId → AlarmkitBridge.pauseAlarm(id) → AlarmKit paused state + LA 자동 update.
+  const snapshot = readRoutineSnapshot();
+  if (snapshot?.currentAlarmId) {
+    await AlarmkitBridge.pauseAlarm(snapshot.currentAlarmId).catch(() => {});
+  }
+  // v1.7 hotfix #LAUnify Phase 10-G1 — endLiveActivity 호출 제거. AlarmKit framework가 .pause(id:) 시 LA 자동 paused UI.
   return paused;
 }
 
@@ -495,8 +499,13 @@ export async function resumeRoutine(): Promise<ActiveRoutine | null> {
     pausedAt: null,
   };
   await saveActiveRoutine(resumed);
-  await scheduleBackgroundNotif(routine, resumed, 'resumeRoutineFromLA');
-  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory가 새 alarm schedule 시 자동으로 LA Activity 시작.
+  // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .resume(id:) 직접 호출.
+  // 직전 = scheduleBackgroundNotif() 측 = 새 alarm schedule → 기존 alarm cancel + 새 alarmId 측 회귀 ⚠️.
+  // 정정 = readRoutineSnapshot() 측 currentAlarmId → AlarmkitBridge.resumeAlarm(id) → countdown 복귀 + LA 자동 update.
+  const snapshot = readRoutineSnapshot();
+  if (snapshot?.currentAlarmId) {
+    await AlarmkitBridge.resumeAlarm(snapshot.currentAlarmId).catch(() => {});
+  }
   return resumed;
 }
 

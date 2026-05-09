@@ -485,6 +485,51 @@ public class AlarmkitBridgeModule: Module {
       try await AlarmManager.shared.stop(id: uuid)
     }
 
+    // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴 정합:
+    //   guard case .countdown = alarm.state → try AlarmManager.shared.pause(id:)
+    //   직전 = JS 측 자체 pauseRoutine() 측 = AsyncStorage 측만 update + AlarmKit framework pause ❌
+    //     → LA Activity 측 paused state 진입 ❌ (= 사용자분 측 "앱에서 일시정지하면 LA 안나오는 문제" 회귀).
+    //   정정 = AlarmKit framework 측 .pause(id:) 직접 호출 → LA Activity 자동 update.
+    AsyncFunction("pauseAlarm") { (alarmId: String) async throws in
+      guard #available(iOS 26.0, *) else { return }
+      guard let uuid = UUID(uuidString: alarmId) else { return }
+      do {
+        let alarms = try AlarmManager.shared.alarms
+        guard let alarm = alarms.first(where: { $0.id == uuid }) else {
+          appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) state=(not in list) → skip")
+          return
+        }
+        guard case .countdown = alarm.state else {
+          appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) state=\(Self.alarmStateToString(alarm.state)) ❌ countdown → skip")
+          return
+        }
+        appendNativeDbg("AlarmKit-DBG", "pauseAlarm 진입 alarmId=\(alarmId) state=countdown → pause()")
+        try AlarmManager.shared.pause(id: uuid)
+      } catch {
+        appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) error=\(error)")
+      }
+    }
+
+    AsyncFunction("resumeAlarm") { (alarmId: String) async throws in
+      guard #available(iOS 26.0, *) else { return }
+      guard let uuid = UUID(uuidString: alarmId) else { return }
+      do {
+        let alarms = try AlarmManager.shared.alarms
+        guard let alarm = alarms.first(where: { $0.id == uuid }) else {
+          appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) state=(not in list) → skip")
+          return
+        }
+        guard case .paused = alarm.state else {
+          appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) state=\(Self.alarmStateToString(alarm.state)) ❌ paused → skip")
+          return
+        }
+        appendNativeDbg("AlarmKit-DBG", "resumeAlarm 진입 alarmId=\(alarmId) state=paused → resume()")
+        try AlarmManager.shared.resume(id: uuid)
+      } catch {
+        appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) error=\(error)")
+      }
+    }
+
     // v1.6 Phase 10-A — App Group UserDefaults helper (LA Intent 동기화 통로)
     Function("writeAppGroupString") { (key: String, value: String?) -> Bool in
       guard let defaults = UserDefaults(suiteName: "group.com.shuttimer.app") else { return false }

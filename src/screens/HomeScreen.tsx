@@ -810,15 +810,19 @@ export default function HomeScreen({ navigation, route }: Props) {
     setIsPaused(next);
     const now = Date.now();
     if (next) {
-      // pause: pause 시점 저장 + 알람 취소
+      // pause: pause 시점 저장 + AlarmKit framework 측 pause 호출.
       pausedAtRef.current = now;
-      cancelAlarms();
       // v1.7 hotfix #WidgetAppPausedAlign — pause 시점 remaining 강제 update (= setInterval stale value 회피).
       const remaining = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
       remainingSecondsRef.current = remaining;
       setRemainingSeconds(remaining);
-      // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.end 호출 제거.
-      // AlarmKit framework가 alarm cancel 시 LA Activity 자동 종료. cancelAlarms()는 G3에서 AlarmKit pause로 교체 예정.
+      // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .pause(id:) 직접 호출.
+      // 직전 = cancelAlarms() 측 = 모든 alarm cancel → AlarmKit framework 측 paused state 진입 ❌ + LA Activity 종료 ⚠️.
+      // 정정 = .pause(id:) 측 = paused state 진입 + LA Activity 자동 paused UI update.
+      if (alarmkitIdRef.current) {
+        AlarmkitBridge.pauseAlarm(alarmkitIdRef.current).catch(() => {});
+      }
+      // 타이머 플래그 잔존 (= isTimerActive=true 잔존, paused state 측 = AlarmKit framework 잔존).
     } else {
       // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
       const pauseDuration = now - (pausedAtRef.current ?? now);
@@ -828,9 +832,12 @@ export default function HomeScreen({ navigation, route }: Props) {
       // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
       remainingSecondsRef.current = remainingSecs;
       setRemainingSeconds(remainingSecs);
-      scheduleAlarm(remainingSecs);
-      // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
-      // scheduleAlarm()이 새 AlarmKit alarm을 등록하면 LA Activity 자동 시작.
+      // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .resume(id:) 직접 호출.
+      // 직전 = scheduleAlarm() 측 = 새 alarm 등록 → 기존 alarm 측 cancel + 새 alarmId 측 회귀 ⚠️.
+      // 정정 = .resume(id:) 측 = 기존 alarm 측 countdown state 복귀 + LA Activity 자동 update.
+      if (alarmkitIdRef.current) {
+        AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => {});
+      }
     }
     // AsyncStorage 업데이트 (cold start 복원용)
     AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {

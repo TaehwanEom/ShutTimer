@@ -100,8 +100,11 @@ struct AlarmKitLiveActivity: Widget {
             } compactTrailing: {
                 AlarmKitCompactTrailingView(context: context)
             } minimal: {
+                // v1.7 hotfix #DI-PausedUX — minimal paused 측 = 동그라미 + 일시정지 (= pause.circle.fill).
+                //   직전 = pause.fill (= "||" 두 개) → 사용자분 측 직관 ❌.
+                //   정정 = pause.circle.fill (= 동그라미 + 일시정지) → 사용자분 직관 정합.
                 if case .paused = context.state.mode {
-                    Image(systemName: "pause.fill").foregroundColor(.brand)
+                    Image(systemName: "pause.circle.fill").foregroundColor(.brand)
                 } else {
                     Image(systemName: "timer").foregroundColor(.brand)
                 }
@@ -243,8 +246,20 @@ struct AlarmKitCompactTrailingView: View {
             Text(timerInterval: countdown.startDate...countdown.fireDate, countsDown: true)
                 .monospacedDigit()
                 .frame(maxWidth: 50)
-        case .paused:
-            Image(systemName: "pause.fill").foregroundColor(.brand)
+        case .paused(let p):
+            // v1.7 hotfix #DI-PausedUX — compact trailing paused 측 = pause.circle.fill icon + 잔여 시간 동시 표시.
+            //   직전 1차 (= HStack + Image + Text + maxWidth:70 + .caption2) 측 = render 영역 부족 → LA UI 표시 ❌ 회귀.
+            //   정정 = HStack + spacing 4 + maxWidth ❌ + .font(.caption2) ❌ (= 자동 크기 + render error 회피).
+            let remaining = Duration.seconds(p.totalCountdownDuration - p.previouslyElapsedDuration)
+            let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60)
+                ? .hourMinuteSecond(padHourToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
+                : .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
+            HStack(spacing: 4) {
+                Image(systemName: "pause.circle.fill")
+                    .foregroundColor(.brand)
+                Text(remaining.formatted(.time(pattern: pattern)))
+                    .monospacedDigit()
+            }
         case .alert:
             Image(systemName: "bell.fill").foregroundColor(.brand)
         }

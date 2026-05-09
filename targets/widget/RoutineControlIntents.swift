@@ -139,6 +139,13 @@ struct PauseRoutineIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         // v1.7 hotfix #DBG — Pause Intent perform 진입 (= LA Button = iPhone + Apple Watch 양쪽).
         appendNativeDbg("Intent-DBG-Widget", "PauseRoutineIntent.perform routineId=\(routineId)")
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — widget extension process 측 Activity.activities 측정.
+        // main app 측 active 1건 ✅ 측정. widget extension process 측 = active count + ID 측정 →
+        // 0건 시 = type identity mismatch (= main app 측 SharedAlarmTypes vs widget 측 SharedAlarmTypes 측 다른 module identity)
+        // 1건 시 = type identity 정합 + widget body 측 = 다른 cause (= ActivityConfiguration registration level)
+        let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+        let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+        appendNativeDbg("LA-DBG-AKLA-WidgetActivity", "PauseIntent widget process Activity.activities.count=\(activities.count) [\(activitiesDesc)] routineId=\(routineId)")
         // v1.6 #4-A — chain_alarms 영역 (옵션 A 폐기 후 미사용) + snapshot.currentAlarmId 둘 다 처리.
         let alarmIds = readAlarmIds(routineId: routineId)
         for idStr in alarmIds {

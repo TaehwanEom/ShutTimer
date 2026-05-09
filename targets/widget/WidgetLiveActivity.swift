@@ -60,8 +60,19 @@ fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
 //   Lock Screen + Dynamic Island 측 정합 layout 표시.
 // v1.7 hotfix #LAUnify Phase 10-G4 — @available(iOS 26.0, *) 마크 제거 (= widget extension deployment target 26.0 정합).
 struct AlarmKitLiveActivity: Widget {
+    init() {
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — Widget struct init 시점 측정.
+        // WidgetBundle 측 등록 시점 = system 측 본 widget instantiate 정합 → init() 호출 정합.
+        // 본 log 측 발생 ❌ 시 = WidgetBundle 측 본 widget instantiate ❌ → registration ❌ root cause.
+        // 본 log 측 발생 ✅ + AlarmKitLockScreenView.init() 0건 → ActivityConfiguration content closure 측 호출 ❌
+        //   → AlarmKit framework 측 ActivityConfiguration<AlarmAttributes<X>> 측 type lookup ❌
+        appendNativeDbgWidget("LA-DBG-AKLA-WidgetInit", "AlarmKitLiveActivity.init() called")
+    }
+
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — body evaluation 시점 측정.
+        let _ = appendNativeDbgWidget("LA-DBG-AKLA-WidgetBody", "AlarmKitLiveActivity.body accessed")
+        return ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
             // Lock Screen view
             AlarmKitLockScreenView(context: context)
         } dynamicIsland: { context in

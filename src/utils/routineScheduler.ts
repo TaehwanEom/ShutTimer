@@ -125,7 +125,7 @@ export type ScheduleStatus = {
 
 /**
  * 사용자 설정 기준 푸시 사운드 파일명 반환.
- * HomeScreen/RunningScreen 패턴과 일관성 유지.
+ * HomeScreen 패턴과 일관성 유지.
  * alarmEnabled=false면 false 반환 (무음).
  */
 async function resolveSound(): Promise<string | false> {

@@ -66,7 +66,6 @@ Notifications.setNotificationHandler({
 });
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';
-import RunningScreen from './src/screens/RunningScreen';
 import AlarmScreen from './src/screens/AlarmScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import EditMissionsScreen from './src/screens/EditMissionsScreen';
@@ -127,7 +126,6 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
-  Running: { mission: Mission | null; minutes: number };
   Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmSoundKey?: string; alarmEntityId?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
@@ -974,7 +972,6 @@ function AppNavigator() {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Home" component={MainTabsNavigator} />
-        <Stack.Screen name="Running" component={RunningScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Alarm" component={AlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="EditMissions" component={EditMissionsScreen} />

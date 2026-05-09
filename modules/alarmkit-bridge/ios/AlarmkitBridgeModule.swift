@@ -96,6 +96,13 @@ public class AlarmkitBridgeModule: Module {
             if prev != alarm.state {
               // v1.7 hotfix #DBG-B — state 변화 (= 진동/banner root cause 추적용).
               appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(alarm.id.uuidString) prev=\(String(describing: prev)) → cur=\(Self.alarmStateToString(alarm.state))")
+              // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — observer 측 매 state change 시 Activity.activities 측 active count 측정.
+              // schedule 직후 = system sync 시간 부족 가능성. observer 측 = state change 시 = 시간 경과 후 → Activity 측정 정합.
+              if #available(iOS 26.0, *) {
+                let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+                let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+                appendNativeDbg("LA-DBG-AKLA-Activity", "observer alarmId=\(alarm.id.uuidString) state=\(Self.alarmStateToString(alarm.state)) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
+              }
               self.sendEvent("onAlarmStateChange", [
                 "alarmId": alarm.id.uuidString,
                 "state": Self.alarmStateToString(alarm.state),
@@ -419,12 +426,22 @@ public class AlarmkitBridgeModule: Module {
       // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (timer 영역).
       NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=timer(duration:) durationSec=\(durationSecAll)")
       // v1.7 hotfix #LAUnify Phase 10-G4dbg — ActivityKit Activity 측 active count + ID 측 native log.
-      // root cause 추적: AlarmKit framework 측 .timer factory 호출 시 Activity 자동 시작 정합 ❓
-      // count=0 → AlarmKit framework 자체 Activity 시작 ❌ (= 다른 root cause).
-      // count≥1 → Activity 시작 정합 + widget body 호출 ❌ → ActivityConfiguration registration 측 issue.
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
       appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
+      // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — system sync 시간 race 가능성 검증.
+      // 5초 delay 후 다시 측정 → count 측 변화 ❓.
+      Task {
+        try? await Task.sleep(nanoseconds: 5_000_000_000)
+        if #available(iOS 26.0, *) {
+          let delayed = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+          let delayedDesc = delayed.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+          appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer)+5s alarmId=\(id.uuidString) Activity.activities.count=\(delayed.count) [\(delayedDesc)]")
+          // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — AlarmKit authorization 측 측정.
+          let authState = Self.stateToString(AlarmManager.shared.authorizationState)
+          appendNativeDbg("LA-DBG-AKLA-Auth", "post-schedule(timer)+5s alarmId=\(id.uuidString) authorizationState=\(authState) areActivitiesEnabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)")
+        }
+      }
       return id.uuidString
     }
 

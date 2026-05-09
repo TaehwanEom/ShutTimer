@@ -10,7 +10,7 @@ import {
   ScrollView,
   Image,
   Alert,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -31,13 +31,9 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MissionSelect'>;
 };
 
-const SCREEN_W = Dimensions.get('window').width;
 const GRID_PADDING_H = 16;
 const GRID_GAP = 8;
 const COL_COUNT = 3;
-const CARD_W = Math.floor((SCREEN_W - GRID_PADDING_H * 2 - GRID_GAP * (COL_COUNT - 1)) / COL_COUNT);
-const CARD_H = Math.floor(CARD_W * 1.15);
-const EMOJI_SIZE = Math.floor(CARD_W * 0.65);
 
 // 테마 무관 고정: iOS 표준 액션 컬러 (선택/비활성 표시)
 const ACCENT = '#0a84ff';
@@ -45,7 +41,15 @@ const ACCENT = '#0a84ff';
 export default function MissionSelectScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
+  // useWindowDimensions 측 = 동적 정합 (= 회전/화면 swap 시 자동 update). iPhone 12 mini 등 작은 화면 측 정합.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const CARD_W = Math.floor((SCREEN_W - GRID_PADDING_H * 2 - GRID_GAP * (COL_COUNT - 1)) / COL_COUNT);
+  const CARD_H = Math.floor(CARD_W * 1.15);
+  const EMOJI_SIZE = Math.floor(CARD_W * 0.65);
+  const styles = useMemo(
+    () => makeStyles(colors, isDark, CARD_W, CARD_H, EMOJI_SIZE),
+    [colors, isDark, CARD_W, CARD_H, EMOJI_SIZE],
+  );
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set(MISSION_POOL));
   const [loaded, setLoaded] = useState(false);
@@ -240,7 +244,7 @@ function Checkbox({
   );
 }
 
-const makeStyles = (colors: ThemeColors, isDark: boolean) =>
+const makeStyles = (colors: ThemeColors, isDark: boolean, CARD_W: number, CARD_H: number, EMOJI_SIZE: number) =>
   StyleSheet.create({
     container: {
       flex: 1,

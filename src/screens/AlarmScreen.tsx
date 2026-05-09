@@ -9,7 +9,8 @@ import {
   Easing,
   AppState,
   Platform,
-  Dimensions,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Accelerometer } from 'expo-sensors';
@@ -152,6 +153,7 @@ const RESULT_BG = {
 
 export default function AlarmScreen({ navigation, route }: Props) {
   const { t } = useTranslation();
+  const { width: screenW } = useWindowDimensions();
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree } = usePurchase();
   // @v1.5 Phase A — 카메라/tflite 관련 hook은 AlarmCameraMode child로 이동
@@ -1075,7 +1077,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const hasBatchim = code >= 0xAC00 && code <= 0xD7A3 && (code - 0xAC00) % 28 !== 0;
     const josa = hasBatchim ? '을' : '를';
     const missionSentence = t('alarm.missionSentence', { mission: missionLabel, josa });
-    const screenW = Dimensions.get('window').width;
     const boxWidth = screenW - 32; // 좌우 16px 여백 (여백 최소화)
     const boxHeight = boxWidth * 1.25; // 세로로 살짝 긴 박스 (높이 축소)
 
@@ -1135,27 +1136,29 @@ export default function AlarmScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <View style={[styles.centerSection, { paddingTop: 40 }]}>
-          <View style={styles.rippleWrapper}>
-            <Animated.View style={rippleStyle(tapRipple1)} />
-            <Animated.View style={rippleStyle(tapRipple2)} />
-            <View style={styles.centerIconWrapper}>
-              <Animated.View style={{ transform: [{ scale: tapFingerScale }] }}>
-                <MaterialIcons name="touch-app" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-              </Animated.View>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
+          <View style={[styles.centerSection, { paddingTop: 40 }]}>
+            <View style={styles.rippleWrapper}>
+              <Animated.View style={rippleStyle(tapRipple1)} />
+              <Animated.View style={rippleStyle(tapRipple2)} />
+              <View style={styles.centerIconWrapper}>
+                <Animated.View style={{ transform: [{ scale: tapFingerScale }] }}>
+                  <MaterialIcons name="touch-app" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
+                </Animated.View>
+              </View>
+            </View>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
+              <Text style={styles.centerSubtitle}>{t('alarm.tapInstruction')}</Text>
             </View>
           </View>
-          <View style={{ alignItems: 'center', gap: 6 }}>
-            <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
-            <Text style={styles.centerSubtitle}>{t('alarm.tapInstruction')}</Text>
-          </View>
-        </View>
 
-        <View style={styles.tapSection}>
-          <TouchableOpacity style={styles.tapButton} onPress={() => enterResult('success')} activeOpacity={0.8}>
-            <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.tapSection}>
+            <TouchableOpacity style={styles.tapButton} onPress={() => enterResult('success')} activeOpacity={0.8}>
+              <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
         <AdBanner />
       </SafeAreaView>
     );
@@ -1170,22 +1173,24 @@ export default function AlarmScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      <View style={styles.centerSection}>
-        <View style={styles.rippleWrapper}>
-          <Animated.View style={rippleStyle(ripple1)} />
-          <Animated.View style={rippleStyle(ripple2)} />
-          <Animated.View style={[styles.centerIconWrapper, {
-            transform: [
-              { scale: pulse },
-              { rotate: rotate.interpolate({ inputRange: [-1, 1], outputRange: ['-20deg', '20deg'] }) },
-            ],
-          }]}>
-            <MaterialIcons name="vibration" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-          </Animated.View>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
+        <View style={styles.centerSection}>
+          <View style={styles.rippleWrapper}>
+            <Animated.View style={rippleStyle(ripple1)} />
+            <Animated.View style={rippleStyle(ripple2)} />
+            <Animated.View style={[styles.centerIconWrapper, {
+              transform: [
+                { scale: pulse },
+                { rotate: rotate.interpolate({ inputRange: [-1, 1], outputRange: ['-20deg', '20deg'] }) },
+              ],
+            }]}>
+              <MaterialIcons name="vibration" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
+            </Animated.View>
+          </View>
+          <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
+          <Text style={styles.centerSubtitle}>{t('alarm.shakeInstruction')}</Text>
         </View>
-        <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
-        <Text style={styles.centerSubtitle}>{t('alarm.shakeInstruction')}</Text>
-      </View>
+      </ScrollView>
       <AdBanner />
     </SafeAreaView>
   );

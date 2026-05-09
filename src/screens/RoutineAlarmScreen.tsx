@@ -15,7 +15,7 @@ import {
   BackHandler,
   Image,
   Animated,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -137,9 +137,9 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const scanLine = useRef(new Animated.Value(0)).current;
   const dangerBlink = useRef(new Animated.Value(0)).current;
 
-  // 레이아웃 — AlarmCameraMode props 요구치. AlarmScreen 패턴 차용 (Dimensions 기반 const).
+  // 레이아웃 — AlarmCameraMode props 요구치. useWindowDimensions 측 = 동적 정합 (= 회전/화면 swap 시 자동 update).
   // useState(0) 사용 시 마운트 직후 0×0 → 빈 화면 회귀 (Step C 회귀 fix).
-  const screenW = Dimensions.get('window').width;
+  const { width: screenW } = useWindowDimensions();
   const boxWidth = screenW - 32; // 좌우 16px 여백 (AlarmScreen 동일)
   const boxHeight = boxWidth * 1.25; // 세로로 살짝 긴 박스
 

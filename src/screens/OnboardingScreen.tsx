@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   AppState,
   Platform,
   Animated,
@@ -51,14 +51,14 @@ type Slide =
       buttonLabel: string;
     };
 
-const { width: SCREEN_W } = Dimensions.get('window');
-
 export default function OnboardingScreen({ navigation }: Props) {
   const { t, i18n } = useTranslation();
   // RTL 언어 (아랍어) 감지 — 마스크 reveal 방향 반전용
   const isRTL = i18n.language === 'ar';
   const { colors } = useTheme();
-  const styles = makeStyles(colors);
+  // useWindowDimensions 측 = 동적 정합 (= 회전/화면 swap 시 자동 update). iPhone 12 mini 등 작은 화면 측 정합.
+  const { width: SCREEN_W } = useWindowDimensions();
+  const styles = useMemo(() => makeStyles(colors, SCREEN_W), [colors, SCREEN_W]);
   const scrollRef = useRef<ScrollView>(null);
   const [currentPage, setCurrentPage] = useState(0);
   // 페이지별 애니메이션 완료 여부 — true면 이동 버튼 노출
@@ -1413,7 +1413,7 @@ function FeatureCardsSlide({
   );
 }
 
-const makeStyles = (colors: ThemeColors) =>
+const makeStyles = (colors: ThemeColors, SCREEN_W: number) =>
   StyleSheet.create({
     container: {
       flex: 1,

@@ -341,19 +341,19 @@ export default function AddTimerScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* v1.6 후속 — 저장 버튼 위 AdBanner (= BottomTabBar 위 영역) */}
-      <View style={{ position: 'absolute', bottom: 170, left: 0, right: 0 }}>
-        <AdBanner />
-      </View>
-
-      {/* 저장 버튼 */}
+      {/* 저장 버튼 (= 위 위치) */}
       <TouchableOpacity
-        style={[styles.saveButton, !selectedIcon && styles.saveButtonDisabled, { bottom: 100 }]}
+        style={[styles.saveButton, !selectedIcon && styles.saveButtonDisabled, { bottom: 170 }]}
         onPress={handleSave}
         disabled={!selectedIcon}
       >
         <Text style={styles.saveButtonText}>{t('addTimer.save')}</Text>
       </TouchableOpacity>
+
+      {/* v1.7 hotfix Phase 14 — AdBanner 위치 = 저장 버튼 밑 (= BottomTabBar 위 영역) */}
+      <View style={{ position: 'absolute', bottom: 100, left: 0, right: 0 }}>
+        <AdBanner />
+      </View>
 
       {/* v1.6 후속 — 외부 Stack.Screen 측 하단 시각 Tab Bar */}
       <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}>

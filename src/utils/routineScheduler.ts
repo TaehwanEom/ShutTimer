@@ -1,8 +1,7 @@
 // v1.6: 루틴 알림 스케줄러.
-// (1) 다단계 prealert (T2) — 시작 30분 전 + 5분 전 2회. iOS 26+ AlarmKit (한도 해방) / 그 외 expo-notifications WEEKLY (64 한계).
-// (2) 자동 진행 모드 백그라운드 체인 — DATE trigger 1개. AlarmKit/expo-notifications 모두 임시 1슬롯.
+// (1) 다단계 prealert (T2) — 시작 30분 전 + 5분 전 2회. iOS 26+ AlarmKit only (= G4-E 측 expo-notifications 폐기).
+// (2) F4 confirm_prompt — 미션 종료 시점 DATE trigger 1개. AlarmKit only.
 
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, AppState } from 'react-native';
 import i18n from '../i18n';
@@ -147,19 +146,9 @@ async function resolveSound(): Promise<string | false> {
 
 type ScheduledRoutineRecord = {
   routineId: string;
-  /** expo-notifications 폴백 경로 알림 id */
-  notifIds: string[];
   /** AlarmKit 경로 alarm UUID */
   alarmKitIds?: string[];
   lastSyncedAt: number;
-};
-
-type RoutineNotifData = {
-  type: 'routine_prealert' | 'routine_chain';
-  routineId: string;
-  /** 체인 알림 전용 — 다음 step index */
-  nextStepIndex?: number;
-  scheduledFor?: number;
 };
 
 // ─── 스토리지 ─────────────────────────────────────────────────
@@ -216,11 +205,10 @@ export async function scheduleRoutinePrealerts(routine: Routine): Promise<string
   if (!routine.schedule || !routine.active) return [];
   await cancelRoutinePrealerts(routine.id);
 
+  // v1.7 hotfix Phase 13 G4-E — AlarmKit 측만 사용 (= expo-notifications WEEKLY 경로 폐기).
   const useAlarmKit = await shouldUseAlarmKit();
-  if (useAlarmKit) {
-    return scheduleViaAlarmKit(routine);
-  }
-  return scheduleViaExpoNotifications(routine);
+  if (!useAlarmKit) return [];
+  return scheduleViaAlarmKit(routine);
 }
 
 /** AlarmKit 경로 — iOS 26+. 64 한도 없음. fixed-date 1회성이라 (요일 × prealert 단계) 만큼 등록. */
@@ -273,7 +261,6 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
   const next = records.filter(r => r.routineId !== routine.id);
   next.push({
     routineId: routine.id,
-    notifIds: [],
     alarmKitIds: alarmIds,
     lastSyncedAt: Date.now(),
   });
@@ -281,60 +268,7 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
   return alarmIds;
 }
 
-/** expo-notifications WEEKLY 경로 — iOS 25 이하 / Android. 64 한도 적용 (routine 수 × prealert 단계). */
-async function scheduleViaExpoNotifications(routine: Routine): Promise<string[]> {
-  if (!routine.schedule) return [];
-
-  const { days } = routine.schedule;
-  const effectiveDays = days.length === 0 ? [0, 1, 2, 3, 4, 5, 6] : days;
-  const ids: string[] = [];
-  const sound = await resolveSound();
-
-  for (const prealertMin of ROUTINE_PREALERT_MINUTES_LIST) {
-    const alertTime = computeAlertTime(routine.schedule.startTime, prealertMin);
-    if (!alertTime) continue;
-    const titleKey = `routine.prealertTitle${prealertMin}m`;
-    const bodyKey = `routine.prealertBody${prealertMin}m`;
-    const title = i18n.t(titleKey, { defaultValue: `${prealertMin}분 후 루틴 시작` });
-    const body = i18n.t(bodyKey, { defaultValue: `${prealertMin}분 후 루틴이 시작됩니다` });
-
-    for (const day of effectiveDays) {
-      const alertDay = (day + alertTime.dayOffset + 7) % 7;
-      const weekday = alertDay + 1;
-
-      try {
-        const data: RoutineNotifData = {
-          type: 'routine_prealert',
-          routineId: routine.id,
-        };
-        const id = await Notifications.scheduleNotificationAsync({
-          content: {
-            title,
-            body,
-            data: { ...data },
-            sound,
-            interruptionLevel: 'active',
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-            weekday,
-            hour: alertTime.hour,
-            minute: alertTime.minute,
-          },
-        });
-        ids.push(id);
-      } catch {
-        // 예약 실패 무시 (64개 한계 등)
-      }
-    }
-  }
-
-  const records = await loadNotifRecords();
-  const next = records.filter(r => r.routineId !== routine.id);
-  next.push({ routineId: routine.id, notifIds: ids, lastSyncedAt: Date.now() });
-  await saveNotifRecords(next);
-  return ids;
-}
+// v1.7 hotfix Phase 13 G4-E — scheduleViaExpoNotifications 함수 통째 폐기 (= AlarmKit only).
 
 /** 특정 요일 + alertTime 기준 다음 발화 Date (now 기준 향후). 못 찾으면 null. */
 function computeNextOccurrence(
@@ -354,21 +288,14 @@ function computeNextOccurrence(
   return null;
 }
 
-/** 특정 루틴의 모든 예약 알림 취소 (legacy + alarmkit 양쪽). */
+/** 특정 루틴의 모든 예약 알림 취소 (= AlarmKit 측만 = G4-E 정합). */
 export async function cancelRoutinePrealerts(routineId: string): Promise<void> {
   const records = await loadNotifRecords();
   const target = records.find(r => r.routineId === routineId);
-  if (target) {
-    for (const id of target.notifIds) {
-      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
-    }
-    if (target.alarmKitIds) {
-      for (const id of target.alarmKitIds) {
-        await AlarmkitBridge.cancelAlarm(id).catch(() => {});
-        // v1.7 hotfix #3 후속 — prealert metadata 신규 저장됨 (line 260) → cancel 시 mapping table 정리.
-        // 미정리 시 syncRollingSchedule 측 fallback (line 403~409) 까지 stale 누적.
-        await deleteAlarmMetadata(id).catch(() => {});
-      }
+  if (target?.alarmKitIds) {
+    for (const id of target.alarmKitIds) {
+      await AlarmkitBridge.cancelAlarm(id).catch(() => {});
+      await deleteAlarmMetadata(id).catch(() => {});
     }
   }
   const filtered = records.filter(r => r.routineId !== routineId);
@@ -384,13 +311,9 @@ export async function syncRollingSchedule(): Promise<void> {
   const routines = await loadRoutines();
   const scheduledRoutines = routines.filter(r => r.schedule && r.active);
 
-  // 기존 전부 cancel (단순 + 정확)
+  // v1.7 hotfix Phase 13 G4-E — AlarmKit 측만 cancel (= expo-notifications cancel 폐기).
   const records = await loadNotifRecords();
   for (const rec of records) {
-    for (const id of rec.notifIds) {
-      await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
-    }
-    // v1.6 후속 hotfix — AlarmKit 측 cancel 추가 (= records 측 알려진 영역).
     if (rec.alarmKitIds) {
       for (const id of rec.alarmKitIds) {
         await AlarmkitBridge.cancelAlarm(id).catch(() => {});
@@ -457,103 +380,9 @@ export async function loadScheduleStatus(): Promise<ScheduleStatus | null> {
   }
 }
 
-// ─── 백그라운드 체인 (자동 진행 모드 — 미션 종료 시점 DATE trigger) ─
-
-/**
- * @deprecated v1.6 옵션 A — `scheduleAllRoutineChains` 사용 (BG/KILL 자동 진행 보장).
- * 본 함수는 호환성 보존만. 신규 호출 금지.
- *
- * 자동 진행 모드에서 현재 미션 종료 시점에 발화할 알림 1개 예약.
- * 발화 시 App.tsx notification handler가 data.type === 'routine_chain'으로 분기.
- * 연쇄 방식: 이 알림 발화 시 다음 미션 알림을 다시 등록.
- */
-export async function scheduleRoutineChain(
-  routineId: string,
-  nextStepIndex: number,
-  fireAt: Date
-): Promise<string | null> {
-  if (fireAt.getTime() <= Date.now()) return null;
-  const useAlarmKit = await shouldUseAlarmKit();
-  if (useAlarmKit) {
-    return scheduleChainViaAlarmKit(routineId, nextStepIndex, fireAt);
-  }
-  return scheduleChainViaExpoNotifications(routineId, nextStepIndex, fireAt);
-}
-
-/** AlarmKit 경로 — iOS 26+. 64 한도 + 30초 사운드 한도 해방. */
-async function scheduleChainViaAlarmKit(
-  routineId: string,
-  nextStepIndex: number,
-  fireAt: Date
-): Promise<string | null> {
-  try {
-    const id = await AlarmkitBridge.scheduleAlarm({
-      entityId: routineId,
-      title: i18n.t('routine.chainTitle', { defaultValue: '다음 루틴' }),
-      fireAt: fireAt.getTime(),
-      stopLabel: i18n.t('routine.chainStop', { defaultValue: '확인' }),
-      type: 'chain',
-      nextStepIndex,
-    });
-    if (!id) return null;
-    await saveAlarmMetadata({
-      alarmId: id,
-      type: 'chain',
-      entityId: routineId,
-      nextStepIndex,
-    });
-    return id;
-  } catch {
-    return null;
-  }
-}
-
-/** expo-notifications 경로 — iOS 25 이하 / Android. */
-async function scheduleChainViaExpoNotifications(
-  routineId: string,
-  nextStepIndex: number,
-  fireAt: Date
-): Promise<string | null> {
-  try {
-    const data: RoutineNotifData = {
-      type: 'routine_chain',
-      routineId,
-      nextStepIndex,
-      scheduledFor: fireAt.getTime(),
-    };
-    const sound = await resolveSound();
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: i18n.t('routine.chainTitle', { defaultValue: '다음 루틴' }),
-        body: i18n.t('routine.chainBody', { defaultValue: '다음 루틴이 시작됩니다' }),
-        data: { ...data },
-        sound,
-        interruptionLevel: 'active',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: fireAt,
-      },
-    });
-    return id;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * @deprecated v1.6 옵션 A — `cancelAllRoutineChains` 사용.
- * 체인 알림 취소 (루틴 일시정지/종료 시). AlarmKit / expo-notifications 자동 분기.
- */
-export async function cancelRoutineChain(notifId: string): Promise<void> {
-  const meta = await loadAlarmMetadata(notifId);
-  if (meta) {
-    await AlarmkitBridge.cancelAlarm(notifId).catch(() => {});
-    await deleteAlarmMetadata(notifId);
-    return;
-  }
-  await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
-}
+// v1.7 hotfix Phase 13 G4-E — 옛 routine_chain 함수 4개 통째 폐기 (= caller 0건 = dead 확정).
+//   scheduleRoutineChain / scheduleChainViaAlarmKit / scheduleChainViaExpoNotifications / cancelRoutineChain.
+//   v1.6 옵션 A 측 폐기 영역 (= scheduleAllRoutineChains 측 사용 명시). 본 cycle 측 통째 정리.
 
 // ─── F4: 확인 후 진행 모드 배경 알림 (미션 종료 시점 RoutineAlarm 유도) ─
 
@@ -575,15 +404,10 @@ export async function scheduleRoutineConfirmPrompt(
   if (fireAt.getTime() <= Date.now()) {
     fireAt = new Date(Date.now() + 1000);
   }
+  // v1.7 hotfix Phase 13 G4-E — AlarmKit 측만 사용 (= expo-notifications 폴백 폐기).
   const useAlarmKit = await shouldUseAlarmKit();
-  if (useAlarmKit) {
-    // v1.6 Phase 12 — AlarmKit 등록 실패 시 expo-notifications 폴백 (silent fail 방지).
-    const akId = await scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName);
-    if (akId) return akId;
-    Logger.warn('routine', 'AlarmKit confirm_prompt 등록 실패 → expo-notifications 폴백');
-    return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt, nextStepName);
-  }
-  return scheduleConfirmPromptViaExpoNotifications(routineId, fireAt, nextStepName);
+  if (!useAlarmKit) return null;
+  return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName);
 }
 
 /** AlarmKit 경로 — iOS 26+. */
@@ -631,49 +455,15 @@ async function scheduleConfirmPromptViaAlarmKit(
   }
 }
 
-/** expo-notifications 경로 — iOS 25 이하 / Android. */
-async function scheduleConfirmPromptViaExpoNotifications(
-  routineId: string,
-  fireAt: Date,
-  nextStepName?: string
-): Promise<string | null> {
-  try {
-    const data = {
-      type: 'routine_confirm_prompt' as const,
-      routineId,
-      scheduledFor: fireAt.getTime(),
-    };
-    const sound = await resolveSound();
-    const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
-    const title = nextStepName ? `${baseTitle} ${nextStepName}` : baseTitle;
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body: i18n.t('routine.confirmPromptBody', { defaultValue: '다음 루틴을 시작하려면 앱을 여세요' }),
-        data: { ...data },
-        sound,
-        interruptionLevel: 'active',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: fireAt,
-      },
-    });
-    return id;
-  } catch {
-    return null;
-  }
-}
+// v1.7 hotfix Phase 13 G4-E — scheduleConfirmPromptViaExpoNotifications 통째 폐기 (= AlarmKit only).
 
-/** 확인 후 진행 프롬프트 알림 취소 (사용자 dismiss 시). AlarmKit / expo-notifications 자동 분기. */
+/** 확인 후 진행 프롬프트 알림 취소 (사용자 dismiss 시). */
 export async function cancelRoutineConfirmPrompt(notifId: string): Promise<void> {
   const meta = await loadAlarmMetadata(notifId);
   if (meta) {
     await AlarmkitBridge.cancelAlarm(notifId).catch(() => {});
     await deleteAlarmMetadata(notifId);
-    return;
   }
-  await Notifications.cancelScheduledNotificationAsync(notifId).catch(() => {});
 }
 
 // v1.6 Phase 12 — 옵션 A (chain 일괄 등록) 영구 폐기.

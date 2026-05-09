@@ -1,7 +1,7 @@
 // v1.6 T1 — AlarmKit alarmId → 메타데이터 mapping table.
 // Alarm struct 에 metadata 필드 부재 (swiftinterface L223-229) 로 JS 측 보관.
-// scheduleRoutineChain/ConfirmPrompt 에서 등록 시 저장 + cancel 시 삭제.
-// App.tsx onAlarmStateChange listener 가 alarmId 로 lookup 후 routine_chain/confirm_prompt 분기.
+// scheduleConfirmPromptViaAlarmKit / scheduleRoutinePrealerts / scheduleAlarmMain 측 등록 시 저장 + cancel 시 삭제.
+// App.tsx onAlarmStateChange listener 가 alarmId 로 lookup 후 confirm_prompt / prealert / alarm_main / timer_main 분기.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AlarmKitType, AlarmKitEndMethod } from '../../modules/alarmkit-bridge';

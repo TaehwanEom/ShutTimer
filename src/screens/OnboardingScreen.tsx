@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
-import * as Notifications from 'expo-notifications';
+import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 import { useTranslation } from 'react-i18next';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 import { RootStackParamList } from '../../App';
@@ -283,7 +283,10 @@ export default function OnboardingScreen({ navigation }: Props) {
           await AsyncStorage.setItem('attStatus', current.status);
         }
       } else if (permission === 'notification') {
-        await Notifications.requestPermissionsAsync();
+        // v1.7 hotfix Phase 13 G4-A — expo-notifications 측 폐기 + AlarmKit 측 권한 요청.
+        // iOS 26+ 측 = AlarmKit framework 측 자체 권한 요청 (= AlarmManager.shared.requestAuthorization).
+        // iOS 25 이하 측 = 'unavailable' 반환 = silent skip (= AlarmKit 미지원).
+        await requestAlarmKitAuthorizationIfNeeded();
         await AsyncStorage.setItem('notificationsAsked', 'true');
       } else if (permission === 'camera') {
         const { Camera } = require('react-native-vision-camera');

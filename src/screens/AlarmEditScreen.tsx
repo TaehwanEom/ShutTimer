@@ -38,8 +38,6 @@ import {
   createStepId,
 } from '../constants/routines';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SETTINGS_KEY } from '../constants/settings';
 import DurationWheelPicker from '../components/DurationWheelPicker';
 import {
   scheduleAlarmMain,
@@ -50,7 +48,7 @@ import {
   isAlertShownThisCycle,
   markAlertShown,
 } from '../utils/routineScheduler';
-import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import { DEFAULT_SOUND_ID } from '../constants/sounds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AlarmEdit'>;
@@ -87,15 +85,6 @@ function parseHHMM(s: string): { h: number; m: number } | null {
   return { h: parseInt(m[1], 10), m: parseInt(m[2], 10) };
 }
 
-function soundLabel(soundKey: string, t: (k: string, opts?: any) => string): string {
-  const item = ALARM_SOUNDS.find(s => s.id === soundKey);
-  if (!item) return t('alarm.sound.default', { defaultValue: '기본' });
-  const num = item.id.split('_')[1] ?? '';
-  return item.id.startsWith('alarm_')
-    ? `${t('routine.sound.alarm', { defaultValue: '알람' })} ${num}`
-    : `${t('routine.sound.ringtone', { defaultValue: '벨소리' })} ${num}`;
-}
-
 export default function AlarmEditScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -107,9 +96,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
   const [repeat, setRepeat] = useState<AlarmRepeat>('once');
   const [days, setDays] = useState<number[]>([]);
   const [label, setLabel] = useState('');
-  const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [dismissMethod, setDismissMethod] = useState<AlarmDismissMethod>('tap');
-  const [soundPickerVisible, setSoundPickerVisible] = useState(false);
   // v1.7 Phase 1 — 알람+루틴 통합. steps[] 직접 보유. 0개 = 단독 알람 / 1개 이상 = 통합.
   const [steps, setSteps] = useState<RoutineStep[]>([]);
   const [durationPickerVisible, setDurationPickerVisible] = useState(false);
@@ -157,24 +144,10 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       setRepeat(target.repeat);
       setDays(target.days);
       setLabel(target.label);
-      setSoundKey(target.soundKey);
       setDismissMethod(target.dismissMethod);
       setSteps(target.steps ?? []);
       loadedRef.current = true;
     });
-  }, [editingId]);
-
-  // v1.7 hotfix B1 — 새 알람 측 default = 글로벌 SETTINGS 측 ALARM_SOUND fallback.
-  // 편집 모드 (= editingId 영역) 측 = 기존 alarm.soundKey 영역 우선 = skip.
-  // ALARM_SOUNDS 측 valid 영역 시만 setSoundKey (= 글로벌 SETTINGS 측 stale 영역 회피).
-  useEffect(() => {
-    if (editingId) return;
-    AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND).then(v => {
-      if (!isMountedRef.current) return;
-      if (v && ALARM_SOUNDS.find(s => s.id === v)) {
-        setSoundKey(v);
-      }
-    }).catch(() => {});
   }, [editingId]);
 
   const handleTimeConfirm = (hour: number, minute: number) => {
@@ -321,7 +294,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       label: label.trim(),
       enabled: true,
       dismissMethod,
-      soundKey,
+      soundKey: DEFAULT_SOUND_ID,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
       ...(trimmedSteps.length > 0 ? { steps: trimmedSteps } : {}),
     };
@@ -496,46 +469,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
             maxLength={LABEL_MAX}
           />
         </View>
-
-        {/* 사운드 */}
-        <TouchableOpacity
-          style={styles.row}
-          onPress={() => setSoundPickerVisible(v => !v)}
-        >
-          <Text style={styles.rowLabel}>
-            {t('alarm.sound.title', { defaultValue: '사운드' })}
-          </Text>
-          <Text style={styles.rowValue}>{soundLabel(soundKey, t)}</Text>
-        </TouchableOpacity>
-        {soundPickerVisible && (
-          <View style={styles.soundList}>
-            {ALARM_SOUNDS.map(s => (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.soundItem,
-                  soundKey === s.id && styles.soundItemActive,
-                ]}
-                onPress={() => {
-                  setSoundKey(s.id);
-                  setSoundPickerVisible(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.soundItemText,
-                    soundKey === s.id && styles.soundItemTextActive,
-                  ]}
-                >
-                  {soundLabel(s.id, t)}
-                </Text>
-                {soundKey === s.id && (
-                  <MaterialIcons name="check" size={20} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
 
         {/* 해제 방식 */}
         <View style={styles.section}>
@@ -828,29 +761,6 @@ const makeStyles = (colors: ThemeColors) => {
       paddingVertical: 8,
       borderBottomWidth: 1,
       borderBottomColor: colors.outlineVariant,
-    },
-    soundList: {
-      backgroundColor: colors.surfaceContainerLow,
-      borderBottomWidth: 0.5,
-      borderBottomColor: colors.outlineVariant,
-    },
-    soundItem: {
-      flexDirection: flexRow,
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 32,
-      paddingVertical: 12,
-    },
-    soundItemActive: {
-      backgroundColor: colors.surfaceContainerLow,
-    },
-    soundItemText: {
-      fontSize: 15,
-      color: colors.onBackground,
-    },
-    soundItemTextActive: {
-      color: colors.primary,
-      fontWeight: '600',
     },
     dismissRow: {
       flexDirection: flexRow,

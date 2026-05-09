@@ -49,13 +49,14 @@ async function isAlarmKitReady(): Promise<boolean> {
 // ─── 사운드 resolve ──────────────────────────────────────
 
 /**
- * 알람 entity 측 명시 soundKey 측 그대로 사용. 글로벌 SETTINGS 측 fallback ❌.
- * 직전 v1.7 B2 hotfix 측 = soundKey === 'alarm_01' 시 = 글로벌 ALARM_SOUND 측 fallback →
- *   사용자분 측 = 알람 측 = 본인 명시 sound ❌ + 글로벌 설정 측 자동 follow 영역 = 의도 ❌ → 제거.
+ * 매번 설정 사운드 (= SettingsScreen 측 SETTINGS_KEY.ALARM_SOUND key) 측 read.
+ * alarm.soundKey 측 인자 폐기 (= 사운드 picker UI 폐기 정합).
+ * 사용자분 측 SettingsScreen 측 사운드 변경 시 = 모든 알람/루틴 측 = 자동 follow ✅.
  */
-async function resolveSoundName(soundKey: string): Promise<string | undefined> {
+async function resolveSoundName(): Promise<string | undefined> {
+  const soundId = (await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND)) ?? DEFAULT_SOUND_ID;
   const item =
-    ALARM_SOUNDS.find(s => s.id === soundKey) ??
+    ALARM_SOUNDS.find(s => s.id === soundId) ??
     ALARM_SOUNDS.find(s => s.id === DEFAULT_SOUND_ID);
   return (item as any)?.pushSound;
 }
@@ -78,10 +79,9 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   const fireAt = nextAlarmOccurrenceTime(alarm);
   if (fireAt === null) return null;
 
-  const soundName = await resolveSoundName(alarm.soundKey);
-  // v1.7 hotfix #DBG-D — soundKey → soundName 매핑 결과 출력 (= 사운드 ❌ / 다른 사운드 root cause 추적용).
-  // v1.7 hotfix B2 — soundKey === DEFAULT_SOUND_ID 영역 시 = 글로벌 SETTINGS 측 fallback 영역.
-  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundKey=${alarm.soundKey} → soundName=${soundName ?? '(undefined)'}`);
+  const soundName = await resolveSoundName();
+  // v1.7 hotfix Phase 12 G6sub2 — alarm.soundKey 측 폐기 + 매번 설정 사운드 read.
+  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundName=${soundName ?? '(undefined)'} (= 매번 설정 사운드 read)`);
   const title = alarm.label || '알람';
 
   // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.

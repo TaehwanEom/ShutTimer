@@ -48,7 +48,7 @@ import {
   CategoryDef,
   loadCustomCategories,
 } from '../constants/categories';
-import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
+import { DEFAULT_SOUND_ID } from '../constants/sounds';
 import AdBanner from '../components/AdBanner';
 
 type Props = {
@@ -110,7 +110,7 @@ function formatDuration(sec: number, emptyLabel: string): string {
   return parts.join(' ');
 }
 
-// ─── 카테고리/요일/사운드 라벨 ───────────────────────────
+// ─── 카테고리/요일 라벨 ──────────────────────────────────
 
 function formatDaysLabel(days: number[], t: (k: string) => string): string {
   if (days.length === 0) return t('routine.edit.unselected');
@@ -121,15 +121,6 @@ function formatDaysLabel(days: number[], t: (k: string) => string): string {
   if (isWeekday) return t('routine.daysWeekday');
   if (isWeekend) return t('routine.daysWeekend');
   return sorted.map(d => t(`routine.weekday.${WEEKDAY_KEYS[d]}`)).join(' ');
-}
-
-function formatSoundLabel(soundKey: string, t: (k: string) => string): string {
-  const item = ALARM_SOUNDS.find(s => s.id === soundKey);
-  if (!item) return t('routine.edit.unselected');
-  const num = item.id.split('_')[1] ?? '';
-  return item.id.startsWith('alarm_')
-    ? `${t('routine.sound.alarm')} ${num}`
-    : `${t('routine.sound.ringtone')} ${num}`;
 }
 
 // ─── 컴포넌트 ────────────────────────────────────────────
@@ -150,7 +141,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const [routineName, setRoutineName] = useState('');
   const [startTime, setStartTime] = useState<string>(DEFAULT_START_TIME);
   const [days, setDays] = useState<number[]>([]);
-  const [soundKey, setSoundKey] = useState<string>(DEFAULT_SOUND_ID);
   const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
   const [steps, setSteps] = useState<LocalStep[]>(() => [
     { id: createStepId(), name: '', durationSeconds: 0 },
@@ -210,7 +200,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       setRoutineName(target.name ?? '');
       setStartTime(target.schedule?.startTime ?? DEFAULT_START_TIME);
       setDays(target.schedule?.days ?? []);
-      setSoundKey(target.soundKey || DEFAULT_SOUND_ID);
       setEndMethod(target.endMethod);
       setSteps(
         target.steps.map(s => ({
@@ -252,15 +241,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       navigation.setParams({ selectedDays: undefined } as any);
     }
   }, [route.params?.selectedDays, navigation]);
-
-  useEffect(() => {
-    const sel = route.params?.selectedSound;
-    if (sel !== undefined) {
-      setSoundKey(sel);
-      markDirty();
-      navigation.setParams({ selectedSound: undefined } as any);
-    }
-  }, [route.params?.selectedSound, navigation]);
 
   // ─── 슬롯 핸들러 ────────────────────────────────────
 
@@ -387,7 +367,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       steps: finalSteps,
       // manual 모드는 schedule 자체 미생성 (scheduler 자동 skip)
       schedule: mode === 'scheduled' ? { startTime, days } : undefined,
-      soundKey,
+      soundKey: DEFAULT_SOUND_ID,
       active: isEditMode ? originalActiveRef.current : true,
       endMethod,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
@@ -452,10 +432,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     navigation.navigate('RoutineDays', { current: days });
   };
 
-  const handleNavSound = () => {
-    navigation.navigate('RoutineSound', { current: soundKey });
-  };
-
   // ─── 표시용 라벨 ────────────────────────────────────
 
   const categoryLabel = (() => {
@@ -465,7 +441,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     return def.labelKey ? t(def.labelKey) : def.label ?? category;
   })();
   const daysLabel = formatDaysLabel(days, t);
-  const soundLabel = formatSoundLabel(soundKey, t);
   const startTimeLabel = formatTimeKr(startTime);
 
   // ─── 렌더 ───────────────────────────────────────────
@@ -599,14 +574,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
             </View>
           </TouchableOpacity>
         )}
-
-        <TouchableOpacity style={styles.settingRow} onPress={handleNavSound}>
-          <Text style={styles.settingLabel}>{t('routine.edit.fieldSound')}</Text>
-          <View style={styles.settingValueRow}>
-            <Text style={styles.settingValue}>{soundLabel}</Text>
-            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
-          </View>
-        </TouchableOpacity>
 
         {/* 종료 방식 — 항상 표시 (tap / shake / camera) */}
         <View style={styles.endMethodSection}>

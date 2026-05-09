@@ -80,7 +80,6 @@ import RoutineEditScreen from './src/screens/RoutineEditScreen';
 import RoutineAlarmScreen from './src/screens/RoutineAlarmScreen';
 import RoutineCategoryScreen from './src/screens/RoutineCategoryScreen';
 import RoutineDaysScreen from './src/screens/RoutineDaysScreen';
-import RoutineSoundScreen from './src/screens/RoutineSoundScreen';
 import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
@@ -142,12 +141,10 @@ export type RootStackParamList = {
     // Phase 4: 하위 화면에서 merge:true 로 반환되는 값들 (useEffect로 소비 후 undefined 세팅)
     selectedCategory?: string;
     selectedDays?: number[];
-    selectedSound?: string;
   } | undefined;
   RoutineAlarm: { routineId: string };
   RoutineCategory: { current?: string } | undefined;
   RoutineDays: { current?: number[] } | undefined;
-  RoutineSound: { current?: string } | undefined;
   // v1.6+ 알람 기능
   AlarmList: undefined;
   AlarmEdit: { alarmId?: string } | undefined;
@@ -984,7 +981,6 @@ function AppNavigator() {
         <Stack.Screen name="RoutineAlarm" component={RoutineAlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
-        <Stack.Screen name="RoutineSound" component={RoutineSoundScreen} />
         <Stack.Screen name="FavoritesList" component={FavoritesListScreen} />
         <Stack.Screen name="AlarmList" component={AlarmListScreen} />
         <Stack.Screen name="AlarmEdit" component={AlarmEditScreen} />

@@ -10,7 +10,6 @@ ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SETTINGS_KEY } from './src/constants/settings';
@@ -19,51 +18,7 @@ import { preloadDismissMethod } from './src/utils/settingsCache';
 import { Logger } from './src/utils/logger';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => {
-    const appState = AppState.currentState;
-    let phase = 'init';
-    let alarmEnabledRaw: string | null = null;
-    let isAlarmActive: string | null = null;
-    let isTimerActive: string | null = null;
-    let isRoutineActive: string | null = null;
-
-    Logger.info('NotifHandler', `ENTER appState=${appState}`);
-
-    try {
-      phase = 'reading_storage';
-      [alarmEnabledRaw, isAlarmActive, isTimerActive, isRoutineActive] = await Promise.all([
-        AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
-        AsyncStorage.getItem('isAlarmActive'),
-        AsyncStorage.getItem('isTimerActive'),
-        AsyncStorage.getItem('isRoutineActive'),
-      ]);
-      phase = 'computing';
-
-      const alarmEnabled = alarmEnabledRaw !== 'false';
-      // v1.6: 루틴 실행 중 포그라운드 상태면 다른 루틴/타이머 알림 suppress (중복 발화 방지)
-      const suppress = (isAlarmActive === 'true' || isTimerActive === 'true' || isRoutineActive === 'true') && appState === 'active';
-
-      const result = suppress || !alarmEnabled
-        ? { shouldPlaySound: false, shouldShowBanner: false, shouldShowList: false, shouldSetBadge: false }
-        : { shouldPlaySound: true, shouldShowBanner: true, shouldShowList: true, shouldSetBadge: true };
-
-      Logger.info(
-        'NotifHandler',
-        `OK raw=${alarmEnabledRaw} alarm=${isAlarmActive} timer=${isTimerActive} routine=${isRoutineActive} suppress=${suppress} enabled=${alarmEnabled} → sound=${result.shouldPlaySound}`
-      );
-      return result;
-    } catch (e) {
-      Logger.error('NotifHandler', `THROW phase=${phase} appState=${appState} err=${e instanceof Error ? e.message : String(e)}`);
-      return {
-        shouldPlaySound: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldSetBadge: true,
-      };
-    }
-  },
-});
+// v1.7 hotfix Phase 13 G4-F — Notifications.setNotificationHandler 통째 폐기 (= AlarmKit only).
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';
 import AlarmScreen from './src/screens/AlarmScreen';
@@ -341,117 +296,11 @@ function AppNavigator() {
     run();
   }, []);
 
-  // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도) + 이중 가드 (시나리오 A 방어)
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
-      // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거.
-      // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입.
-      const data = notification?.request?.content?.data as any;
-      if (!navigationRef.current?.isReady()) return;
-      const route = navigationRef.current?.getCurrentRoute()?.name;
-      if (route === 'Alarm') return;
-      const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
-      if (isAlarmActive === 'true') return;
-      // routine 진행 중이면 단일 timer 알람 fallback 차단
-      const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
-      if (isRoutineActive === 'true') return;
-      navigationRef.current?.navigate('Alarm');
-    });
-    return () => subscription.remove();
-  }, []);
-
-  // 알림 탭 시 적절한 화면으로 이동
-  // v1.6: 루틴 알림 분기 — data.type으로 routine_prealert / routine_chain / (기본: Alarm) 구분
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
-      if (!navigationRef.current?.isReady()) return;
-      const data = (response?.notification?.request?.content?.data ?? {}) as any;
-      const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
-
-      if (data?.type === 'routine_prealert' && typeof data?.routineId === 'string') {
-        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
-        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_prealert currentRoute=${currentRoute}`);
-        (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
-        return;
-      }
-      if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
-        // 자동 진행 체인 — RoutineList 의 inline 진행이 active routine sync 로 자동 마운트
-        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab') return;
-        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_chain currentRoute=${currentRoute}`);
-        (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
-        return;
-      }
-      if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-        // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
-        // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
-        // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
-        // camera → RoutineAlarm (scan UI).
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm') return;
-        const routines = await loadRoutines();
-        const r = routines.find(x => x.id === data.routineId);
-        if (!r) {
-          Logger.warn('NAV-DBG', `reset target=RoutineTab source=notif-response/routine_confirm_prompt-noRoutine currentRoute=${currentRoute}`);
-          navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
-          return;
-        }
-        if (!navigationRef.current?.isReady()) return;
-        // v1.6 A-1 — 모달 통일. 모든 endMethod (tap/shake/camera) = RoutineList → ActiveRoutineSection modal.
-        Logger.warn('NAV-DBG', `navigate target=RoutineTab source=notif-response/routine_confirm_prompt-routine currentRoute=${currentRoute}`);
-        (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-        return;
-      }
-
-      // 기본 알람 경로 — routine 진행 중이면 차단
-      if (currentRoute === 'Alarm') return;
-      const isAlarmActive = await AsyncStorage.getItem('isAlarmActive');
-      if (isAlarmActive === 'true') return;
-      const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
-      if (isRoutineActive === 'true') return;
-      navigationRef.current?.navigate('Alarm');
-    });
-    return () => subscription.remove();
-  }, []);
-
-  // 콜드 스타트: 알림 탭으로 앱 진입 시 적절한 화면 이동
-  useEffect(() => {
-    Notifications.getLastNotificationResponseAsync()
-      .then(async (response) => {
-        if (!response) return;
-        const data = (response?.notification?.request?.content?.data ?? {}) as any;
-        if (data?.type === 'routine_prealert') {
-          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_prealert`);
-          (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
-          return;
-        }
-        if (data?.type === 'routine_chain' && typeof data?.routineId === 'string') {
-          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_chain`);
-          (navigationRef.current as any)?.navigate('Home', { screen: 'RoutineTab' });
-          return;
-        }
-        if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-          // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
-          // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
-          const routines = await loadRoutines();
-          const r = routines.find(x => x.id === data.routineId);
-          if (!r) {
-            Logger.warn('NAV-DBG', `reset target=RoutineTab source=cold-start/routine_confirm_prompt-noRoutine`);
-            navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
-            return;
-          }
-          if (!navigationRef.current?.isReady()) return;
-          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start/routine_confirm_prompt-routine`);
-          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-          return;
-        }
-        // 기본 알람 경로 — routine 진행 중이면 차단
-        const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
-        if (isRoutineActive === 'true') return;
-        navigationRef.current?.navigate('Alarm');
-      })
-      .catch(e => {
-        Logger.warn('AppNavigator', `Failed to get last notification response: ${e}`);
-      });
-  }, []);
+  // v1.7 hotfix Phase 13 G4-F — expo-notifications 측 listener 3 useEffect 통째 폐기 (= AlarmKit only).
+  // 알림 도착 / tap / cold start 측 = AlarmKit framework 측 자체 처리:
+  //   - alerting state → onAlarmStateChange listener (= 본 file 측 잔존)
+  //   - alarm UI tap → OpenAppDismiss Intent (= 자체 navigate)
+  //   - cold start → AlarmKit 측 자체 lifecycle 정합
 
   // v1.6 T1 + v1.7 hotfix #3 — AlarmKit 알람 발화 listener.
   // 분기 type: chain / timer_main / alarm_main / confirm_prompt.

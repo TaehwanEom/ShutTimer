@@ -321,6 +321,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const ar = JSON.parse(arRaw);
         // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측 영역) 시 = RoutineList 강제 이동 ❌ → AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
         if (ar?.routineId && !isAdhocAlarmRoutine(ar.routineId)) {
+          Logger.warn('NAV-DBG-COLD', `AlarmScreen-guard replace RoutineList isRoutineActive=true ar.routineId=${ar.routineId}`);
           navigation.replace('RoutineList');
         }
       } catch {}
@@ -390,8 +391,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
       });
       return;
     }
+    Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset Home dismissMethod=${dismissMethod}`);
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-  }, [navigation, route.params]);
+  }, [navigation, route.params, dismissMethod]);
 
   // 광고 종료 후 분기: 카메라 결과 화면 OR 홈
   const handleAfterAd = useCallback(() => {
@@ -1023,8 +1025,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
   }, [remainingMs, dismissMethod, isShuffling, isRetryBannerVisible, resultState, dangerBlink]);
 
   // 설정 로드 전 빈 화면 / goHome 호출 후 빈 검은 화면 (광고 닫힘 → 화면 전환 잔상 차단)
+  // v1.7 hotfix — camera mode 측 첫 frame 빨강 잔상 차단 (= dismissMethod useState 초기값 측 정합 + #000 swap).
   if (!settingsLoaded) {
-    return <SafeAreaView style={styles.container} />;
+    return <SafeAreaView style={[styles.container, dismissMethod === 'camera' && { backgroundColor: '#000' }]} />;
   }
   if (dismissingHome) {
     return <SafeAreaView style={[styles.container, { backgroundColor: '#000' }]} />;

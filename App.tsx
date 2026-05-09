@@ -350,6 +350,7 @@ function AppNavigator() {
         // listAllAlarmMetadata loop 가 cancel + delete 통합 처리 (race 방지: listener 가
         // 먼저 metadata 삭제하면 AlarmScreen cleanup 이 A 를 못 찾아 system 측 ghost 잔존).
         if (currentRoute === 'Alarm') return;
+        Logger.warn('NAV-DBG-COLD', `onAlarmState-timer_main navigate Alarm currentRoute=${currentRoute} alarmId=${event.alarmId}`);
         navigationRef.current?.navigate('Alarm');
         return;
       }
@@ -365,6 +366,7 @@ function AppNavigator() {
         // v1.7 Phase 2-A — alarmEntityId 전달. AlarmScreen.goHome 측 alarm.steps 분기 사용.
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === meta.entityId);
+        Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
         navigationRef.current?.navigate('Alarm', {
           endMethod: a?.dismissMethod ?? 'tap',
           alarmSoundKey: a?.soundKey,
@@ -447,6 +449,7 @@ function AppNavigator() {
         if (meta.type === 'timer_main') {
           // v1.6 Phase 9: cold-start 시 fire 된 timer_main 알람
           // v1.6 hotfix — deleteAlarmMetadata 호출 제거. AlarmScreen 가 cleanup 책임 통합.
+          Logger.warn('NAV-DBG-COLD', `coldStart-timer_main navigate Alarm alarmId=${alerting.id}`);
           navigationRef.current?.navigate('Alarm');
           return;
         }
@@ -457,6 +460,7 @@ function AppNavigator() {
           // v1.7 Phase 2-A — alarmEntityId 전달.
           const alarms = await loadAlarms();
           const a = alarms.find(x => x.id === meta.entityId);
+          Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
           navigationRef.current?.navigate('Alarm', {
             endMethod: a?.dismissMethod ?? 'tap',
             alarmSoundKey: a?.soundKey,
@@ -544,7 +548,18 @@ function AppNavigator() {
           if (signal.action === 'open_app_dismiss') {
             if (navigationRef.current?.isReady()) {
               const route = navigationRef.current.getCurrentRoute()?.name;
-              if (route !== 'Alarm') navigationRef.current.navigate('Alarm');
+              if (route !== 'Alarm') {
+                // v1.7 hotfix #ColdStartRemount — currentRoute='Splash' 시 race 회피.
+                // Splash 측 setTimeout 1.5초 후 navigation.replace('Home') 측 = stack reorder → AlarmScreen unmount + remount 회귀.
+                // 정공 = navigation.reset 측 직접 [Home, Alarm] stack set → Splash 측 self-replace 측 = noop (= Splash instance ❌).
+                if (route === 'Splash') {
+                  Logger.warn('NAV-DBG-COLD', `polling-timer_main reset[Home,Alarm] from Splash routineId=${signal.routineId}`);
+                  navigationRef.current.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'Alarm' }] });
+                } else {
+                  Logger.warn('NAV-DBG-COLD', `polling-timer_main navigate Alarm route=${route} routineId=${signal.routineId}`);
+                  navigationRef.current.navigate('Alarm');
+                }
+              }
             }
           } else {
             // timer 측 (pause/resume/stop) — HomeScreen listener 가 처리
@@ -622,6 +637,7 @@ function AppNavigator() {
               if (alarmEntity) {
                 const route = navigationRef.current.getCurrentRoute()?.name;
                 if (route !== 'Alarm') {
+                  Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${alarmEntity.dismissMethod ?? 'tap'}`);
                   navigationRef.current.navigate('Alarm', {
                     endMethod: alarmEntity.dismissMethod ?? 'tap',
                     alarmSoundKey: alarmEntity.soundKey,

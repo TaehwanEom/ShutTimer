@@ -2,7 +2,7 @@
 // Widget Extension target — Button(intent:) 호출 대상.
 //
 // 가드 분기:
-//   Intent struct  = @available(iOS 26.0, *)  — LiveActivityIntent + Button(intent:) 사용 영역
+//   Intent struct  = unconditional (= widget extension deployment target 26.0, Phase 10-G4 정합)
 //   AlarmKit 호출 = if #available(iOS 26.0, *) — AlarmManager.shared.pause/resume/cancel
 //   Activity API  = iOS 16.2+ (LiveActivity 자체)
 //
@@ -125,7 +125,6 @@ private func clearRoutineSnapshot() {
     defaults.removeObject(forKey: KEY_ROUTINE_SNAPSHOT)
 }
 
-@available(iOS 26.0, *)
 struct PauseRoutineIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "일시정지"
     // 잠금 상태에서 비번/Face ID 해제 없이 perform 가능. iPhone 기본 타이머 동급.
@@ -161,7 +160,6 @@ struct PauseRoutineIntent: LiveActivityIntent {
     }
 }
 
-@available(iOS 26.0, *)
 struct ResumeRoutineIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "재개"
     static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
@@ -198,7 +196,6 @@ struct ResumeRoutineIntent: LiveActivityIntent {
     }
 }
 
-@available(iOS 26.0, *)
 struct StopRoutineIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "정지"
     static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
@@ -243,7 +240,6 @@ struct StopRoutineIntent: LiveActivityIntent {
 // v1.6 hotfix — LA Button "다음 진행" (잠금화면 / Dynamic Island).
 // AlarmKit alerting UI secondary button (modules/alarmkit-bridge/ios/AdvanceNextStepIntent.swift) 와 동일 native 처리.
 // RN setInterval 백그라운드 정지 우회 — perform() 안에서 직접 alarm stop + 다음 step schedule.
-@available(iOS 26.0, *)
 private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx: Int) async throws -> UUID {
     let nextStep = snapshot.steps[nextStepIdx]
     let durationSec = max(0.001, nextStep.durationSec)
@@ -351,7 +347,6 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
 // native 측 직접 처리 (RN setInterval 백그라운드 정지 우회):
 //   1. snapshot 읽기 → 2. 현재 alarm stop → 3. 마지막 step ? cleanup : 다음 step schedule
 //   4. snapshot 갱신 → 5. 'advance_done' signal write (RN active 시 ar/LA 동기화)
-@available(iOS 26.0, *)
 struct AdvanceNextStepIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "다음 진행"
     static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed

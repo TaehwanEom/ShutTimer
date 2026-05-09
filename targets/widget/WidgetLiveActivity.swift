@@ -41,7 +41,6 @@ fileprivate func appendNativeDbgWidget(_ tag: String, _ msg: String, throttle: B
 
 // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmPresentationState.Mode 측 String 변환 helper.
 // dbg log 측 mode 분기 + associated value 핵심 데이터 명시용.
-@available(iOS 26.0, *)
 fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
     switch mode {
     case .countdown(let c):
@@ -59,7 +58,7 @@ fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
 //   직전 = 본 widget 미등록 → system default layout 표시 (= 카운터 ❌ root cause).
 //   본 commit = ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) 등록 →
 //   Lock Screen + Dynamic Island 측 정합 layout 표시.
-@available(iOS 26.0, *)
+// v1.7 hotfix #LAUnify Phase 10-G4 — @available(iOS 26.0, *) 마크 제거 (= widget extension deployment target 26.0 정합).
 struct AlarmKitLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
@@ -103,7 +102,6 @@ struct AlarmKitLiveActivity: Widget {
 
 // MARK: - AlarmKit LA helpers (= AlarmPresentationState.Mode 분기 + metadata 사용)
 
-@available(iOS 26.0, *)
 struct AlarmKitLockScreenView: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
@@ -163,7 +161,6 @@ struct AlarmKitLockScreenView: View {
     }
 }
 
-@available(iOS 26.0, *)
 struct AlarmKitCountdownText: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
     let fontStyle: Font
@@ -194,7 +191,6 @@ struct AlarmKitCountdownText: View {
     }
 }
 
-@available(iOS 26.0, *)
 struct AlarmKitCompactTrailingView: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
@@ -212,7 +208,6 @@ struct AlarmKitCompactTrailingView: View {
     }
 }
 
-@available(iOS 26.0, *)
 struct AlarmKitTrailingButtons: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
@@ -229,7 +224,6 @@ struct AlarmKitTrailingButtons: View {
     }
 }
 
-@available(iOS 26.0, *)
 struct AlarmKitPauseResumeButton: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
@@ -261,7 +255,6 @@ struct AlarmKitPauseResumeButton: View {
     }
 }
 
-@available(iOS 26.0, *)
 struct AlarmKitStepBottomLabel: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 

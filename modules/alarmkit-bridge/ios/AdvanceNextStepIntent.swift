@@ -19,6 +19,7 @@ import Foundation
 
 #if canImport(AlarmKit)
 import AlarmKit
+import SharedAlarmTypes
 import SwiftUI
 #endif
 

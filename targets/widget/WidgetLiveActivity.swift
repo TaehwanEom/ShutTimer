@@ -3,6 +3,7 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 import AlarmKit
+import SharedAlarmTypes
 
 // v1.6 Phase 10 — ShutTimer 기본 색상 (#ff2424). app.json color 와 일관성.
 private extension Color {

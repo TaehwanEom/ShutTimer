@@ -1,0 +1,54 @@
+// AlarmKit 자동 LA Activity 측 AlarmAttributes<ShutTimerAlarmMetadata> 단일 정의 영역.
+// v1.7 hotfix #LAUnify Phase 10-G2 — 별도 SharedAlarmTypes Pod 측 단일 Swift module identity 보장.
+//
+// 배경 = ActivityKit framework 측 widget lookup = module-level type identity 매칭 필수.
+//   직전 옵션 α (= AlarmkitBridge Pod + widget extension 측 자체 정의) 측 = 별도 module identity
+//   → ActivityKit lookup ❌ → widget body 호출 ❌ → 잠금화면 LA 안 보임 root cause.
+//
+// 본 commit = AlarmkitBridge Pod + widget extension target 측 = 본 Pod 측 import →
+//   단일 Swift module identity (= SharedAlarmTypes.ShutTimerAlarmMetadata) 보장 →
+//   ActivityKit widget lookup 정합 → widget body 정상 호출.
+//
+// 사용 site:
+//   AlarmkitBridge Pod 측 = AlarmkitBridgeModule.swift + AdvanceNextStepIntent.swift
+//   widget extension target 측 = WidgetLiveActivity.swift + RoutineControlIntents.swift
+//
+// cross-module access 위해 struct + 모든 field + init 측 public 명시 필수.
+
+import Foundation
+
+#if canImport(AlarmKit)
+import AlarmKit
+
+@available(iOS 26.0, *)
+public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
+    public var currentStepName: String? = nil
+    public var currentStepIndex: Int = 0
+    public var totalSteps: Int = 1
+    public var stage: String = "step"
+    public var paused: Bool = false
+    public var pausedAt: Double? = nil
+    public var routineId: String? = nil
+    public var routineName: String? = nil
+
+    public init(
+        currentStepName: String? = nil,
+        currentStepIndex: Int = 0,
+        totalSteps: Int = 1,
+        stage: String = "step",
+        paused: Bool = false,
+        pausedAt: Double? = nil,
+        routineId: String? = nil,
+        routineName: String? = nil
+    ) {
+        self.currentStepName = currentStepName
+        self.currentStepIndex = currentStepIndex
+        self.totalSteps = totalSteps
+        self.stage = stage
+        self.paused = paused
+        self.pausedAt = pausedAt
+        self.routineId = routineId
+        self.routineName = routineName
+    }
+}
+#endif

@@ -40,11 +40,12 @@ fileprivate func appendNativeDbg(_ tag: String, _ msg: String) {
 
 #if canImport(AlarmKit)
 import AlarmKit
+import SharedAlarmTypes
 import SwiftUI
 #endif
 
-// v1.7 hotfix #LAUnify Phase 9-B — ShutTimerAlarmMetadata struct 정의 제거.
-// 단일 정의 = `targets/widget/ShutTimerAlarmMetadata.swift` 측 두 target 측 file membership share.
+// v1.7 hotfix #LAUnify Phase 10-G2 — ShutTimerAlarmMetadata struct 단일 정의 = `modules/shared-alarm-types/ios/ShutTimerAlarmMetadata.swift`.
+// `import SharedAlarmTypes` 측 = ActivityKit framework 측 widget lookup 정합 위해 단일 Swift module identity 보장.
 
 private let APP_GROUP = "group.com.shuttimer.app"
 private let KEY_SIGNAL = "la_control_signal"

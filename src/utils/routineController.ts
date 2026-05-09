@@ -219,24 +219,6 @@ async function findRoutine(routineId: string): Promise<Routine | null> {
   return list.find(r => r.id === routineId) ?? null;
 }
 
-/**
- * v1.6 Phase 12 — routine 시작 시점 권한 자동 검증 + 미결정 시 요청.
- * RoutineEdit / Onboarding 경로 외 (직접 RoutineList 에서 시작) 시 권한 미결정 보강.
- * - expo-notifications 권한 (confirm_prompt 폴백 fire 보장)
- * - AlarmKit 권한 (iOS 26+ 풀스크린 알람 fire 보장)
- */
-async function ensureNotificationPermissions(): Promise<void> {
-  try {
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') {
-      await Notifications.requestPermissionsAsync();
-    }
-  } catch {}
-  try {
-    await requestAlarmKitAuthorizationIfNeeded();
-  } catch {}
-}
-
 // v1.7 hotfix #LAUnify Phase 10-G1 — startOrUpdateLiveActivity / setLiveActivityStage / endLiveActivity 함수 폐기.
 // AlarmKit framework가 .timer/.alarm factory 호출 시 자동으로 LA Activity를 시작/갱신/종료한다.
 // 옛 LiveActivityBridge 모듈은 별도 ActivityKit Activity를 manual 관리하던 영역으로 두 LA 시스템이 충돌
@@ -287,8 +269,10 @@ export async function startRoutine(
   const target = await findRoutine(routineId);
   if (!target) return { kind: 'not_found' };
 
-  // v1.6 Phase 12 — 권한 자동 검증 + 미결정 시 요청 (RoutineEdit / Onboarding 외 경로 보강)
-  await ensureNotificationPermissions();
+  // v1.7 hotfix Phase 13 G4-D-1 — AlarmKit 측 권한 자동 검증 (= expo-notifications 측 권한 요청 폐기 정합).
+  try {
+    await requestAlarmKitAuthorizationIfNeeded();
+  } catch {}
 
   const activeTimerRaw = await AsyncStorage.getItem(ACTIVE_TIMER_KEY);
   if (activeTimerRaw && !options.overrideTimer) {

@@ -20,7 +20,6 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from '../../App';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
@@ -348,7 +347,6 @@ export default function HomeScreen({ navigation, route }: Props) {
   const totalSecondsRef = useRef(0);
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
-  const notificationIdsRef = useRef<string[]>([]);
   // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
   const endAtRef = useRef<number>(0);
   const pausedAtRef = useRef<number | null>(null);
@@ -395,7 +393,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     }, [route?.params?.selectedFavoriteId])
   );
 
-  const scheduleAlarm = async (seconds: number, opts?: { skipAlarmKit?: boolean }) => {
+  const scheduleAlarm = async (seconds: number) => {
     // v1.6 hotfix — AlarmKit 권한 미결정 시 명시 요청.
     // 권한 grant 시 AlarmKit alerting fire = silent/Focus 우회 자동.
     // 미요청 상태로 expo 폴백만 등록되면 silent mode 시 kill 상태 무음.
@@ -419,19 +417,13 @@ export default function HomeScreen({ navigation, route }: Props) {
     const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmEnabledRaw !== 'false';
 
-    // 기존 예약 모두 취소
-    for (const oldId of notificationIdsRef.current) {
-      await Notifications.cancelScheduledNotificationAsync(oldId);
-    }
-    notificationIdsRef.current = [];
-
     // 타이머 활성 플래그 (foreground 이중 재생 방지 — App.tsx NotifHandler 경로)
     AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
 
-    // v1.6 Phase 9 — AlarmKit 분기 (iOS 26+ + 권한 + 알람 ON). 성공 시 expo-notifications 경로 skip.
+    // v1.7 hotfix Phase 13 G4-C — AlarmKit 측만 사용 (= iOS 26+ + 권한 + 알람 ON).
     // alarmEnabled=false 시 AlarmKit 미사용 (사용자 무음 의도 ↔ AlarmKit silent 우회 강제 충돌).
     const useAlarmKit = alarmEnabled && (await shouldUseAlarmKitInTimer());
-    if (useAlarmKit && !opts?.skipAlarmKit) {
+    if (useAlarmKit) {
       // 기존 AlarmKit alarm cleanup
       if (alarmkitIdRef.current) {
         await AlarmkitBridge.cancelAlarm(alarmkitIdRef.current).catch(() => {});
@@ -480,7 +472,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           alarmkitIdRef.current = id;
           // v1.6 Phase 10-A — LA Intent 가 read 해 AlarmKit pause/resume/cancel 호출
           writeChainAlarms(routineId, [id]);
-          return; // expo-notifications 경로 skip
+          return;
         }
       } catch (e) {
         // Phase E 진단 — catch 빈 블록 → throw 표면화
@@ -488,54 +480,11 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
     }
 
-    // 사운드 + 사용자 설정 (expo 폴백)
-    const vibrationEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.VIBRATION_ENABLED);
-    const vibrationEnabled = vibrationEnabledRaw !== 'false';
-
-    // iOS 푸시는 사운드 없으면 진동도 안 옴. 알람 OFF + 진동 ON 케이스에서 무음 WAV로 진동만 유도.
-    // (iOS가 "사운드 있음"으로 인지하여 기본 햅틱 트리거 — 단 무음 모드에선 iOS 설정에 따라 동작 불확실)
-    const sound: string | false = alarmEnabled
-      ? soundItem.pushSound
-      : (vibrationEnabled ? 'notification_silent_vibe.wav' : false);
-
-    // v1.5: 알람 사운드 Pre-load (AlarmScreen 마운트 시 playAsync 즉시 호출 가능 → 딜레이 단축)
-    // alarmEnabled=false이면 스킵. 기존 preload는 모듈 내부에서 clear 후 재생성.
+    // v1.7 hotfix Phase 13 G4-C — expo-notifications 폴백 폐기 (= AlarmKit only).
+    // alarmEnabled 시 = AlarmScreen 측 즉시 play 측 = sound preload 측 잔존.
     if (alarmEnabled) {
       preloadAlarmSound(soundItem.source).catch(() => {});
     }
-
-    // 종료 방식별 첫 본문
-    const method = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
-    const firstBodyKey =
-      method === 'tap' ? 'running.notifBodyTap'
-      : method === 'shake' ? 'running.notifBodyShake'
-      : 'running.notifBodyCamera';
-
-    // 3단계 알람 (첫 번째만 사운드, 2/3번째는 배너만 — v1.5: 미션 종료 후에도 iOS 시스템 사운드가
-    // 이미 발화된 상태면 dismissAllNotificationsAsync로 중단 불가하므로 애초에 2/3번째는 sound:false)
-    const stages: { offset: number; bodyKey: string; withSound: boolean }[] = [
-      { offset: 0,   bodyKey: firstBodyKey,                  withSound: true },
-      { offset: 60,  bodyKey: 'running.notifBodyReminder2',  withSound: false },
-      { offset: 120, bodyKey: 'running.notifBodyReminder3',  withSound: false },
-    ];
-
-    const ids: string[] = [];
-    for (const { offset, bodyKey, withSound } of stages) {
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: t('running.notifTitle'),
-          body: t(bodyKey),
-          sound: withSound ? sound : false,
-          interruptionLevel: 'active',
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: seconds + offset,
-        },
-      });
-      ids.push(id);
-    }
-    notificationIdsRef.current = ids;
   };
 
   const cancelAlarms = async (opts?: { keepPreload?: boolean; keepAlarmKit?: boolean }) => {
@@ -555,9 +504,6 @@ export default function HomeScreen({ navigation, route }: Props) {
       clearChainAlarms(timerRoutineIdRef.current);
     }
     timerRoutineIdRef.current = null;
-    // 메모리 배열 + 시스템 예약 양쪽 모두 정리 (cold start 복원 후 메모리 배열이 비어있어도 안전)
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    notificationIdsRef.current = [];
     // 타이머 플래그 해제 (pair with scheduleAlarm)
     AsyncStorage.removeItem('isTimerActive').catch(() => {});
     // v1.5: preload된 사운드 메모리 해제 (메모리 누수 방지).
@@ -627,8 +573,6 @@ export default function HomeScreen({ navigation, route }: Props) {
     setIsRunning(true);
     setIsPaused(false);
     isPausedRef.current = false;
-    // @v1.5 — 알림 권한은 Onboarding이 처리. 미응답 사용자 대비 fallback (이미 응답 시 no-op)
-    Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
     // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
     // AlarmKit framework가 .timer factory로 schedule된 alarm에 대해 LA Activity 자동 시작 (= AlarmKitLiveActivity widget render).
@@ -718,11 +662,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, pausedAt: signal.timestamp })).catch(() => {});
           } catch {}
         });
-        // v1.7 hotfix — 위젯 측 pause 시 = expo notif fallback (= 3단계 알람) cancel (= 시간 완료 시점 측 = 과거 푸시 발화 회피).
-        for (const oldId of notificationIdsRef.current) {
-          Notifications.cancelScheduledNotificationAsync(oldId).catch(() => {});
-        }
-        notificationIdsRef.current = [];
+        // v1.7 hotfix Phase 13 G4-C — 위젯 측 pause 시 = expo notif fallback cancel 폐기 (= AlarmKit native pause 정합).
       } else if (signal.action === 'resume' && isPausedRef.current && isRunning) {
         // 위험 #X 정정: pauseDuration = resume signal.timestamp - 실제 pausedAt
         const pauseDuration = Math.max(0, signal.timestamp - (pausedAtRef.current ?? signal.timestamp));
@@ -737,10 +677,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, endAt: endAtRef.current, pausedAt: null })).catch(() => {});
           } catch {}
         });
-        // v1.7 hotfix — 위젯 측 resume 시 = expo notif fallback 재등록 (= AlarmKit 측 ❌ 시 백업 영역).
-        // skipAlarmKit:true 측 = AlarmKit 측 = native pause/resume 영역 정공 + 중복 등록 회피.
-        const remainingSec = Math.max(1, Math.floor((endAtRef.current - Date.now()) / 1000));
-        scheduleAlarm(remainingSec, { skipAlarmKit: true }).catch(() => {});
+        // v1.7 hotfix Phase 13 G4-C — 위젯 측 resume 시 = expo notif fallback 재등록 폐기 (= AlarmKit native resume 정합).
       } else if (signal.action === 'stop') {
         // LA Intent 가 이미 AlarmKit cancel + Activity end 처리. handleCancel = state 정리 (cancelAlarms / endLiveActivity 가 noop 호환).
         handleCancel();
@@ -755,7 +692,6 @@ export default function HomeScreen({ navigation, route }: Props) {
   // ★ cancelAlarms() 호출 금지 — cancelAllScheduledNotificationsAsync 가 routine 알림까지 wipe 하는 race 차단.
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('timerCancelledExternally', () => {
-      notificationIdsRef.current = [];
       setIsRunning(false);
       setIsPaused(false);
       isPausedRef.current = false;
@@ -788,13 +724,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         return;
       }
       if (!raw) {
-        // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 LiveActivityBridge.endAll 측 cleanup 제거. AlarmKit framework가 자동 lifecycle 관리.
-        // v1.7 hotfix #18 — 이전 세션 측 단일 타이머 expo 알림 stale cleanup.
-        // 직전 시점 AlarmKit 등록 실패 → expo 폴백 (= 0/60/120s offset 3단계 등록) +
-        // 비정상 종료로 cancel 누락 시 = 시스템 큐 잔존 → 알람 entity / 신규 timer 시점 에 fire.
-        // 가드: routine ❌ (직전 분기 처리) + timer ❌ → AlarmKit 측 routine/alarm entity 측
-        // expo 등록 ❌ (= AlarmKit only) → wipe 안전 (= stale 단일 타이머 expo 알림만 정리).
-        await Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
+        // v1.7 hotfix Phase 13 G4-C — cold start 측 expo 알림 stale cleanup 폐기 (= AlarmKit only = stale ❌).
         return;
       }
       let t: ActiveTimer;

@@ -4,7 +4,6 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import {
   Routine,
   ActiveRoutine,
@@ -188,18 +187,8 @@ async function cancelBackgroundNotif(): Promise<void> {
     await cancelRoutineConfirmPrompt(currentConfirmPromptId);
     currentConfirmPromptId = null;
   }
-  // ★ 강제 종료 등으로 모듈 ref 가 사라진 경우 대비 — iOS 시스템 큐에 잔존하는 routine_chain /
-  //   routine_confirm_prompt 알림 모두 조회 + cancel. routine_prealert 는 rolling schedule 이므로 제외.
-  try {
-    const all = await Notifications.getAllScheduledNotificationsAsync();
-    for (const n of all) {
-      const t = (n.content?.data as any)?.type;
-      if (t === 'routine_chain' || t === 'routine_confirm_prompt') {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
-      }
-    }
-  } catch {}
-  // v1.6 T1 — AlarmKit 잔존 알람 cleanup (chain / confirm_prompt 만. prealert 는 rolling schedule)
+  // v1.7 hotfix Phase 13 G4-D-2 — expo-notifications 측 잔존 정리 폐기 (= AlarmKit only).
+  // AlarmKit 잔존 알람 cleanup (chain / confirm_prompt 만. prealert 는 rolling schedule)
   try {
     const metas = await listAllAlarmMetadata();
     for (const meta of metas) {
@@ -281,16 +270,7 @@ export async function startRoutine(
   if (activeTimerRaw && options.overrideTimer) {
     await AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
     await AsyncStorage.removeItem(IS_TIMER_ACTIVE_KEY).catch(() => {});
-    // 단일 timer 의 시스템 예약 알림 cancel — routine_* 외 모든 알림 (단일 timer 알림은 type 없음).
-    try {
-      const all = await Notifications.getAllScheduledNotificationsAsync();
-      for (const n of all) {
-        const t = (n.content?.data as any)?.type;
-        if (t !== 'routine_prealert' && t !== 'routine_chain' && t !== 'routine_confirm_prompt') {
-          await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
-        }
-      }
-    } catch {}
+    // v1.7 hotfix Phase 13 G4-D-2 — expo-notifications 측 단일 timer 정리 폐기 (= AlarmKit only = HomeScreen scheduleAlarm 측 AlarmKit 측만 등록).
     // preload 된 알람 사운드 정리 (HomeScreen 이 scheduleAlarm 시 createAsync 한 핸들 누수 방지)
     await clearPreloadedSound().catch(() => {});
     // HomeScreen 의 React state / setInterval 리셋 신호 — 루틴이 단일 타이머를 override 했음을 알림

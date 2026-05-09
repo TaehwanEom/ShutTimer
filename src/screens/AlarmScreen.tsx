@@ -23,7 +23,6 @@ import { colors } from '../constants/theme';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import * as Notifications from 'expo-notifications';
 import { useTranslation } from 'react-i18next';
 import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
@@ -290,11 +289,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     } catch (e) {
       Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration outer throw=${String(e)}`);
     }
-    // 미발화 예약 알림 취소 + 이미 발화된 배너/OS 사운드 dismiss (race 방지 위해 await)
-    await Promise.all([
-      Notifications.cancelAllScheduledNotificationsAsync().catch(() => {}),
-      Notifications.dismissAllNotificationsAsync().catch(() => {}),
-    ]);
+    // v1.7 hotfix Phase 13 G4-B — expo-notifications 측 cancel/dismiss 폐기 (= AlarmKit only).
     // AlarmScreen 비활성 플래그 먼저 제거 (App.tsx listener가 즉시 navigate 차단 해제)
     await AsyncStorage.removeItem('isAlarmActive').catch(() => {});
     const s = soundRef.current;
@@ -341,10 +336,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const stackTop = stack?.split('\n').slice(1, 6).join(' | ') ?? '(no stack)';
     Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})} stack=${stackTop}`);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
-    // v1.7 hotfix — mount 시 = expo banner dismiss (= 백그라운드 → banner tap 진입 시 잔존 banner 영역 정리).
-    Notifications.dismissAllNotificationsAsync()
-      .then(() => Logger.warn('AlarmScreen-DBG', 'mount dismissAllNotifications OK'))
-      .catch((e: any) => Logger.warn('AlarmScreen-DBG', `mount dismissAllNotifications throw=${String(e)}`));
+    // v1.7 hotfix Phase 13 G4-B — expo banner dismiss 폐기 (= AlarmKit only).
     return () => {
       Logger.warn('AlarmScreen-DBG', 'unmount');
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});
@@ -552,10 +544,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     };
   }, []);
 
-  // portrait 잠금 + 예약 알림 전부 취소 (안전장치)
+  // portrait 잠금 (= v1.7 hotfix Phase 13 G4-B 측 expo cancel 안전장치 폐기 = AlarmKit only).
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    Notifications.cancelAllScheduledNotificationsAsync();
   }, []);
 
   useEffect(() => {

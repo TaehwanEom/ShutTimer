@@ -35,12 +35,9 @@ import AlarmKit
 import SwiftUI
 #endif
 
-// v1.7 hotfix #20 — 외부 symbol 정의 추가 (= AlarmkitBridge module + Widget target 동등 정의).
-// AdvanceNextStepIntent 동기화 측 scheduleNextStepAlarmLA + stopIntent 측 사용.
-@available(iOS 26.0, *)
-nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
-    // ShutTimer 측 = routineId 로 매칭. metadata 자체는 비움.
-}
+// v1.7 hotfix #LAUnify Phase 10-G0 — ShutTimerAlarmMetadata 정의 제거 (= 직전 Phase 9-B 측 누락 영역).
+// 단일 정의 = `targets/widget/_shared/ShutTimerAlarmMetadata.swift` 측 두 target file membership share.
+// 본 module (= live-activity-bridge, main app target 측) 측 = _shared/ 측 자동 file membership 측 lookup OK.
 
 @available(iOS 26.0, *)
 struct OpenAppDismissIntent: LiveActivityIntent {

@@ -246,8 +246,7 @@
       "./plugins/withInfoPlistLocalizations.js",
       "./plugins/withWidgetAppIntentsMetadata.js",
       "@react-native-community/datetimepicker",
-      "@bacons/apple-targets",
-      "./plugins/withSharedAlarmMetadata.js"
+      "@bacons/apple-targets"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

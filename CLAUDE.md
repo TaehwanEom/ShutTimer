@@ -149,6 +149,31 @@ When something fails:
 
 This is the step LLMs skip most often after "run tests". They guess from error keywords and apply the most-recent-pattern fix. That's how a one-line bug becomes a three-file refactor.
 
+### 11. No Legacy Code on Modern Frameworks [Critical]
+
+When integrating a modern framework (e.g., AlarmKit on iOS 26+, Xcode 16+ project structure, the latest version of any library), do not stack legacy patterns on top of it. Use the framework's current recommended pattern.
+
+**Why:** Stacking old code under new code creates two systems that conflict. Each conflict requires a workaround (forced flags, suppression bandages, manual sync code). Each workaround creates new bugs. The cycle compounds — every fix produces new bugs because the underlying duality is never resolved.
+
+**Real examples from this project (2026-05):**
+- Used ActivityKit's manual `Activity.request` / `update` / `end` while AlarmKit auto-manages the LiveActivity → forced `areActivitiesEnabled = false` to suppress the old system → manual `Activity.update` calls scattered across 4 files → paused-state LA broke and every patch made it worse.
+- Wrote an Xcode plugin using legacy `pbxFileReferenceSection` + `addSourceFile` API while the project uses Xcode 16+ `PBXFileSystemSynchronizedRootGroup` → plugin silently skipped → type identity mismatch persisted → debug logs never fired → root cause hidden for multiple cycles.
+- Kept 50+ `expo-notifications` calls after migrating to AlarmKit → permission dialogs, sound registration, and scheduling all duplicated → race conditions on cancel/reschedule.
+
+**Rules:**
+1. **Verify the framework's current recommended pattern from official docs / source / sample code before writing.** Do not infer from training data. Memory entry `feedback_search_first.md` and `feedback_latest_tech_first.md` apply here as hard preconditions.
+2. **Do not keep old code as a "safety net".** If you migrate to a new framework, remove the old code in the same change, not later.
+3. **Never write a workaround/flag/bandage to stop an old system from interfering.** If you find yourself writing one, stop. Remove the old system instead.
+4. **Forbidden patterns when modern alternatives exist:**
+   - `Activity.request/update/end` when AlarmKit `.timer/.alarm` factory auto-manages the LiveActivity
+   - `pbxFileReferenceSection` + `addSourceFile` when Xcode 16+ uses `PBXFileSystemSynchronizedRootGroup` + `membershipExceptions`
+   - `expo-notifications` calls when AlarmKit covers the same scheduling layer
+   - `setInterval` + `endAtRef`-style time tracking when an OS observer (e.g., `AlarmManager.alarmUpdates`) provides authoritative state
+   - Polling AsyncStorage / App Group on a timer when an event-driven API exists
+5. **Test:** If you cannot describe in one sentence why both the old and new code must coexist, the old code must go.
+
+**Cost of violation:** every cycle ends with a new bug, the codebase grows debt instead of features, and the user loses trust. This rule is not optional.
+
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 ---

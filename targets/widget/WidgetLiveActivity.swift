@@ -211,8 +211,13 @@ struct AlarmKitCountdownText: View {
             //   - .time(pattern: .minuteSecond / .hourMinuteSecond) 측 = format (= 60분+ 분기 + 다국어 정합).
             // 직전 = SwiftUI Text(timerInterval:pauseTime:) 측 = Apple Developer Forum #756971 보고 bug → 본 패턴 회피.
             // 직전 = String(format:) 측 = 구형 + 다국어 ❌ → Apple 공식 sample 패턴 정합.
+            // v1.7 hotfix #WidgetAppPausedAlign — roundFractionalSeconds: .up 명시 (= ceil 정합).
+            //   직전 = default truncate (= 50.5초 → 50초) → 앱 측 Math.ceil (= 51초) vs 위젯 50초 = 1초 차이.
+            //   정정 = .up 측 = 50.5초 → 51초 (= ceil) → 앱 vs 위젯 일관성 + "남은 시간" 직관 정합.
             let remaining = Duration.seconds(p.totalCountdownDuration - p.previouslyElapsedDuration)
-            let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60) ? .hourMinuteSecond : .minuteSecond
+            let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60)
+                ? .hourMinuteSecond(padHourToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
+                : .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
             Text(remaining.formatted(.time(pattern: pattern)))
                 .monospacedDigit()
                 .font(fontStyle)

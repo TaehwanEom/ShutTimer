@@ -655,6 +655,11 @@ export default function HomeScreen({ navigation, route }: Props) {
         pausedAtRef.current = signal.timestamp;
         isPausedRef.current = true;
         setIsPaused(true);
+        // v1.7 hotfix #WidgetAppPausedAlign — pause 시점 remaining 강제 update (= setInterval stale value 회피).
+        // 직전 = setInterval polling cycle 측 마지막 update 시점 측 stale value 잔존 → 위젯 측 (= AlarmKit framework ceil) vs 앱 측 = 1초 차이.
+        const remaining = Math.max(0, Math.ceil((endAtRef.current - signal.timestamp) / 1000));
+        remainingSecondsRef.current = remaining;
+        setRemainingSeconds(remaining);
         AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
           if (!raw) return;
           try {
@@ -670,6 +675,10 @@ export default function HomeScreen({ navigation, route }: Props) {
         pausedAtRef.current = null;
         isPausedRef.current = false;
         setIsPaused(false);
+        // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
+        const remaining = Math.max(0, Math.ceil((endAtRef.current - signal.timestamp) / 1000));
+        remainingSecondsRef.current = remaining;
+        setRemainingSeconds(remaining);
         AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
           if (!raw) return;
           try {
@@ -804,6 +813,10 @@ export default function HomeScreen({ navigation, route }: Props) {
       // pause: pause 시점 저장 + 알람 취소
       pausedAtRef.current = now;
       cancelAlarms();
+      // v1.7 hotfix #WidgetAppPausedAlign — pause 시점 remaining 강제 update (= setInterval stale value 회피).
+      const remaining = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      remainingSecondsRef.current = remaining;
+      setRemainingSeconds(remaining);
       // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.end 호출 제거.
       // AlarmKit framework가 alarm cancel 시 LA Activity 자동 종료. cancelAlarms()는 G3에서 AlarmKit pause로 교체 예정.
     } else {
@@ -812,6 +825,9 @@ export default function HomeScreen({ navigation, route }: Props) {
       endAtRef.current += pauseDuration;
       pausedAtRef.current = null;
       const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
+      remainingSecondsRef.current = remainingSecs;
+      setRemainingSeconds(remainingSecs);
       scheduleAlarm(remainingSecs);
       // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
       // scheduleAlarm()이 새 AlarmKit alarm을 등록하면 LA Activity 자동 시작.

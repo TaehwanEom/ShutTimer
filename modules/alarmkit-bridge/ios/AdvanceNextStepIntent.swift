@@ -313,13 +313,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.routineEnded = true
             snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
             writeSnapshot(snapshot)
-            // v1.6 — 마지막 step LA 즉시 종료 (위젯 측 동일 패턴, RN polling 대기 ❌).
-            // (= 카테고리 C 측 ShutTimerActivityAttributes.routineId 보존, 비교만 entityId)
-            for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == effectiveEntityId {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
-            }
+            // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual end 제거.
+            // 마지막 step alerting → AlarmKit framework가 LA Activity 자동 종료.
             writeAdvanceDoneSignal(routineId: effectiveEntityId)
             return .result()
         }
@@ -339,23 +334,9 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.savedAt = nowMs
             writeSnapshot(snapshot)
 
-            // v1.6 — LA 즉시 갱신 (위젯 측 동일 패턴). RN polling 대기 ❌ → 잠금 화면 0:00+로딩 stale 차단.
-            // ActivityKit 시스템 측 type name + properties 매칭 가정 — alarmkit-bridge 측 자체 ShutTimerActivityAttributes 정의 사용.
-            // (= 카테고리 C 측 routineId 보존, 비교만 entityId)
-            let nextStepName = snapshot.steps[nextIdx].name
-            for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == effectiveEntityId {
-                    var newState = activity.content.state
-                    newState.currentStepName = nextStepName
-                    newState.progress = 0
-                    newState.paused = false
-                    newState.currentStepIndex = nextIdx
-                    newState.totalSteps = snapshot.totalSteps
-                    newState.stage = "step"
-                    newState.stepEndAt = snapshot.stepEndAt
-                    await activity.update(.init(state: newState, staleDate: nil))
-                }
-            }
+            // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual update 제거.
+            // 새 alarm schedule (= scheduleNextStepAlarm) → AlarmKit framework가 새 LA Activity 자동 시작.
+            // 새 metadata (= ShutTimerAlarmMetadata) → AlarmKitLiveActivity widget 자동 갱신.
 
             // 6. RN polling 측 'advance_done' 신호 (active 시 ar/LA 동기화)
             writeAdvanceDoneSignal(routineId: effectiveEntityId)

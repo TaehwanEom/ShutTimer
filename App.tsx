@@ -86,7 +86,7 @@ import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, setLiveActivityStage, syncRoutineFromSnapshot, markAwaitingConfirm } from './src/utils/routineController';
+import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, syncRoutineFromSnapshot, markAwaitingConfirm } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal, readRoutineSnapshot } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
@@ -349,11 +349,9 @@ function AppNavigator() {
   // 알림 도착 시 자동으로 AlarmScreen 이동 (탭 안 해도) + 이중 가드 (시나리오 A 방어)
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
-      // v1.6 Phase 12 — expo-notifications 폴백 경로의 routine_confirm_prompt fire 시 LA stage 자동 전환
+      // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거.
+      // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입.
       const data = notification?.request?.content?.data as any;
-      if (data?.type === 'routine_confirm_prompt') {
-        await setLiveActivityStage('manual_prompt').catch(() => {});
-      }
       if (!navigationRef.current?.isReady()) return;
       const route = navigationRef.current?.getCurrentRoute()?.name;
       if (route === 'Alarm') return;
@@ -389,8 +387,7 @@ function AppNavigator() {
         return;
       }
       if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-        // v1.6 Phase 12 — 알림 탭 경로의 routine_confirm_prompt 도 LA stage 자동 전환
-        await setLiveActivityStage('manual_prompt').catch(() => {});
+        // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
         // v1.6: 확인 후 진행 모드 배경 알림 — endMethod 별 분기.
         // tap/shake → RoutineList (active routine sync → ActiveRoutineSection 마운트 → awaitingConfirm 분기에서 Modal alarm 표시).
         // camera → RoutineAlarm (scan UI).
@@ -437,8 +434,7 @@ function AppNavigator() {
           return;
         }
         if (data?.type === 'routine_confirm_prompt' && typeof data?.routineId === 'string') {
-          // v1.6 Phase 12 — cold-start 알림 탭 경로도 LA stage 자동 전환
-          await setLiveActivityStage('manual_prompt').catch(() => {});
+          // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
           // v1.6 A-1 — 모달 통일. 모든 endMethod = RoutineList.
           const routines = await loadRoutines();
           const r = routines.find(x => x.id === data.routineId);
@@ -534,12 +530,10 @@ function AppNavigator() {
       }
 
       if (meta.type === 'confirm_prompt') {
-        // v1.6 Phase 12 — alerting 시 LA stage='manual_prompt' 자동 전환 (위젯 "다음 진행" Button 노출)
+        // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거.
+        // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입 → "다음 진행" 버튼 표시.
         Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
-        await setLiveActivityStage('manual_prompt').catch(() => {});
         // v1.7 hotfix #6 — ar.awaitingConfirm=true 동기 갱신.
-        // JS thread active 시점 측 ar 갱신 → 향후 startOrUpdateLiveActivity 호출 시 stage='manual_prompt' 보장.
-        // JS thread 정지 시점 측은 native fix #5 가 보강.
         await markAwaitingConfirm(meta.entityId).catch(() => {});
         // v1.7 hotfix #LastStepDirectNavigate — 마지막 step 측 = AlarmScreen navigate 직접.
         // listener 측 navigate('RoutineList') / ('AlarmTab') 측 = 마지막 step 측 = 시각 race
@@ -627,8 +621,7 @@ function AppNavigator() {
           return;
         }
         if (meta.type === 'confirm_prompt') {
-          // v1.6 Phase 12 — cold-start AlarmKit alerting 경로도 LA stage 자동 전환
-          await setLiveActivityStage('manual_prompt').catch(() => {});
+          // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
           // v1.7 hotfix #6 — cold-start 측 동일 ar 동기 갱신.
           await markAwaitingConfirm(meta.entityId).catch(() => {});
           // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (nested = tab bar 보존).

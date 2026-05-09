@@ -30,9 +30,7 @@ import AlarmKit
 import SwiftUI
 #endif
 
-#if canImport(ActivityKit)
-import ActivityKit
-#endif
+// v1.7 hotfix #LAUnify Phase 10-G1 — ActivityKit import 제거. AlarmKit framework가 LA Activity 자동 관리.
 
 // v1.7 hotfix #LAUnify Phase 9-B — ShutTimerAlarmMetadata struct 정의 제거.
 // 단일 정의 = `targets/widget/ShutTimerAlarmMetadata.swift` 측 두 target 측 file membership share.
@@ -107,23 +105,9 @@ public class AlarmkitBridgeModule: Module {
               // JS thread 측 background 정지 시도 정합 (= App.tsx onAlarmStateChange listener →
               // setLiveActivityStage 호출 ❌ 영역. JS 측 hotfix #4 = active 시점만 효과).
               // 매칭 = snapshot.currentAlarmId vs alarm.id (= routine confirm_prompt 측 only).
-              // timer_main / alarm_main / prealert / chain 측 = snapshot.currentAlarmId 매칭 ❌ → 영향 ❌.
-              if alarm.state == .alerting,
-                 let snap = readRoutineSnapshotMini(),
-                 snap.currentAlarmId == alarm.id.uuidString {
-                let routineId = snap.routineId
-                Task {
-                  if #available(iOS 16.2, *) {
-                    for activity in Activity<ShutTimerActivityAttributes>.activities {
-                      if activity.attributes.routineId == routineId {
-                        var newState = activity.content.state
-                        newState.stage = "manual_prompt"
-                        await activity.update(.init(state: newState, staleDate: nil))
-                      }
-                    }
-                  }
-                }
-              }
+              // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual stage update 제거.
+              // AlarmKit framework가 alerting state 진입 시 mode=.alert 자동 전이 → AlarmKitLiveActivity widget이
+              // alert mode 분기에서 "다음 진행" 버튼 자동 표시.
             }
           }
           lastStates = Dictionary(uniqueKeysWithValues: alarms.map { ($0.id, $0.state) })

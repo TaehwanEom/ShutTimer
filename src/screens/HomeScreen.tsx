@@ -37,7 +37,6 @@ import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { Logger } from '../utils/logger';
-import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
@@ -353,9 +352,9 @@ export default function HomeScreen({ navigation, route }: Props) {
   // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
   const endAtRef = useRef<number>(0);
   const pausedAtRef = useRef<number | null>(null);
-  // v1.6 Phase 9 — AlarmKit alarm id (timer_main type) + LiveActivity id
+  // v1.6 Phase 9 — AlarmKit alarm id (timer_main type)
+  // v1.7 hotfix #LAUnify Phase 10-G1 — activeLiveActivityIdRef 제거 (LiveActivityBridge 폐기 영역).
   const alarmkitIdRef = useRef<string | null>(null);
-  const activeLiveActivityIdRef = useRef<string | null>(null);
   const timerRoutineIdRef = useRef<string | null>(null);
 
   useFocusEffect(
@@ -631,32 +630,8 @@ export default function HomeScreen({ navigation, route }: Props) {
     // @v1.5 — 알림 권한은 Onboarding이 처리. 미응답 사용자 대비 fallback (이미 응답 시 no-op)
     Notifications.requestPermissionsAsync();
     scheduleAlarm(total);
-    // v1.6 Phase 9 — LiveActivity 시작 (iOS 16.2+ 권한 활성 시. 그 외 silent skip)
-    // v1.7 hotfix #LADbgTimer — 단일 타이머 LA 표시 ❌ root cause 추적 디버그 로그.
-    try {
-      const areEnabled = LiveActivityBridge.areActivitiesEnabled();
-      Logger.warn('LA-DBG', `timer start areEnabled=${areEnabled}`);
-      if (areEnabled) {
-        // v1.7 hotfix — 일반 타이머 start 직전 = stale LA (= 종료된 루틴 / 이전 timer) 정리. LA 다중 영역 회피.
-        await LiveActivityBridge.endAll().catch(() => {});
-        const routineId = timerRoutineIdRef.current;
-        const stepName = t('home.timerName', { defaultValue: '타이머' });
-        Logger.warn('LA-DBG', `timer start.start ENTER routineId=${routineId} stepEndAt=${endAtRef.current} now=${Date.now()}`);
-        const id = await LiveActivityBridge.start({
-          routineId,
-          routineName: stepName,
-          stepName,
-          stepEndAt: endAtRef.current,
-          progress: 0,
-        });
-        Logger.warn('LA-DBG', `timer start.start RESULT id=${id ?? 'null'}`);
-        activeLiveActivityIdRef.current = id || null;
-      } else {
-        Logger.warn('LA-DBG', 'timer start SKIP — areActivitiesEnabled=false');
-      }
-    } catch (e) {
-      Logger.warn('LA-DBG', `timer start THROW ${String(e)}`);
-    }
+    // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
+    // AlarmKit framework가 .timer factory로 schedule된 alarm에 대해 LA Activity 자동 시작 (= AlarmKitLiveActivity widget render).
     // 영속화 (cold start 복원용)
     AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({
       startedAt: now,
@@ -715,14 +690,8 @@ export default function HomeScreen({ navigation, route }: Props) {
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
       AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
-      // v1.6 Phase 9 — LiveActivity 종료
-      if (activeLiveActivityIdRef.current) {
-        LiveActivityBridge.end({
-          activityId: activeLiveActivityIdRef.current,
-          dismissalPolicy: 'immediate',
-        }).catch(() => {});
-        activeLiveActivityIdRef.current = null;
-      }
+      // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.end 호출 제거.
+      // AlarmKit framework가 alarm cancel/alerting 시 LA Activity 자동 종료.
       // v1.5: 타이머 자연 종료 → AlarmScreen 진입. preload된 사운드를 AlarmScreen이 consume하도록 유지.
       // v1.6 hotfix — keepAlarmKit:true. JS countdown=0 시 AlarmKit cancel 호출 시 alerting UI 즉시 dismiss
       // (= "잠깐 비췄다 꺼짐" #2) + system 측 ghost 잔존 가능 (#3 후보) 동시 차단.
@@ -819,12 +788,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         return;
       }
       if (!raw) {
-        // ActiveTimer 없음 + routine 도 없음 → stale LA 가능 (이전 세션 잔존)
-        try {
-          if (LiveActivityBridge.areActivitiesEnabled()) {
-            await LiveActivityBridge.endAll().catch(() => {});
-          }
-        } catch {}
+        // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 LiveActivityBridge.endAll 측 cleanup 제거. AlarmKit framework가 자동 lifecycle 관리.
         // v1.7 hotfix #18 — 이전 세션 측 단일 타이머 expo 알림 stale cleanup.
         // 직전 시점 AlarmKit 등록 실패 → expo 폴백 (= 0/60/120s offset 3단계 등록) +
         // 비정상 종료로 cancel 누락 시 = 시스템 큐 잔존 → 알람 entity / 신규 timer 시점 에 fire.
@@ -848,13 +812,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       endAtRef.current = endAt;
       pausedAtRef.current = pausedAt;
 
-      // v1.6 Phase 9 — 복원 시 stale LA 일괄 종료 (timer 만 영향 — routine 동시 active 차단됨).
-      // 진행 중 분기에서 신규 LA 재등록.
-      try {
-        if (LiveActivityBridge.areActivitiesEnabled()) {
-          await LiveActivityBridge.endAll().catch(() => {});
-        }
-      } catch {}
+      // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 LiveActivityBridge.endAll cleanup 제거. AlarmKit 자동 lifecycle.
 
       if (pausedAt !== null) {
         // Pause 상태 복원 — 알람 재예약 X (이미 cancelAlarms됨). LA 재등록도 skip (pause = 시간 정지 표시 의미 약함).
@@ -876,28 +834,8 @@ export default function HomeScreen({ navigation, route }: Props) {
         setIsRunning(true);
         // 예약 알림은 이미 iOS 네이티브 레이어에 남아있음. 플래그만 재설정 (foreground suppress)
         AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
-        // v1.6 Phase 9 — LA 재등록 (진행 중 복원 시 잠금화면 가시화 복구)
-        try {
-          if (LiveActivityBridge.areActivitiesEnabled()) {
-            const total = t.totalSeconds * 1000;
-            const elapsed = Math.max(0, total - (endAt - now));
-            const progress = total > 0 ? Math.min(1, elapsed / total) : 0;
-            const newRoutineId = `main_timer_${now}`;
-            timerRoutineIdRef.current = newRoutineId;
-            // T4 일괄 (정책 #1) — 복원 useEffect 안 't' 변수 = ActiveTimer 와 충돌해 useTranslation 의 t 사용 X. ko 하드코딩.
-            const stepName = '타이머';
-            const id = await LiveActivityBridge.start({
-              routineId: newRoutineId,
-              routineName: stepName,
-              stepName,
-              stepEndAt: endAt,
-              progress,
-            });
-            activeLiveActivityIdRef.current = id || null;
-          }
-        } catch {
-          // 권한 / 시스템 한도 — silent skip
-        }
+        // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
+        // AlarmKit framework가 cold-start 시점 alarm 잔존하면 LA Activity도 자동 잔존.
       } else {
         // 알람 시간 지났음 → 세션 기록 + AlarmScreen
         saveSession(t.totalSeconds, t.missionIcon ?? 'timer');
@@ -936,14 +874,8 @@ export default function HomeScreen({ navigation, route }: Props) {
       // pause: pause 시점 저장 + 알람 취소
       pausedAtRef.current = now;
       cancelAlarms();
-      // v1.6 발견 #E — pause 시 LA 종료 (ContentState paused 미지원 — 카운트다운 진행처럼 보임 ↔ 실제 알람 X 혼란 차단)
-      if (activeLiveActivityIdRef.current) {
-        LiveActivityBridge.end({
-          activityId: activeLiveActivityIdRef.current,
-          dismissalPolicy: 'immediate',
-        }).catch(() => {});
-        activeLiveActivityIdRef.current = null;
-      }
+      // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.end 호출 제거.
+      // AlarmKit framework가 alarm cancel 시 LA Activity 자동 종료. cancelAlarms()는 G3에서 AlarmKit pause로 교체 예정.
     } else {
       // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
       const pauseDuration = now - (pausedAtRef.current ?? now);
@@ -951,26 +883,8 @@ export default function HomeScreen({ navigation, route }: Props) {
       pausedAtRef.current = null;
       const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
       scheduleAlarm(remainingSecs);
-      // v1.6 발견 #E — resume 시 LA 신규 start (pause 시 end 한 LA 재개)
-      try {
-        if (LiveActivityBridge.areActivitiesEnabled()) {
-          const total = Math.max(1, totalSecondsRef.current * 1000);
-          const elapsed = Math.max(0, total - (endAtRef.current - now));
-          const progress = Math.min(1, elapsed / total);
-          const stepName = t('home.timerName', { defaultValue: '타이머' });
-          const routineId = timerRoutineIdRef.current ?? `main_timer_${now}`;
-          timerRoutineIdRef.current = routineId;
-          LiveActivityBridge.start({
-            routineId,
-            routineName: stepName,
-            stepName,
-            stepEndAt: endAtRef.current,
-            progress,
-          }).then(id => {
-            activeLiveActivityIdRef.current = id || null;
-          }).catch(() => {});
-        }
-      } catch {}
+      // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
+      // scheduleAlarm()이 새 AlarmKit alarm을 등록하면 LA Activity 자동 시작.
     }
     // AsyncStorage 업데이트 (cold start 복원용)
     AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
@@ -990,14 +904,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // --- 취소 ---
   const handleCancel = () => {
     cancelAlarms();
-    // v1.6 Phase 9 — LiveActivity 즉시 종료
-    if (activeLiveActivityIdRef.current) {
-      LiveActivityBridge.end({
-        activityId: activeLiveActivityIdRef.current,
-        dismissalPolicy: 'immediate',
-      }).catch(() => {});
-      activeLiveActivityIdRef.current = null;
-    }
+    // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.end 호출 제거.
+    // AlarmKit framework가 alarm cancel 시 LA Activity 자동 종료.
     AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
     setIsRunning(false);
     setIsPaused(false);

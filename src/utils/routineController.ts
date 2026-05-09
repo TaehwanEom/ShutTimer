@@ -23,7 +23,6 @@ import {
   requestAlarmKitAuthorizationIfNeeded,
 } from './routineScheduler';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
-import LiveActivityBridge from '../../modules/live-activity-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from './alarmkitMappingTable';
 import { Logger } from './logger';
 import i18n from '../i18n';
@@ -45,8 +44,7 @@ const IS_TIMER_ACTIVE_KEY = 'isTimerActive';
 // 현재 예약된 배경 알림 id — 모듈 레벨에서 보관 (UI 마운트/언마운트와 독립)
 // v1.6 Phase 12 — 옵션 A (chain 일괄 등록) 폐기. confirm_prompt 단발만 유지.
 let currentConfirmPromptId: string | null = null;
-// v1.6 T3 Phase 4: 활성 LiveActivity id — 잠금화면/다이내믹 아일랜드 표시용.
-let currentLiveActivityId: string | null = null;
+// v1.7 hotfix #LAUnify Phase 10-G1 — currentLiveActivityId 변수 제거 (LiveActivityBridge 모듈 폐기 영역).
 // v1.7 hotfix #DupSched — 이중 schedule 차단 가드.
 // root cause = startRoutineFromAlarm → startRoutine-fresh (#1) → AlarmListScreen mount → ActiveRoutineSection.init → startRoutine-resumed (#2)
 // 동일 routineId + stepIdx + stepEndAt key 측 1초 이내 재호출 시 skip. 정상 호출 (= stepEndAt 다른 영역 = 다음 step / pause shift / cold restart) 측 영향 ❌.
@@ -239,74 +237,14 @@ async function ensureNotificationPermissions(): Promise<void> {
   } catch {}
 }
 
-/**
- * v1.6 T3 Phase 4 — LiveActivity 시작 또는 갱신.
- * iOS 16.2+ + 사용자 권한 활성 시에만 실제 표시. 그 외엔 silent skip.
- */
-async function startOrUpdateLiveActivity(routine: Routine, ar: ActiveRoutine): Promise<void> {
-  try {
-    if (!LiveActivityBridge.areActivitiesEnabled()) return;
-  } catch {
-    return;
-  }
-  const step = routine.steps[ar.currentStepIndex];
-  if (!step) return;
-
-  const stepDurationMs = Math.max(0, step.durationSeconds) * 1000;
-  const remaining = Math.max(0, ar.stepEndAt - Date.now());
-  const elapsed = Math.max(0, stepDurationMs - remaining);
-  const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
-  const routineName = routine.name ?? routine.category;
-  // v1.7 hotfix #21 — LA stepEndAt debug log (= 위젯 0:00 root cause 추적용).
-  Logger.warn('LA', `startOrUpdate stepEndAt=${ar.stepEndAt} now=${Date.now()} delta=${ar.stepEndAt - Date.now()}ms stepIdx=${ar.currentStepIndex} duration=${step.durationSeconds}s laId=${currentLiveActivityId}`);
-
-  // v1.7 hotfix #4 — stage 파라미터 명시. 직전: stage 미전달 → native 측 fallback 'step' →
-  // alerting 시점에 setLiveActivityStage('manual_prompt') 호출했어도 다른 영역 update 호출이
-  // 'step' 으로 덮어쓰기 → 잠금화면 위젯 측 ❚❚ 표시 (= countdown stage 잔존). awaitingConfirm
-  // 측 = 알람 fire 시 true / 다음 step 시작 시 false → stage 정합.
-  const stage: 'step' | 'manual_prompt' = ar.awaitingConfirm ? 'manual_prompt' : 'step';
-
-  if (currentLiveActivityId) {
-    try {
-      await LiveActivityBridge.update({
-        activityId: currentLiveActivityId,
-        stepName: step.name,
-        stepEndAt: ar.stepEndAt,
-        progress,
-        stage,
-        currentStepIndex: ar.currentStepIndex,
-        totalSteps: routine.steps.length,
-        // v1.7 hotfix #30 — paused 측 동기화 (= ar 측 진실 영역).
-        paused: ar.pausedAt !== null,
-      });
-      return;
-    } catch {
-      // update 실패 — start 로 재시도
-      currentLiveActivityId = null;
-    }
-  }
-
-  try {
-    const id = await LiveActivityBridge.start({
-      routineId: routine.id,
-      routineName,
-      stepName: step.name,
-      stepEndAt: ar.stepEndAt,
-      progress,
-      stage,
-      currentStepIndex: ar.currentStepIndex,
-      totalSteps: routine.steps.length,
-    });
-    currentLiveActivityId = id || null;
-  } catch {
-    // 권한 거부 / 시스템 한도 등 — silent skip
-  }
-}
+// v1.7 hotfix #LAUnify Phase 10-G1 — startOrUpdateLiveActivity / setLiveActivityStage / endLiveActivity 함수 폐기.
+// AlarmKit framework가 .timer/.alarm factory 호출 시 자동으로 LA Activity를 시작/갱신/종료한다.
+// 옛 LiveActivityBridge 모듈은 별도 ActivityKit Activity를 manual 관리하던 영역으로 두 LA 시스템이 충돌
+// → areActivitiesEnabled=false 강제 땜빵 + 검정 바 root cause. 본 G1에서 모듈 통째 폐기.
 
 /**
  * v1.7 hotfix #6 — alerting 시 ar.awaitingConfirm=true 동기 갱신.
  * App.tsx onAlarmStateChange listener (= JS thread active 시점) 측 호출.
- * 효과: 향후 startOrUpdateLiveActivity 호출 시 = ar.awaitingConfirm 기반 stage='manual_prompt' 보장 (= hotfix #4 정합).
  * idempotent — 이미 awaitingConfirm=true 시 noop.
  */
 export async function markAwaitingConfirm(entityId: string): Promise<void> {
@@ -314,93 +252,8 @@ export async function markAwaitingConfirm(entityId: string): Promise<void> {
   if (!ar || ar.routineId !== entityId || ar.awaitingConfirm) return;
   await saveActiveRoutine({ ...ar, awaitingConfirm: true });
   Logger.warn('routine', `markAwaitingConfirm entityId=${entityId} OK`);
-  // v1.7 hotfix #32-C — ActiveRoutineSection 측 ar 갱신 sync emit.
-  // 본 함수 = AsyncStorage 측 ar 갱신만 → ActiveRoutineSection 측 local state 갱신 ❌ → 모달 자동 재표시 ❌ (= fix #32-B 단독 부족).
-  // emit 추가 → ActiveRoutineSection 측 listener (= subAwaitingConfirm) → loadActiveRoutine + setAr 갱신 → fix #32-B useEffect 진입 → 모달 자동 재표시.
+  // ActiveRoutineSection 측 = subAwaitingConfirm listener → loadActiveRoutine + setAr → 모달 자동 재표시.
   DeviceEventEmitter.emit('routineAwaitingConfirmExternally', { routineId: entityId });
-}
-
-/**
- * v1.6 Phase 12 — LA stage 갱신 (alerting 시 'manual_prompt' / 다음 step 시작 시 'step').
- * 위젯 자동 stage 전환 — App.tsx onAlarmStateChange listener 가 confirm_prompt alerting 시 호출.
- */
-export async function setLiveActivityStage(stage: 'step' | 'manual_prompt'): Promise<void> {
-  Logger.warn('routine', `setStage stage=${stage} laId=${currentLiveActivityId}`);
-  try {
-    if (!LiveActivityBridge.areActivitiesEnabled()) return;
-  } catch {
-    return;
-  }
-  const ar = await loadActiveRoutine();
-  if (!ar) return;
-  const routine = await findRoutine(ar.routineId);
-  if (!routine) return;
-  const step = routine.steps[ar.currentStepIndex];
-  if (!step) return;
-  const stepDurationMs = Math.max(0, step.durationSeconds) * 1000;
-  const remaining = Math.max(0, ar.stepEndAt - Date.now());
-  const elapsed = Math.max(0, stepDurationMs - remaining);
-  const progress = stepDurationMs > 0 ? Math.min(1, elapsed / stepDurationMs) : 0;
-
-  // v1.6 hotfix — currentLiveActivityId stale 시 endAll → start 재생성 (가설 C 직접 fix).
-  // 잠금 진입 / cold-start 등으로 module-level ref 가 사라진 경우에도 LA stage 전환 보장.
-  if (!currentLiveActivityId) {
-    try {
-      await LiveActivityBridge.endAll().catch(() => {});
-      const id = await LiveActivityBridge.start({
-        routineId: ar.routineId,
-        routineName: routine.name ?? routine.category,
-        stepName: step.name,
-        stepEndAt: ar.stepEndAt,
-        progress,
-        stage,
-        currentStepIndex: ar.currentStepIndex,
-        totalSteps: routine.steps.length,
-      });
-      currentLiveActivityId = id || null;
-      Logger.warn('routine', `LA recreate stage=${stage} id=${currentLiveActivityId}`);
-    } catch (e) {
-      Logger.warn('routine', `LA recreate throw=${String(e)}`);
-    }
-    return;
-  }
-
-  try {
-    await LiveActivityBridge.update({
-      activityId: currentLiveActivityId,
-      stepName: step.name,
-      stepEndAt: ar.stepEndAt,
-      progress,
-      stage,
-      currentStepIndex: ar.currentStepIndex,
-      totalSteps: routine.steps.length,
-    });
-    Logger.warn('routine', 'LA update OK');
-  } catch (e) {
-    Logger.warn('routine', `LA update throw=${String(e)}`);
-  }
-}
-
-/**
- * v1.6 T3 Phase 4 — 활성 LiveActivity 종료. fullCleanup 시점에 호출.
- */
-async function endLiveActivity(): Promise<void> {
-  if (!currentLiveActivityId) {
-    // 모듈 변수 stale 방지 — 시스템에 잔존 가능성 있을 때 endAll
-    try {
-      if (LiveActivityBridge.areActivitiesEnabled()) {
-        await LiveActivityBridge.endAll();
-      }
-    } catch {}
-    return;
-  }
-  try {
-    await LiveActivityBridge.end({
-      activityId: currentLiveActivityId,
-      dismissalPolicy: 'immediate',
-    });
-  } catch {}
-  currentLiveActivityId = null;
 }
 
 // v1.6 Phase 12 — reinstallChainsIfAuto 함수 제거 (auto 모드 영구 미사용).
@@ -415,7 +268,6 @@ async function fullCleanup(): Promise<void> {
     clearChainAlarms(snapshot.routineId);
   }
   await cancelBackgroundNotif();
-  await endLiveActivity();
   await clearActiveRoutine();
   await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
   // v1.6 #9 — snapshot 명시적 정리 (cancelBackgroundNotif 끝에서 이미 호출, idempotent).
@@ -476,13 +328,11 @@ export async function startRoutine(
       await saveActiveRoutine(fresh);
       await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
       await scheduleBackgroundNotif(target, fresh, 'startRoutine-deadline-expired');
-      await startOrUpdateLiveActivity(target, fresh);
       return { kind: 'started', ar: fresh, routine: target };
     }
     await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
     if (existing.pausedAt === null && !existing.awaitingConfirm) {
       await scheduleBackgroundNotif(target, existing, 'startRoutine-resumed');
-      await startOrUpdateLiveActivity(target, existing);
     }
     return { kind: 'resumed', ar: existing, routine: target };
   }
@@ -496,7 +346,6 @@ export async function startRoutine(
   await saveActiveRoutine(fresh);
   await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
   await scheduleBackgroundNotif(target, fresh, 'startRoutine-fresh');
-  await startOrUpdateLiveActivity(target, fresh);
   return { kind: 'started', ar: fresh, routine: target };
 }
 
@@ -529,11 +378,8 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
   if (!ar.awaitingConfirm) {
     const pending: ActiveRoutine = { ...ar, awaitingConfirm: true };
     await saveActiveRoutine(pending);
-    // v1.7 hotfix #9 — ar.awaitingConfirm=true 갱신 직후 LA stage='manual_prompt' 명시 갱신.
-    // ActiveRoutineSection timer-tick 측 호출 = JS active 시점 = startOrUpdateLiveActivity 호출 보장.
-    // fix #4 측 = ar.awaitingConfirm 기반 stage 결정 → 'manual_prompt' 보장 → 잠금화면 위젯 ▶▶ 노출.
-    // listener 측 setLiveActivityStage / markAwaitingConfirm 호출 ❌ 영역 (= AppState background 시) 보강.
-    await startOrUpdateLiveActivity(routine, pending);
+    // v1.7 hotfix #LAUnify Phase 10-G1 — opted out of legacy LiveActivityBridge update.
+    // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입 → "다음 진행" 자동 표시.
     return { kind: 'advance_confirm', ar: pending, routine };
   }
   return { kind: 'advance_confirm', ar, routine };
@@ -593,9 +439,7 @@ export async function syncRoutineFromSnapshot(routineId: string): Promise<Missio
     awaitingConfirm: false,
   };
   await saveActiveRoutine(nextAr);
-  // LA 갱신 — native 가 이미 Activity.update 호출 (B2-1 fix) → RN sync 시 추가 갱신은 멱등.
-  // 단 LA recreate 케이스 (currentLiveActivityId stale) 보장 위해 호출.
-  await startOrUpdateLiveActivity(routine, nextAr);
+  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory가 새 alarm schedule 시 자동으로 LA Activity 갱신.
   // completedStepIndices flush 후 snapshot 갱신 (다음 record 누락 회피)
   if (completed.length > 0) {
     const cleared: RoutineSnapshot = { ...snapshot, completedStepIndices: [] };
@@ -655,7 +499,7 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
   };
   await saveActiveRoutine(nextAr);
   await scheduleBackgroundNotif(routine, nextAr, 'confirmAndAdvance');
-  await startOrUpdateLiveActivity(routine, nextAr);
+  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory 자동 LA 갱신.
   return { kind: 'advance_auto', ar: nextAr, routine };
 }
 
@@ -669,9 +513,7 @@ export async function pauseRoutine(): Promise<ActiveRoutine | null> {
   // v1.6 #4-D — pause 시 snapshot 명시적 cleanup (위젯 측 perform() race 방지).
   // cancelBackgroundNotif 가 이미 clearRoutineSnapshot 호출하지만 idempotent.
   clearRoutineSnapshot();
-  // v1.6 발견 #D — pause 시 LA 종료 (잠금화면 카운트다운 진행 표시 ↔ 실제 알람 X 혼란 차단).
-  // resume 시 reinstallChainsIfAuto + startOrUpdateLiveActivity 가 자동 재시작.
-  await endLiveActivity();
+  // v1.7 hotfix #LAUnify Phase 10-G1 — endLiveActivity 호출 제거. AlarmKit framework가 alarm cancel 시 LA 자동 종료.
   return paused;
 }
 
@@ -690,7 +532,7 @@ export async function resumeRoutine(): Promise<ActiveRoutine | null> {
   };
   await saveActiveRoutine(resumed);
   await scheduleBackgroundNotif(routine, resumed, 'resumeRoutineFromLA');
-  await startOrUpdateLiveActivity(routine, resumed);
+  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory가 새 alarm schedule 시 자동으로 LA Activity 시작.
   return resumed;
 }
 
@@ -737,10 +579,7 @@ export async function resumeRoutineFromLA(resumeTimestamp: number): Promise<Acti
   // 직전 = ar 측 stepEndAt shift + LA update ❌ → LA 측 stepEndAt = 과거 시점 잔존 →
   //   resume 후 paused:false 갱신 (= LA Intent native) → countdown 분기 진입 →
   //   safeStepEndDate (= max(end, now+0.01)) → 0.01초 → 위젯 0:00 표시.
-  const routine = await findRoutine(ar.routineId);
-  if (routine) {
-    await startOrUpdateLiveActivity(routine, resumed);
-  }
+  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory 자동 LA 갱신.
   return resumed;
 }
 
@@ -762,22 +601,12 @@ export async function restoreRoutineState(): Promise<RestoreResult> {
     return { kind: 'expired' };
   }
 
-  // v1.6 위험 #C — cold-start 시 stale LA cleanup. currentLiveActivityId = null + 시스템 측 살아 있을 때
-  // startOrUpdateLiveActivity 의 start 호출이 새 LA 추가 → 두 LA 동시 위험. endAll 로 멱등성 보장.
-  // routine + timer 동시 active 차단됨 (overrideTimer/timerBlocked) → endAll 안전.
-  try {
-    if (LiveActivityBridge.areActivitiesEnabled()) {
-      await LiveActivityBridge.endAll().catch(() => {});
-    }
-  } catch {}
+  // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 LiveActivityBridge cleanup 코드 제거.
+  // AlarmKit framework가 LA Activity lifecycle을 자동 관리 (cold-start 시 alarm 잔존하면 LA도 자동 표시).
 
   await AsyncStorage.setItem(IS_ROUTINE_ACTIVE_KEY, 'true').catch(() => {});
 
   if (ar.awaitingConfirm) {
-    // v1.7 hotfix #8 — cold-start 시 ar.awaitingConfirm=true 잔존 시 = 새 LA 측 stage='manual_prompt' 정합 갱신.
-    // 직전 line 716 endAll → currentLiveActivityId=null → start 호출 (= recreate).
-    // start 측 stage 인자 = ar.awaitingConfirm=true 기반 'manual_prompt' (= hotfix #4 정합).
-    await startOrUpdateLiveActivity(routine, ar);
     return { kind: 'alarm', routineId: routine.id };
   }
 
@@ -797,6 +626,6 @@ export async function restoreRoutineState(): Promise<RestoreResult> {
   }
 
   await scheduleBackgroundNotif(routine, cur, 'restoreRoutineState');
-  await startOrUpdateLiveActivity(routine, cur);
+  // v1.7 hotfix #LAUnify Phase 10-G1 — AlarmKit factory 자동 LA 갱신.
   return { kind: 'run', routineId: routine.id };
 }

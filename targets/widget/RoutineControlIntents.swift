@@ -152,16 +152,8 @@ struct PauseRoutineIntent: LiveActivityIntent {
             try? AlarmManager.shared.pause(id: currentUuid)
         }
 
-        // v1.7 hotfix — Pause 시점 timestamp 측 LA state 측 저장. Resume 시 native 측 stepEndAt shift 계산용.
-        let pauseNowMs = Date().timeIntervalSince1970 * 1000
-        for activity in Activity<ShutTimerActivityAttributes>.activities {
-            if activity.attributes.routineId == routineId {
-                var newState = activity.content.state
-                newState.paused = true
-                newState.pausedAt = pauseNowMs
-                await activity.update(.init(state: newState, staleDate: nil))
-            }
-        }
+        // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual update 제거.
+        // AlarmKit framework `.pause(id:)` API가 자동으로 mode=.paused 전이 + AlarmKitLiveActivity widget 자동 갱신.
 
         writeControlSignal(action: "pause", routineId: routineId)
         return .result()
@@ -197,25 +189,8 @@ struct ResumeRoutineIntent: LiveActivityIntent {
 
         // v1.7 hotfix — Resume 시 native 측 stepEndAt 직접 shift (= RN polling 의존 ❌ 영역).
         // 이전 = paused=false 만 토글 → stepEndAt = 일시정지 직전 시각 잔존 → 위젯 = safeStepEndDate (= max(end, now+0.01))
-        //   = now+0.01 → 0:00 표시. RN polling (= AppState 'active' 1초) 측 = resumeRoutineFromLA 측 ar.stepEndAt shift +
-        //   LA startOrUpdate 측 정정 영역. background 시 polling skip → foreground 진입 시점까지 0:00 잔존.
-        // 정정 = native 측 = pausedAt → 즉시 stepEndAt += (now - pausedAt) shift + pausedAt=nil + paused=false 갱신.
-        let resumeNowMs = Date().timeIntervalSince1970 * 1000
-        for activity in Activity<ShutTimerActivityAttributes>.activities {
-            if activity.attributes.routineId == routineId {
-                var newState = activity.content.state
-                if let p = newState.pausedAt {
-                    let shift = max(0, resumeNowMs - p)
-                    newState.stepEndAt += shift
-                    appendNativeDbg("Intent-DBG-Widget", "Resume stepEndAt shift=\(Int(shift))ms pausedAt=\(p) now=\(resumeNowMs) newStepEndAt=\(newState.stepEndAt)")
-                } else {
-                    appendNativeDbg("Intent-DBG-Widget", "Resume pausedAt=nil → shift skip (= JS pause 경로 또는 LA 재시작 영역)")
-                }
-                newState.pausedAt = nil
-                newState.paused = false
-                await activity.update(.init(state: newState, staleDate: nil))
-            }
-        }
+        // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual update 제거.
+        // AlarmKit framework `.resume(id:)` API가 자동으로 mode=.countdown 전이 + 시간 누적 + AlarmKitLiveActivity widget 자동 갱신.
 
         writeControlSignal(action: "resume", routineId: routineId)
         return .result()
@@ -250,11 +225,8 @@ struct StopRoutineIntent: LiveActivityIntent {
             try? AlarmManager.shared.cancel(id: currentUuid)
         }
 
-        for activity in Activity<ShutTimerActivityAttributes>.activities {
-            if activity.attributes.routineId == routineId {
-                await activity.end(nil, dismissalPolicy: .immediate)
-            }
-        }
+        // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual end 제거.
+        // AlarmKit framework `.cancel(id:)` API가 자동으로 LA Activity 종료.
 
         if let defaults = UserDefaults(suiteName: APP_GROUP) {
             defaults.removeObject(forKey: "\(KEY_ALARM_IDS_PREFIX)\(routineId)")
@@ -430,12 +402,8 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.routineEnded = true
             snapshot.savedAt = Date().timeIntervalSince1970 * 1000.0
             writeRoutineSnapshot(snapshot)
-            // v1.6 hotfix B2-1 — LA 종료 (잠금/백그라운드 즉시 사라짐)
-            for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == effectiveRoutineId {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
-            }
+            // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual end 제거.
+            // 마지막 step alerting → AlarmKit framework가 alarm cancel/stop 시 LA Activity 자동 종료.
             writeControlSignal(action: "advance_done", routineId: effectiveRoutineId)
             return .result()
         }
@@ -454,21 +422,9 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
             snapshot.savedAt = nowMs
             writeRoutineSnapshot(snapshot)
 
-            // LA 즉시 갱신 — stage='step' 단일.
-            let nextStepName = snapshot.steps[nextIdx].name
-            for activity in Activity<ShutTimerActivityAttributes>.activities {
-                if activity.attributes.routineId == effectiveRoutineId {
-                    var newState = activity.content.state
-                    newState.currentStepName = nextStepName
-                    newState.progress = 0
-                    newState.paused = false
-                    newState.currentStepIndex = nextIdx
-                    newState.totalSteps = snapshot.totalSteps
-                    newState.stage = "step"
-                    newState.stepEndAt = snapshot.stepEndAt
-                    await activity.update(.init(state: newState, staleDate: nil))
-                }
-            }
+            // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual update 제거.
+            // 새 alarm schedule (= scheduleNextStepAlarm) → AlarmKit framework가 새 LA Activity 자동 시작.
+            // 새 metadata (= ShutTimerAlarmMetadata) → AlarmKitLiveActivity widget 자동 갱신.
 
             writeControlSignal(action: "advance_done", routineId: effectiveRoutineId)
         } catch {

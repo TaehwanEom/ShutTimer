@@ -204,12 +204,21 @@ struct AlarmKitCountdownText: View {
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-        case .paused:
-            Text("일시정지")
+        case .paused(let p):
+            // v1.7 hotfix #WidgetPausedRemainingTime — "일시정지" 텍스트 → 남은 시간 static 표시.
+            // Apple AlarmKit 공식 sample (= AlarmKitDemo) 패턴 정합:
+            //   - Duration.seconds(totalCountdownDuration - previouslyElapsedDuration) 측 = 남은 시간.
+            //   - .time(pattern: .minuteSecond / .hourMinuteSecond) 측 = format (= 60분+ 분기 + 다국어 정합).
+            // 직전 = SwiftUI Text(timerInterval:pauseTime:) 측 = Apple Developer Forum #756971 보고 bug → 본 패턴 회피.
+            // 직전 = String(format:) 측 = 구형 + 다국어 ❌ → Apple 공식 sample 패턴 정합.
+            let remaining = Duration.seconds(p.totalCountdownDuration - p.previouslyElapsedDuration)
+            let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60) ? .hourMinuteSecond : .minuteSecond
+            Text(remaining.formatted(.time(pattern: pattern)))
+                .monospacedDigit()
                 .font(fontStyle)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .minimumScaleFactor(0.6)
         case .alert:
             Text("알람")
                 .font(fontStyle)

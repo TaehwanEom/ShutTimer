@@ -111,6 +111,21 @@ struct AlarmKitLockScreenView: View {
         // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmKit LA widget body 진입 + state.mode 값 native log.
         // 사용자분 보고 = paused 시 "검정 바만 표시" → 본 widget body 호출 여부 + mode 분기 확인용.
         let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitLockScreenView render mode=\(akModeString(context.state.mode)) routineName=\(context.attributes.metadata?.routineName ?? "nil") routineId=\(context.attributes.metadata?.routineId ?? "nil")", throttle: true) }()
+        // v1.7 hotfix #LAUnify Phase 10-G3 — WWDC25 "Wake up to the AlarmKit API" 강제 정합:
+        // "You MUST handle all three mode cases (.countdown, .paused, .alert) even if they share views."
+        // 직전 = switch 누락 → AlarmKit framework가 widget body 호출 자체 안 함 (= LA-DBG-AKLA 0건 root cause).
+        switch context.state.mode {
+        case .countdown:
+            lockScreenContent
+        case .paused:
+            lockScreenContent
+        case .alert:
+            lockScreenContent
+        }
+    }
+
+    @ViewBuilder
+    private var lockScreenContent: some View {
         HStack(spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {

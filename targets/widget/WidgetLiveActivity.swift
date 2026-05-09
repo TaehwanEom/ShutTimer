@@ -105,6 +105,14 @@ struct AlarmKitLiveActivity: Widget {
 struct AlarmKitLockScreenView: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
+    init(context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>) {
+        self.context = context
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — struct init 시점 측 widget body 호출 직접 측정.
+        // 직전 = view body 측 `let _ = { ... }()` 측 closure compiler dead code elimination 가능성 의심.
+        // init() 측 = side effects 보존 정합 → widget body 호출 시 = 본 log 측 정상 발생 정합.
+        appendNativeDbgWidget("LA-DBG-AKLA-Init", "AlarmKitLockScreenView.init() mode=\(akModeString(context.state.mode))")
+    }
+
     var body: some View {
         // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmKit LA widget body 진입 + state.mode 값 native log.
         // 사용자분 보고 = paused 시 "검정 바만 표시" → 본 widget body 호출 여부 + mode 분기 확인용.
@@ -115,10 +123,20 @@ struct AlarmKitLockScreenView: View {
         switch context.state.mode {
         case .countdown:
             lockScreenContent
+                .onAppear {
+                    // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — onAppear 측 widget body 측 SwiftUI evaluation 시점 직접 측정.
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(countdown) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
         case .paused:
             lockScreenContent
+                .onAppear {
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(paused) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
         case .alert:
             lockScreenContent
+                .onAppear {
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(alert) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
         }
     }
 

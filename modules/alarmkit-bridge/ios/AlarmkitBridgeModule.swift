@@ -30,7 +30,14 @@ import AlarmKit
 import SwiftUI
 #endif
 
-// v1.7 hotfix #LAUnify Phase 10-G1 — ActivityKit import 제거. AlarmKit framework가 LA Activity 자동 관리.
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
+
+// v1.7 hotfix #LAUnify Phase 10-G1 — 옛 Activity.request/update/end manual 호출 제거 (= AlarmKit framework가 LA Activity 자동 관리).
+// v1.7 hotfix #LAUnify Phase 10-G1b — ActivityKit import 복원. AlertConfiguration.AlertSound (= AlarmKit alarm sound 측 ActivityKit type 채택 영역) 측 = ActivityKit import 필요.
+//   증거 = https://developer.apple.com/documentation/activitykit/alertconfiguration/alertsound (= URL path activitykit/alertconfiguration/alertsound).
+//   본 file 측 = 옛 Activity.request/update/end 호출 site 측 추가 ❌ (= CLAUDE.md rule 11 정합).
 
 // v1.7 hotfix #LAUnify Phase 9-B — ShutTimerAlarmMetadata struct 정의 제거.
 // 단일 정의 = `targets/widget/ShutTimerAlarmMetadata.swift` 측 두 target 측 file membership share.

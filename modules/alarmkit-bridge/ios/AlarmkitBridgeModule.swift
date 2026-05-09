@@ -363,9 +363,15 @@ public class AlarmkitBridgeModule: Module {
           stopIntent: OpenAppDismissIntent(entityId: params.entityId),
           sound: alertSound
         )
+
         _ = try await AlarmManager.shared.schedule(id: id, configuration: alarmConfig)
         // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (recurrence 영역).
         NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=alarm(schedule:)")
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg — ActivityKit Activity 측 active count + ID 측 native log.
+        // root cause 추적: AlarmKit framework 측 .alarm factory 호출 시 Activity 자동 시작 정합 ❓
+        let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+        let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+        appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(alarm) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
         return id.uuidString
       }
 
@@ -412,6 +418,13 @@ public class AlarmkitBridgeModule: Module {
       _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
       // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (timer 영역).
       NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=timer(duration:) durationSec=\(durationSecAll)")
+      // v1.7 hotfix #LAUnify Phase 10-G4dbg — ActivityKit Activity 측 active count + ID 측 native log.
+      // root cause 추적: AlarmKit framework 측 .timer factory 호출 시 Activity 자동 시작 정합 ❓
+      // count=0 → AlarmKit framework 자체 Activity 시작 ❌ (= 다른 root cause).
+      // count≥1 → Activity 시작 정합 + widget body 호출 ❌ → ActivityConfiguration registration 측 issue.
+      let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+      let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+      appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
       return id.uuidString
     }
 

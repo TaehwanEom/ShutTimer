@@ -1,8 +1,36 @@
 import WidgetKit
 import SwiftUI
 
+// v1.7 hotfix #LAUnify Phase 10-G4dbg — App Group UserDefaults 측 native log helper.
+// WidgetBundle init 시점 측정 위해 본 file 측 직접 native log 추가.
+fileprivate let DBG_GROUP_BUNDLE = "group.com.shuttimer.app"
+fileprivate let DBG_KEY_BUNDLE = "native_debug_log_v1"
+fileprivate let DBG_MAX_BUNDLE = 300
+
+fileprivate func appendBundleDbg(_ tag: String, _ msg: String) {
+    NSLog("[\(tag)] \(msg)")
+    guard let d = UserDefaults(suiteName: DBG_GROUP_BUNDLE) else { return }
+    let ts = ISO8601DateFormatter().string(from: Date())
+    let proc = ProcessInfo.processInfo.processName
+    let line = "\(ts) [\(proc)][\(tag)] \(msg)"
+    let existing = d.string(forKey: DBG_KEY_BUNDLE) ?? ""
+    var lines = existing.isEmpty ? [] : existing.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    lines.append(line)
+    if lines.count > DBG_MAX_BUNDLE { lines = Array(lines.suffix(DBG_MAX_BUNDLE)) }
+    d.set(lines.joined(separator: "\n"), forKey: DBG_KEY_BUNDLE)
+}
+
 @main
 struct exportWidgets: WidgetBundle {
+    init() {
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg — WidgetBundle init 측 widget extension process launch 시점 측정.
+        // 본 log 측 발생 ❌ 시 = widget extension binary 측 device install ❌ 또는 process launch ❌
+        //   → root cause 측 = widget extension install / launch level.
+        // 본 log 측 발생 ✅ + LA-DBG-AKLA entry 측 0건 잔존 시 = WidgetBundle init 정합 +
+        //   ActivityConfiguration registration / lookup level 측 issue.
+        appendBundleDbg("LA-DBG-Bundle", "exportWidgets.init() called")
+    }
+
     // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 WidgetLiveActivity (ShutTimerActivityAttributes 기반) 등록 제거.
     // AlarmKit framework가 자동 관리하는 LA Activity (= AlarmAttributes<ShutTimerAlarmMetadata>) 전용 widget만 남김.
     //

@@ -425,6 +425,13 @@ public class AlarmkitBridgeModule: Module {
       _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
       // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (timer 영역).
       NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=timer(duration:) durationSec=\(durationSecAll)")
+      // v1.7 hotfix #LAUnify Phase 10-G4dbg5 — main app process 측 type fully qualified name 측정.
+      // widget extension process 측 (= RoutineControlIntents 측 PauseIntent) 측 같은 측정 → 직접 비교.
+      // 두 process 측 type name 같음 = static_framework 측 cause 아님 (= 다른 cause 측정 필요).
+      // 두 process 측 type name 다름 = static_framework 측 별도 instance build 확정 → 정정 진입.
+      let typeName = String(describing: AlarmAttributes<ShutTimerAlarmMetadata>.self)
+      let metadataTypeName = String(describing: ShutTimerAlarmMetadata.self)
+      appendNativeDbg("LA-DBG-AKLA-Type", "main app process AlarmAttributes type=\(typeName) metadata type=\(metadataTypeName)")
       // v1.7 hotfix #LAUnify Phase 10-G4dbg — ActivityKit Activity 측 active count + ID 측 native log.
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")

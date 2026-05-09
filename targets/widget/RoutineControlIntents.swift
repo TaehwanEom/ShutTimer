@@ -139,6 +139,13 @@ struct PauseRoutineIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         // v1.7 hotfix #DBG — Pause Intent perform 진입 (= LA Button = iPhone + Apple Watch 양쪽).
         appendNativeDbg("Intent-DBG-Widget", "PauseRoutineIntent.perform routineId=\(routineId)")
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg5 — widget extension process 측 type fully qualified name 측정.
+        // main app process 측 (= AlarmkitBridgeModule schedule 측) 같은 측정 → 직접 비교.
+        // 두 process 측 type name 같음 = static_framework 측 cause 아님 → 다른 cause 측정 필요
+        // 두 process 측 type name 다름 = static_framework 측 별도 instance build 확정 → 정정 진입
+        let typeName = String(describing: AlarmAttributes<ShutTimerAlarmMetadata>.self)
+        let metadataTypeName = String(describing: ShutTimerAlarmMetadata.self)
+        appendNativeDbg("LA-DBG-AKLA-Type", "widget process AlarmAttributes type=\(typeName) metadata type=\(metadataTypeName)")
         // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — widget extension process 측 Activity.activities 측정.
         // main app 측 active 1건 ✅ 측정. widget extension process 측 = active count + ID 측정 →
         // 0건 시 = type identity mismatch (= main app 측 SharedAlarmTypes vs widget 측 SharedAlarmTypes 측 다른 module identity)

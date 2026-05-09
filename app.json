@@ -184,10 +184,8 @@
     },
     "plugins": [
       [
-        "expo-notifications",
+        "./plugins/withSoundResources.js",
         {
-          "icon": "./assets/icon.png",
-          "color": "#ff2424",
           "sounds": [
             "./assets/sounds/notification_alarm.wav",
             "./assets/sounds/notification_ringtone.wav",

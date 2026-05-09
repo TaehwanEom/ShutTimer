@@ -30,7 +30,6 @@
     "expo-intent-launcher": "~13.0.8",
     "expo-keep-awake": "~15.0.8",
     "expo-localization": "~17.0.8",
-    "expo-notifications": "~0.32.16",
     "expo-screen-orientation": "~9.0.8",
     "expo-sensors": "~15.0.8",
     "expo-splash-screen": "~31.0.13",

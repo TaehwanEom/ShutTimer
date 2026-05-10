@@ -66,14 +66,30 @@ export type ScheduleAlarmParams = {
   laRoutineName?: string;
 };
 
-/** v1.6 T1 — alarmUpdates AsyncSequence state 변화를 JS 측에 emit */
+/**
+ * v1.6 T1 — alarmUpdates AsyncSequence state 변화를 JS 측에 emit.
+ * v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute 신규 field 추가.
+ *   AlarmKit framework 측 = `alarm.countdownDuration?.preAlert` (= TimeInterval?) + `alarm.schedule` (= .fixed(Date) / .relative(Time)) 측 = JS 측 emit.
+ *   removed event 측 = state='removed' + 신규 field 미포함 (= alarm instance 측 ❌ 영역).
+ */
 export type AlarmStateChangeEvent = {
   alarmId: string;
   state: AlarmKitAlarmState | 'removed';
+  preAlertSeconds?: number;
+  fixedFireMs?: number;
+  relativeHour?: number;
+  relativeMinute?: number;
 };
 
-/** v1.6 T1 — listAlarms 반환 (UUID[] → {id, state}[] 시그니처 변경) */
+/**
+ * v1.6 T1 — listAlarms 반환 (UUID[] → {id, state}[] 시그니처 변경).
+ * v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute 신규 field 추가.
+ */
 export type AlarmInfo = {
   id: string;
   state: AlarmKitAlarmState;
+  preAlertSeconds?: number;
+  fixedFireMs?: number;
+  relativeHour?: number;
+  relativeMinute?: number;
 };

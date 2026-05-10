@@ -100,10 +100,13 @@ public class AlarmkitBridgeModule: Module {
               let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
               let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
               appendNativeDbg("LA-DBG-AKLA-Activity", "observer alarmId=\(alarm.id.uuidString) state=\(Self.alarmStateToString(alarm.state)) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
-              self.sendEvent("onAlarmStateChange", [
+              // v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute emit (= JS 측 endAt 측정 단일화 영역).
+              var eventPayload: [String: Any] = [
                 "alarmId": alarm.id.uuidString,
                 "state": Self.alarmStateToString(alarm.state),
-              ])
+              ]
+              Self.appendScheduleAndCountdown(&eventPayload, alarm: alarm)
+              self.sendEvent("onAlarmStateChange", eventPayload)
 
               // v1.7 hotfix #DBG-Sound (B4) — alerting 시점 alarm 측 schedule + countdownDuration 추적.
               // Apple 공식 (= AlarmKit Alarm struct 측 = id / state / schedule / countdownDuration 4개 멤버 영역).
@@ -537,11 +540,36 @@ public class AlarmkitBridgeModule: Module {
       // v1.7 hotfix #DBG-Sound (B7) — listAlarms 진입 = count + state per alarm.
       let stateSummary = alarms.map { "\($0.id.uuidString.prefix(8))=\(Self.alarmStateToString($0.state))" }.joined(separator: ",")
       appendNativeDbg("AlarmKit-DBG", "listAlarms 진입 count=\(alarms.count) [\(stateSummary)]")
+      // v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute emit (= JS 측 endAt 측정 단일화 영역).
       return alarms.map { alarm in
-        [
+        var dict: [String: Any] = [
           "id": alarm.id.uuidString,
           "state": Self.alarmStateToString(alarm.state),
         ]
+        Self.appendScheduleAndCountdown(&dict, alarm: alarm)
+        return dict
+      }
+    }
+  }
+
+  // v1.7 hotfix #G5 Phase A — alarm 측 schedule + countdownDuration 측 = dict 측 append (= 단일 source of truth).
+  //   AlarmKit framework 측 정합:
+  //     - alarm.countdownDuration?.preAlert (= TimeInterval? = Double seconds) → preAlertSeconds emit
+  //     - alarm.schedule (= Alarm.Schedule? = enum) → .fixed(Date) → fixedFireMs / .relative(Time) → relativeHour + relativeMinute emit
+  //   사용 site = OnStartObserving Task 측 onAlarmStateChange event + listAlarms return.
+  private static func appendScheduleAndCountdown(_ dict: inout [String: Any], alarm: Alarm) {
+    if let preAlert = alarm.countdownDuration?.preAlert {
+      dict["preAlertSeconds"] = preAlert
+    }
+    if let schedule = alarm.schedule {
+      switch schedule {
+      case .fixed(let date):
+        dict["fixedFireMs"] = date.timeIntervalSince1970 * 1000.0
+      case .relative(let relative):
+        dict["relativeHour"] = relative.time.hour
+        dict["relativeMinute"] = relative.time.minute
+      @unknown default:
+        break
       }
     }
   }

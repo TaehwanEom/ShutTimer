@@ -43,12 +43,9 @@ import { stopRoutine } from '../utils/routineController';
 import { loadActiveRoutine } from '../constants/routines';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 
-// v1.6 Phase 9 — 일반 타이머 AlarmKit 가용성 (file-local — 분리 정책 정공)
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
 async function shouldUseAlarmKitInTimer(): Promise<boolean> {
   if (Platform.OS !== 'ios') return false;
-  const ver = parseInt(String(Platform.Version), 10);
-  if (isNaN(ver) || ver < 26) return false;
-  if (!AlarmkitBridge.isAvailable()) return false;
   try {
     const state = await AlarmkitBridge.getAuthorizationState();
     return state === 'authorized';

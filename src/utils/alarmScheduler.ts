@@ -25,15 +25,9 @@ import { SETTINGS_KEY } from '../constants/settings';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
 
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
 function isAlarmKitAvailableSync(): boolean {
-  if (Platform.OS !== 'ios') return false;
-  const ver = parseInt(String(Platform.Version), 10);
-  if (isNaN(ver) || ver < 26) return false;
-  try {
-    return AlarmkitBridge.isAvailable();
-  } catch {
-    return false;
-  }
+  return Platform.OS === 'ios';
 }
 
 async function isAlarmKitReady(): Promise<boolean> {

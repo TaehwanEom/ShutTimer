@@ -30,22 +30,10 @@ import { Logger } from './logger';
 let _alarmKitAvailable: boolean | null = null;
 let _alarmKitAuthorized: boolean | null = null;
 
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
 function isAlarmKitAvailableSync(): boolean {
   if (_alarmKitAvailable !== null) return _alarmKitAvailable;
-  if (Platform.OS !== 'ios') {
-    _alarmKitAvailable = false;
-    return false;
-  }
-  const ver = parseInt(String(Platform.Version), 10);
-  if (isNaN(ver) || ver < 26) {
-    _alarmKitAvailable = false;
-    return false;
-  }
-  try {
-    _alarmKitAvailable = AlarmkitBridge.isAvailable();
-  } catch {
-    _alarmKitAvailable = false;
-  }
+  _alarmKitAvailable = Platform.OS === 'ios';
   return _alarmKitAvailable;
 }
 
@@ -60,7 +48,7 @@ async function shouldUseAlarmKit(): Promise<boolean> {
       _alarmKitAuthorized = true;
       return true;
     }
-    if (state === 'denied' || state === 'unsupported') {
+    if (state === 'denied') {
       _alarmKitAuthorized = false;
       return false;
     }

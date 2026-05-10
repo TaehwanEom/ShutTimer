@@ -2,7 +2,6 @@ export type AuthorizationState =
   | 'notDetermined'
   | 'denied'
   | 'authorized'
-  | 'unsupported'
   | 'unknown';
 
 // v1.6+ — 'alarm_main' 추가 (= 알람 entity 측 정시 발화).

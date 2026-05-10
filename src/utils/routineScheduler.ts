@@ -312,11 +312,14 @@ export async function syncRollingSchedule(): Promise<void> {
   await saveNotifRecords([]);
 
   // v1.6 후속 hotfix — mapping table 측 stale 영역 cleanup (= 이전 빌드 측 예약 영역 = records 측 ❌ 영역).
-  // type 'prealert' / 'chain' / 'timer_main' 영역 cancel (= 'confirm_prompt' = 활성 영역 보호).
-  // 'timer_main' 추가 영역 = 사용자 측 종료 후도 울리는 영역 정정 (= AlarmScreen dismiss 시점 외 stale).
+  // type 'prealert' / 'chain' 영역 cancel (= 'confirm_prompt' = 활성 영역 보호).
+  // v1.7 hotfix #SyncRollingTimerMainCancel — 'timer_main' 영역 폐기.
+  //   직전 = 'timer_main' 측 = 모두 cancel → 시나리오 2 측 = 강종 후 LA 누름 + 앱 진입 시점 측 = 잔존 5분 타이머 측 cancel
+  //   → LA 측 OS 측 dismiss → 앱 진입 후 LA 사라짐 root cause (= 사용자분 사인 정합).
+  //   본 정정 = 'timer_main' 측 cancel 폐기 (= 잔존 타이머 측 보존 강제). AlarmScreen dismiss 측 = stopAudioAndVibration 측 = timer_main cancel 잔존 ✅.
   const allMeta = await listAllAlarmMetadata();
   for (const meta of allMeta) {
-    if (meta.type === 'prealert' || meta.type === 'chain' || meta.type === 'timer_main') {
+    if (meta.type === 'prealert' || meta.type === 'chain') {
       await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
       await deleteAlarmMetadata(meta.alarmId).catch(() => {});
     }

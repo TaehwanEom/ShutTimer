@@ -80,7 +80,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
-  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmSoundKey?: string; alarmEntityId?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera'; alarmEntityId?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
@@ -367,9 +367,9 @@ function AppNavigator() {
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === meta.entityId);
         Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
+        // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기 (= AlarmScreen 측 = SETTINGS_KEY.ALARM_SOUND 측만 read = alarmScheduler 정합).
         navigationRef.current?.navigate('Alarm', {
           endMethod: a?.dismissMethod ?? 'tap',
-          alarmSoundKey: a?.soundKey,
           alarmEntityId: meta.entityId,
         });
         return;
@@ -461,9 +461,9 @@ function AppNavigator() {
           const alarms = await loadAlarms();
           const a = alarms.find(x => x.id === meta.entityId);
           Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
+          // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
           navigationRef.current?.navigate('Alarm', {
             endMethod: a?.dismissMethod ?? 'tap',
-            alarmSoundKey: a?.soundKey,
             alarmEntityId: meta.entityId,
           });
           return;
@@ -638,9 +638,9 @@ function AppNavigator() {
                 const route = navigationRef.current.getCurrentRoute()?.name;
                 if (route !== 'Alarm') {
                   Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${alarmEntity.dismissMethod ?? 'tap'}`);
+                  // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
                   navigationRef.current.navigate('Alarm', {
                     endMethod: alarmEntity.dismissMethod ?? 'tap',
-                    alarmSoundKey: alarmEntity.soundKey,
                     alarmEntityId: alarmEntity.id,
                   } as never);
                 }

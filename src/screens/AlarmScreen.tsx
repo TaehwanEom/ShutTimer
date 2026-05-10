@@ -641,10 +641,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
       ]).then(([soundIdRaw, alarmRaw]) => {
         const alarmEnabled = alarmRaw !== 'false';
         if (!alarmEnabled) return;
-        // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
-        // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
-        const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
-        const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
+        // v1.7 hotfix #SoundMismatch — alarm.soundKey 측 폐기 (= alarmScheduler.ts 정합 = SETTINGS_KEY.ALARM_SOUND 측만 read).
+        //   직전 = navigate params 측 alarmSoundKey 우선 영역 → AlarmEditScreen 측 = soundKey: DEFAULT_SOUND_ID 'alarm_01' 항상 저장 영역 → AlarmScreen 측 = 'alarm_01' 우선 read → 잠금 사운드 (= SettingsScreen 셋팅) ↔ 앱 진입 후 사운드 (= alarm_01) mismatch.
+        //   본 정정 = alarmSoundKey 측 read 폐기 → SETTINGS_KEY.ALARM_SOUND 측만 read → 잠금 + 앱 진입 후 동일 사운드 보장.
+        const soundId = soundIdRaw ?? DEFAULT_SOUND_ID;
 
         // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
         const runFallback = () => {

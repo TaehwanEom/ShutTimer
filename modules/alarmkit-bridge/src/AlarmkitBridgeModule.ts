@@ -27,12 +27,15 @@ declare class AlarmkitBridgeModule extends NativeModule<AlarmkitBridgeEvents> {
    * v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: countdown state 측만 pause 가능.
    * native 측 = state 검사 후 try AlarmManager.shared.pause(id:) 호출 → LA Activity 자동 paused state.
    * state ❌ countdown 시 = silent skip (= warn log 잔존).
+   * v1.7 hotfix #G5 Phase B-2 — return ms timestamp (= native 측 = pause 호출 직전 측 측정 = JS bridge 통신 영역 정확 측정 영역).
+   *   skip / error 시 = 0 return (= JS 측 = Date.now() fallback 강제).
    */
-  pauseAlarm(alarmId: string): Promise<void>;
+  pauseAlarm(alarmId: string): Promise<number>;
   /**
    * v1.7 hotfix #G3 — paused state 측만 resume 가능. native 측 = state 검사 후 try AlarmManager.shared.resume(id:) 호출.
+   * v1.7 hotfix #G5 Phase B-2 — return ms timestamp (= native 측 = resume 호출 직전 측 측정).
    */
-  resumeAlarm(alarmId: string): Promise<void>;
+  resumeAlarm(alarmId: string): Promise<number>;
   /** 현재 등록된 알람 목록 (id + state). v1.6 T1 — 콜드스타트 alerting filter 위해 state 포함. */
   listAlarms(): Promise<AlarmInfo[]>;
   /** v1.6 Phase 10-A — App Group UserDefaults write (LA Intent 동기화). value=null 시 삭제. */
@@ -56,8 +59,8 @@ try {
     scheduleAlarm: async () => '',
     cancelAlarm: async () => {},
     stopAlarm: async () => {},
-    pauseAlarm: async () => {},
-    resumeAlarm: async () => {},
+    pauseAlarm: async () => 0,
+    resumeAlarm: async () => 0,
     listAlarms: async (): Promise<AlarmInfo[]> => [],
     writeAppGroupString: () => false,
     readAppGroupString: () => null,

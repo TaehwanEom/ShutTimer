@@ -801,40 +801,38 @@ export default function HomeScreen({ navigation, route }: Props) {
   }, [isRunning]);
 
   // --- 일시정지/재개 (v1.5 timestamp 기반) ---
-  const handlePauseResume = () => {
+  // v1.7 hotfix #G5 Phase B-2 — pauseAlarm / resumeAlarm 측 = native 측 시점 측 측정 + return → JS 측 = pauseDuration 측 정확 측정 (= JS bridge 통신 영역 1초 미만 오차 ❌).
+  const handlePauseResume = async () => {
     const next = !isPausedRef.current;
     isPausedRef.current = next;
     setIsPaused(next);
     const now = Date.now();
     if (next) {
-      // pause: pause 시점 저장 + AlarmKit framework 측 pause 호출.
-      pausedAtRef.current = now;
+      // pause: AlarmKit framework 측 .pause(id:) 호출 → native 측 = pause 시점 측 측정 + return.
+      // v1.7 hotfix #G5 Phase B-2 — pausedAtRef 측 = native 측 시점 측 측정 (= JS bridge 통신 영역 정확 측정).
+      const pausedAtMs = alarmkitIdRef.current
+        ? await AlarmkitBridge.pauseAlarm(alarmkitIdRef.current).catch(() => 0)
+        : 0;
+      pausedAtRef.current = pausedAtMs > 0 ? pausedAtMs : now;
       // v1.7 hotfix #WidgetAppPausedAlign — pause 시점 remaining 강제 update (= setInterval stale value 회피).
-      const remaining = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      const remaining = Math.max(0, Math.ceil((endAtRef.current - pausedAtRef.current) / 1000));
       remainingSecondsRef.current = remaining;
       setRemainingSeconds(remaining);
-      // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .pause(id:) 직접 호출.
-      // 직전 = cancelAlarms() 측 = 모든 alarm cancel → AlarmKit framework 측 paused state 진입 ❌ + LA Activity 종료 ⚠️.
-      // 정정 = .pause(id:) 측 = paused state 진입 + LA Activity 자동 paused UI update.
-      if (alarmkitIdRef.current) {
-        AlarmkitBridge.pauseAlarm(alarmkitIdRef.current).catch(() => {});
-      }
       // 타이머 플래그 잔존 (= isTimerActive=true 잔존, paused state 측 = AlarmKit framework 잔존).
     } else {
-      // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
-      const pauseDuration = now - (pausedAtRef.current ?? now);
+      // resume: AlarmKit framework 측 .resume(id:) 호출 → native 측 = resume 시점 측 측정 + return.
+      // v1.7 hotfix #G5 Phase B-2 — pauseDuration 측 = native 측 측정 시점 정확 측정 (= JS bridge 통신 영역 ❌).
+      const resumedAtMs = alarmkitIdRef.current
+        ? await AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => 0)
+        : 0;
+      const resumedAt = resumedAtMs > 0 ? resumedAtMs : now;
+      const pauseDuration = resumedAt - (pausedAtRef.current ?? resumedAt);
       endAtRef.current += pauseDuration;
       pausedAtRef.current = null;
-      const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - resumedAt) / 1000));
       // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
       remainingSecondsRef.current = remainingSecs;
       setRemainingSeconds(remainingSecs);
-      // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .resume(id:) 직접 호출.
-      // 직전 = scheduleAlarm() 측 = 새 alarm 등록 → 기존 alarm 측 cancel + 새 alarmId 측 회귀 ⚠️.
-      // 정정 = .resume(id:) 측 = 기존 alarm 측 countdown state 복귀 + LA Activity 자동 update.
-      if (alarmkitIdRef.current) {
-        AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => {});
-      }
     }
     // AsyncStorage 업데이트 (cold start 복원용)
     AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {

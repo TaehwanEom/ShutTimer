@@ -474,41 +474,51 @@ public class AlarmkitBridgeModule: Module {
     //   직전 = JS 측 자체 pauseRoutine() 측 = AsyncStorage 측만 update + AlarmKit framework pause ❌
     //     → LA Activity 측 paused state 진입 ❌ (= 사용자분 측 "앱에서 일시정지하면 LA 안나오는 문제" 회귀).
     //   정정 = AlarmKit framework 측 .pause(id:) 직접 호출 → LA Activity 자동 update.
-    AsyncFunction("pauseAlarm") { (alarmId: String) async throws in
-      guard let uuid = UUID(uuidString: alarmId) else { return }
+    // v1.7 hotfix #G5 Phase B-2 — return ms timestamp (= AlarmManager.shared.pause(id:) 호출 직전 측 측정).
+    //   JS 측 = pauseDuration 측 = native 측 측정 정합 (= JS bridge 통신 시간 측 1초 미만 오차 ❌ 영역).
+    //   skip / error 측 = 0 return (= JS 측 = Date.now() fallback).
+    AsyncFunction("pauseAlarm") { (alarmId: String) async throws -> Double in
+      guard let uuid = UUID(uuidString: alarmId) else { return 0 }
       do {
         let alarms = try AlarmManager.shared.alarms
         guard let alarm = alarms.first(where: { $0.id == uuid }) else {
           appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) state=(not in list) → skip")
-          return
+          return 0
         }
         guard case .countdown = alarm.state else {
           appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) state=\(Self.alarmStateToString(alarm.state)) ❌ countdown → skip")
-          return
+          return 0
         }
         appendNativeDbg("AlarmKit-DBG", "pauseAlarm 진입 alarmId=\(alarmId) state=countdown → pause()")
+        let nowMs = Date().timeIntervalSince1970 * 1000.0
         try AlarmManager.shared.pause(id: uuid)
+        return nowMs
       } catch {
         appendNativeDbg("AlarmKit-DBG-WARN", "pauseAlarm 진입 alarmId=\(alarmId) error=\(error)")
+        return 0
       }
     }
 
-    AsyncFunction("resumeAlarm") { (alarmId: String) async throws in
-      guard let uuid = UUID(uuidString: alarmId) else { return }
+    // v1.7 hotfix #G5 Phase B-2 — return ms timestamp (= AlarmManager.shared.resume(id:) 호출 직전 측 측정).
+    AsyncFunction("resumeAlarm") { (alarmId: String) async throws -> Double in
+      guard let uuid = UUID(uuidString: alarmId) else { return 0 }
       do {
         let alarms = try AlarmManager.shared.alarms
         guard let alarm = alarms.first(where: { $0.id == uuid }) else {
           appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) state=(not in list) → skip")
-          return
+          return 0
         }
         guard case .paused = alarm.state else {
           appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) state=\(Self.alarmStateToString(alarm.state)) ❌ paused → skip")
-          return
+          return 0
         }
         appendNativeDbg("AlarmKit-DBG", "resumeAlarm 진입 alarmId=\(alarmId) state=paused → resume()")
+        let nowMs = Date().timeIntervalSince1970 * 1000.0
         try AlarmManager.shared.resume(id: uuid)
+        return nowMs
       } catch {
         appendNativeDbg("AlarmKit-DBG-WARN", "resumeAlarm 진입 alarmId=\(alarmId) error=\(error)")
+        return 0
       }
     }
 

@@ -546,11 +546,16 @@ public class AlarmkitBridgeModule: Module {
 
     // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.
     // v1.7 hotfix #G5 Phase A — return type 측 = [[String: Any]] 측 swap (= preAlertSeconds Double + fixedFireMs Double + relativeHour/Minute Int 측 추가 영역 정합).
+    // v1.7 hotfix #ColdStartLA-2 — Activity<AlarmAttributes<...>>.activities 측 측정 + hasLiveActivity field emit.
+    //   Apple Developer Forum #729651 정합 = Activity.activities 측 source of truth.
+    //   사용 site = HomeScreen cold start 측 = 잔존 LA 측 측정 + 옛 alarm cancel + 새 schedule 분기.
     AsyncFunction("listAlarms") { () async throws -> [[String: Any]] in
       let alarms = try AlarmManager.shared.alarms
+      let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       // v1.7 hotfix #DBG-Sound (B7) — listAlarms 진입 = count + state per alarm.
       let stateSummary = alarms.map { "\($0.id.uuidString.prefix(8))=\(Self.alarmStateToString($0.state))" }.joined(separator: ",")
-      appendNativeDbg("AlarmKit-DBG", "listAlarms 진입 count=\(alarms.count) [\(stateSummary)]")
+      let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+      appendNativeDbg("AlarmKit-DBG", "listAlarms 진입 count=\(alarms.count) [\(stateSummary)] activities=\(activities.count) [\(activitiesDesc)]")
       // v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute emit (= JS 측 endAt 측정 단일화 영역).
       return alarms.map { alarm in
         var dict: [String: Any] = [
@@ -558,6 +563,10 @@ public class AlarmkitBridgeModule: Module {
           "state": Self.alarmStateToString(alarm.state),
         ]
         Self.appendScheduleAndCountdown(&dict, alarm: alarm)
+        // AlarmKit Alarm instance 측 = attributes 측정 ❌ 영역 (= Apple SDK 한계).
+        // 본 앱 측 = 1 alarm = 1 LA 영역 가정 → activities.isEmpty 측 단순 매핑 영역 정합.
+        // (= 다중 alarm 영역 = 별도 cycle 측 attributes.metadata.routineId 매칭 영역 강제.)
+        dict["hasLiveActivity"] = !activities.isEmpty
         return dict
       }
     }

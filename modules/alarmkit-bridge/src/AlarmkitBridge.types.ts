@@ -84,6 +84,9 @@ export type AlarmStateChangeEvent = {
 /**
  * v1.6 T1 — listAlarms 반환 (UUID[] → {id, state}[] 시그니처 변경).
  * v1.7 hotfix #G5 Phase A — preAlertSeconds + fixedFireMs + relativeHour/Minute 신규 field 추가.
+ * v1.7 hotfix #ColdStartLA-2 — hasLiveActivity field 추가 (= Apple Developer Forum #729651 정합).
+ *   `Activity<AlarmAttributes<...>>.activities` 측 source of truth → cold start 측 잔존 LA 측정 영역.
+ *   false 측 = 옛 alarm cancel + 새 schedule 강제 (= 새 LA Activity 시작).
  */
 export type AlarmInfo = {
   id: string;
@@ -92,4 +95,5 @@ export type AlarmInfo = {
   fixedFireMs?: number;
   relativeHour?: number;
   relativeMinute?: number;
+  hasLiveActivity?: boolean;
 };

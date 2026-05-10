@@ -76,7 +76,6 @@ public class AlarmkitBridgeModule: Module {
       // v1.7 hotfix #DBG-B — observer 시작 진입 (= JS bridge 측 listener attach 추적용).
       appendNativeDbg("AlarmKit-DBG", "observer OnStartObserving 진입 — alarmUpdates 구독 시작")
       self.observerTask = Task { [weak self] in
-        guard #available(iOS 26.0, *) else { return }
         var lastStates: [UUID: Alarm.State] = [:]
         for await alarms in AlarmManager.shared.alarmUpdates {
           guard let self = self else { return }
@@ -98,11 +97,9 @@ public class AlarmkitBridgeModule: Module {
               appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(alarm.id.uuidString) prev=\(String(describing: prev)) → cur=\(Self.alarmStateToString(alarm.state))")
               // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — observer 측 매 state change 시 Activity.activities 측 active count 측정.
               // schedule 직후 = system sync 시간 부족 가능성. observer 측 = state change 시 = 시간 경과 후 → Activity 측정 정합.
-              if #available(iOS 26.0, *) {
-                let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
-                let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
-                appendNativeDbg("LA-DBG-AKLA-Activity", "observer alarmId=\(alarm.id.uuidString) state=\(Self.alarmStateToString(alarm.state)) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
-              }
+              let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+              let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+              appendNativeDbg("LA-DBG-AKLA-Activity", "observer alarmId=\(alarm.id.uuidString) state=\(Self.alarmStateToString(alarm.state)) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
               self.sendEvent("onAlarmStateChange", [
                 "alarmId": alarm.id.uuidString,
                 "state": Self.alarmStateToString(alarm.state),
@@ -135,33 +132,21 @@ public class AlarmkitBridgeModule: Module {
       self.observerTask = nil
     }
 
+    // v1.7 hotfix #G7 Phase 2 — main app deployment target 26.0 강제 정합 → AlarmKit 항상 사용 가능.
     Function("isAvailable") { () -> Bool in
-      if #available(iOS 26.0, *) {
-        return true
-      }
-      return false
+      return true
     }
 
     AsyncFunction("requestAuthorization") { () async throws -> String in
-      guard #available(iOS 26.0, *) else { return "unsupported" }
       let state = try await AlarmManager.shared.requestAuthorization()
       return Self.stateToString(state)
     }
 
     AsyncFunction("getAuthorizationState") { () -> String in
-      guard #available(iOS 26.0, *) else { return "unsupported" }
       return Self.stateToString(AlarmManager.shared.authorizationState)
     }
 
     AsyncFunction("scheduleAlarm") { (params: ScheduleAlarmParams) async throws -> String in
-      guard #available(iOS 26.0, *) else {
-        throw NSError(
-          domain: "AlarmkitBridge",
-          code: 1,
-          userInfo: [NSLocalizedDescriptionKey: "AlarmKit requires iOS 26.0+"]
-        )
-      }
-
       // v1.7 hotfix #26 — debug log: scheduleAlarm 진입 시점.
       // 베너 미노출 root cause 추적용. fireAt = 절대 시각 (ms) → 디바이스 측 console 시각 비교.
       // recurrence ❌ = nil log / recurrence ✅ = mode + days log.
@@ -440,20 +425,17 @@ public class AlarmkitBridgeModule: Module {
       // 5초 delay 후 다시 측정 → count 측 변화 ❓.
       Task {
         try? await Task.sleep(nanoseconds: 5_000_000_000)
-        if #available(iOS 26.0, *) {
-          let delayed = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
-          let delayedDesc = delayed.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
-          appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer)+5s alarmId=\(id.uuidString) Activity.activities.count=\(delayed.count) [\(delayedDesc)]")
-          // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — AlarmKit authorization 측 측정.
-          let authState = Self.stateToString(AlarmManager.shared.authorizationState)
-          appendNativeDbg("LA-DBG-AKLA-Auth", "post-schedule(timer)+5s alarmId=\(id.uuidString) authorizationState=\(authState) areActivitiesEnabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)")
-        }
+        let delayed = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+        let delayedDesc = delayed.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
+        appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer)+5s alarmId=\(id.uuidString) Activity.activities.count=\(delayed.count) [\(delayedDesc)]")
+        // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — AlarmKit authorization 측 측정.
+        let authState = Self.stateToString(AlarmManager.shared.authorizationState)
+        appendNativeDbg("LA-DBG-AKLA-Auth", "post-schedule(timer)+5s alarmId=\(id.uuidString) authorizationState=\(authState) areActivitiesEnabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)")
       }
       return id.uuidString
     }
 
     AsyncFunction("cancelAlarm") { (alarmId: String) async throws in
-      guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
       // v1.7 hotfix #2 — Apple 공식: stop(id:) = alerting 전용, cancel(id:) = scheduled 전용.
       // 정상 영역 = state check 분기. scheduled alarm 측 stop 호출 시 부작용 회피
@@ -478,7 +460,6 @@ public class AlarmkitBridgeModule: Module {
     }
 
     AsyncFunction("stopAlarm") { (alarmId: String) async throws in
-      guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
       // v1.7 hotfix #DBG-Sound (B6) — stopAlarm 진입 = alarmId 추적.
       appendNativeDbg("AlarmKit-DBG", "stopAlarm 진입 alarmId=\(alarmId)")
@@ -491,7 +472,6 @@ public class AlarmkitBridgeModule: Module {
     //     → LA Activity 측 paused state 진입 ❌ (= 사용자분 측 "앱에서 일시정지하면 LA 안나오는 문제" 회귀).
     //   정정 = AlarmKit framework 측 .pause(id:) 직접 호출 → LA Activity 자동 update.
     AsyncFunction("pauseAlarm") { (alarmId: String) async throws in
-      guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
       do {
         let alarms = try AlarmManager.shared.alarms
@@ -511,7 +491,6 @@ public class AlarmkitBridgeModule: Module {
     }
 
     AsyncFunction("resumeAlarm") { (alarmId: String) async throws in
-      guard #available(iOS 26.0, *) else { return }
       guard let uuid = UUID(uuidString: alarmId) else { return }
       do {
         let alarms = try AlarmManager.shared.alarms
@@ -554,7 +533,6 @@ public class AlarmkitBridgeModule: Module {
 
     // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.
     AsyncFunction("listAlarms") { () async throws -> [[String: String]] in
-      guard #available(iOS 26.0, *) else { return [] }
       let alarms = try AlarmManager.shared.alarms
       // v1.7 hotfix #DBG-Sound (B7) — listAlarms 진입 = count + state per alarm.
       let stateSummary = alarms.map { "\($0.id.uuidString.prefix(8))=\(Self.alarmStateToString($0.state))" }.joined(separator: ",")
@@ -569,7 +547,6 @@ public class AlarmkitBridgeModule: Module {
   }
 
   // v1.6 T1 — Alarm.State → String 매핑
-  @available(iOS 26.0, *)
   private static func alarmStateToString(_ state: Alarm.State) -> String {
     switch state {
     case .scheduled: return "scheduled"
@@ -580,7 +557,6 @@ public class AlarmkitBridgeModule: Module {
     }
   }
 
-  @available(iOS 26.0, *)
   private static func stateToString(_ state: AlarmManager.AuthorizationState) -> String {
     switch state {
     case .notDetermined: return "notDetermined"

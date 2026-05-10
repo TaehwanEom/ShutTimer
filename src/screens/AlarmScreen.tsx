@@ -340,9 +340,33 @@ export default function AlarmScreen({ navigation, route }: Props) {
     Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})} stack=${stackTop}`);
     AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     // v1.7 hotfix Phase 13 G4-B — expo banner dismiss 폐기 (= AlarmKit only).
+    // v1.7 hotfix #BannerDismissOnActive — AppState=active 진입 시점 측만 stopAlarm 호출 (= 사용자분 측 banner 누름 + 앱 진입 시점만 dismiss).
+    //   직전 (= #BannerDismissOnMount = 모든 mount 시점 호출) = 백그라운드 측 App.tsx onAlarmStateChange 측 자동 navigate 시점 측도 호출 → 알람 즉시 종료 회귀.
+    //   본 정정 = AppState change listener 측 = active 진입 시점만 호출 → background mount 시점 호출 ❌ + active 진입 (= banner 누름) 시점만 dismiss.
+    //   stopAudioAndVibration 측 = 잔존 cleanup 영역 보존 ✅ (= mapping table + dismissMethod 별 정리 영역).
+    const dismissAlertingBanner = async () => {
+      try {
+        const alarms = await AlarmkitBridge.listAlarms();
+        for (const a of alarms) {
+          if (a.state === 'alerting') {
+            Logger.warn('AlarmScreen-DBG', `BannerDismissOnActive stopAlarm id=${a.id}`);
+            await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+          }
+        }
+      } catch {}
+    };
+    if (AppState.currentState === 'active') {
+      dismissAlertingBanner();
+    }
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        dismissAlertingBanner();
+      }
+    });
     return () => {
       Logger.warn('AlarmScreen-DBG', 'unmount');
       AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+      appStateSub.remove();
     };
   }, []);
 
@@ -602,62 +626,81 @@ export default function AlarmScreen({ navigation, route }: Props) {
   //       HomeScreen.scheduleAlarm이 preloadAlarmSound를 호출했으면 consumeAlarmSound()로 즉시 playAsync.
   //       preload 실패/콜드스타트 시 createAsync fallback.
   // v1.7 hotfix — b8c7ce8 revert 영역. SUPPRESS_ALARMKIT_BANNER_IN_FG=true 정합 = AlarmScreen 측 expo-av 사운드 강제 영역.
+  // v1.7 hotfix #AudioStartOnActive — AlarmScreen 자체 사운드 측 = AppState=active 진입 시점만 시작 (= AlarmKit 시스템 사운드 측 interrupt 영역 회피).
+  //   직전 = mount 시점 즉시 시작 → 백그라운드 측 = AlarmKit 시스템 사운드 + AlarmScreen 자체 사운드 = 동시 영역 → DoNotMix interrupt → "한번 딱 끊김" 회귀.
+  //   본 정정 = AppState=active 진입 시점 측만 시작 → BannerDismissOnActive 측 stopAlarm 후 자체 사운드 시작 → 자연스럽 영역.
+  //   guard ref = 다중 active 진입 시 = 중복 시작 회피 (= unmount까지 1회만).
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
-    ]).then(([soundIdRaw, alarmRaw]) => {
-      const alarmEnabled = alarmRaw !== 'false';
-      if (!alarmEnabled) return;
-      // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
-      // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
-      const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
-      const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
+    let audioStarted = false;
+    const startAlarmAudio = () => {
+      if (audioStarted) return;
+      audioStarted = true;
+      Promise.all([
+        AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
+        AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
+      ]).then(([soundIdRaw, alarmRaw]) => {
+        const alarmEnabled = alarmRaw !== 'false';
+        if (!alarmEnabled) return;
+        // v1.6+ 알람 측 진입 시 = navigate params 측 alarmSoundKey 우선 (= 알람별 사운드).
+        // 그 외 (= 타이머 / 루틴) = 전역 SETTINGS_KEY.ALARM_SOUND 측 사용.
+        const alarmSoundKey = (route.params as { alarmSoundKey?: string } | undefined)?.alarmSoundKey;
+        const soundId = alarmSoundKey ?? soundIdRaw ?? DEFAULT_SOUND_ID;
 
-      // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
-      const runFallback = () => {
-        const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
-        Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
-          if (resultEnteredRef.current || dismissedRef.current) {
-            sound.unloadAsync().catch(() => {});
-            return;
-          }
-          soundRef.current = sound;
-          sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
-        }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
-      };
-
-      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
-        .then(() => {
-          const preloaded = consumeAlarmSound();
-          if (!preloaded) {
-            runFallback();
-            return;
-          }
-          // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
-          preloaded.getStatusAsync().then((status: any) => {
+        // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
+        const runFallback = () => {
+          const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+          Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
             if (resultEnteredRef.current || dismissedRef.current) {
-              preloaded.unloadAsync().catch(() => {});
+              sound.unloadAsync().catch(() => {});
               return;
             }
-            if (status?.isLoaded) {
-              soundRef.current = preloaded;
-              preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
-            } else {
-              appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
+            soundRef.current = sound;
+            sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
+          }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
+        };
+
+        Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
+          .then(() => {
+            const preloaded = consumeAlarmSound();
+            if (!preloaded) {
+              runFallback();
+              return;
+            }
+            // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
+            preloaded.getStatusAsync().then((status: any) => {
+              if (resultEnteredRef.current || dismissedRef.current) {
+                preloaded.unloadAsync().catch(() => {});
+                return;
+              }
+              if (status?.isLoaded) {
+                soundRef.current = preloaded;
+                preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
+              } else {
+                appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
+                preloaded.unloadAsync().catch(() => {});
+                runFallback();
+              }
+            }).catch((e: any) => {
+              appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
               preloaded.unloadAsync().catch(() => {});
               runFallback();
-            }
-          }).catch((e: any) => {
-            appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
-            preloaded.unloadAsync().catch(() => {});
-            runFallback();
-          });
-        })
-        .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
-    }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
+            });
+          })
+          .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
+      }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
+    };
+
+    if (AppState.currentState === 'active') {
+      startAlarmAudio();
+    }
+    const audioStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        startAlarmAudio();
+      }
+    });
 
     return () => {
+      audioStateSub.remove();
       soundRef.current?.stopAsync().catch(() => {});
       soundRef.current?.unloadAsync().catch(() => {});
     };

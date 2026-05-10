@@ -67,6 +67,13 @@ struct AlarmKitLiveActivity: Widget {
         // 본 log 측 발생 ✅ + AlarmKitLockScreenView.init() 0건 → ActivityConfiguration content closure 측 호출 ❌
         //   → AlarmKit framework 측 ActivityConfiguration<AlarmAttributes<X>> 측 type lookup ❌
         appendNativeDbgWidget("LA-DBG-AKLA-WidgetInit", "AlarmKitLiveActivity.init() called")
+        // v1.7 hotfix #LATypeLookup — AlarmAttributes<ShutTimerAlarmMetadata> 측 type identity 측 측정.
+        // main app process 측 (= AlarmkitBridgeModule schedule 시점 측 LA-DBG-AKLA-Type log) 측 동일 측정 → 두 process 측 type name 직접 비교.
+        // 두 process 측 type name 같음 = type identity 정합 → ActivityConfiguration registration level 측 다른 root cause
+        // 두 process 측 type name 다름 = static_framework 측 별도 instance build 확정 → SharedAlarmTypes Pod 측 module identity 정정 강제
+        let typeName = String(describing: AlarmAttributes<ShutTimerAlarmMetadata>.self)
+        let metadataTypeName = String(describing: ShutTimerAlarmMetadata.self)
+        appendNativeDbgWidget("LA-DBG-AKLA-Type", "WidgetInit widget process AlarmAttributes type=\(typeName) metadata type=\(metadataTypeName)")
     }
 
     var body: some WidgetConfiguration {

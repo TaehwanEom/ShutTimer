@@ -768,10 +768,17 @@ export default function HomeScreen({ navigation, route }: Props) {
         remainingSecondsRef.current = remaining;
         setRemainingSeconds(remaining);
         setIsRunning(true);
-        // 예약 알림은 이미 iOS 네이티브 레이어에 남아있음. 플래그만 재설정 (foreground suppress)
         AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
-        // v1.7 hotfix #LAUnify Phase 10-G1 — LiveActivityBridge.start 호출 제거.
-        // AlarmKit framework가 cold-start 시점 alarm 잔존하면 LA Activity도 자동 잔존.
+        // v1.7 hotfix #ColdStartLA-3 — cold start 측 = 잔존 alarm 측 alarmkitIdRef 동기화만 진입.
+        //   직전 (= #ColdStartLA-2) = cancelAlarm + scheduleAlarm 진입 → 잔존 LA dismiss + 새 alarm 측 LA 자동 시작 ❌
+        //   → 앱 진입 후 LA 사라짐 root cause (= 사용자분 사인 정합).
+        //   본 정정 = ref 동기화만 진입 + LA 잔존 영역 그대로 (= Apple Forum #729651 정합 = force quit 후 LA NOT dismissed).
+        AlarmkitBridge.listAlarms().then((alarms) => {
+          const timerAlarm = alarms.find(a => a.state === 'countdown' || a.state === 'paused');
+          if (timerAlarm) {
+            alarmkitIdRef.current = timerAlarm.id;
+          }
+        }).catch(() => {});
       } else {
         // 알람 시간 지났음 → 세션 기록 + AlarmScreen
         saveSession(t.totalSeconds, t.missionIcon ?? 'timer');

@@ -600,20 +600,6 @@ export default function HomeScreen({ navigation, route }: Props) {
     return () => clearInterval(id);
   }, [isRunning, isPaused]);
 
-  // --- v1.7 hotfix #G5 Phase B-1 — AlarmKit observer 측 = endAt 자동 update (= Apple AlarmKitDemo 패턴 정합) ---
-  // AlarmKit observer 측 = state 변화 시점 측만 emit (= scheduled / countdown / paused / alerting / removed transition).
-  // event.preAlertSeconds 측 = AlarmKit framework 측 = countdownDuration?.preAlert 측 = 잔여 시간 자체 측정.
-  // resume 시점 측 = AlarmKit framework 측 = countdown state 측 emit + preAlertSeconds 측 = 잔여 시간 → endAtRef 자동 update.
-  // → 옛 = JS 측 += pauseDuration 측 self-managed 패턴 폐기 정합 (= AlarmKitDemo 측 createdAt + duration 측 자체 측정 정합).
-  useEffect(() => {
-    const sub = AlarmkitBridge.addListener('onAlarmStateChange', (event) => {
-      if (event.alarmId !== alarmkitIdRef.current) return;
-      if (event.preAlertSeconds == null) return;
-      endAtRef.current = Date.now() + event.preAlertSeconds * 1000;
-    });
-    return () => sub.remove();
-  }, []);
-
   // --- 세션 저장 ---
   const saveSession = async (totalSecs: number, icon: string) => {
     const now = new Date();
@@ -680,13 +666,23 @@ export default function HomeScreen({ navigation, route }: Props) {
         });
         // v1.7 hotfix Phase 13 G4-C — 위젯 측 pause 시 = expo notif fallback cancel 폐기 (= AlarmKit native pause 정합).
       } else if (signal.action === 'resume' && isPausedRef.current && isRunning) {
-        // v1.7 hotfix #G5 Phase B-1 — AlarmKit framework 측 = preAlert 자체 측정 (= AlarmKitDemo 패턴 정합).
-        //   옛 = pauseDuration 측 측정 + endAtRef += pauseDuration 측 self-managed 측 폐기.
-        //   AlarmKit observer 측 = countdown state emit + event.preAlertSeconds 측 = endAtRef 자동 update.
-        //   AsyncStorage 측 endAt 영속화 측 = G5 Phase B-2 측 별도 cycle 측 폐기 영역 (= 본 cycle 측 잔존).
+        // 위험 #X 정정: pauseDuration = resume signal.timestamp - 실제 pausedAt
+        const pauseDuration = Math.max(0, signal.timestamp - (pausedAtRef.current ?? signal.timestamp));
+        endAtRef.current += pauseDuration;
         pausedAtRef.current = null;
         isPausedRef.current = false;
         setIsPaused(false);
+        // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
+        const remaining = Math.max(0, Math.ceil((endAtRef.current - signal.timestamp) / 1000));
+        remainingSecondsRef.current = remaining;
+        setRemainingSeconds(remaining);
+        AsyncStorage.getItem(ACTIVE_TIMER_KEY).then(raw => {
+          if (!raw) return;
+          try {
+            const t: ActiveTimer = JSON.parse(raw);
+            AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify({ ...t, endAt: endAtRef.current, pausedAt: null })).catch(() => {});
+          } catch {}
+        });
         // v1.7 hotfix Phase 13 G4-C — 위젯 측 resume 시 = expo notif fallback 재등록 폐기 (= AlarmKit native resume 정합).
       } else if (signal.action === 'stop') {
         // LA Intent 가 이미 AlarmKit cancel + Activity end 처리. handleCancel = state 정리 (cancelAlarms / endLiveActivity 가 noop 호환).
@@ -825,14 +821,17 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
       // 타이머 플래그 잔존 (= isTimerActive=true 잔존, paused state 측 = AlarmKit framework 잔존).
     } else {
-      // v1.7 hotfix #G5 Phase B-1 — AlarmKit framework 측 = preAlert 자체 측정 (= AlarmKitDemo 패턴 정합).
-      //   옛 = JS 측 += pauseDuration 측 self-managed 측 폐기.
-      //   AlarmKit observer 측 = countdown state emit + event.preAlertSeconds 측 = endAtRef 자동 update.
-      //   setInterval polling 측 = endAtRef 측 비교 → 자동 정합 (= 1 cycle delay 가능 + AlarmKit emit 후 즉각 정합).
+      // resume: pause 동안 흐른 시간만큼 endAt 연장 → 실제 남은 시간 정확 유지
+      const pauseDuration = now - (pausedAtRef.current ?? now);
+      endAtRef.current += pauseDuration;
       pausedAtRef.current = null;
+      const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - now) / 1000));
+      // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
+      remainingSecondsRef.current = remainingSecs;
+      setRemainingSeconds(remainingSecs);
       // v1.7 hotfix #G3 — Apple AlarmKitDemo 공식 패턴: AlarmKit framework 측 .resume(id:) 직접 호출.
-      //   직전 = scheduleAlarm() 측 = 새 alarm 등록 → 기존 alarm 측 cancel + 새 alarmId 측 회귀 ⚠️.
-      //   정정 = .resume(id:) 측 = 기존 alarm 측 countdown state 복귀 + LA Activity 자동 update.
+      // 직전 = scheduleAlarm() 측 = 새 alarm 등록 → 기존 alarm 측 cancel + 새 alarmId 측 회귀 ⚠️.
+      // 정정 = .resume(id:) 측 = 기존 alarm 측 countdown state 복귀 + LA Activity 자동 update.
       if (alarmkitIdRef.current) {
         AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => {});
       }

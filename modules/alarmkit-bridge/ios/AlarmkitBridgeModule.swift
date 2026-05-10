@@ -535,7 +535,8 @@ public class AlarmkitBridgeModule: Module {
     }
 
     // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.
-    AsyncFunction("listAlarms") { () async throws -> [[String: String]] in
+    // v1.7 hotfix #G5 Phase A — return type 측 = [[String: Any]] 측 swap (= preAlertSeconds Double + fixedFireMs Double + relativeHour/Minute Int 측 추가 영역 정합).
+    AsyncFunction("listAlarms") { () async throws -> [[String: Any]] in
       let alarms = try AlarmManager.shared.alarms
       // v1.7 hotfix #DBG-Sound (B7) — listAlarms 진입 = count + state per alarm.
       let stateSummary = alarms.map { "\($0.id.uuidString.prefix(8))=\(Self.alarmStateToString($0.state))" }.joined(separator: ",")

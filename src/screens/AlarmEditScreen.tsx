@@ -48,7 +48,6 @@ import {
   isAlertShownThisCycle,
   markAlertShown,
 } from '../utils/routineScheduler';
-import { DEFAULT_SOUND_ID } from '../constants/sounds';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'AlarmEdit'>;
@@ -294,7 +293,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       label: label.trim(),
       enabled: true,
       dismissMethod,
-      soundKey: DEFAULT_SOUND_ID,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
       ...(trimmedSteps.length > 0 ? { steps: trimmedSteps } : {}),
     };

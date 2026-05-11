@@ -61,7 +61,6 @@ export async function startRoutineFromAlarm(alarm: Alarm): Promise<StartFromAlar
     category: alarm.label || 'alarm',
     name: alarm.label || undefined,
     steps: alarm.steps,
-    soundKey: alarm.soundKey,
     active: true,
     endMethod: alarm.dismissMethod,
     autoCountdownSec: 5,

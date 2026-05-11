@@ -17,8 +17,6 @@ export type Alarm = {
   label: string;
   enabled: boolean;
   dismissMethod: AlarmDismissMethod;
-  /** ALARM_SOUNDS.id */
-  soundKey: string;
   createdAt: number;
   /**
    * v1.7 — 알람+루틴 통합. 발화 후 진행할 step 시퀀스. undefined / 빈 배열 = 단독 알람.
@@ -108,7 +106,6 @@ export function isValidAlarm(a: any): a is Alarm {
     typeof a.label !== 'string' ||
     typeof a.enabled !== 'boolean' ||
     !isValidDismissMethod(a.dismissMethod) ||
-    typeof a.soundKey !== 'string' ||
     typeof a.createdAt !== 'number'
   ) {
     return false;

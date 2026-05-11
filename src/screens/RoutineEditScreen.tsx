@@ -48,7 +48,6 @@ import {
   CategoryDef,
   loadCustomCategories,
 } from '../constants/categories';
-import { DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Logger } from '../utils/logger';
 import AdBanner from '../components/AdBanner';
 
@@ -368,7 +367,6 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       steps: finalSteps,
       // manual 모드는 schedule 자체 미생성 (scheduler 자동 skip)
       schedule: mode === 'scheduled' ? { startTime, days } : undefined,
-      soundKey: DEFAULT_SOUND_ID,
       active: isEditMode ? originalActiveRef.current : true,
       endMethod,
       createdAt: originalCreatedAtRef.current ?? Date.now(),

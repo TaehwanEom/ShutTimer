@@ -38,8 +38,6 @@ export type Routine = {
   steps: RoutineStep[];
   /** 예약 없는 수동 실행 루틴 허용. schedule 없거나 active=false면 예약 스킵. */
   schedule?: RoutineSchedule;
-  /** 알람 사운드 id (ALARM_SOUNDS.id) */
-  soundKey: string;
   /** 스케줄 on/off 토글. false면 예약 등록 안 됨. */
   active: boolean;
   /** step 종료 방식. */
@@ -209,7 +207,6 @@ function isValidRoutine(r: any): r is Routine {
     Array.isArray(r.steps) &&
     r.steps.every(isValidStep) &&
     (r.schedule === undefined || isValidSchedule(r.schedule)) &&
-    typeof r.soundKey === 'string' &&
     typeof r.active === 'boolean' &&
     (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera') &&
     typeof r.createdAt === 'number'

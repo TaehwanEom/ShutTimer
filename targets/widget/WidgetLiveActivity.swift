@@ -213,7 +213,7 @@ struct AlarmKitCountdownText: View {
                 .font(fontStyle)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.4)
         case .paused(let p):
             // v1.7 hotfix #WidgetPausedRemainingTime — "일시정지" 텍스트 → 남은 시간 static 표시.
             // Apple AlarmKit 공식 sample (= AlarmKitDemo) 패턴 정합:
@@ -233,13 +233,13 @@ struct AlarmKitCountdownText: View {
                 .font(fontStyle)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.4)
         case .alert:
             Text("알람")
                 .font(fontStyle)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.4)
         }
     }
 }
@@ -252,6 +252,8 @@ struct AlarmKitCompactTrailingView: View {
         case .countdown(let countdown):
             Text(timerInterval: countdown.startDate...countdown.fireDate, countsDown: true)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .frame(maxWidth: 50)
         case .paused(let p):
             // v1.7 hotfix #DI-PausedUX — compact trailing paused 측 = pause.circle.fill icon + 잔여 시간 동시 표시.
@@ -266,6 +268,8 @@ struct AlarmKitCompactTrailingView: View {
                     .foregroundColor(.brand)
                 Text(remaining.formatted(.time(pattern: pattern)))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
             }
         case .alert:
             Image(systemName: "bell.fill").foregroundColor(.brand)

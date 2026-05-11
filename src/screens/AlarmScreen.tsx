@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Accelerometer } from 'expo-sensors';
-import { Audio, InterruptionModeIOS } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -214,7 +214,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod
   );
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   // v1.5: iOS Vibration API는 pattern/repeat 미지원 → 인자 없는 Vibration.vibrate()를 interval로 반복 호출
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // @preserve v1-camera — v1 실패 횟수 카운터. v1.5에서 2회 attempt로 대체.
@@ -297,8 +297,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const s = soundRef.current;
     soundRef.current = null;
     if (s) {
-      await s.stopAsync().catch(() => {});
-      await s.unloadAsync().catch(() => {});
+      try { s.release(); } catch {}
     }
     accelSubRef.current?.remove();
     accelSubRef.current = null;
@@ -646,45 +645,47 @@ export default function AlarmScreen({ navigation, route }: Props) {
         //   본 정정 = alarmSoundKey 측 read 폐기 → SETTINGS_KEY.ALARM_SOUND 측만 read → 잠금 + 앱 진입 후 동일 사운드 보장.
         const soundId = soundIdRaw ?? DEFAULT_SOUND_ID;
 
-        // Fallback: createAsync (preload 없거나 invalid 상태에서 호출)
+        // v1.7 hotfix #ExpoAudio Phase 4-C — expo-av → expo-audio swap.
+        //   createAsync (= async + Promise) → createAudioPlayer (= sync) + loop property.
+        //   getStatusAsync (= async + status.isLoaded) → isLoaded (= sync property).
+        //   stopAsync + unloadAsync → release() (= 통합).
+        // Fallback: createAudioPlayer (preload 없거나 invalid 상태에서 호출)
         const runFallback = () => {
           const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
-          Audio.Sound.createAsync(soundItem.source, { isLooping: true }).then(({ sound }) => {
+          try {
+            const player = createAudioPlayer(soundItem.source);
+            player.loop = true;
             if (resultEnteredRef.current || dismissedRef.current) {
-              sound.unloadAsync().catch(() => {});
+              try { player.release(); } catch {}
               return;
             }
-            soundRef.current = sound;
-            sound.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync fail: ${e?.message || e}`));
-          }).catch((e: any) => appendAlarmAudioLog(`createAsync fail: ${e?.message || e}`));
+            soundRef.current = player;
+            try { player.play(); } catch (e: any) { appendAlarmAudioLog(`play fail: ${e?.message || e}`); }
+          } catch (e: any) {
+            appendAlarmAudioLog(`createAudioPlayer fail: ${e?.message || e}`);
+          }
         };
 
-        Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
+        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' })
           .then(() => {
             const preloaded = consumeAlarmSound();
             if (!preloaded) {
               runFallback();
               return;
             }
-            // v1.5: preload 상태 검증 — iOS 백그라운드 리소스 회수 대비. isLoaded=false면 fallback.
-            preloaded.getStatusAsync().then((status: any) => {
-              if (resultEnteredRef.current || dismissedRef.current) {
-                preloaded.unloadAsync().catch(() => {});
-                return;
-              }
-              if (status?.isLoaded) {
-                soundRef.current = preloaded;
-                preloaded.playAsync().catch((e: any) => appendAlarmAudioLog(`playAsync(preloaded) fail: ${e?.message || e}`));
-              } else {
-                appendAlarmAudioLog('preloaded invalidated, fallback to createAsync');
-                preloaded.unloadAsync().catch(() => {});
-                runFallback();
-              }
-            }).catch((e: any) => {
-              appendAlarmAudioLog(`preloaded getStatus fail: ${e?.message || e}`);
-              preloaded.unloadAsync().catch(() => {});
+            // v1.7 hotfix #ExpoAudio — isLoaded 측 = sync property → getStatusAsync 측 비동기 패턴 폐기.
+            if (resultEnteredRef.current || dismissedRef.current) {
+              try { preloaded.release(); } catch {}
+              return;
+            }
+            if (preloaded.isLoaded) {
+              soundRef.current = preloaded;
+              try { preloaded.play(); } catch (e: any) { appendAlarmAudioLog(`play(preloaded) fail: ${e?.message || e}`); }
+            } else {
+              appendAlarmAudioLog('preloaded invalidated, fallback to createAudioPlayer');
+              try { preloaded.release(); } catch {}
               runFallback();
-            });
+            }
           })
           .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
       }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));
@@ -701,8 +702,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
     return () => {
       audioStateSub.remove();
-      soundRef.current?.stopAsync().catch(() => {});
-      soundRef.current?.unloadAsync().catch(() => {});
+      try { soundRef.current?.release(); } catch {}
     };
   }, []);
 
@@ -745,13 +745,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
       const s = soundRef.current;
       if (s) {
-        s.getStatusAsync().then((status: any) => {
-          if (status?.isLoaded && !status.isPlaying) {
-            Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true, interruptionModeIOS: InterruptionModeIOS.DoNotMix })
-              .then(() => s.playAsync())
-              .catch((e: any) => appendAlarmAudioLog(`resume: ${e?.message || e}`));
-          }
-        }).catch((e: any) => appendAlarmAudioLog(`getStatusAsync: ${e?.message || e}`));
+        // v1.7 hotfix #ExpoAudio — isLoaded + playing 측 sync property + setAudioModeAsync 측 새 API.
+        if (s.isLoaded && !s.playing) {
+          setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' })
+            .then(() => { try { s.play(); } catch (e: any) { appendAlarmAudioLog(`resume play: ${e?.message || e}`); } })
+            .catch((e: any) => appendAlarmAudioLog(`resume setAudioModeAsync: ${e?.message || e}`));
+        }
       }
     });
 

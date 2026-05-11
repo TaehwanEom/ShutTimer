@@ -193,7 +193,8 @@
     "restoreNone": "No purchases to restore",
     "adFreeActive": "Ad-Free Active",
     "purchaseFailed": "Purchase failed",
-    "alarmEnabled": "Alarm Sound"
+    "alarmEnabled": "Alarm Sound",
+    "keepScreenOn": "Keep screen on"
   },
   "missions": {
     "boy": "Person",
@@ -534,6 +535,12 @@
       "pm": "PM",
       "hourUnit": ":",
       "minuteUnit": ""
-    }
+    },
+    "chainStop": "OK",
+    "confirmPromptStop": "OK",
+    "prealertBody30m": "Your routine will start in 30 minutes",
+    "prealertBody5m": "Your routine is about to start",
+    "prealertTitle30m": "Routine starts in 30 minutes",
+    "prealertTitle5m": "Routine starts soon"
   }
 }

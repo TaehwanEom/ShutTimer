@@ -649,6 +649,23 @@ export default function AlarmScreen({ navigation, route }: Props) {
         //   createAsync (= async + Promise) → createAudioPlayer (= sync) + loop property.
         //   getStatusAsync (= async + status.isLoaded) → isLoaded (= sync property).
         //   stopAsync + unloadAsync → release() (= 통합).
+        // v1.7 hotfix #ExpoAudio-LoadGate — createAudioPlayer 측 = sync 단 = 실제 사운드 load 측 = async 영역
+        //   → 즉시 play() 호출 시 = silent fail / 지연 (= 사용자분 = "끊어지는 느낌" 영역 정합).
+        //   본 정정 = playbackStatusUpdate listener 측 = isLoaded event 후 play 진입 (= Expo 공식 권장 패턴).
+        const playWhenLoaded = (player: AudioPlayer, tag: string) => {
+          if (player.isLoaded) {
+            try { player.play(); } catch (e: any) { appendAlarmAudioLog(`${tag} play fail: ${e?.message || e}`); }
+            return;
+          }
+          const sub = player.addListener('playbackStatusUpdate', (status) => {
+            if (status?.isLoaded) {
+              sub.remove();
+              if (resultEnteredRef.current || dismissedRef.current) return;
+              try { player.play(); } catch (e: any) { appendAlarmAudioLog(`${tag} play(after-load) fail: ${e?.message || e}`); }
+            }
+          });
+        };
+
         // Fallback: createAudioPlayer (preload 없거나 invalid 상태에서 호출)
         const runFallback = () => {
           const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
@@ -660,7 +677,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
               return;
             }
             soundRef.current = player;
-            try { player.play(); } catch (e: any) { appendAlarmAudioLog(`play fail: ${e?.message || e}`); }
+            playWhenLoaded(player, 'fallback');
           } catch (e: any) {
             appendAlarmAudioLog(`createAudioPlayer fail: ${e?.message || e}`);
           }
@@ -673,19 +690,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
               runFallback();
               return;
             }
-            // v1.7 hotfix #ExpoAudio — isLoaded 측 = sync property → getStatusAsync 측 비동기 패턴 폐기.
             if (resultEnteredRef.current || dismissedRef.current) {
               try { preloaded.release(); } catch {}
               return;
             }
-            if (preloaded.isLoaded) {
-              soundRef.current = preloaded;
-              try { preloaded.play(); } catch (e: any) { appendAlarmAudioLog(`play(preloaded) fail: ${e?.message || e}`); }
-            } else {
-              appendAlarmAudioLog('preloaded invalidated, fallback to createAudioPlayer');
-              try { preloaded.release(); } catch {}
-              runFallback();
-            }
+            // preload 측 = 타이머 시작 시점 측 사전 로드 영역 → 대개 isLoaded=true 영역.
+            // 단 = isLoaded=false 시도 = playWhenLoaded 측 = listener 진입 + 로드 완료 후 play.
+            soundRef.current = preloaded;
+            playWhenLoaded(preloaded, 'preloaded');
           })
           .catch((e: any) => appendAlarmAudioLog(`setAudioModeAsync fail: ${e?.message || e}`));
       }).catch((e: any) => appendAlarmAudioLog(`AsyncStorage.get (audio) fail: ${e?.message || e}`));

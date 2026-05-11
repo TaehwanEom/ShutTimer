@@ -17,7 +17,9 @@
       "bundleIdentifier": "com.shuttimer.app",
       "entitlements": {
         "com.apple.developer.usernotifications.time-sensitive": true,
-        "com.apple.security.application-groups": ["group.com.shuttimer.app"]
+        "com.apple.security.application-groups": [
+          "group.com.shuttimer.app"
+        ]
       },
       "infoPlist": {
         "NSCameraUsageDescription": "Scan a photo to dismiss the timer.",
@@ -244,7 +246,8 @@
       "./plugins/withInfoPlistLocalizations.js",
       "./plugins/withWidgetAppIntentsMetadata.js",
       "@react-native-community/datetimepicker",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "expo-audio"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

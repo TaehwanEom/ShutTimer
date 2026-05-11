@@ -64,7 +64,7 @@ type LocalStep = {
 };
 
 const STEP_NAME_MAX = 20;
-const MAX_STEPS = 5;
+const MAX_STEPS = 3;
 const DEFAULT_START_TIME = '07:00';
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 

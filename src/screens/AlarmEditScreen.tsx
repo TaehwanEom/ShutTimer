@@ -55,7 +55,7 @@ type Props = {
 
 const LABEL_MAX = 30;
 const STEP_NAME_MAX = 20;
-const MAX_STEPS = 20;
+const MAX_STEPS = 3;
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 /** step duration 표시용 formatter. 0 = fallback ("시간 설정") 표시. i18n 영영. */

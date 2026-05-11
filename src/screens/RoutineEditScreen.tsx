@@ -49,6 +49,7 @@ import {
   loadCustomCategories,
 } from '../constants/categories';
 import { DEFAULT_SOUND_ID } from '../constants/sounds';
+import { Logger } from '../utils/logger';
 import AdBanner from '../components/AdBanner';
 
 type Props = {
@@ -170,11 +171,11 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
 
   // [DEBUG] mount/unmount 추적 — state reset 원인 확인용
   useEffect(() => {
-    console.log('[RoutineEdit] MOUNTED', { editingId, params: route.params });
-    return () => console.log('[RoutineEdit] UNMOUNTED');
+    Logger.warn('RoutineEdit', `MOUNTED editingId=${editingId} params=${JSON.stringify(route.params)}`);
+    return () => Logger.warn('RoutineEdit', 'UNMOUNTED');
   }, []);
   useEffect(() => {
-    console.log('[RoutineEdit] params change', route.params);
+    Logger.warn('RoutineEdit', `params change ${JSON.stringify(route.params)}`);
   }, [route.params]);
 
   const markDirty = () => setDirty(true);

@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Logger } from '../utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -27,9 +28,9 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('=== ERROR BOUNDARY CAUGHT ===');
-    console.error('Error:', error.toString());
-    console.error('Stack:', errorInfo.componentStack);
+    Logger.error('ErrorBoundary', '=== ERROR BOUNDARY CAUGHT ===');
+    Logger.error('ErrorBoundary', error);
+    Logger.error('ErrorBoundary', `Stack: ${errorInfo.componentStack ?? '(no stack)'}`);
 
     this.setState({
       error,
@@ -52,7 +53,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
       await AsyncStorage.setItem('app_error_log', JSON.stringify(limited));
     } catch (e) {
-      console.warn('Failed to save error log:', e);
+      Logger.warn('ErrorBoundary', `Failed to save error log: ${String(e)}`);
     }
   };
 

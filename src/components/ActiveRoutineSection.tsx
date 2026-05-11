@@ -214,14 +214,14 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
   // ─── 카운트다운 tick ──────────────────────────────────────
   useEffect(() => {
-    console.log('[V1 timer-tick] effect run', { routine: !!routine, ar: !!ar, isPaused, pausedAt: ar?.pausedAt, awaitingConfirm: ar?.awaitingConfirm, modalVisible });
+    Logger.warn('V1 timer-tick', `effect run routine=${!!routine} ar=${!!ar} isPaused=${isPaused} pausedAt=${ar?.pausedAt} awaitingConfirm=${ar?.awaitingConfirm} modalVisible=${modalVisible}`);
     // v1.6 #4-C Fix 1 — ar.pausedAt 가드 추가. 위젯 pause 신호 폴링 처리 후 ar.pausedAt 가 갱신됐지만
     // setIsPaused(true) emit 가 race 로 늦으면 tick 진행 → 시간 mismatch. ar.pausedAt 검사로 확실 차단.
     if (!routine || !ar || isPaused || ar.pausedAt !== null || ar.awaitingConfirm || modalVisible) {
-      if (tickRef.current) { console.log('[V1 timer-tick] EARLY CLEANUP'); clearInterval(tickRef.current); tickRef.current = null; }
+      if (tickRef.current) { Logger.warn('V1 timer-tick', 'EARLY CLEANUP'); clearInterval(tickRef.current); tickRef.current = null; }
       return;
     }
-    console.log('[V1 timer-tick] START interval');
+    Logger.warn('V1 timer-tick', 'START interval');
     const update = () => {
       const remainMs = ar.stepEndAt - Date.now();
       setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
@@ -230,7 +230,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     update();
     tickRef.current = setInterval(update, 500);
     return () => {
-      console.log('[V1 timer-tick] EFFECT CLEANUP');
+      Logger.warn('V1 timer-tick', 'EFFECT CLEANUP');
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,12 +326,12 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
           volume: 1.0,
         });
         soundRef.current = sound;
-        console.log('[alarm] sound START', item.id);
+        Logger.warn('alarm', `sound START ${item.id}`);
       } catch (e) {
-        console.warn('[alarm] startAlarmEffects fail', e);
+        Logger.warn('alarm', `startAlarmEffects fail ${String(e)}`);
       }
     } else {
-      console.log('[alarm] alarmEnabled=false → skip');
+      Logger.warn('alarm', 'alarmEnabled=false → skip');
     }
 
     if (vibrationEnabled) {

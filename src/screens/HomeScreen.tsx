@@ -395,14 +395,14 @@ export default function HomeScreen({ navigation, route }: Props) {
     // 권한 grant 시 AlarmKit alerting fire = silent/Focus 우회 자동.
     // 미요청 상태로 expo 폴백만 등록되면 silent mode 시 kill 상태 무음.
     const akAuth = await requestAlarmKitAuthorizationIfNeeded();
-    console.warn('[timer] AlarmKit auth:', akAuth);
+    Logger.warn('timer', `AlarmKit auth: ${akAuth}`);
 
     // Phase E 진단 — 등록 전 system 측 alarm 상태
     try {
       const before = await AlarmkitBridge.listAlarms();
-      console.warn('[timer] alarms before:', before.length, JSON.stringify(before));
+      Logger.warn('timer', `alarms before: ${before.length} ${JSON.stringify(before)}`);
     } catch (e) {
-      console.warn('[timer] listAlarms before fail:', String(e));
+      Logger.warn('timer', `listAlarms before fail: ${String(e)}`);
     }
 
     // v1.6 hotfix — 사용자 설정 사운드 사전 로드 (AlarmKit + expo 양쪽 사용).
@@ -410,7 +410,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
     // v1.7 hotfix #DBG-Sound (C2) — timer_main 측 사운드 매핑 출력 (= storedId → matchedId → pushSound).
     // mismatch 시 = ALARM_SOUNDS[0] fallback → matchedId 영역 측 storedId 와 다름 (= root cause 식별).
-    console.warn(`[timer-DBG] sound storedId=${soundId} → matchedId=${soundItem.id} pushSound=${soundItem.pushSound}`);
+    Logger.warn('timer-DBG', `sound storedId=${soundId} → matchedId=${soundItem.id} pushSound=${soundItem.pushSound}`);
     const alarmEnabledRaw = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED);
     const alarmEnabled = alarmEnabledRaw !== 'false';
 
@@ -456,13 +456,13 @@ export default function HomeScreen({ navigation, route }: Props) {
           laRoutineId: routineId,
           laRoutineName: t('home.timerName', { defaultValue: '타이머' }),
         });
-        console.warn('[timer] scheduled id:', id);
+        Logger.warn('timer', `scheduled id: ${id}`);
         // Phase E 진단 — 등록 직후 system 측 alarm 상태
         try {
           const after = await AlarmkitBridge.listAlarms();
-          console.warn('[timer] alarms after:', after.length, JSON.stringify(after));
+          Logger.warn('timer', `alarms after: ${after.length} ${JSON.stringify(after)}`);
         } catch (e) {
-          console.warn('[timer] listAlarms after fail:', String(e));
+          Logger.warn('timer', `listAlarms after fail: ${String(e)}`);
         }
         if (id) {
           await saveAlarmMetadata({ alarmId: id, type: 'timer_main', entityId: routineId });
@@ -473,7 +473,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         }
       } catch (e) {
         // Phase E 진단 — catch 빈 블록 → throw 표면화
-        console.warn('[timer] schedule throw:', String(e));
+        Logger.warn('timer', `schedule throw: ${String(e)}`);
       }
     }
 

@@ -45,6 +45,7 @@ import { useSharedValue } from 'react-native-worklets-core';
 import AlarmCameraMode from './AlarmCameraMode';
 import type { Detection } from '../utils/objectDetection';
 import { SETTINGS_KEY } from '../constants/settings';
+import { Logger } from '../utils/logger';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineAlarm'>;
@@ -571,13 +572,13 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     // v1.7 hotfix #DBG-StopNav — 정지 누름 진입 + reset 직전 currentRoute / routineId 추적용.
     // 사용자 보고 = "알람 루틴 정지 → RoutineList 진입" root cause 식별 (= 본 경로 진입 시점 추적).
     const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
-    console.warn(`[StopNav-DBG] RoutineAlarmScreen.handleStop ENTER routineId=${routine?.id ?? '(null)'} currentRoute=${currentRoute ?? '(unknown)'}`);
+    Logger.warn('StopNav-DBG', `RoutineAlarmScreen.handleStop ENTER routineId=${routine?.id ?? '(null)'} currentRoute=${currentRoute ?? '(unknown)'}`);
     stopAudio();
     stopVibe();
     await stopRoutine();
     const tab = routine ? getRoutineMode(routine) : undefined;
     const params = tab ? { initialTab: tab } : undefined;
-    console.warn(`[StopNav-DBG] RoutineAlarmScreen.handleStop reset → RoutineTab tab=${tab ?? '(none)'}`);
+    Logger.warn('StopNav-DBG', `RoutineAlarmScreen.handleStop reset → RoutineTab tab=${tab ?? '(none)'}`);
     (navigation as any).reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab', params }] } }] });
   }, [navigation, routine]);
 

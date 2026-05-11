@@ -106,7 +106,7 @@ if (!isExpoGo) {
       // 앱 시작 시 1회 preload (= AlarmScreen mount 시 LOADED 영역 보장).
       try { interstitial.load(); } catch {}
     } catch (e) {
-      console.warn('InterstitialAd failed to initialize:', e);
+      Logger.warn('AdInit', `InterstitialAd failed to initialize: ${String(e)}`);
     }
   })();
 }
@@ -548,7 +548,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       };
     } catch (e) {
       Logger.warn('Ad-DBG', `AdEventType import 실패=${String(e)}`);
-      console.warn('AdEventType failed to load:', e);
+      Logger.warn('AdInit', `AdEventType failed to load: ${String(e)}`);
     }
     // @preserve IAP — deps 원본: [navigation, isAdFree, isExpoGo]
   }, [navigation, isExpoGo]);

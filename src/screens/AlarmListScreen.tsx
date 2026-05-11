@@ -76,11 +76,6 @@ function formatRepeat(alarm: Alarm, t: (k: string, opts?: any) => string): strin
     .join(' ');
 }
 
-function dismissMethodIcon(method: Alarm['dismissMethod']): string {
-  if (method === 'tap') return 'touch-app';
-  if (method === 'shake') return 'vibration';
-  return 'photo-camera';
-}
 
 /** step duration 표시용 (RoutineListScreen 패턴). i18n 영영. */
 function formatDurationLabel(sec: number, t: (k: string, opts?: any) => string): string {
@@ -429,12 +424,6 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
                 <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]}>
                   {formatRepeat(item, t)}
                 </Text>
-                <MaterialIcons
-                  name={dismissMethodIcon(item.dismissMethod) as any}
-                  size={14}
-                  color={item.enabled ? colors.secondary : colors.outlineVariant}
-                  style={{ marginStart: 8 }}
-                />
                 {/* alarm.steps[] 보유 시 배지 노출 */}
                 {hasSteps && (
                   <View

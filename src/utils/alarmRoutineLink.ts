@@ -14,6 +14,8 @@ import {
   loadActiveRoutine,
 } from '../constants/routines';
 import { startRoutine, stopRoutine, StartRoutineResult } from './routineController';
+import { getCachedDismissMethod } from './settingsCache';
+import { DEFAULT_SETTINGS } from '../constants/settings';
 import { Logger } from './logger';
 
 const ADHOC_PREFIX = 'aa_';
@@ -62,7 +64,8 @@ export async function startRoutineFromAlarm(alarm: Alarm): Promise<StartFromAlar
     name: alarm.label || undefined,
     steps: alarm.steps,
     active: true,
-    endMethod: alarm.dismissMethod,
+    // v1.7 hotfix #DismissMethodPurge — alarm.dismissMethod 폐기 → 전역 SettingsScreen 측 read.
+    endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
     autoCountdownSec: 5,
     createdAt: Date.now(),
   };

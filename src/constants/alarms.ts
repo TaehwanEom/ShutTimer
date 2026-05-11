@@ -5,7 +5,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoutineStep } from './routines';
 
 export type AlarmRepeat = 'once' | 'daily' | 'weekly';
-export type AlarmDismissMethod = 'tap' | 'shake' | 'camera';
 
 export type Alarm = {
   id: string;
@@ -16,7 +15,6 @@ export type Alarm = {
   days: number[];
   label: string;
   enabled: boolean;
-  dismissMethod: AlarmDismissMethod;
   createdAt: number;
   /**
    * v1.7 — 알람+루틴 통합. 발화 후 진행할 step 시퀀스. undefined / 빈 배열 = 단독 알람.
@@ -80,10 +78,6 @@ function isValidRepeat(r: any): r is AlarmRepeat {
   return r === 'once' || r === 'daily' || r === 'weekly';
 }
 
-function isValidDismissMethod(m: any): m is AlarmDismissMethod {
-  return m === 'tap' || m === 'shake' || m === 'camera';
-}
-
 function isValidAlarmStep(s: any): boolean {
   return (
     s &&
@@ -105,7 +99,6 @@ export function isValidAlarm(a: any): a is Alarm {
     !a.days.every((d: any) => typeof d === 'number' && d >= 0 && d <= 6) ||
     typeof a.label !== 'string' ||
     typeof a.enabled !== 'boolean' ||
-    !isValidDismissMethod(a.dismissMethod) ||
     typeof a.createdAt !== 'number'
   ) {
     return false;

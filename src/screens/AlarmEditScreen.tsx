@@ -25,7 +25,6 @@ import TimeWheelPicker from '../components/TimeWheelPicker';
 import {
   Alarm,
   AlarmRepeat,
-  AlarmDismissMethod,
   loadAlarms,
   upsertAlarm,
   deleteAlarm,
@@ -95,7 +94,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
   const [repeat, setRepeat] = useState<AlarmRepeat>('once');
   const [days, setDays] = useState<number[]>([]);
   const [label, setLabel] = useState('');
-  const [dismissMethod, setDismissMethod] = useState<AlarmDismissMethod>('tap');
   // v1.7 Phase 1 — 알람+루틴 통합. steps[] 직접 보유. 0개 = 단독 알람 / 1개 이상 = 통합.
   const [steps, setSteps] = useState<RoutineStep[]>([]);
   const [durationPickerVisible, setDurationPickerVisible] = useState(false);
@@ -143,7 +141,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       setRepeat(target.repeat);
       setDays(target.days);
       setLabel(target.label);
-      setDismissMethod(target.dismissMethod);
       setSteps(target.steps ?? []);
       loadedRef.current = true;
     });
@@ -292,7 +289,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       days: repeat === 'weekly' ? days : [],
       label: label.trim(),
       enabled: true,
-      dismissMethod,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
       ...(trimmedSteps.length > 0 ? { steps: trimmedSteps } : {}),
     };
@@ -469,43 +465,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         </View>
 
         {/* 해제 방식 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>
-            {t('alarm.dismissMethod.title', { defaultValue: '해제 방식' })}
-          </Text>
-          <View style={styles.dismissRow}>
-            {(['tap', 'shake', 'camera'] as AlarmDismissMethod[]).map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[
-                  styles.dismissBtn,
-                  dismissMethod === m && styles.dismissBtnActive,
-                ]}
-                onPress={() => setDismissMethod(m)}
-              >
-                <MaterialIcons
-                  name={
-                    m === 'tap' ? 'touch-app' : m === 'shake' ? 'vibration' : 'photo-camera'
-                  }
-                  size={22}
-                  color={dismissMethod === m ? colors.onPrimary : colors.onBackground}
-                />
-                <Text
-                  style={[
-                    styles.dismissBtnText,
-                    dismissMethod === m && styles.dismissBtnTextActive,
-                  ]}
-                >
-                  {m === 'tap'
-                    ? t('alarm.dismissMethod.tap', { defaultValue: '탭' })
-                    : m === 'shake'
-                      ? t('alarm.dismissMethod.shake', { defaultValue: '흔들기' })
-                      : t('alarm.dismissMethod.camera', { defaultValue: '사진' })}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* v1.7 hotfix #DismissMethodPurge — 알람별 해제 방식 영역 폐기 (= 전역 SettingsScreen 측 DISMISS_METHOD 정합). 사용자분 측 = "헷갈림" 사인 + 본 cycle #SoundMismatch 정합 영역. */}
 
         {/* v1.7 Phase 1 — 루틴 추가 (= alarm.steps[] 직접 편집) */}
         <View style={styles.section}>

@@ -14,7 +14,8 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SETTINGS_KEY } from './src/constants/settings';
 import { MISSIONS_STORAGE_KEY } from './src/constants/missions';
-import { preloadDismissMethod } from './src/utils/settingsCache';
+import { preloadDismissMethod, getCachedDismissMethod } from './src/utils/settingsCache';
+import { DEFAULT_SETTINGS } from './src/constants/settings';
 import { Logger } from './src/utils/logger';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
@@ -366,10 +367,10 @@ function AppNavigator() {
         // v1.7 Phase 2-A — alarmEntityId 전달. AlarmScreen.goHome 측 alarm.steps 분기 사용.
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === meta.entityId);
-        Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
+        Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
         // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기 (= AlarmScreen 측 = SETTINGS_KEY.ALARM_SOUND 측만 read = alarmScheduler 정합).
         navigationRef.current?.navigate('Alarm', {
-          endMethod: a?.dismissMethod ?? 'tap',
+          endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
           alarmEntityId: meta.entityId,
         });
         return;
@@ -460,10 +461,10 @@ function AppNavigator() {
           // v1.7 Phase 2-A — alarmEntityId 전달.
           const alarms = await loadAlarms();
           const a = alarms.find(x => x.id === meta.entityId);
-          Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${a?.dismissMethod ?? 'tap'}`);
+          Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
           // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
           navigationRef.current?.navigate('Alarm', {
-            endMethod: a?.dismissMethod ?? 'tap',
+            endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
             alarmEntityId: meta.entityId,
           });
           return;
@@ -637,10 +638,10 @@ function AppNavigator() {
               if (alarmEntity) {
                 const route = navigationRef.current.getCurrentRoute()?.name;
                 if (route !== 'Alarm') {
-                  Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${alarmEntity.dismissMethod ?? 'tap'}`);
+                  Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
                   // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
                   navigationRef.current.navigate('Alarm', {
-                    endMethod: alarmEntity.dismissMethod ?? 'tap',
+                    endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
                     alarmEntityId: alarmEntity.id,
                   } as never);
                 }

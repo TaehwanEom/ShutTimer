@@ -22,7 +22,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { SETTINGS_KEY, DismissMethod, DEFAULT_SETTINGS, COLOR_PRESETS, MissionDuration, MISSION_DURATION_OPTIONS } from '../constants/settings';
 import { MISSION_POOL } from '../constants/missionIcons';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useTranslation } from 'react-i18next';
 import AdBanner from '../components/AdBanner';
@@ -183,7 +183,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [missionDurationModalVisible, setMissionDurationModalVisible] = useState(false);
   const [selectedMissionsCount, setSelectedMissionsCount] = useState<number>(MISSION_POOL.length);
   const [keepScreenOn, setKeepScreenOn] = useState(DEFAULT_SETTINGS.keepScreenOn);
-  const previewSoundRef = React.useRef<Audio.Sound | null>(null);
+  const previewSoundRef = React.useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
@@ -193,8 +193,7 @@ export default function SettingsScreen({ navigation }: Props) {
   // 직전 = closeSoundModal 측만 stopPreview 호출 → screen 자체 측 unmount 시 (= 뒤로 가기, tab 이동) 측 잔존.
   useEffect(() => {
     return () => {
-      previewSoundRef.current?.stopAsync().catch(() => {});
-      previewSoundRef.current?.unloadAsync().catch(() => {});
+      try { previewSoundRef.current?.release(); } catch {}
       previewSoundRef.current = null;
     };
   }, []);
@@ -269,8 +268,7 @@ export default function SettingsScreen({ navigation }: Props) {
   };
 
   const stopPreview = () => {
-    previewSoundRef.current?.stopAsync().catch(() => {});
-    previewSoundRef.current?.unloadAsync().catch(() => {});
+    try { previewSoundRef.current?.release(); } catch {}
     previewSoundRef.current = null;
   };
 
@@ -293,11 +291,24 @@ export default function SettingsScreen({ navigation }: Props) {
     stopPreview();
     const item = ALARM_SOUNDS.find(s => s.id === soundId);
     if (!item) return;
-    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-    // v1.7 hotfix #PreviewLoopFix — isLooping: false (= 한 번 재생 후 자동 정지). 직전 = isLooping: true → 무한 루프.
-    const { sound } = await Audio.Sound.createAsync(item.source, { isLooping: false });
-    previewSoundRef.current = sound;
-    await sound.playAsync();
+    // v1.7 hotfix #ExpoAudio Phase 4-E — expo-av → expo-audio swap (= preview 영역).
+    await setAudioModeAsync({ playsInSilentMode: true });
+    // v1.7 hotfix #PreviewLoopFix — loop: false (= 한 번 재생 후 자동 정지). 직전 = isLooping: true → 무한 루프.
+    const player = createAudioPlayer(item.source);
+    player.loop = false;
+    previewSoundRef.current = player;
+    // LoadGate 패턴 = isLoaded event 후 play (= preview 측 단순 영역).
+    if (player.isLoaded) {
+      try { player.play(); } catch {}
+    } else {
+      const sub = player.addListener('playbackStatusUpdate', (status) => {
+        if (status?.isLoaded) {
+          sub.remove();
+          if (previewSoundRef.current !== player) return;
+          try { player.play(); } catch {}
+        }
+      });
+    }
   };
 
   const handleAlarmEnabled = (value: boolean) => {

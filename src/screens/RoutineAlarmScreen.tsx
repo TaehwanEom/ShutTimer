@@ -20,7 +20,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
-import { Audio, InterruptionModeIOS } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
@@ -78,7 +78,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const [countdown, setCountdown] = useState<number | null>(null);
   // camera 모드: 랜덤 MISSION_POOL 1개 — mount 시 한 번 픽
   const [cameraMission, setCameraMission] = useState<string | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shakeCountRef = useRef(0);
   const lastShakeTimeRef = useRef(0);
@@ -202,19 +202,37 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       const item = ALARM_SOUNDS.find(s => s.id === effectiveId) ?? ALARM_SOUNDS[0];
 
       if (alarmEnabled) {
-        Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        // v1.7 hotfix #ExpoAudio Phase 4-D — expo-av → expo-audio swap + LoadGate 패턴 적용.
+        setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: 'doNotMix',
         })
-          .then(() => Audio.Sound.createAsync(item.source, { isLooping: true }))
-          .then(({ sound }) => {
-            if (cancelled) {
-              sound.unloadAsync().catch(() => {});
-              return;
-            }
-            soundRef.current = sound;
-            sound.playAsync().catch(() => {});
+          .then(() => {
+            if (cancelled) return;
+            try {
+              const player = createAudioPlayer(item.source);
+              player.loop = true;
+              if (cancelled) {
+                try { player.release(); } catch {}
+                return;
+              }
+              soundRef.current = player;
+              const playWhenLoaded = () => {
+                if (player.isLoaded) {
+                  try { player.play(); } catch {}
+                  return;
+                }
+                const sub = player.addListener('playbackStatusUpdate', (status) => {
+                  if (status?.isLoaded) {
+                    sub.remove();
+                    if (cancelled) return;
+                    try { player.play(); } catch {}
+                  }
+                });
+              };
+              playWhenLoaded();
+            } catch {}
           })
           .catch(() => {});
       }
@@ -302,20 +320,19 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         vibrationIntervalRef.current = setInterval(() => Vibration.vibrate(), 1000);
       }
 
-      // Audio 재시작
+      // Audio 재시작 (= AppState=active 진입 시 = 사운드 재개 영역)
+      // v1.7 hotfix #ExpoAudio Phase 4-D — expo-audio sync property + setAudioModeAsync 새 API.
       const s = soundRef.current;
       if (s) {
-        s.getStatusAsync().then((status: any) => {
-          if (status?.isLoaded && !status.isPlaying) {
-            Audio.setAudioModeAsync({
-              playsInSilentModeIOS: true,
-              staysActiveInBackground: true,
-              interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-            })
-              .then(() => s.playAsync())
-              .catch(() => {});
-          }
-        }).catch(() => {});
+        if (s.isLoaded && !s.playing) {
+          setAudioModeAsync({
+            playsInSilentMode: true,
+            shouldPlayInBackground: true,
+            interruptionMode: 'doNotMix',
+          })
+            .then(() => { try { s.play(); } catch {} })
+            .catch(() => {});
+        }
       }
     });
     return () => sub.remove();
@@ -555,8 +572,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     const s = soundRef.current;
     soundRef.current = null;
     if (s) {
-      s.stopAsync().catch(() => {});
-      s.unloadAsync().catch(() => {});
+      try { s.release(); } catch {}
     }
   };
   const stopVibe = () => {

@@ -20,7 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
-import { Audio, InterruptionModeIOS } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { Accelerometer } from 'expo-sensors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
@@ -250,7 +250,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   }, [ar, isPaused]);
 
   // ─── 알람 효과 (refs) ─────────────────────────────────────
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   // v1.7 hotfix #StartAlarmEffectsRace — startAlarmEffects 측 200ms 지연 + Audio.createAsync 영역 측 = init useEffect + useEffect-awaitingConfirm 측 같은 시점 호출 race 회피.
   const inProgressRef = useRef(false);
   const vibrationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -265,8 +265,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     const s = soundRef.current;
     soundRef.current = null;
     if (s) {
-      s.stopAsync().catch(() => {});
-      s.unloadAsync().catch(() => {});
+      try { s.release(); } catch {}
     }
   }, []);
 
@@ -309,23 +308,35 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         if (soundRef.current) {
           const prev = soundRef.current;
           soundRef.current = null;
-          await prev.stopAsync().catch(() => {});
-          await prev.unloadAsync().catch(() => {});
+          try { prev.release(); } catch {}
         }
-        // 단일 타이머 알람 (AlarmScreen.tsx:472) 과 동일 옵션 — 옵션 축소 시 iOS default mixing 으로
-        // AdMob WebView 미디어 재생 중에 ducking/silence 처리됨. DoNotMix 로 audio session 명시 점유 필요.
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+        // v1.7 hotfix #ExpoAudio Phase 4-D — expo-av → expo-audio swap + LoadGate 패턴.
+        // 단일 타이머 알람과 동일 옵션 — DoNotMix 로 audio session 명시 점유.
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: true,
+          interruptionMode: 'doNotMix',
         });
-        Logger.warn('SOUND-DBG', `createAsync soundId=${item.id} time=${Date.now()}`);
-        const { sound } = await Audio.Sound.createAsync(item.source, {
-          isLooping: true,
-          shouldPlay: true,   // create 와 동시에 즉시 재생 (별도 playAsync 불필요)
-          volume: 1.0,
-        });
-        soundRef.current = sound;
+        Logger.warn('SOUND-DBG', `createAudioPlayer soundId=${item.id} time=${Date.now()}`);
+        const player = createAudioPlayer(item.source);
+        player.loop = true;
+        player.volume = 1.0;
+        soundRef.current = player;
+        // LoadGate 패턴 = isLoaded event 후 play (= 끊김 회피 영역).
+        const playWhenLoaded = () => {
+          if (player.isLoaded) {
+            try { player.play(); } catch {}
+            return;
+          }
+          const sub = player.addListener('playbackStatusUpdate', (status) => {
+            if (status?.isLoaded) {
+              sub.remove();
+              if (soundRef.current !== player) return;
+              try { player.play(); } catch {}
+            }
+          });
+        };
+        playWhenLoaded();
         Logger.warn('alarm', `sound START ${item.id}`);
       } catch (e) {
         Logger.warn('alarm', `startAlarmEffects fail ${String(e)}`);

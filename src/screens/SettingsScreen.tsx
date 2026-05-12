@@ -42,12 +42,12 @@ type Props = {
 };
 
 const DISMISS_OPTIONS: { value: DismissMethod; labelKey: string; icon: string; descKey: string }[] = [
-  { value: 'camera', labelKey: 'settings.camera', icon: 'photo-camera', descKey: 'settings.cameraDesc' },
+  { value: 'random', labelKey: 'settings.random', icon: 'shuffle', descKey: 'settings.randomDesc' },
   { value: 'tap', labelKey: 'settings.tap', icon: 'touch-app', descKey: 'settings.tapDesc' },
   { value: 'shake', labelKey: 'settings.shake', icon: 'vibration', descKey: 'settings.shakeDesc' },
+  { value: 'camera', labelKey: 'settings.camera', icon: 'photo-camera', descKey: 'settings.cameraDesc' },
   { value: 'math', labelKey: 'settings.math', icon: 'calculate', descKey: 'settings.mathDesc' },
   { value: 'typing', labelKey: 'settings.typing', icon: 'keyboard', descKey: 'settings.typingDesc' },
-  { value: 'random', labelKey: 'settings.random', icon: 'shuffle', descKey: 'settings.randomDesc' },
 ];
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({

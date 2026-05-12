@@ -667,9 +667,12 @@ export default function AlarmListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {t('alarm.title', { defaultValue: '알람' })}
-        </Text>
+        <View style={styles.headerLeft}>
+          <MaterialIcons name="alarm" size={24} color={colors.onBackground} />
+          <Text style={styles.headerTitle}>
+            {t('alarm.title', { defaultValue: '알람' })}
+          </Text>
+        </View>
         <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
           <MaterialIcons name="add" size={28} color={colors.onBackground} />
         </TouchableOpacity>
@@ -717,6 +720,11 @@ const makeStyles = (colors: ThemeColors) => {
       paddingVertical: 16,
       borderBottomWidth: 0.5,
       borderBottomColor: colors.outlineVariant,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     headerTitle: {
       fontSize: 22,

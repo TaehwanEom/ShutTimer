@@ -59,8 +59,15 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.outlineVariant,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   backBtn: {
     padding: 8,
@@ -68,10 +75,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 40,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '600',
     color: colors.onBackground,
-    letterSpacing: -0.5,
   },
   content: {
     paddingHorizontal: 24,
@@ -363,7 +369,10 @@ export default function SettingsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+        <View style={styles.headerLeft}>
+          <MaterialIcons name="settings" size={24} color={colors.onBackground} />
+          <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

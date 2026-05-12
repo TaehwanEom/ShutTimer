@@ -950,7 +950,10 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
+        <View style={styles.headerLeft}>
+          <MaterialIcons name="repeat" size={24} color={colors.onBackground} />
+          <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
+        </View>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
@@ -1129,14 +1132,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.outlineVariant,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '600',
     color: colors.onBackground,
-    letterSpacing: -0.5,
   },
   iconBtn: {
     padding: 8,

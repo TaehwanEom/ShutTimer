@@ -40,12 +40,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.outlineVariant,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
-    fontSize: 18, fontWeight: '800',
-    color: colors.onBackground, letterSpacing: -0.5,
+    fontSize: 22,
+    fontWeight: '600',
+    color: colors.onBackground,
   },
   backBtn: { padding: 8, borderRadius: 50, width: 40 },
   monthNav: {
@@ -254,7 +262,10 @@ export default function HistoryScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('history.title')}</Text>
+        <View style={styles.headerLeft}>
+          <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} />
+          <Text style={styles.headerTitle}>{t('history.title')}</Text>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>

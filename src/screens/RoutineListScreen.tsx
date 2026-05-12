@@ -1148,10 +1148,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.onBackground,
   },
   iconBtn: {
-    padding: 8,
-    borderRadius: 50,
-    width: 44,
+    width: 40,
+    height: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tabBar: {
     flexDirection: 'row',

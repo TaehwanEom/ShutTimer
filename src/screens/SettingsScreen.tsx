@@ -69,6 +69,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  headerSpacer: {
+    width: 40,
+    height: 40,
+  },
   backBtn: {
     padding: 8,
     borderRadius: 50,
@@ -373,6 +377,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <MaterialIcons name="settings" size={24} color={colors.onBackground} />
           <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         </View>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

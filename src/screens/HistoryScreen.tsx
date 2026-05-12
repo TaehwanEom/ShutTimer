@@ -50,6 +50,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  headerSpacer: {
+    width: 40,
+    height: 40,
+  },
   headerTitle: {
     fontSize: 22,
     fontWeight: '600',
@@ -266,6 +270,7 @@ export default function HistoryScreen({ navigation }: Props) {
           <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} />
           <Text style={styles.headerTitle}>{t('history.title')}</Text>
         </View>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>

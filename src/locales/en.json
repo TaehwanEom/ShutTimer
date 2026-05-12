@@ -1,4 +1,11 @@
 {
+  "tabBar": {
+    "home": "Timer",
+    "routine": "Routine",
+    "alarm": "Alarm",
+    "calendar": "Calendar",
+    "settings": "Settings"
+  },
   "home": {
     "favorites": "Favorites",
     "add": "Add",

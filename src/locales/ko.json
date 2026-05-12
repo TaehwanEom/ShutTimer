@@ -1,4 +1,11 @@
 {
+  "tabBar": {
+    "home": "타이머",
+    "routine": "루틴",
+    "alarm": "알람",
+    "calendar": "캘린더",
+    "settings": "설정"
+  },
   "home": {
     "favorites": "즐겨찾기",
     "add": "추가",

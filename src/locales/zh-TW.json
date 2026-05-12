@@ -1,4 +1,11 @@
 {
+  "tabBar": {
+    "home": "計時器",
+    "routine": "例程",
+    "alarm": "鬧鐘",
+    "calendar": "日曆",
+    "settings": "設定"
+  },
   "home": {
     "favorites": "收藏夾",
     "add": "新增",

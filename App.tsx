@@ -1,4 +1,5 @@
 import './src/i18n';
+import { useTranslation } from 'react-i18next';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect } from 'react';
 import { AppState, Platform, DeviceEventEmitter, View, Text } from 'react-native';
@@ -131,8 +132,10 @@ function CalendarPlaceholder() {
 }
 
 // v1.6 후속 — 하단 탭 (타이머 / 루틴 / 캘린더 / 설정).
+// v1.8 #TabBarI18n — tabBarLabel = i18n 분기 (ko / en / ja / zh-CN / zh-TW = 본인 언어 / 나머지 9개 언어 = en fallback)
 function MainTabsNavigator() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   return (
     <Tab.Navigator screenOptions={{
       headerShown: false,
@@ -142,23 +145,23 @@ function MainTabsNavigator() {
       tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     }}>
       <Tab.Screen name="HomeTab" component={HomeScreen as any} options={{
-        tabBarLabel: '타이머',
+        tabBarLabel: t('tabBar.home'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
       }} />
       <Tab.Screen name="RoutineTab" component={RoutineListScreen as any} options={{
-        tabBarLabel: '루틴',
+        tabBarLabel: t('tabBar.routine'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
       }} />
       <Tab.Screen name="AlarmTab" component={AlarmListScreen as any} options={{
-        tabBarLabel: '알람',
+        tabBarLabel: t('tabBar.alarm'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="alarm" size={size} color={color} />,
       }} />
       <Tab.Screen name="CalendarTab" component={HistoryScreen as any} options={{
-        tabBarLabel: '캘린더',
+        tabBarLabel: t('tabBar.calendar'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="calendar-today" size={size} color={color} />,
       }} />
       <Tab.Screen name="SettingsTab" component={SettingsScreen as any} options={{
-        tabBarLabel: '설정',
+        tabBarLabel: t('tabBar.settings'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="settings" size={size} color={color} />,
       }} />
     </Tab.Navigator>

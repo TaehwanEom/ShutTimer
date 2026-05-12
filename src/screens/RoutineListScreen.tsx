@@ -1060,7 +1060,15 @@ export default function RoutineListScreen({ navigation, route }: Props) {
             <Text style={styles.emptyText}>
               {t(activeTab === 'scheduled' ? 'routine.emptyTitleScheduled' : 'routine.emptyTitleManual')}
             </Text>
-            <Text style={styles.emptyHint}>{t('routine.emptyHint')}</Text>
+            <TouchableOpacity
+              style={styles.emptyBtn}
+              onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
+            >
+              <MaterialIcons name="add" size={20} color={colors.onPrimary} />
+              <Text style={styles.emptyBtnText}>
+                {t('routine.add', { defaultValue: 'Add Routine' })}
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
           grouped.map(({ category, items }) => (
@@ -1241,6 +1249,21 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 13,
     color: colors.secondary,
     opacity: 0.8,
+  },
+  emptyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  emptyBtnText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   sectionHeader: {
     flexDirection: 'row',

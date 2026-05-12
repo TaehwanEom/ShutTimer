@@ -8,7 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SHOW_DEBUG_UI": "true"
+        "EXPO_PUBLIC_SHOW_DEBUG_UI": "true",
+        "EXPO_PUBLIC_HIDE_ADS": "true"
       },
       "android": {
         "buildType": "apk"
@@ -17,7 +18,8 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SHOW_DEBUG_UI": "true"
+        "EXPO_PUBLIC_SHOW_DEBUG_UI": "true",
+        "EXPO_PUBLIC_HIDE_ADS": "true"
       },
       "android": {
         "buildType": "apk"
@@ -26,7 +28,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_SHOW_DEBUG_UI": "false"
+        "EXPO_PUBLIC_SHOW_DEBUG_UI": "false",
+        "EXPO_PUBLIC_HIDE_ADS": "false"
       }
     }
   },

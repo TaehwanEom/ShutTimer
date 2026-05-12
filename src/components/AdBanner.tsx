@@ -8,6 +8,9 @@ import { Logger } from '../utils/logger';
 // import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
+// v1.8 #AdHideGate — dev/preview 빌드 측 광고 호출 차단 (= 본인 시험 영역 = AdMob 부정 클릭 위험 회피).
+// production 측 = "false" → 광고 정상 표시.
+const HIDE_ADS = process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
 
 // PROD IDs kept for restoration after verification build
 // iOS: ca-app-pub-3043284478228309/4187716112
@@ -36,7 +39,7 @@ export default function AdBanner() {
    *  if (loading || isAdFree || isExpoGo) return null;
    * ═══════════════════════════════════════════════════════════
    */
-  if (isExpoGo) return null;
+  if (isExpoGo || HIDE_ADS) return null;
 
   try {
     const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');

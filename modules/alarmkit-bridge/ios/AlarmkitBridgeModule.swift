@@ -367,6 +367,9 @@ public class AlarmkitBridgeModule: Module {
         let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
         let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
         appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(alarm) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
+        // v1.8 #LARelevance — 발화 시각 가까울수록 relevanceScore 높게 → 잠금화면 LA banner / Dynamic Island 측 우선 표시.
+        // 공식 docs 측 = AlarmKit 자동 생성 Activity 측 relevanceScore set 영역 명시 ❌, 실험 영역.
+        Self.updateActivityRelevance(alarmId: id.uuidString, fireAtMs: params.fireAt)
         return id.uuidString
       }
 
@@ -424,6 +427,8 @@ public class AlarmkitBridgeModule: Module {
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
       appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
+      // v1.8 #LARelevance — 동일 처리 (= 알람 + 타이머 동시 = 임박한 영역 우선 표시).
+      Self.updateActivityRelevance(alarmId: id.uuidString, fireAtMs: params.fireAt)
       // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — system sync 시간 race 가능성 검증.
       // 5초 delay 후 다시 측정 → count 측 변화 ❓.
       Task {
@@ -611,6 +616,33 @@ public class AlarmkitBridgeModule: Module {
     case .denied: return "denied"
     case .authorized: return "authorized"
     @unknown default: return "unknown"
+    }
+  }
+
+  // v1.8 #LARelevance — AlarmKit framework 자동 생성 Activity 측 = relevanceScore 후처리 set 시도.
+  // 발화 시각이 가까울수록 score 큼 (= 잠금화면 LA banner + Dynamic Island 측 우선 표시).
+  //
+  // 공식 docs 측 = AlarmKit + relevanceScore 영역 명시 ❌ → 실험 영역.
+  // 실험 결과 = framework 측 update 무시 영역 가능 영역 = 실측 확인 강제.
+  //
+  // score 계산 = 60.0 / 발화까지초. 1분 안 = 1.0, 60초 = 1.0, 600초 = 0.1, 3600초 = 0.017.
+  // 0~1 클램프 영역. AlarmKit framework 측 = 본 update = 다음 state change 시 = 무효 영역 가능.
+  fileprivate static func updateActivityRelevance(alarmId: String, fireAtMs: Double) {
+    Task { @MainActor in
+      // schedule 직후 = system sync 영역 = 짧은 delay 영역 필요 영역.
+      try? await Task.sleep(nanoseconds: 200_000_000)
+      let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+      guard let activity = activities.first(where: { $0.id == alarmId }) else {
+        appendNativeDbg("LA-DBG-AKLA-Relevance", "skip alarmId=\(alarmId) activity not found")
+        return
+      }
+      let nowMs = Date().timeIntervalSince1970 * 1000
+      let secondsUntilFire = max(1.0, (fireAtMs - nowMs) / 1000.0)
+      let relevanceScore = max(0.0, min(1.0, 60.0 / secondsUntilFire))
+      let currentState = activity.content.state
+      let newContent = ActivityContent(state: currentState, staleDate: nil, relevanceScore: relevanceScore)
+      await activity.update(newContent)
+      appendNativeDbg("LA-DBG-AKLA-Relevance", "set alarmId=\(alarmId) secondsUntilFire=\(Int(secondsUntilFire)) score=\(relevanceScore)")
     }
   }
 }

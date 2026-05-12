@@ -8,9 +8,10 @@ import { Logger } from '../utils/logger';
 // import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
 const isExpoGo = (Constants as any).appOwnership === 'expo';
-// v1.8 #AdHideGate — dev/preview 빌드 측 광고 호출 차단 (= 본인 시험 영역 = AdMob 부정 클릭 위험 회피).
-// production 측 = "false" → 광고 정상 표시.
-const HIDE_ADS = process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
+// v1.8 #AdHideGate — Debug 빌드 (= Xcode 직접 / expo run:ios / EAS dev|preview) 측 = 광고 호출 차단.
+// Release 빌드 (= EAS production / Xcode Archive) 측 = EXPO_PUBLIC_HIDE_ADS=false → 광고 정상 표시.
+// __DEV__ = React Native 빌드 configuration 자동 분기 (= Debug=true / Release=false).
+const HIDE_ADS = __DEV__ || process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
 
 // PROD IDs kept for restoration after verification build
 // iOS: ca-app-pub-3043284478228309/4187716112

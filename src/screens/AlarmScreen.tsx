@@ -79,9 +79,10 @@ let interstitialLoaded = false;
 // module-level timestamp 측 = AlarmScreen 측 lifecycle 무관 보존 → cooldown 내 재호출 시 = handleAfterAd 직접 진입 (= 광고 skip).
 let lastInterstitialShowAt = 0;
 const INTERSTITIAL_COOLDOWN_MS = 60000;
-// v1.8 #AdHideGate — dev/preview 빌드 측 전면 광고 호출 차단 (= 본인 시험 영역 = AdMob 부정 클릭 위험 회피).
-// production 측 = "false" → 전면 광고 정상 표시.
-const HIDE_ADS = process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
+// v1.8 #AdHideGate — Debug 빌드 (= Xcode 직접 / expo run:ios / EAS dev|preview) 측 = 전면 광고 호출 차단.
+// Release 빌드 (= EAS production / Xcode Archive) 측 = EXPO_PUBLIC_HIDE_ADS=false → 전면 광고 정상 표시.
+// __DEV__ = React Native 빌드 configuration 자동 분기 (= Debug=true / Release=false).
+const HIDE_ADS = __DEV__ || process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
 if (!isExpoGo && !HIDE_ADS) {
   (async () => {
     try {

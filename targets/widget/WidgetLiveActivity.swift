@@ -59,29 +59,28 @@ fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
 //   본 commit = ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) 등록 →
 //   Lock Screen + Dynamic Island 측 정합 layout 표시.
 // v1.7 hotfix #LAUnify Phase 10-G4 — @available(iOS 26.0, *) 마크 제거 (= widget extension deployment target 26.0 정합).
+// v1.8 #WatchLA — Apple Watch Smart Stack 측 전용 View 추가 (= supplementalActivityFamilies([.small]) + activityFamily 분기).
+//   WWDC24 "Bring your Live Activity to Apple Watch" 패턴 정합.
 struct AlarmKitLiveActivity: Widget {
+    @Environment(\.activityFamily) var activityFamily: ActivityFamily
+
     init() {
         // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — Widget struct init 시점 측정.
-        // WidgetBundle 측 등록 시점 = system 측 본 widget instantiate 정합 → init() 호출 정합.
-        // 본 log 측 발생 ❌ 시 = WidgetBundle 측 본 widget instantiate ❌ → registration ❌ root cause.
-        // 본 log 측 발생 ✅ + AlarmKitLockScreenView.init() 0건 → ActivityConfiguration content closure 측 호출 ❌
-        //   → AlarmKit framework 측 ActivityConfiguration<AlarmAttributes<X>> 측 type lookup ❌
         appendNativeDbgWidget("LA-DBG-AKLA-WidgetInit", "AlarmKitLiveActivity.init() called")
-        // v1.7 hotfix #LATypeLookup — AlarmAttributes<ShutTimerAlarmMetadata> 측 type identity 측 측정.
-        // main app process 측 (= AlarmkitBridgeModule schedule 시점 측 LA-DBG-AKLA-Type log) 측 동일 측정 → 두 process 측 type name 직접 비교.
-        // 두 process 측 type name 같음 = type identity 정합 → ActivityConfiguration registration level 측 다른 root cause
-        // 두 process 측 type name 다름 = static_framework 측 별도 instance build 확정 → SharedAlarmTypes Pod 측 module identity 정정 강제
         let typeName = String(describing: AlarmAttributes<ShutTimerAlarmMetadata>.self)
         let metadataTypeName = String(describing: ShutTimerAlarmMetadata.self)
         appendNativeDbgWidget("LA-DBG-AKLA-Type", "WidgetInit widget process AlarmAttributes type=\(typeName) metadata type=\(metadataTypeName)")
     }
 
     var body: some WidgetConfiguration {
-        // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — body evaluation 시점 측정.
         let _ = appendNativeDbgWidget("LA-DBG-AKLA-WidgetBody", "AlarmKitLiveActivity.body accessed")
         return ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
-            // Lock Screen view
-            AlarmKitLockScreenView(context: context)
+            // v1.8 #WatchLA — activityFamily 분기 (= Apple Watch Smart Stack = .small, iPhone Lock Screen = 기존)
+            if activityFamily == .small {
+                AlarmKitWatchView(context: context)
+            } else {
+                AlarmKitLockScreenView(context: context)
+            }
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -107,9 +106,6 @@ struct AlarmKitLiveActivity: Widget {
             } compactTrailing: {
                 AlarmKitCompactTrailingView(context: context)
             } minimal: {
-                // v1.7 hotfix #DI-PausedUX — minimal paused 측 = 동그라미 + 일시정지 (= pause.circle.fill).
-                //   직전 = pause.fill (= "||" 두 개) → 사용자분 측 직관 ❌.
-                //   정정 = pause.circle.fill (= 동그라미 + 일시정지) → 사용자분 직관 정합.
                 if case .paused = context.state.mode {
                     Image(systemName: "pause.circle.fill").foregroundColor(.brand)
                 } else {
@@ -117,6 +113,108 @@ struct AlarmKitLiveActivity: Widget {
                 }
             }
             .keylineTint(Color.brand)
+        }
+        .supplementalActivityFamilies([.small])
+    }
+}
+
+// MARK: - v1.8 #WatchLA — Apple Watch Smart Stack 전용 View (= ~150x150 pt 정합)
+
+struct AlarmKitWatchView: View {
+    let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
+
+    init(context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>) {
+        self.context = context
+        appendNativeDbgWidget("LA-DBG-AKLA-Watch", "AlarmKitWatchView.init() mode=\(akModeString(context.state.mode))")
+    }
+
+    var body: some View {
+        let routineId = context.attributes.metadata?.routineId ?? ""
+        let stepName = context.attributes.metadata?.currentStepName ?? ""
+        let total = context.attributes.metadata?.totalSteps ?? 1
+        let idx = (context.attributes.metadata?.currentStepIndex ?? 0) + 1
+
+        VStack(spacing: 4) {
+            // 루틴 이름 (= 가장 위, 작게)
+            Text(context.attributes.metadata?.routineName ?? "타이머")
+                .font(.caption2)
+                .foregroundColor(.brand)
+                .lineLimit(1)
+
+            // step 진행 (= 루틴 측만 표시, 알람 단독 ❌)
+            if total > 1 && !stepName.isEmpty {
+                Text("\(stepName) (\(idx)/\(total))")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+
+            // 잔여 시간 (= 큰 글자, monospaced)
+            AlarmKitCountdownText(context: context, fontStyle: .title3.weight(.bold))
+
+            // 버튼 영역 (= 일시정지/재개 + 다음 step + 종료)
+            HStack(spacing: 6) {
+                // 일시정지 / 재개
+                AlarmKitWatchPauseResumeButton(routineId: routineId, mode: context.state.mode)
+
+                // 다음 step (= 루틴 측만 표시 + countdown 모드만)
+                if total > 1 && idx < total {
+                    if case .countdown = context.state.mode {
+                        Button(intent: AdvanceNextStepIntent(routineId: routineId)) {
+                            Image(systemName: "forward.fill")
+                                .font(.caption.weight(.bold))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(Color.gray.opacity(0.5)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                // 종료
+                Button(intent: StopRoutineIntent(routineId: routineId)) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.gray.opacity(0.5)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .activityBackgroundTint(Color.black.opacity(0.85))
+        .activitySystemActionForegroundColor(Color.white)
+    }
+}
+
+struct AlarmKitWatchPauseResumeButton: View {
+    let routineId: String
+    let mode: AlarmPresentationState.Mode
+
+    var body: some View {
+        switch mode {
+        case .paused:
+            Button(intent: ResumeRoutineIntent(routineId: routineId)) {
+                Image(systemName: "play.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.brand))
+            }
+            .buttonStyle(.plain)
+        case .countdown:
+            Button(intent: PauseRoutineIntent(routineId: routineId)) {
+                Image(systemName: "pause.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.brand))
+            }
+            .buttonStyle(.plain)
+        case .alert:
+            EmptyView()
         }
     }
 }

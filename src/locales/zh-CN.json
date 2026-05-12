@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}}步"
     },
-    "stepBadge": "{{count}}步"
+    "stepBadge": "{{count}}步",
+    "mathTitle": "算术任务",
+    "mathInstruction": "解题以关闭闹钟"
   },
   "addTimer": {
     "editTitle": "编辑收藏",
@@ -194,7 +196,11 @@
     "adFreeActive": "去广告已激活",
     "purchaseFailed": "购买失败",
     "alarmEnabled": "闹钟声音",
-    "keepScreenOn": "保持屏幕常亮"
+    "keepScreenOn": "保持屏幕常亮",
+    "math": "算术",
+    "mathDesc": "解决简单的算术题来关闭闹钟",
+    "random": "随机",
+    "randomDesc": "从点击/摇动/相机/算术中随机选择"
   },
   "missions": {
     "boy": "人",

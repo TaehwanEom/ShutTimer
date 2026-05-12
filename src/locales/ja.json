@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}}ステップ"
     },
-    "stepBadge": "{{count}}ステップ"
+    "stepBadge": "{{count}}ステップ",
+    "mathTitle": "算数ミッション",
+    "mathInstruction": "問題を解いてアラームを止めてください"
   },
   "addTimer": {
     "editTitle": "お気に入り編集",
@@ -194,7 +196,11 @@
     "adFreeActive": "広告削除が有効です",
     "purchaseFailed": "購入に失敗しました",
     "alarmEnabled": "アラーム音",
-    "keepScreenOn": "画面を点灯したままにする"
+    "keepScreenOn": "画面を点灯したままにする",
+    "math": "算数",
+    "mathDesc": "簡単な算数を解いてアラームを止める",
+    "random": "ランダム",
+    "randomDesc": "タップ/振る/カメラ/算数からランダムに1つ"
   },
   "missions": {
     "boy": "人",

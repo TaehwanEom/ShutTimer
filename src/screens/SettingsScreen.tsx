@@ -45,6 +45,8 @@ const DISMISS_OPTIONS: { value: DismissMethod; labelKey: string; icon: string; d
   { value: 'camera', labelKey: 'settings.camera', icon: 'photo-camera', descKey: 'settings.cameraDesc' },
   { value: 'tap', labelKey: 'settings.tap', icon: 'touch-app', descKey: 'settings.tapDesc' },
   { value: 'shake', labelKey: 'settings.shake', icon: 'vibration', descKey: 'settings.shakeDesc' },
+  { value: 'math', labelKey: 'settings.math', icon: 'calculate', descKey: 'settings.mathDesc' },
+  { value: 'random', labelKey: 'settings.random', icon: 'shuffle', descKey: 'settings.randomDesc' },
 ];
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({

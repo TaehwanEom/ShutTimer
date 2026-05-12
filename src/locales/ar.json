@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}} خطوات"
     },
-    "stepBadge": "{{count}} خطوات"
+    "stepBadge": "{{count}} خطوات",
+    "mathTitle": "مهمة الحساب",
+    "mathInstruction": "حل المسألة لإيقاف المنبه"
   },
   "addTimer": {
     "editTitle": "تعديل المفضلة",
@@ -194,7 +196,11 @@
     "adFreeActive": "إزالة الإعلانات مفعّلة",
     "purchaseFailed": "فشل الشراء",
     "alarmEnabled": "صوت المنبه",
-    "keepScreenOn": "إبقاء الشاشة مضاءة"
+    "keepScreenOn": "إبقاء الشاشة مضاءة",
+    "math": "حساب",
+    "mathDesc": "حل مسألة حسابية بسيطة لإيقاف المنبه",
+    "random": "عشوائي",
+    "randomDesc": "اختيار عشوائي من نقر/هز/كاميرا/حساب"
   },
   "missions": {
     "boy": "شخص",

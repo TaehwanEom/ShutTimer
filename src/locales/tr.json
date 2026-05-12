@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}} adım"
     },
-    "stepBadge": "{{count}} adım"
+    "stepBadge": "{{count}} adım",
+    "mathTitle": "Matematik Görevi",
+    "mathInstruction": "Alarmı kapatmak için problemi çözün"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -194,7 +196,11 @@
     "adFreeActive": "Reklamsız aktif",
     "purchaseFailed": "Satın alma başarısız",
     "alarmEnabled": "Alarm sesi",
-    "keepScreenOn": "Ekranı açık tut"
+    "keepScreenOn": "Ekranı açık tut",
+    "math": "Matematik",
+    "mathDesc": "Alarmı kapatmak için basit bir matematik problemi çözün",
+    "random": "Rastgele",
+    "randomDesc": "Dokun/salla/kamera/matematik arasından rastgele"
   },
   "missions": {
     "boy": "Kişi",

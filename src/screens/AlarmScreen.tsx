@@ -42,6 +42,7 @@ import AlarmCameraMode from './AlarmCameraMode';
 import { MISSION_EMOJI, MISSION_POOL, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
 // import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
+import AlarmMathMode from '../components/AlarmMathMode';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 
@@ -144,6 +145,7 @@ const SHAKE_COOLDOWN_MS = 500;
 const AUTO_DISMISS_MS: Record<string, number> = {
   tap: 5 * 60 * 1000,
   shake: 5 * 60 * 1000,
+  math: 5 * 60 * 1000,
 };
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
 const RESULT_BG = {
@@ -209,10 +211,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // App.tsx에서 사전 로드한 dismissMethod 사용 (AsyncStorage 비동기 지연 제거).
   // v1.6 #12 — routine 마지막 step 진입 시 route.params.endMethod 우선 (settingsCache 무시).
   // 캐시 미적중 시 default fallback. settingsLoaded 후 useEffect에서 정확값으로 갱신.
-  const [dismissMethod, setDismissMethod] = useState<DismissMethod>(
-    ((route.params as { endMethod?: DismissMethod } | undefined)?.endMethod) ??
-    getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod
-  );
+  const [dismissMethod, setDismissMethod] = useState<DismissMethod>(() => {
+    const raw = ((route.params as { endMethod?: DismissMethod } | undefined)?.endMethod) ??
+      getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod;
+    // v1.7 — 'random' 선택 시 mount 시점에 4개 (tap/shake/camera/math) 중 1개 즉시 선택.
+    if (raw === 'random') {
+      const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math'];
+      return options[Math.floor(Math.random() * options.length)];
+    }
+    return raw;
+  });
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
   const soundRef = useRef<AudioPlayer | null>(null);
   // v1.5: iOS Vibration API는 pattern/repeat 미지원 → 인자 없는 Vibration.vibrate()를 interval로 반복 호출
@@ -587,7 +595,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
       const alarmEnabled = alarmRaw !== 'false';
       // v1.6 #12 — routine 마지막 step 진입 시 settingsCache override ❌ (route.params.endMethod 우선).
       const routeEndMethod = (route.params as { endMethod?: DismissMethod } | undefined)?.endMethod;
-      if (method && !routeEndMethod) setDismissMethod(method);
+      if (method && !routeEndMethod) {
+        // v1.7 — 'random' 저장값 = 4개 중 1개 즉시 선택 (= 매번 다른 미션).
+        if (method === 'random') {
+          const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math'];
+          setDismissMethod(options[Math.floor(Math.random() * options.length)]);
+        } else {
+          setDismissMethod(method);
+        }
+      }
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
       if (durationRaw !== null) {
         const n = parseInt(durationRaw, 10);
@@ -1116,6 +1132,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
         </View>
         <AdBanner />
       </SafeAreaView>
+    );
+  }
+
+  // Math 모드 레이아웃 (= 산수 미션). 정답 시 enterResult('success') 호출.
+  if (dismissMethod === 'math') {
+    return (
+      <View style={{ flex: 1 }}>
+        <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} />
+        <AdBanner />
+      </View>
     );
   }
 

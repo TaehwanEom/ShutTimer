@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}}단계"
     },
-    "stepBadge": "{{count}}단계"
+    "stepBadge": "{{count}}단계",
+    "mathTitle": "산수 미션",
+    "mathInstruction": "문제를 풀어 알람을 꺼주세요"
   },
   "addTimer": {
     "editTitle": "즐겨찾기 편집",
@@ -194,7 +196,11 @@
     "restoreNone": "복원할 구매 내역이 없습니다",
     "adFreeActive": "광고 제거 활성화됨",
     "purchaseFailed": "구매에 실패했습니다",
-    "alarmEnabled": "알람 소리"
+    "alarmEnabled": "알람 소리",
+    "math": "산수",
+    "mathDesc": "간단한 산수 문제를 풀어 알람을 끕니다",
+    "random": "랜덤",
+    "randomDesc": "탭/흔들기/사진/산수 중 무작위로 1개 출제"
   },
   "missions": {
     "boy": "사람",

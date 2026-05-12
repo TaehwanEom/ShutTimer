@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}} Schritte"
     },
-    "stepBadge": "{{count}} Schritte"
+    "stepBadge": "{{count}} Schritte",
+    "mathTitle": "Rechen-Mission",
+    "mathInstruction": "Löse die Aufgabe, um den Wecker zu beenden"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -194,7 +196,11 @@
     "adFreeActive": "Werbefrei aktiv",
     "purchaseFailed": "Kauf fehlgeschlagen",
     "alarmEnabled": "Alarmton",
-    "keepScreenOn": "Bildschirm an lassen"
+    "keepScreenOn": "Bildschirm an lassen",
+    "math": "Rechnen",
+    "mathDesc": "Eine einfache Rechenaufgabe lösen, um den Wecker zu stoppen",
+    "random": "Zufall",
+    "randomDesc": "Zufällig aus Tippen/Schütteln/Kamera/Rechnen"
   },
   "missions": {
     "boy": "Person",

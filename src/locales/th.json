@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}} ขั้นตอน"
     },
-    "stepBadge": "{{count}} ขั้นตอน"
+    "stepBadge": "{{count}} ขั้นตอน",
+    "mathTitle": "ภารกิจคณิตศาสตร์",
+    "mathInstruction": "แก้โจทย์เพื่อปิดนาฬิกาปลุก"
   },
   "addTimer": {
     "editTitle": "แก้ไขรายการโปรด",
@@ -194,7 +196,11 @@
     "adFreeActive": "ปิดโฆษณาแล้ว",
     "purchaseFailed": "การซื้อล้มเหลว",
     "alarmEnabled": "เสียงปลุก",
-    "keepScreenOn": "เปิดหน้าจอค้างไว้"
+    "keepScreenOn": "เปิดหน้าจอค้างไว้",
+    "math": "คณิตศาสตร์",
+    "mathDesc": "แก้โจทย์คณิตศาสตร์ง่ายๆ เพื่อปิดนาฬิกาปลุก",
+    "random": "สุ่ม",
+    "randomDesc": "สุ่มจาก แตะ/เขย่า/กล้อง/คณิตศาสตร์"
   },
   "missions": {
     "boy": "คน",

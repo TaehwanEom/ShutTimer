@@ -30,6 +30,7 @@ import { ThemeColors } from '../constants/theme';
 import {
   Routine,
   ActiveRoutine,
+  RoutineEndMethod,
   loadRoutines,
   loadActiveRoutine,
   getRoutineMode,
@@ -43,6 +44,7 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
 import { useSharedValue } from 'react-native-worklets-core';
 import AlarmCameraMode from './AlarmCameraMode';
+import AlarmMathMode from '../components/AlarmMathMode';
 import type { Detection } from '../utils/objectDetection';
 import { SETTINGS_KEY } from '../constants/settings';
 import { Logger } from '../utils/logger';
@@ -149,18 +151,26 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     let cancelled = false;
     const init = async () => {
       const list = await loadRoutines();
-      const target = list.find(r => r.id === route.params.routineId);
+      const original = list.find(r => r.id === route.params.routineId);
       let existing = await loadActiveRoutine();
-      if (!target || !existing || cancelled) {
+      if (!original || !existing || cancelled) {
         navigation.goBack();
         return;
       }
 
-      // 이중 가드 — endMethod !== 'camera' 면 RoutineList 로 redirect (inline 진행).
+      // 이중 가드 — endMethod !== 'camera' && !== 'math' && !== 'random' 면 RoutineList 로 redirect (inline 진행).
       // (App.tsx 알림 핸들러/콜드 스타트가 이미 분기하지만, 예측 못한 경로 fallback)
-      if (target.endMethod !== 'camera') {
+      if (original.endMethod !== 'camera' && original.endMethod !== 'math' && original.endMethod !== 'random') {
         navigation.replace('RoutineList');
         return;
+      }
+
+      // v1.7 — 'random' 영역 = 4개 (tap/shake/camera/math) 중 1개 즉시 선택. 매 발화 다름.
+      let target: Routine = original;
+      if (original.endMethod === 'random') {
+        const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math'];
+        const pick = options[Math.floor(Math.random() * options.length)];
+        target = { ...original, endMethod: pick };
       }
 
       // 배경 알림으로 직접 진입한 경로면 awaitingConfirm=false 상태.
@@ -626,6 +636,13 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
           <MaterialIcons name="alarm" size={96} color={colors.primary} />
           <Text style={styles.completeText}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
           <Text style={styles.dismissHint}>{t('routine.shakeToDismiss', { defaultValue: '흔들어서 계속' })}</Text>
+        </View>
+      );
+    }
+    if (routine.endMethod === 'math') {
+      return (
+        <View style={{ flex: 1 }}>
+          <AlarmMathMode colors={colors} t={t} onSuccess={handleDismiss} />
         </View>
       );
     }

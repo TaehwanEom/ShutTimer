@@ -146,7 +146,9 @@
       },
       "stepCount": "{{count}} étapes"
     },
-    "stepBadge": "{{count}} étapes"
+    "stepBadge": "{{count}} étapes",
+    "mathTitle": "Mission calcul",
+    "mathInstruction": "Résolvez le problème pour arrêter l'alarme"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",
@@ -194,7 +196,11 @@
     "adFreeActive": "Sans publicité actif",
     "purchaseFailed": "Échec de l'achat",
     "alarmEnabled": "Son d'alarme",
-    "keepScreenOn": "Garder l'écran allumé"
+    "keepScreenOn": "Garder l'écran allumé",
+    "math": "Calcul",
+    "mathDesc": "Résolvez un problème mathématique simple pour arrêter l'alarme",
+    "random": "Aléatoire",
+    "randomDesc": "Aléatoire parmi toucher/secouer/caméra/calcul"
   },
   "missions": {
     "boy": "Personne",

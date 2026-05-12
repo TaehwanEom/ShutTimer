@@ -1237,13 +1237,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 80,
     alignItems: 'center',
     paddingHorizontal: 24,
-    gap: 8,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.onBackground,
+    fontSize: 15,
+    color: colors.secondary,
     marginTop: 12,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   emptyHint: {
     fontSize: 13,
@@ -1257,13 +1257,11 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 8,
-    marginTop: 8,
   },
   emptyBtnText: {
     color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '600',
-    marginLeft: 4,
   },
   sectionHeader: {
     flexDirection: 'row',

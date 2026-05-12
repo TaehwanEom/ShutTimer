@@ -46,6 +46,8 @@ import { useSharedValue } from 'react-native-worklets-core';
 import AlarmCameraMode from './AlarmCameraMode';
 import AlarmMathMode from '../components/AlarmMathMode';
 import AlarmTypingMode from '../components/AlarmTypingMode';
+import { getCachedDismissMethod } from '../utils/settingsCache';
+import { DEFAULT_SETTINGS } from '../constants/settings';
 import type { Detection } from '../utils/objectDetection';
 import { SETTINGS_KEY } from '../constants/settings';
 import { Logger } from '../utils/logger';
@@ -159,21 +161,25 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         return;
       }
 
-      // 이중 가드 — endMethod !== 'camera' && !== 'math' && !== 'typing' && !== 'random' 면 RoutineList 로 redirect (inline 진행).
+      // v1.8 #DismissMethodPurge-Routine — endMethod = 전역 설정 측 값 사용 (= 알람 정합).
+      // routine.endMethod 필드 = storage 측 잔존, 사용 ❌.
+      const globalEndMethod = (getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod) as RoutineEndMethod;
+
+      // 이중 가드 — globalEndMethod !== 'camera' && !== 'math' && !== 'typing' && !== 'random' 면 RoutineList 로 redirect (inline 진행).
       // (App.tsx 알림 핸들러/콜드 스타트가 이미 분기하지만, 예측 못한 경로 fallback)
       if (
-        original.endMethod !== 'camera' &&
-        original.endMethod !== 'math' &&
-        original.endMethod !== 'typing' &&
-        original.endMethod !== 'random'
+        globalEndMethod !== 'camera' &&
+        globalEndMethod !== 'math' &&
+        globalEndMethod !== 'typing' &&
+        globalEndMethod !== 'random'
       ) {
         navigation.replace('RoutineList');
         return;
       }
 
-      // v1.7 — 'random' 영역 = 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택. 매 발화 다름.
-      let target: Routine = original;
-      if (original.endMethod === 'random') {
+      // 'random' 영역 = 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택. 매 발화 다름.
+      let target: Routine = { ...original, endMethod: globalEndMethod };
+      if (globalEndMethod === 'random') {
         const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
         const pick = options[Math.floor(Math.random() * options.length)];
         target = { ...original, endMethod: pick };

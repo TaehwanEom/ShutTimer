@@ -28,7 +28,6 @@ import { ThemeColors } from '../constants/theme';
 import {
   Routine,
   RoutineStep,
-  RoutineEndMethod,
   loadRoutines,
   upsertRoutine,
   deleteRoutine,
@@ -49,6 +48,8 @@ import {
   loadCustomCategories,
 } from '../constants/categories';
 import { Logger } from '../utils/logger';
+import { getCachedDismissMethod } from '../utils/settingsCache';
+import { DEFAULT_SETTINGS } from '../constants/settings';
 import AdBanner from '../components/AdBanner';
 
 type Props = {
@@ -141,7 +142,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const [routineName, setRoutineName] = useState('');
   const [startTime, setStartTime] = useState<string>(DEFAULT_START_TIME);
   const [days, setDays] = useState<number[]>([]);
-  const [endMethod, setEndMethod] = useState<RoutineEndMethod>('tap');
+  // v1.8 #DismissMethodPurge-Routine — endMethod 상태 영역 폐기. 저장 시 = 전역 설정 read.
   const [steps, setSteps] = useState<LocalStep[]>(() => [
     { id: createStepId(), name: '', durationSeconds: 0 },
   ]);
@@ -200,7 +201,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       setRoutineName(target.name ?? '');
       setStartTime(target.schedule?.startTime ?? DEFAULT_START_TIME);
       setDays(target.schedule?.days ?? []);
-      setEndMethod(target.endMethod);
+      // v1.8 #DismissMethodPurge-Routine — endMethod load 영역 폐기.
       setSteps(
         target.steps.map(s => ({
           id: s.id,
@@ -368,7 +369,8 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       // manual 모드는 schedule 자체 미생성 (scheduler 자동 skip)
       schedule: mode === 'scheduled' ? { startTime, days } : undefined,
       active: isEditMode ? originalActiveRef.current : true,
-      endMethod,
+      // v1.8 #DismissMethodPurge-Routine — endMethod = 전역 SettingsScreen 측 값 (= 알람 정합).
+      endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
       createdAt: originalCreatedAtRef.current ?? Date.now(),
     };
     await upsertRoutine(routine);
@@ -551,57 +553,28 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         )}
 
-        {/* 설정 */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.settingsSection')}</Text>
-
-        {/* 요일 (예약 모드 only) */}
+        {/* 설정 (= 예약 모드에서만 표시, 종료 방식은 v1.8 #DismissMethodPurge-Routine 측 전역 설정 통일) */}
         {mode === 'scheduled' && (
-          <TouchableOpacity style={styles.settingRow} onPress={handleNavDays}>
-            <View style={styles.autoLabelRow}>
-              <Text style={styles.settingLabel}>{t('routine.edit.fieldDays')}</Text>
-              <TouchableOpacity
-                onPress={() => Alert.alert(t('routine.edit.daysHelpTitle'), t('routine.edit.daysHelpBody'))}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.autoHelpBtn}
-              >
-                <MaterialIcons name="help-outline" size={14} color={colors.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.settingValueRow}>
-              <Text style={[styles.settingValue, days.length === 0 && styles.settingValueUnset]}>{daysLabel}</Text>
-              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* 종료 방식 — 항상 표시 (tap / shake / camera) */}
-        <View style={styles.endMethodSection}>
-          <Text style={styles.settingLabel}>{t('routine.edit.fieldEndMethod')}</Text>
-          <View style={styles.endMethodSegment}>
-            {(['tap', 'shake', 'camera'] as const).map(opt => {
-              const selected = endMethod === opt;
-              return (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.settingsSection')}</Text>
+            <TouchableOpacity style={styles.settingRow} onPress={handleNavDays}>
+              <View style={styles.autoLabelRow}>
+                <Text style={styles.settingLabel}>{t('routine.edit.fieldDays')}</Text>
                 <TouchableOpacity
-                  key={opt}
-                  style={[styles.endMethodBtn, selected && styles.endMethodBtnSelected]}
-                  onPress={() => {
-                    setEndMethod(opt);
-                    markDirty();
-                  }}
+                  onPress={() => Alert.alert(t('routine.edit.daysHelpTitle'), t('routine.edit.daysHelpBody'))}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.autoHelpBtn}
                 >
-                  <Text
-                    style={[
-                      styles.endMethodBtnText,
-                      selected && styles.endMethodBtnTextSelected,
-                    ]}
-                  >
-                    {t(`routine.endMethod.${opt}`)}
-                  </Text>
+                  <MaterialIcons name="help-outline" size={14} color={colors.secondary} />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+              </View>
+              <View style={styles.settingValueRow}>
+                <Text style={[styles.settingValue, days.length === 0 && styles.settingValueUnset]}>{daysLabel}</Text>
+                <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* 삭제 (편집 모드만) */}
         {isEditMode && (
@@ -828,39 +801,6 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   autoHelpBtn: {
     padding: 0,
     marginTop: 3,
-  },
-  endMethodSection: {
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceContainerLow,
-    marginBottom: 8,
-    gap: 10,
-  },
-  endMethodSegment: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  endMethodBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceContainerLowest,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  endMethodBtnSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  endMethodBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.onBackground,
-  },
-  endMethodBtnTextSelected: {
-    color: colors.onPrimary,
   },
   deleteBtn: {
     flexDirection: 'row',

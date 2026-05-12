@@ -1,5 +1,5 @@
-// 알람 종료 미션 = 간단 산수 문제 풀이 모드. AlarmScreen 측 dismissMethod='math' 분기에서 사용.
-// 정답 입력 시 onSuccess 호출. 오답 시 새 문제 출제 + 시각 피드백.
+// 알람 종료 미션 = 간단 산수 문제 풀이 모드. 3문제 순차 출제, 각 문제 정답 시 다음 문제로 진행.
+// 마지막 정답 시 onSuccess. 받아쓰기 미션과 동일 패턴.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Animated,
   ScrollView,
+  Vibration,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeColors } from '../constants/theme';
@@ -19,17 +20,31 @@ type Props = {
   colors: ThemeColors;
   t: (key: string, opts?: any) => string;
   onSuccess: () => void;
+  /** 남은 시간 ms. props 없으면 표시 안 함. AlarmScreen 측만 전달. */
+  remainingMs?: number;
 };
 
+const TOTAL_PROBLEMS = 3;
 const KEYPAD: (string | null)[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'submit'];
 
-export default function AlarmMathMode({ colors, t, onSuccess }: Props) {
-  const [problem, setProblem] = useState<MathProblem>(() => generateMathProblem());
+function formatRemaining(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Props) {
+  const [problems, setProblems] = useState<MathProblem[]>(() =>
+    Array.from({ length: TOTAL_PROBLEMS }, () => generateMathProblem())
+  );
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [input, setInput] = useState('');
   const [wrongFlash, setWrongFlash] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const current = problems[currentIdx];
 
   useEffect(() => {
     if (!wrongFlash) return;
@@ -42,18 +57,26 @@ export default function AlarmMathMode({ colors, t, onSuccess }: Props) {
   }, [wrongFlash, shakeAnim]);
 
   const handleKeyPress = (key: string) => {
+    if (!current) return;
     if (key === 'clear') {
       setInput('');
       return;
     }
     if (key === 'submit') {
       const parsed = parseInt(input, 10);
-      if (!isNaN(parsed) && parsed === problem.answer) {
-        onSuccess();
+      if (!isNaN(parsed) && parsed === current.answer) {
+        // 정답.
+        if (currentIdx + 1 >= TOTAL_PROBLEMS) {
+          onSuccess();
+          return;
+        }
+        setCurrentIdx(prev => prev + 1);
+        setInput('');
         return;
       }
-      // 오답 = 새 문제 + 흔들기 애니메이션.
-      setProblem(generateMathProblem());
+      // 오답 = 같은 idx 새 문제로 교체 (= 진행도 유지) + 진동 피드백.
+      Vibration.vibrate();
+      setProblems(prev => prev.map((p, i) => (i === currentIdx ? generateMathProblem() : p)));
       setInput('');
       setWrongFlash(true);
       return;
@@ -68,28 +91,51 @@ export default function AlarmMathMode({ colors, t, onSuccess }: Props) {
     outputRange: [-12, 12],
   });
 
+  // v1.8 — 실시간 피드백. 입력 = 정답 prefix 영역인지 영역 → 연두 / 빨강 (= 전체 색).
+  const inputColor = (() => {
+    if (!input || !current) return '#ffffff';
+    const target = String(current.answer);
+    if (target.startsWith(input)) return '#2bf213'; // 연두 = 정답 진행 중
+    return '#ff6b6b'; // 빨강 = 오답
+  })();
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>ShutTimer</Text>
+      <View style={styles.topBar}>
+        <Text style={styles.brand}>ShutTimer</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
         <View style={styles.centerSection}>
-          <View style={styles.iconWrapper}>
-            <MaterialIcons name="calculate" size={64} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-          </View>
+          {typeof remainingMs === 'number' && (
+            <Text style={styles.timer}>{formatRemaining(remainingMs)}</Text>
+          )}
           <Text style={styles.title}>{t('alarm.mathTitle', { defaultValue: '산수 미션' })}</Text>
           <Text style={styles.subtitle}>
             {t('alarm.mathInstruction', { defaultValue: '문제를 풀어 알람을 꺼주세요' })}
           </Text>
+          <View style={styles.progressRow}>
+            {Array.from({ length: TOTAL_PROBLEMS }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.progressDot,
+                  i < currentIdx && styles.progressDotDone,
+                  i === currentIdx && styles.progressDotActive,
+                ]}
+              />
+            ))}
+            <Text style={styles.progressText}>
+              {currentIdx + 1} / {TOTAL_PROBLEMS}
+            </Text>
+          </View>
 
           <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-            <Text style={styles.problemText}>{problem.display} = ?</Text>
+            <Text style={styles.problemText}>{current?.display ?? ''} = ?</Text>
           </Animated.View>
 
           <View style={styles.inputBox}>
-            <Text style={styles.inputText}>{input || '_'}</Text>
+            <Text style={[styles.inputText, { color: inputColor }]}>{input || '_'}</Text>
           </View>
         </View>
 
@@ -132,27 +178,33 @@ export default function AlarmMathMode({ colors, t, onSuccess }: Props) {
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primary },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
   },
-  headerTitle: {
+  brand: {
     fontSize: 22,
     fontWeight: '800',
     color: colors.onPrimary,
     letterSpacing: -0.5,
   },
+  timer: {
+    fontSize: 64,
+    fontWeight: '900',
+    color: colors.onPrimary,
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 4,
+  },
   centerSection: {
     alignItems: 'center',
-    paddingTop: 32,
+    paddingTop: 12,
     paddingHorizontal: 24,
-    gap: 16,
-  },
-  iconWrapper: {
-    marginBottom: 4,
+    gap: 8,
   },
   title: {
     fontSize: 22,
@@ -160,13 +212,41 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.onPrimary,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.onPrimary,
     opacity: 0.85,
     textAlign: 'center',
   },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  progressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+  },
+  progressDotActive: {
+    backgroundColor: colors.onPrimary,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  progressDotDone: {
+    backgroundColor: 'rgba(255,255,255,0.7)',
+  },
+  progressText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.onPrimary,
+    opacity: 0.85,
+  },
   problemBox: {
-    marginTop: 16,
+    marginTop: 8,
     paddingVertical: 18,
     paddingHorizontal: 32,
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -175,7 +255,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
   },
   problemText: {
-    fontSize: 40,
+    fontSize: 38,
     fontWeight: '800',
     color: colors.onPrimary,
     letterSpacing: 2,
@@ -196,7 +276,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 4,
   },
   keypad: {
-    marginTop: 24,
+    marginTop: 20,
     paddingHorizontal: 24,
     paddingBottom: 24,
     flexDirection: 'row',

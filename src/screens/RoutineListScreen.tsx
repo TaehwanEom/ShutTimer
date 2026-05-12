@@ -477,7 +477,7 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
             width: 56,
             height: 56,
             borderRadius: 28,
-            backgroundColor: colors.error,
+            backgroundColor: colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
           }}

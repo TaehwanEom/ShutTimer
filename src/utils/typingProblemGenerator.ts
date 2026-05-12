@@ -61,12 +61,13 @@ function generateEnglishProblem(): TypingProblem {
 }
 
 /**
- * 본 앱 언어 = locale 측 정합. 'ko' 시 = 한글/영문/숫자 모두 사용. 그 외 = 영문/숫자만.
+ * 본 앱 언어 = locale 측 정합. 'ko' 시 = 한글 + 숫자만. 그 외 13 언어 = 영문 + 숫자만.
+ * 한국어 사용자 영어 입력 어려움 회피 + 영문권 사용자 한글 입력 ❌ 정합.
  * 중복 종류 없이 3문제 출제 시도 (= 풀이 부족하면 중복 허용).
  */
 export function generateTypingProblems(locale: string, count: number = 3): TypingProblem[] {
-  const allowKorean = locale.startsWith('ko');
-  const kinds: TypingProblemKind[] = allowKorean ? ['ko', 'en', 'number'] : ['en', 'number'];
+  const isKorean = locale.startsWith('ko');
+  const kinds: TypingProblemKind[] = isKorean ? ['ko', 'number'] : ['en', 'number'];
 
   const problems: TypingProblem[] = [];
   const usedTexts = new Set<string>();

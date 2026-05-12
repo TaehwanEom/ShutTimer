@@ -143,16 +143,17 @@ const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT_REQUIRED = 3;
 const SHAKE_COOLDOWN_MS = 500;
 // v1.5: camera 미션은 사용자 설정 타이머 × 2회로 관리되므로 제거. tap/shake만 기존 5분 유지.
+// tap/shake 측만 5분 자동 종료 (= 사용자가 안 끄면 5분 후 silent 종료).
+// math/typing = missionDuration 카운트다운 + 만료 시 즉시 fail (= 별도 useEffect 처리, 본 영역 ❌).
+// camera = 자체 만료 useEffect 영역 (= 재시도 1회 + 2차 만료 시 fail).
 const AUTO_DISMISS_MS: Record<string, number> = {
   tap: 5 * 60 * 1000,
   shake: 5 * 60 * 1000,
-  math: 5 * 60 * 1000,
-  typing: 5 * 60 * 1000,
 };
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
 const RESULT_BG = {
   success: '#2e7d32',
-  fail: '#c62828',
+  fail: '#ff2424',
 };
 
 export default function AlarmScreen({ navigation, route }: Props) {
@@ -472,10 +473,17 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // cancel/dismiss/sound stop 완료 후 광고/네비게이션 진행 (race 방지)
     await stopAudioAndVibration();
     pendingResultRef.current = result;
-    afterAdActionRef.current = dismissMethod === 'camera' ? 'result' : 'home';
+    // v1.8 #ResultScreen-MathTyping — 산수/받아쓰기도 카메라 정합 = 결과 화면 영역 진입.
+    // tap/shake = silent 종료 = home 영역 유지.
+    const showsResultScreen =
+      dismissMethod === 'camera' ||
+      dismissMethod === 'math' ||
+      dismissMethod === 'typing';
+    afterAdActionRef.current = showsResultScreen ? 'result' : 'home';
     // @v1.0.1 — 카메라 모드: 광고 show 전에 resultState 미리 세팅.
     // 광고 오버레이 뒤에서 카메라가 unmount되어, 광고 닫힐 때 카메라가 순간 보이는 현상 방지.
-    if (dismissMethod === 'camera') {
+    // math/typing 측 동일 = 광고 닫힘 후 잠시 미션 화면 영역 노출 회피 강제.
+    if (showsResultScreen) {
       setResultState(result);
     }
     // v1.7 hotfix H1 — module-level interstitialLoaded 측 검사 (= preload 영역 정합).
@@ -960,9 +968,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     thresholdSV.value = MISSION_CONFIDENCE_OVERRIDE[currentMission] ?? TARGET_CONFIDENCE;
   }, [currentMission, targetLabelsSV, thresholdSV]);
 
-  // v1.5 카운트다운 (camera 미션만, 슬롯머신 중엔 일시정지)
+  // v1.5 카운트다운 (camera 미션 / math / typing — missionDuration 측 카운트다운 정합).
+  // 슬롯머신 중엔 일시정지 (= camera 측만 해당). math/typing = 슬롯머신 영역 ❌.
   useEffect(() => {
-    if (dismissMethod !== 'camera') return;
+    if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (isShuffling) return;
@@ -973,6 +982,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dismissMethod, resultState, isRetryBannerVisible, isShuffling]);
+
+  // v1.8 math/typing 미션 만료 처리 — missionDuration 도달 시 즉시 fail (= 재시도 ❌, camera 재시도 패턴과 분리).
+  useEffect(() => {
+    if (dismissMethod !== 'math' && dismissMethod !== 'typing') return;
+    if (resultState !== 'idle') return;
+    if (remainingMs > 0) return;
+    enterResult('fail');
+  }, [dismissMethod, resultState, remainingMs, enterResult]);
 
   // v1.5 만료 처리 (setTimeout useRef로 취소 버그 방지)
   useEffect(() => {
@@ -1137,11 +1154,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
     );
   }
 
-  // Math 모드 레이아웃 (= 산수 미션). 정답 시 enterResult('success') 호출.
+  // Math 모드 레이아웃 (= 산수 미션 3문제). 마지막 정답 시 enterResult('success') 호출.
   if (dismissMethod === 'math') {
     return (
       <View style={{ flex: 1 }}>
-        <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} />
+        <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} remainingMs={remainingMs} />
         <AdBanner />
       </View>
     );
@@ -1151,7 +1168,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'typing') {
     return (
       <View style={{ flex: 1 }}>
-        <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} />
+        <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} remainingMs={remainingMs} />
         <AdBanner />
       </View>
     );

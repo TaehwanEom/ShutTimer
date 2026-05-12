@@ -38,7 +38,8 @@ import {
   stopRoutine,
 } from '../utils/routineController';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
-import { SETTINGS_KEY } from '../constants/settings';
+import { SETTINGS_KEY, DEFAULT_SETTINGS } from '../constants/settings';
+import { getCachedDismissMethod } from '../utils/settingsCache';
 
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 
@@ -158,7 +159,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
               navigation.navigate('Alarm', {
                 fromRoutine: 'last_step',
                 routineId: r.routine.id,
-                endMethod: r.routine.endMethod,
+                endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
               });
             }
           } else {
@@ -197,7 +198,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
         navigation.navigate('Alarm', {
           fromRoutine: 'last_step',
           routineId: routine.id,
-          endMethod: routine.endMethod,
+          endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
         });
       }
       return;
@@ -387,7 +388,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
             navigation.navigate('Alarm', {
               fromRoutine: 'last_step',
               routineId: res.routine.id,
-              endMethod: res.routine.endMethod,
+              endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
             });
           }
           return;
@@ -535,7 +536,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   // 흔들기 감지 — v1.6 A-1: 모달 통일 후 'next' 단계 안에서 흔들기 = 자동 진행 트리거.
   // 일반 step = "다음 루틴 시작" 누른 효과. 마지막 step = "루틴 완료" 누른 효과 (handleStartNext 가 'end' 분기 → onClose).
   useEffect(() => {
-    if (!modalVisible || modalStage !== 'next' || !routine || routine.endMethod !== 'shake') return;
+    if (!modalVisible || modalStage !== 'next' || !routine || (getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod) !== 'shake') return;
     shakeCountRef.current = 0;
     lastShakeTimeRef.current = 0;
     Accelerometer.setUpdateInterval(100);
@@ -762,7 +763,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
                 >
                   {routine.steps[ar.currentStepIndex]?.name ?? ''}
                 </Text>
-                {routine.endMethod === 'shake' ? (
+                {(getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod) === 'shake' ? (
                   <Text style={{ fontSize: 14, color: colors.secondary, fontWeight: '700', marginBottom: 12 }}>
                     흔들어서 계속
                   </Text>

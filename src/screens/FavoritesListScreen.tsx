@@ -135,7 +135,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
             width: 56,
             height: 56,
             borderRadius: 28,
-            backgroundColor: colors.error,
+            backgroundColor: colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
           }}

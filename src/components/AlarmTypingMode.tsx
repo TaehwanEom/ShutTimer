@@ -12,6 +12,7 @@ import {
   Platform,
   Animated,
   ScrollView,
+  Vibration,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeColors } from '../constants/theme';
@@ -26,11 +27,20 @@ type Props = {
   t: (key: string, opts?: any) => string;
   locale: string;
   onSuccess: () => void;
+  /** 남은 시간 ms. props 없으면 표시 안 함. AlarmScreen 측만 전달. */
+  remainingMs?: number;
 };
 
 const TOTAL_PROBLEMS = 3;
 
-export default function AlarmTypingMode({ colors, t, locale, onSuccess }: Props) {
+function formatRemaining(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainingMs }: Props) {
   const [problems, setProblems] = useState<TypingProblem[]>(() => generateTypingProblems(locale, TOTAL_PROBLEMS));
   const [currentIdx, setCurrentIdx] = useState(0);
   const [input, setInput] = useState('');
@@ -69,7 +79,8 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess }: Props)
       setInput('');
       return;
     }
-    // 오답 = 새 문제 출제 (= 현재 idx 위치만 교체, 진행도 유지).
+    // 오답 = 새 문제 출제 (= 현재 idx 위치만 교체, 진행도 유지) + 진동 피드백.
+    Vibration.vibrate();
     const replacement = generateTypingProblems(locale, 1)[0];
     setProblems(prev => prev.map((p, i) => (i === currentIdx ? replacement : p)));
     setInput('');
@@ -81,23 +92,52 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess }: Props)
     outputRange: [-12, 12],
   });
 
+  // v1.8 — 실시간 피드백. input 글자별 = 정답 측 동일 idx 영역 비교 → 연두 / 빨강.
+  // 공백 / 대소문자 무시 (= 정답 체크 측과 동일).
+  const charColors: string[] = (() => {
+    if (!input || !current) return [];
+    const norm = (c: string) => c.toLowerCase().replace(/\s/g, '');
+    const nTarget = norm(current.text);
+    const colors: string[] = [];
+    let targetIdx = 0;
+    for (let i = 0; i < input.length; i++) {
+      const inputCh = input[i];
+      const nInputCh = norm(inputCh);
+      if (nInputCh === '') {
+        colors.push('#ffffff');
+        continue;
+      }
+      if (targetIdx >= nTarget.length) {
+        colors.push('#ff6b6b');
+        targetIdx += 1;
+        continue;
+      }
+      if (nInputCh === nTarget[targetIdx]) {
+        colors.push('#2bf213'); // 연두 = 정확 일치 (= Tailwind green-400)
+      } else {
+        colors.push('#ff6b6b');
+      }
+      targetIdx += 1;
+    }
+    return colors;
+  })();
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>ShutTimer</Text>
+      <View style={styles.topBar}>
+        <Text style={styles.brand}>ShutTimer</Text>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.centerSection}>
-            <View style={styles.iconWrapper}>
-              <MaterialIcons name="keyboard" size={56} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-            </View>
+            {typeof remainingMs === 'number' && (
+              <Text style={styles.timer}>{formatRemaining(remainingMs)}</Text>
+            )}
             <Text style={styles.title}>{t('alarm.typingTitle', { defaultValue: '받아쓰기 미션' })}</Text>
             <Text style={styles.subtitle}>
               {t('alarm.typingInstruction', { defaultValue: '화면의 글자를 그대로 입력하세요' })}
             </Text>
-
             <View style={styles.progressRow}>
               {[0, 1, 2].map(i => (
                 <View
@@ -120,21 +160,35 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess }: Props)
               </Text>
             </Animated.View>
 
-            <TextInput
-              ref={inputRef}
-              style={styles.input}
-              value={input}
-              onChangeText={setInput}
-              placeholder={t('alarm.typingPlaceholder', { defaultValue: '여기에 입력' })}
-              placeholderTextColor="rgba(255,255,255,0.5)"
-              autoCorrect={false}
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              onSubmitEditing={handleSubmit}
-              returnKeyType="done"
-              blurOnSubmit={false}
-            />
+            {/* TextInput 측 = 글자별 색 = React Native 측 children 영역 동작 ❌ 영역.
+                대안 = TextInput color transparent + 별도 Text overlay = 글자별 색 영역. */}
+            <View style={styles.inputWrap}>
+              <TextInput
+                ref={inputRef}
+                style={[styles.input, { color: 'transparent' }]}
+                value={input}
+                onChangeText={setInput}
+                placeholder={input.length === 0 ? t('alarm.typingPlaceholder', { defaultValue: '여기에 입력' }) : ''}
+                placeholderTextColor="rgba(255,255,255,0.5)"
+                selectionColor={colors.onPrimary}
+                autoCorrect={false}
+                autoCapitalize="none"
+                autoComplete="off"
+                spellCheck={false}
+                onSubmitEditing={handleSubmit}
+                returnKeyType="done"
+                blurOnSubmit={false}
+              />
+              {input.length > 0 && (
+                <View pointerEvents="none" style={styles.overlay}>
+                  {Array.from(input).map((ch, i) => (
+                    <Text key={i} style={[styles.overlayChar, { color: charColors[i] ?? '#ffffff' }]}>
+                      {ch}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} activeOpacity={0.8}>
               <Text style={styles.submitText}>{t('alarm.typingSubmit', { defaultValue: '확인' })}</Text>
@@ -148,26 +202,34 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess }: Props)
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primary },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 4,
   },
-  headerTitle: {
+  brand: {
     fontSize: 22,
     fontWeight: '800',
     color: colors.onPrimary,
     letterSpacing: -0.5,
   },
+  timer: {
+    fontSize: 64,
+    fontWeight: '900',
+    color: colors.onPrimary,
+    letterSpacing: -1,
+    fontVariant: ['tabular-nums'],
+    marginBottom: 4,
+  },
   centerSection: {
     alignItems: 'center',
-    paddingTop: 24,
+    paddingTop: 10,
     paddingHorizontal: 24,
-    gap: 12,
+    gap: 8,
   },
-  iconWrapper: { marginBottom: 4 },
   title: {
     fontSize: 22,
     fontWeight: '800',
@@ -223,9 +285,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 1,
     textAlign: 'center',
   },
-  input: {
+  inputWrap: {
     marginTop: 8,
     width: '85%',
+    position: 'relative',
+  },
+  input: {
+    width: '100%',
     paddingVertical: 14,
     paddingHorizontal: 18,
     fontSize: 22,
@@ -234,6 +300,22 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.22)',
     borderRadius: 12,
     textAlign: 'center',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+  },
+  overlayChar: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 0,
   },
   submitButton: {
     marginTop: 12,

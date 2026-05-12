@@ -33,6 +33,7 @@ import { stopRoutine } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import { incrementAlarmSuccessCount, maybeRequestReview } from '../utils/storeReview';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -474,6 +475,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const enterResult = useCallback(async (result: 'success' | 'fail') => {
     if (resultEnteredRef.current) return;
     resultEnteredRef.current = true;
+    // v1.8 #StoreReview — 알람 미션 성공 시 카운터 증가 + 트리거 조건 만족 시 별점 요청 (= fire-and-forget, 핵심 흐름 영향 ❌)
+    if (result === 'success') {
+      incrementAlarmSuccessCount()
+        .then(() => maybeRequestReview())
+        .catch((e) => Logger.warn('StoreReview', `enterResult flow failed: ${String(e)}`));
+    }
     // cancel/dismiss/sound stop 완료 후 광고/네비게이션 진행 (race 방지)
     await stopAudioAndVibration();
     pendingResultRef.current = result;

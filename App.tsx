@@ -54,6 +54,7 @@ import {
   cleanupGhostAlarms,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
+import { recordInstallDateIfNeeded } from './src/utils/storeReview';
 /*
   ═══════════════════════════════════════════════════════════
    @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
@@ -775,6 +776,10 @@ function AppNavigator() {
     // v1.7 Phase 2-A — 시작 시 잔존 ad-hoc routine (= 비정상 종료 / 다른 알람 fire 안 함) 정리.
     cleanupStaleAdhocRoutines().catch((e) => {
       Logger.warn('AppNavigator', `cleanupStaleAdhocRoutines failed: ${e}`);
+    });
+    // v1.8 #StoreReview — 첫 실행 시 install date 기록 (= 별점 요청 트리거 영역 = 3일 + 성공 5회 동시 만족 시)
+    recordInstallDateIfNeeded().catch((e) => {
+      Logger.warn('AppNavigator', `recordInstallDateIfNeeded failed: ${e}`);
     });
     // 콜드 스타트 복원 — 약간 지연 후 navigationRef 준비되면 분기
     const timer = setTimeout(() => {

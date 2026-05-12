@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}}ステップ",
     "mathTitle": "算数ミッション",
-    "mathInstruction": "問題を解いてアラームを止めてください"
+    "mathInstruction": "問題を解いてアラームを止めてください",
+    "typingTitle": "タイピングミッション",
+    "typingInstruction": "画面の文字をそのまま入力",
+    "typingPlaceholder": "ここに入力",
+    "typingSubmit": "確認"
   },
   "addTimer": {
     "editTitle": "お気に入り編集",
@@ -200,7 +204,9 @@
     "math": "算数",
     "mathDesc": "簡単な算数を解いてアラームを止める",
     "random": "ランダム",
-    "randomDesc": "タップ/振る/カメラ/算数からランダムに1つ"
+    "randomDesc": "タップ/振る/カメラ/算数からランダムに1つ",
+    "typing": "タイピング",
+    "typingDesc": "単語と数字3つを正確に入力すると終了"
   },
   "missions": {
     "boy": "人",

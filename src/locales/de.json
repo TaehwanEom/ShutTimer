@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} Schritte",
     "mathTitle": "Rechen-Mission",
-    "mathInstruction": "Löse die Aufgabe, um den Wecker zu beenden"
+    "mathInstruction": "Löse die Aufgabe, um den Wecker zu beenden",
+    "typingTitle": "Tipp-Mission",
+    "typingInstruction": "Den Text auf dem Bildschirm exakt eingeben",
+    "typingPlaceholder": "Hier eingeben",
+    "typingSubmit": "Bestätigen"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -200,7 +204,9 @@
     "math": "Rechnen",
     "mathDesc": "Eine einfache Rechenaufgabe lösen, um den Wecker zu stoppen",
     "random": "Zufall",
-    "randomDesc": "Zufällig aus Tippen/Schütteln/Kamera/Rechnen"
+    "randomDesc": "Zufällig aus Tippen/Schütteln/Kamera/Rechnen",
+    "typing": "Tippen",
+    "typingDesc": "3 Wörter/Zahlen korrekt eingeben zum Beenden"
   },
   "missions": {
     "boy": "Person",

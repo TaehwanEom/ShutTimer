@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} passi",
     "mathTitle": "Missione matematica",
-    "mathInstruction": "Risolvi il problema per spegnere la sveglia"
+    "mathInstruction": "Risolvi il problema per spegnere la sveglia",
+    "typingTitle": "Missione digitazione",
+    "typingInstruction": "Digita il testo sullo schermo esattamente",
+    "typingPlaceholder": "Digita qui",
+    "typingSubmit": "Conferma"
   },
   "addTimer": {
     "editTitle": "Modifica preferito",
@@ -200,7 +204,9 @@
     "math": "Matematica",
     "mathDesc": "Risolvi un problema matematico semplice per spegnere la sveglia",
     "random": "Casuale",
-    "randomDesc": "Casuale tra tocco/scuoti/fotocamera/matematica"
+    "randomDesc": "Casuale tra tocco/scuoti/fotocamera/matematica",
+    "typing": "Digitazione",
+    "typingDesc": "Digita 3 parole/numeri correttamente per spegnere"
   },
   "missions": {
     "boy": "Persona",

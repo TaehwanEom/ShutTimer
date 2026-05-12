@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} steps",
     "mathTitle": "Math Mission",
-    "mathInstruction": "Solve the problem to dismiss the alarm"
+    "mathInstruction": "Solve the problem to dismiss the alarm",
+    "typingTitle": "Typing Mission",
+    "typingInstruction": "Type the text on screen exactly",
+    "typingPlaceholder": "Type here",
+    "typingSubmit": "Submit"
   },
   "addTimer": {
     "editTitle": "Edit Favorite",
@@ -200,7 +204,9 @@
     "math": "Math",
     "mathDesc": "Solve a simple math problem to dismiss",
     "random": "Random",
-    "randomDesc": "Random pick from tap/shake/camera/math"
+    "randomDesc": "Random pick from tap/shake/camera/math",
+    "typing": "Typing",
+    "typingDesc": "Type 3 words/numbers correctly to dismiss"
   },
   "missions": {
     "boy": "Person",

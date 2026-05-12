@@ -43,6 +43,7 @@ import { MISSION_EMOJI, MISSION_POOL, MISSION_LABEL, MISSION_COCO_LABELS, MISSIO
 // import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
 import AlarmMathMode from '../components/AlarmMathMode';
+import AlarmTypingMode from '../components/AlarmTypingMode';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 
@@ -146,6 +147,7 @@ const AUTO_DISMISS_MS: Record<string, number> = {
   tap: 5 * 60 * 1000,
   shake: 5 * 60 * 1000,
   math: 5 * 60 * 1000,
+  typing: 5 * 60 * 1000,
 };
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
 const RESULT_BG = {
@@ -154,7 +156,7 @@ const RESULT_BG = {
 };
 
 export default function AlarmScreen({ navigation, route }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { width: screenW } = useWindowDimensions();
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree } = usePurchase();
@@ -214,9 +216,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(() => {
     const raw = ((route.params as { endMethod?: DismissMethod } | undefined)?.endMethod) ??
       getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod;
-    // v1.7 — 'random' 선택 시 mount 시점에 4개 (tap/shake/camera/math) 중 1개 즉시 선택.
+    // v1.7 — 'random' 선택 시 mount 시점에 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택.
     if (raw === 'random') {
-      const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math'];
+      const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
       return options[Math.floor(Math.random() * options.length)];
     }
     return raw;
@@ -596,9 +598,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
       // v1.6 #12 — routine 마지막 step 진입 시 settingsCache override ❌ (route.params.endMethod 우선).
       const routeEndMethod = (route.params as { endMethod?: DismissMethod } | undefined)?.endMethod;
       if (method && !routeEndMethod) {
-        // v1.7 — 'random' 저장값 = 4개 중 1개 즉시 선택 (= 매번 다른 미션).
+        // v1.7 — 'random' 저장값 = 5개 중 1개 즉시 선택 (= 매번 다른 미션).
         if (method === 'random') {
-          const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math'];
+          const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
           setDismissMethod(options[Math.floor(Math.random() * options.length)]);
         } else {
           setDismissMethod(method);
@@ -1140,6 +1142,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     return (
       <View style={{ flex: 1 }}>
         <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} />
+        <AdBanner />
+      </View>
+    );
+  }
+
+  // Typing 모드 레이아웃 (= 받아쓰기 미션 3문제). 마지막 정답 시 enterResult('success') 호출.
+  if (dismissMethod === 'typing') {
+    return (
+      <View style={{ flex: 1 }}>
+        <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} />
         <AdBanner />
       </View>
     );

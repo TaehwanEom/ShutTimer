@@ -45,6 +45,7 @@ import { MISSION_POOL, MISSION_EMOJI, MISSION_LABEL, MISSION_COCO_LABELS, MISSIO
 import { useSharedValue } from 'react-native-worklets-core';
 import AlarmCameraMode from './AlarmCameraMode';
 import AlarmMathMode from '../components/AlarmMathMode';
+import AlarmTypingMode from '../components/AlarmTypingMode';
 import type { Detection } from '../utils/objectDetection';
 import { SETTINGS_KEY } from '../constants/settings';
 import { Logger } from '../utils/logger';
@@ -70,7 +71,7 @@ const ROUTINE_CAMERA_DURATION_SEC = 30; // routine 카메라 미션 시간 (Alar
 
 export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const styles = makeStyles(colors);
 
   const [routine, setRoutine] = useState<Routine | null>(null);
@@ -158,17 +159,22 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         return;
       }
 
-      // 이중 가드 — endMethod !== 'camera' && !== 'math' && !== 'random' 면 RoutineList 로 redirect (inline 진행).
+      // 이중 가드 — endMethod !== 'camera' && !== 'math' && !== 'typing' && !== 'random' 면 RoutineList 로 redirect (inline 진행).
       // (App.tsx 알림 핸들러/콜드 스타트가 이미 분기하지만, 예측 못한 경로 fallback)
-      if (original.endMethod !== 'camera' && original.endMethod !== 'math' && original.endMethod !== 'random') {
+      if (
+        original.endMethod !== 'camera' &&
+        original.endMethod !== 'math' &&
+        original.endMethod !== 'typing' &&
+        original.endMethod !== 'random'
+      ) {
         navigation.replace('RoutineList');
         return;
       }
 
-      // v1.7 — 'random' 영역 = 4개 (tap/shake/camera/math) 중 1개 즉시 선택. 매 발화 다름.
+      // v1.7 — 'random' 영역 = 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택. 매 발화 다름.
       let target: Routine = original;
       if (original.endMethod === 'random') {
-        const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math'];
+        const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
         const pick = options[Math.floor(Math.random() * options.length)];
         target = { ...original, endMethod: pick };
       }
@@ -643,6 +649,13 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       return (
         <View style={{ flex: 1 }}>
           <AlarmMathMode colors={colors} t={t} onSuccess={handleDismiss} />
+        </View>
+      );
+    }
+    if (routine.endMethod === 'typing') {
+      return (
+        <View style={{ flex: 1 }}>
+          <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={handleDismiss} />
         </View>
       );
     }

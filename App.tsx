@@ -81,7 +81,7 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
-  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' | 'math' | 'random'; alarmEntityId?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random'; alarmEntityId?: string } | undefined;
   Settings: undefined;
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;

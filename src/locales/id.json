@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} langkah",
     "mathTitle": "Misi Matematika",
-    "mathInstruction": "Selesaikan soal untuk mematikan alarm"
+    "mathInstruction": "Selesaikan soal untuk mematikan alarm",
+    "typingTitle": "Misi Mengetik",
+    "typingInstruction": "Ketik teks di layar persis sama",
+    "typingPlaceholder": "Ketik di sini",
+    "typingSubmit": "Konfirmasi"
   },
   "addTimer": {
     "editTitle": "Edit Favorit",
@@ -200,7 +204,9 @@
     "math": "Matematika",
     "mathDesc": "Selesaikan soal matematika sederhana untuk mematikan alarm",
     "random": "Acak",
-    "randomDesc": "Acak dari ketuk/goyang/kamera/matematika"
+    "randomDesc": "Acak dari ketuk/goyang/kamera/matematika",
+    "typing": "Mengetik",
+    "typingDesc": "Ketik 3 kata/angka dengan benar untuk mematikan"
   },
   "missions": {
     "boy": "Orang",

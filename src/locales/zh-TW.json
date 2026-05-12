@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}}步",
     "mathTitle": "算術任務",
-    "mathInstruction": "解題以關閉鬧鐘"
+    "mathInstruction": "解題以關閉鬧鐘",
+    "typingTitle": "打字任務",
+    "typingInstruction": "準確輸入螢幕上的文字",
+    "typingPlaceholder": "在此輸入",
+    "typingSubmit": "確認"
   },
   "addTimer": {
     "editTitle": "編輯收藏",
@@ -200,7 +204,9 @@
     "math": "算術",
     "mathDesc": "解決簡單的算術題來關閉鬧鐘",
     "random": "隨機",
-    "randomDesc": "從點擊/搖動/相機/算術中隨機選擇"
+    "randomDesc": "從點擊/搖動/相機/算術中隨機選擇",
+    "typing": "打字",
+    "typingDesc": "正確輸入3個單詞/數字以關閉"
   },
   "missions": {
     "boy": "人",

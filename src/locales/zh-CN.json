@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}}步",
     "mathTitle": "算术任务",
-    "mathInstruction": "解题以关闭闹钟"
+    "mathInstruction": "解题以关闭闹钟",
+    "typingTitle": "打字任务",
+    "typingInstruction": "准确输入屏幕上的文字",
+    "typingPlaceholder": "在此输入",
+    "typingSubmit": "确认"
   },
   "addTimer": {
     "editTitle": "编辑收藏",
@@ -200,7 +204,9 @@
     "math": "算术",
     "mathDesc": "解决简单的算术题来关闭闹钟",
     "random": "随机",
-    "randomDesc": "从点击/摇动/相机/算术中随机选择"
+    "randomDesc": "从点击/摇动/相机/算术中随机选择",
+    "typing": "打字",
+    "typingDesc": "正确输入3个单词/数字以关闭"
   },
   "missions": {
     "boy": "人",

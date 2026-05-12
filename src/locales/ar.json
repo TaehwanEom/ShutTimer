@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} خطوات",
     "mathTitle": "مهمة الحساب",
-    "mathInstruction": "حل المسألة لإيقاف المنبه"
+    "mathInstruction": "حل المسألة لإيقاف المنبه",
+    "typingTitle": "مهمة الكتابة",
+    "typingInstruction": "اكتب النص على الشاشة تماماً",
+    "typingPlaceholder": "اكتب هنا",
+    "typingSubmit": "تأكيد"
   },
   "addTimer": {
     "editTitle": "تعديل المفضلة",
@@ -200,7 +204,9 @@
     "math": "حساب",
     "mathDesc": "حل مسألة حسابية بسيطة لإيقاف المنبه",
     "random": "عشوائي",
-    "randomDesc": "اختيار عشوائي من نقر/هز/كاميرا/حساب"
+    "randomDesc": "اختيار عشوائي من نقر/هز/كاميرا/حساب",
+    "typing": "كتابة",
+    "typingDesc": "اكتب 3 كلمات/أرقام بشكل صحيح للإيقاف"
   },
   "missions": {
     "boy": "شخص",

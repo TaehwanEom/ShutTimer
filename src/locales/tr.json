@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} adım",
     "mathTitle": "Matematik Görevi",
-    "mathInstruction": "Alarmı kapatmak için problemi çözün"
+    "mathInstruction": "Alarmı kapatmak için problemi çözün",
+    "typingTitle": "Yazma Görevi",
+    "typingInstruction": "Ekrandaki metni aynen yazın",
+    "typingPlaceholder": "Buraya yazın",
+    "typingSubmit": "Onayla"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -200,7 +204,9 @@
     "math": "Matematik",
     "mathDesc": "Alarmı kapatmak için basit bir matematik problemi çözün",
     "random": "Rastgele",
-    "randomDesc": "Dokun/salla/kamera/matematik arasından rastgele"
+    "randomDesc": "Dokun/salla/kamera/matematik arasından rastgele",
+    "typing": "Yazma",
+    "typingDesc": "Kapatmak için 3 kelime/sayıyı doğru yazın"
   },
   "missions": {
     "boy": "Kişi",

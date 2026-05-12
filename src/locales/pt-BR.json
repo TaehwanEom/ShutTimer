@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} etapas",
     "mathTitle": "Missão matemática",
-    "mathInstruction": "Resolva o problema para desligar o alarme"
+    "mathInstruction": "Resolva o problema para desligar o alarme",
+    "typingTitle": "Missão de digitação",
+    "typingInstruction": "Digite o texto na tela exatamente",
+    "typingPlaceholder": "Digite aqui",
+    "typingSubmit": "Confirmar"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -200,7 +204,9 @@
     "math": "Matemática",
     "mathDesc": "Resolva um problema matemático simples para desligar o alarme",
     "random": "Aleatório",
-    "randomDesc": "Aleatório entre toque/sacudir/câmera/matemática"
+    "randomDesc": "Aleatório entre toque/sacudir/câmera/matemática",
+    "typing": "Digitação",
+    "typingDesc": "Digite 3 palavras/números corretamente para desligar"
   },
   "missions": {
     "boy": "Pessoa",

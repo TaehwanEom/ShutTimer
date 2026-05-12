@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}}단계",
     "mathTitle": "산수 미션",
-    "mathInstruction": "문제를 풀어 알람을 꺼주세요"
+    "mathInstruction": "문제를 풀어 알람을 꺼주세요",
+    "typingTitle": "받아쓰기 미션",
+    "typingInstruction": "화면의 글자를 그대로 입력하세요",
+    "typingPlaceholder": "여기에 입력",
+    "typingSubmit": "확인"
   },
   "addTimer": {
     "editTitle": "즐겨찾기 편집",
@@ -200,7 +204,9 @@
     "math": "산수",
     "mathDesc": "간단한 산수 문제를 풀어 알람을 끕니다",
     "random": "랜덤",
-    "randomDesc": "탭/흔들기/사진/산수 중 무작위로 1개 출제"
+    "randomDesc": "탭/흔들기/사진/산수 중 무작위로 1개 출제",
+    "typing": "받아쓰기",
+    "typingDesc": "단어와 숫자 3개를 정확히 입력하면 종료"
   },
   "missions": {
     "boy": "사람",

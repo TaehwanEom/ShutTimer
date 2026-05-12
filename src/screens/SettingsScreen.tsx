@@ -46,6 +46,7 @@ const DISMISS_OPTIONS: { value: DismissMethod; labelKey: string; icon: string; d
   { value: 'tap', labelKey: 'settings.tap', icon: 'touch-app', descKey: 'settings.tapDesc' },
   { value: 'shake', labelKey: 'settings.shake', icon: 'vibration', descKey: 'settings.shakeDesc' },
   { value: 'math', labelKey: 'settings.math', icon: 'calculate', descKey: 'settings.mathDesc' },
+  { value: 'typing', labelKey: 'settings.typing', icon: 'keyboard', descKey: 'settings.typingDesc' },
   { value: 'random', labelKey: 'settings.random', icon: 'shuffle', descKey: 'settings.randomDesc' },
 ];
 

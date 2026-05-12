@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} étapes",
     "mathTitle": "Mission calcul",
-    "mathInstruction": "Résolvez le problème pour arrêter l'alarme"
+    "mathInstruction": "Résolvez le problème pour arrêter l'alarme",
+    "typingTitle": "Mission de saisie",
+    "typingInstruction": "Tapez le texte affiché exactement",
+    "typingPlaceholder": "Tapez ici",
+    "typingSubmit": "Confirmer"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",
@@ -200,7 +204,9 @@
     "math": "Calcul",
     "mathDesc": "Résolvez un problème mathématique simple pour arrêter l'alarme",
     "random": "Aléatoire",
-    "randomDesc": "Aléatoire parmi toucher/secouer/caméra/calcul"
+    "randomDesc": "Aléatoire parmi toucher/secouer/caméra/calcul",
+    "typing": "Saisie",
+    "typingDesc": "Tapez 3 mots/chiffres correctement pour arrêter"
   },
   "missions": {
     "boy": "Personne",

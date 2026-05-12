@@ -148,7 +148,11 @@
     },
     "stepBadge": "{{count}} pasos",
     "mathTitle": "Misión matemática",
-    "mathInstruction": "Resuelve el problema para apagar la alarma"
+    "mathInstruction": "Resuelve el problema para apagar la alarma",
+    "typingTitle": "Misión de escritura",
+    "typingInstruction": "Escribe el texto en pantalla exactamente",
+    "typingPlaceholder": "Escribe aquí",
+    "typingSubmit": "Confirmar"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -200,7 +204,9 @@
     "math": "Matemáticas",
     "mathDesc": "Resuelve un problema matemático simple para apagar la alarma",
     "random": "Aleatorio",
-    "randomDesc": "Aleatorio entre toque/sacudir/cámara/matemáticas"
+    "randomDesc": "Aleatorio entre toque/sacudir/cámara/matemáticas",
+    "typing": "Escribir",
+    "typingDesc": "Escribe 3 palabras/números correctamente para apagar"
   },
   "missions": {
     "boy": "Persona",

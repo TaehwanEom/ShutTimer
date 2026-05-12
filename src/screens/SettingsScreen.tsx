@@ -85,6 +85,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
+    paddingTop: 16,
     paddingBottom: 48,
     gap: 32,
   },

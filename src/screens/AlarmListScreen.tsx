@@ -742,8 +742,7 @@ const makeStyles = (colors: ThemeColors) => {
       paddingBottom: 8,
     },
     emptyContent: {
-      flexGrow: 1,
-      justifyContent: 'center',
+      paddingTop: 80,
       alignItems: 'center',
     },
     itemTime: {

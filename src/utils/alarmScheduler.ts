@@ -161,6 +161,10 @@ export async function cancelAlarm(alarmKitId: string): Promise<void> {
 /**
  * 특정 alarm entity 측 등록된 모든 AlarmKit alarm cancel + metadata 삭제.
  * mapping table 측 entityId 매칭으로 검출.
+ * v1.8 #OnceAutoDisable — cancel 루프 후 = 'once' 알람 측 자동 disable (= 회귀 정정).
+ *   직전 = lazy chain 측 disableOnceAlarmIfNeeded 측 위치 이동 → dismiss 경로 측 호출 ❌ 회귀.
+ *   정정 = cancelAlarmsForEntity 측 = 모든 dismiss 경로 측 단일 funnel → 본 위치 측 disableOnce 추가.
+ *   edit 경로 측 = cancel → upsertAlarm (= 사용자 enabled 측 덮어쓰기) → schedule 순서 측 = 회귀 ❌.
  */
 export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void> {
   const all = await listAllAlarmMetadata();
@@ -170,6 +174,7 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   for (const meta of targets) {
     await cancelAlarm(meta.alarmId);
   }
+  await disableOnceAlarmIfNeeded(alarmEntityId).catch(() => {});
 }
 
 /**

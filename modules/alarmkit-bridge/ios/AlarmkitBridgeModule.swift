@@ -260,7 +260,19 @@ public class AlarmkitBridgeModule: Module {
       // AlarmManager.pause(id:) = countdown state alarm 만 호환 (Apple 공식). fixed schedule = scheduled state = throw.
       // 모든 분기 .timer(duration:) + Countdown/Paused presentation 통일.
       let nowMsAll = Date().timeIntervalSince1970 * 1000.0
-      let durationSecAll = max(0.001, (params.fireAt - nowMsAll) / 1000.0)
+      let durationRawAll = (params.fireAt - nowMsAll) / 1000.0
+      // v1.8 #StaleFireAt — stale fireAt 측 silent fail 정정. 직전 = max(0.001, ...) 측 = 과거 fireAt 측 0.001s fallback
+      //   → .timer(duration: 0.001) 측 즉시 fire + 사용자분 측 못 들음 (= 가설 B root cause).
+      //   정정 = durationRaw ≤ 0 시 = throw + WARN log. JS 측 catch → 다음 occurrence 재계산 또는 silent skip.
+      if durationRawAll <= 0 {
+        appendNativeDbg("AlarmKit-DBG-WARN", "stale fireAt entityId=\(params.entityId) type=\(params.type ?? "?") durationSec=\(durationRawAll) fireAt=\(params.fireAt) now=\(nowMsAll)")
+        throw NSError(
+          domain: "AlarmkitBridge",
+          code: 5,
+          userInfo: [NSLocalizedDescriptionKey: "stale fireAt: durationSec=\(durationRawAll)"]
+        )
+      }
+      let durationSecAll = durationRawAll
       let pauseButtonAll = AlarmButton(
         text: LocalizedStringResource(stringLiteral: "일시정지"),
         textColor: .white,

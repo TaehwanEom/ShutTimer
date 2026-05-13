@@ -58,28 +58,39 @@ async function resolveSoundName(): Promise<string | undefined> {
 // ─── 스케줄링 ────────────────────────────────────────────
 
 /**
- * 알람 entity 측 AlarmKit 등록.
+ * v1.8 #AlarmRepeat — 알람 entity 측 AlarmKit 등록 + 2분 간격 chain 강제.
  * iOS 26+ + authorized 시만 진입. 그 외 = silent skip (= AlarmListScreen 측 Platform 분기 정합).
  *
- * recurrence 옵션:
- *   - repeat='once' → recurrence 미전달 = .timer(duration:) 분기 (= 단발)
- *   - repeat='daily' → recurrence: { mode: 'daily' } = .alarm(schedule:) + .relative(.weekly(7요일))
- *   - repeat='weekly' → recurrence: { mode: 'weekly', days: alarm.days } = .alarm(schedule:) + .relative(.weekly(선택 요일))
+ * 정책 (= 사용자분 측 명시 v1.8).
+ *   - OS 자체 반복 (= .alarm(schedule:)) 폐기. 모든 repeat 측 .timer(duration:) chain 통일.
+ *   - 활성 알람 갯수 측 → chain 갯수 동적 분배 (총 100분 = 50개 max).
+ *   - 1개 활성 → 50 chain (100분), 2개 활성 → 25 chain (50분), 10개 활성 → 5 chain (10분).
+ *   - 사용자분 측 dismiss → cancelAlarmsForEntity 측 = mapping table 측 entityId 동일 chain 일괄 cancel.
+ *   - daily/weekly 다음 occurrence 재예약 측 = 콜드 스타트 측 syncAllAlarms 측 정합 (= 매 기동 시 재예약).
+ *
+ * @returns 첫 chain alarm ID (= 호출처 호환). chain 전체 ID 측 = mapping table 측 entityId 측 lookup.
  */
+const CHAIN_INTERVAL_MS = 120000; // 2분
+const CHAIN_TOTAL_BUDGET = 50; // 100분 / 2분
+
 export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   if (!alarm.enabled) return null;
   if (!(await isAlarmKitReady())) return null;
 
-  const fireAt = nextAlarmOccurrenceTime(alarm);
-  if (fireAt === null) return null;
+  const baseFireAt = nextAlarmOccurrenceTime(alarm);
+  if (baseFireAt === null) return null;
+
+  // v1.8 #AlarmRepeat — 활성 알람 갯수 측 chain 동적 분배.
+  const all = await loadAlarms();
+  const activeCount = Math.max(1, all.filter(a => a.enabled).length);
+  const chainCount = Math.max(1, Math.min(CHAIN_TOTAL_BUDGET, Math.floor(CHAIN_TOTAL_BUDGET / activeCount)));
 
   const soundName = await resolveSoundName();
   // v1.7 hotfix Phase 12 G6sub2 — alarm.soundKey 측 폐기 + 매번 설정 사운드 read.
-  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundName=${soundName ?? '(undefined)'} (= 매번 설정 사운드 read)`);
+  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundName=${soundName ?? '(undefined)'} activeCount=${activeCount} chainCount=${chainCount}`);
   const title = alarm.label || '알람';
 
   // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.
-  //   알람 = 단순 영역 (= 1 step), routineName = label 영역.
   const laMeta = {
     laStepName: title,
     laStepIndex: 0,
@@ -88,10 +99,12 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
     laRoutineId: alarm.id,
     laRoutineName: title,
   } as const;
-  try {
-    let id: string;
-    if (alarm.repeat === 'once') {
-      id = await AlarmkitBridge.scheduleAlarm({
+
+  let firstId: string | null = null;
+  for (let i = 0; i < chainCount; i++) {
+    const fireAt = baseFireAt + i * CHAIN_INTERVAL_MS;
+    try {
+      const id = await AlarmkitBridge.scheduleAlarm({
         entityId: alarm.id,
         title,
         fireAt,
@@ -99,31 +112,19 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
         soundName,
         ...laMeta,
       });
-    } else {
-      id = await AlarmkitBridge.scheduleAlarm({
-        entityId: alarm.id,
-        title,
-        fireAt,
+      if (!id) continue;
+      await saveAlarmMetadata({
+        alarmId: id,
         type: 'alarm_main',
-        soundName,
-        recurrence:
-          alarm.repeat === 'daily'
-            ? { mode: 'daily' }
-            : { mode: 'weekly', days: alarm.days },
-        ...laMeta,
+        entityId: alarm.id,
       });
+      if (firstId === null) firstId = id;
+    } catch (e) {
+      // chain 측 한 개 fail = 전체 fail ❌. 다음 chain 계속.
+      Logger.warn('alarmScheduler', `scheduleAlarmMain chain[${i}] error=${String(e)}`);
     }
-    if (!id) return null;
-    await saveAlarmMetadata({
-      alarmId: id,
-      type: 'alarm_main',
-      entityId: alarm.id,
-    });
-    return id;
-  } catch (e) {
-    Logger.warn('alarmScheduler', `scheduleAlarmMain error=${String(e)}`);
-    return null;
   }
+  return firstId;
 }
 
 /** 특정 AlarmKit alarm 취소 + metadata 삭제. */

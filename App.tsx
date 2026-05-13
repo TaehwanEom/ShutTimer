@@ -53,6 +53,7 @@ import {
   disableOnceAlarmIfNeeded,
   recordAlarmSession,
   cleanupGhostAlarms,
+  cancelAlarmsForEntity,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 import { recordInstallDateIfNeeded } from './src/utils/storeReview';
@@ -640,6 +641,11 @@ function AppNavigator() {
               const alarms = await loadAlarms();
               const alarmEntity = alarms.find(x => x.id === signal.routineId);
               if (alarmEntity) {
+                // v1.8 #AlarmRepeat — slide-to-stop 측 = chain 형제 일괄 cancel.
+                // 직전 = alerting 1개만 stop (= OpenAppDismissIntent perform 측) → scheduled 측 chain 49개 잔존 → 2분 뒤 또 울림.
+                // 정정 = mapping table 측 entityId 동일 모든 alarm cancel.
+                await cancelAlarmsForEntity(alarmEntity.id).catch(() => {});
+                Logger.warn('LAControl-DBG', `alarm entity chain cancel entityId=${alarmEntity.id}`);
                 const route = navigationRef.current.getCurrentRoute()?.name;
                 if (route !== 'Alarm') {
                   Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);

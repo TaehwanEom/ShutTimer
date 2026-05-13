@@ -16,7 +16,8 @@
       }
     },
     "preview": {
-      "distribution": "internal",
+      "distribution": "store",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SHOW_DEBUG_UI": "true",
         "EXPO_PUBLIC_HIDE_ADS": "true"

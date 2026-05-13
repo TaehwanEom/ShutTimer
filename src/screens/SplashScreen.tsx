@@ -26,16 +26,19 @@ export default function SplashScreen({ navigation }: Props) {
     // 첫 실행 vs 기존 사용자 분기 → Onboarding or Home
     // 기준:
     //  - onboardingCompleted='true' → Home (이미 온보딩 완료)
-    //  - attStatus 또는 missions 데이터 존재 → Home (v1.5 이전 기존 사용자, 권한 응답 이력 있음)
-    //  - 둘 다 없음 → Onboarding (첫 설치)
+    //  - missions 데이터 존재 → Home (v1.5 이전 기존 사용자, 미션 보유)
+    //  - 둘 다 없음 → Onboarding (첫 설치 또는 = 온보딩 측 미완료 측 강제 종료)
+    // v1.8 #OnboardingResume — `attStatus !== null` 측 = 조건 제거.
+    //   사유 = 온보딩 측 ATT 권한 슬라이드 측 "계속" 누름 시 = attStatus 저장됨.
+    //   직전 = attStatus !== null 측 → 온보딩 측 미완료 강제 종료 시 = "기존 사용자" 측 오판정 → 온보딩 측 skip 회귀.
+    //   정정 = onboardingCompleted='true' 측 = 진짜 온보딩 완료 측만 / missions 측 = legacy 사용자 측만 분기.
     const timer = setTimeout(async () => {
       try {
-        const [onboarded, attStatus, missions] = await Promise.all([
+        const [onboarded, missions] = await Promise.all([
           AsyncStorage.getItem('onboardingCompleted'),
-          AsyncStorage.getItem('attStatus'),
           AsyncStorage.getItem(MISSIONS_STORAGE_KEY),
         ]);
-        const isExistingUser = onboarded === 'true' || attStatus !== null || missions !== null;
+        const isExistingUser = onboarded === 'true' || missions !== null;
         navigation.replace(isExistingUser ? 'Home' : 'Onboarding');
       } catch {
         navigation.replace('Home');

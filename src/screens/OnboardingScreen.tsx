@@ -66,6 +66,12 @@ export default function OnboardingScreen({ navigation }: Props) {
   const markPageComplete = useCallback((idx: number) => {
     setPageAnimComplete((prev) => (prev[idx] ? prev : { ...prev, [idx]: true }));
   }, []);
+  // v1.8 #SkipButton — 페이지별 skip counter. 증가 시 = 해당 페이지 측 애니메이션 측 snap to final.
+  const [skipSignal, setSkipSignal] = useState<Record<number, number>>({});
+
+  // v1.8 #OnboardingResume — currentPage 측 AsyncStorage 측 persist + 콜드 스타트 측 resume.
+  //   강제 종료 시 = 마지막 진행 페이지 측 = 다음 실행 시 = 자동 scroll.
+  //   온보딩 완료 (= handleStart) 시 = key 측 삭제.
 
   // 슬라이드 정의 — 마지막 "시작하기" 슬라이드는 별도 처리
   const slides: Slide[] = [
@@ -136,6 +142,34 @@ export default function OnboardingScreen({ navigation }: Props) {
     scrollRef.current?.scrollTo({ x: idx * SCREEN_W, animated: true });
   };
 
+  // v1.8 #OnboardingResume — 콜드 스타트 측 resume = 저장된 page 측 = 즉시 scroll (= animated false).
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current) return;
+    if (!SCREEN_W || SCREEN_W === 0) return;
+    AsyncStorage.getItem('onboardingCurrentPage')
+      .then((saved) => {
+        if (resumedRef.current) return;
+        resumedRef.current = true;
+        if (!saved) return;
+        const idx = parseInt(saved, 10);
+        if (isNaN(idx) || idx <= 0 || idx >= totalPages) return;
+        // ScrollView 측 mount 직후 측 = 100ms 측 지연 후 scrollTo (= ref 준비 보장).
+        setTimeout(() => {
+          scrollRef.current?.scrollTo({ x: idx * SCREEN_W, animated: false });
+          setCurrentPage(idx);
+        }, 100);
+      })
+      .catch(() => {
+        resumedRef.current = true;
+      });
+  }, [SCREEN_W, totalPages]);
+
+  // v1.8 #OnboardingResume — currentPage 변경 시 = AsyncStorage 측 persist.
+  useEffect(() => {
+    AsyncStorage.setItem('onboardingCurrentPage', String(currentPage)).catch(() => {});
+  }, [currentPage]);
+
   // feature-cards(다양한 종료 방식) → next 시 카메라 권한 요청 (한 번만)
   const cameraAskedRef = useRef(false);
   const triggerCameraIfLeavingCards = (fromPage: number) => {
@@ -149,6 +183,18 @@ export default function OnboardingScreen({ navigation }: Props) {
     triggerCameraIfLeavingCards(currentPage);
     if (currentPage < totalPages - 1) {
       goToPage(currentPage + 1);
+    }
+  };
+
+  // v1.8 #SkipButton — 스킵 버튼 측 동작.
+  //  1번 누름 (= 애니메이션 진행 중) → skipSignal[currentPage]++ → 슬라이드 측 = snap to final + markPageComplete.
+  //  2번 누름 (= 애니메이션 완료, 자체 버튼 ❌ 페이지) → handleNext.
+  //  자체 버튼 보유 페이지 (= permission / HomePreview / ReadySlide) 측 = 애니메이션 완료 후 = 버튼 측 숨김 (= isNextButtonSlide false).
+  const handleSkipOrNext = () => {
+    if (pageAnimComplete[currentPage]) {
+      handleNext();
+    } else {
+      setSkipSignal((prev) => ({ ...prev, [currentPage]: (prev[currentPage] ?? 0) + 1 }));
     }
   };
 
@@ -175,6 +221,15 @@ export default function OnboardingScreen({ navigation }: Props) {
   useEffect(() => {
     if (currentPage !== 0) return;
     const anims = charAnimsRef.current;
+    // v1.8 #SkipButton — skipSignal[0] > 0 시 = snap to final + 즉시 markComplete + 루프 ❌.
+    if ((skipSignal[0] ?? 0) > 0) {
+      anims.forEach((a) => {
+        a.stopAnimation();
+        a.setValue(1);
+      });
+      markPageComplete(0);
+      return;
+    }
     let stopped = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const run = (isFirst: boolean) => {
@@ -197,7 +252,7 @@ export default function OnboardingScreen({ navigation }: Props) {
       if (timeoutId) clearTimeout(timeoutId);
       anims.forEach((a) => a.stopAnimation());
     };
-  }, [currentPage, greetingFull, markPageComplete]);
+  }, [currentPage, greetingFull, markPageComplete, skipSignal]);
 
   // welcome 시퀀스: 로고 fade-in → 줄별 좌→우 reveal 순차 (1회, 재진입 시 스냅)
   const welcomePlayedRef = useRef(false);
@@ -205,6 +260,19 @@ export default function OnboardingScreen({ navigation }: Props) {
     if (currentPage !== 1) return;
     if (welcomeLineWidths.length !== welcomeLines.length) return;
     if (welcomeLineWidths.some((w) => !w || w === 0)) return;
+
+    // v1.8 #SkipButton — skipSignal[1] > 0 시 = snap to final + 즉시 markComplete.
+    if ((skipSignal[1] ?? 0) > 0) {
+      welcomeLogoOpacity.stopAnimation();
+      welcomeLogoOpacity.setValue(1);
+      welcomeLineMasksRef.current.forEach((m, i) => {
+        m.stopAnimation();
+        m.setValue(welcomeLineWidths[i]);
+      });
+      welcomePlayedRef.current = true;
+      markPageComplete(1);
+      return;
+    }
 
     if (welcomePlayedRef.current) {
       welcomeLogoOpacity.setValue(1);
@@ -252,10 +320,12 @@ export default function OnboardingScreen({ navigation }: Props) {
       welcomeLineMasksRef.current.forEach((m) => m.stopAnimation());
       welcomePlayedRef.current = true;
     };
-  }, [currentPage, welcomeLineWidths, welcomeLines.length, welcomeLogoOpacity, markPageComplete]);
+  }, [currentPage, welcomeLineWidths, welcomeLines.length, welcomeLogoOpacity, markPageComplete, skipSignal]);
 
   const handleStart = useCallback(async () => {
     await AsyncStorage.setItem('onboardingCompleted', 'true');
+    // v1.8 #OnboardingResume — 완료 시 = resume key 측 삭제 (= 다음 설치 측 = page 0 측 시작 정합).
+    await AsyncStorage.removeItem('onboardingCurrentPage').catch(() => {});
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
@@ -327,13 +397,26 @@ export default function OnboardingScreen({ navigation }: Props) {
     extrapolate: 'clamp',
   });
 
-  // 다음 버튼 노출: 일반 슬라이드만 (HomePreview=확인 버튼, ReadySlide=시작하기 버튼으로 자체 이동)
-  const isNextButtonSlide =
+  // v1.8 #SkipButton — 모든 슬라이드 측 = 애니메이션 진행 중 측 = 건너뛰기 표시.
+  //   permission / HomePreview / ReadySlide 측 = 자체 버튼 (계속 / 확인 / 시작하기) 보유 →
+  //     애니메이션 완료 후 측 = 건너뛰기 숨김 (= 사용자 측 = 자체 버튼 누름 강제).
+  const isAnimatedSlide =
     slides[currentPage]?.kind === 'greeting' ||
     slides[currentPage]?.kind === 'welcome' ||
     slides[currentPage]?.kind === 'feature' ||
     slides[currentPage]?.kind === 'feature-anim' ||
-    slides[currentPage]?.kind === 'feature-cards';
+    slides[currentPage]?.kind === 'feature-cards' ||
+    slides[currentPage]?.kind === 'permission' ||
+    currentPage === slides.length ||      // HomePreview
+    currentPage === totalPages - 1;       // ReadySlide
+
+  const hasOwnAdvanceButton =
+    slides[currentPage]?.kind === 'permission' ||
+    currentPage === slides.length ||      // HomePreview = 확인 버튼
+    currentPage === totalPages - 1;       // ReadySlide = 시작하기 버튼
+
+  // 건너뛰기 버튼 표시 = 애니메이션 진행 중 (= 모든 슬라이드) || 애니메이션 완료 + 자체 버튼 ❌ (= 다음 페이지 진입용)
+  const isNextButtonSlide = isAnimatedSlide && (!pageAnimComplete[currentPage] || !hasOwnAdvanceButton);
 
   // 현재 페이지 애니메이션 완료 여부 (이동 버튼 가드). 모든 슬라이드는 자체 onComplete 호출.
   const isCurrentPageAnimComplete = pageAnimComplete[currentPage] === true;
@@ -361,14 +444,15 @@ export default function OnboardingScreen({ navigation }: Props) {
             </TouchableOpacity>
           )}
         </View>
-        <View style={{ width: 44, alignItems: 'flex-end' }}>
-          {isNextButtonSlide && isCurrentPageAnimComplete && (
+        {/* v1.8 #SkipButton — 스킵 버튼 = 통일 "건너뛰기" 텍스트 (= 사용자 명시 측 chevron-right → 텍스트). */}
+        <View style={{ alignItems: 'flex-end', minWidth: 44 }}>
+          {isNextButtonSlide && (
             <TouchableOpacity
-              onPress={handleNext}
+              onPress={handleSkipOrNext}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.topNavBtn}
             >
-              <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
+              <Text style={styles.topNavText}>Skip</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -472,6 +556,7 @@ export default function OnboardingScreen({ navigation }: Props) {
                 styles={styles}
                 isRTL={isRTL}
                 onComplete={() => markPageComplete(idx)}
+                skipSignal={skipSignal[idx] ?? 0}
               />
             );
           }
@@ -485,6 +570,7 @@ export default function OnboardingScreen({ navigation }: Props) {
                 colors={colors}
                 styles={styles}
                 onComplete={() => markPageComplete(idx)}
+                skipSignal={skipSignal[idx] ?? 0}
               />
             );
           }
@@ -502,6 +588,7 @@ export default function OnboardingScreen({ navigation }: Props) {
                 styles={styles}
                 isRTL={isRTL}
                 onComplete={() => markPageComplete(idx)}
+                skipSignal={skipSignal[idx] ?? 0}
               />
             );
           }
@@ -531,6 +618,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           tooltipFavLabel={t('onboarding.tooltipFav', { defaultValue: '즐겨찾기를 길게 누르면 편집할 수 있습니다' })}
           confirmLabel={t('onboarding.confirm', { defaultValue: '확인' })}
           onComplete={() => markPageComplete(slides.length)}
+          skipSignal={skipSignal[slides.length] ?? 0}
         />
 
         {/* 마지막 — 준비 완료 + 시작하기 버튼 → Home 이동 */}
@@ -543,6 +631,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           colors={colors}
           styles={styles}
           onComplete={() => markPageComplete(totalPages - 1)}
+          skipSignal={skipSignal[totalPages - 1] ?? 0}
         />
       </ScrollView>
 
@@ -578,6 +667,7 @@ function FeatureAnimSlide({
   styles,
   isRTL,
   onComplete,
+  skipSignal,
 }: {
   active: boolean;
   icon: string;
@@ -587,6 +677,7 @@ function FeatureAnimSlide({
   styles: ReturnType<typeof makeStyles>;
   isRTL: boolean;
   onComplete: () => void;
+  skipSignal: number;
 }) {
   const lines = useMemo(() => body.split('\n'), [body]);
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -601,6 +692,19 @@ function FeatureAnimSlide({
     if (!active) return;
     if (lineWidths.length !== lines.length) return;
     if (lineWidths.some((w) => !w || w === 0)) return;
+
+    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
+    if (skipSignal > 0) {
+      headerOpacity.stopAnimation();
+      headerOpacity.setValue(1);
+      lineMasksRef.current.forEach((m, i) => {
+        m.stopAnimation();
+        m.setValue(lineWidths[i]);
+      });
+      playedRef.current = true;
+      onComplete();
+      return;
+    }
 
     if (playedRef.current) {
       headerOpacity.setValue(1);
@@ -646,7 +750,7 @@ function FeatureAnimSlide({
       lineMasksRef.current.forEach((m) => m.stopAnimation());
       playedRef.current = true;
     };
-  }, [active, lineWidths, lines, headerOpacity, onComplete]);
+  }, [active, lineWidths, lines, headerOpacity, onComplete, skipSignal]);
 
   return (
     <View style={styles.slide}>
@@ -704,6 +808,7 @@ function PermissionAnimSlide({
   styles,
   isRTL,
   onComplete,
+  skipSignal,
 }: {
   active: boolean;
   icon: string;
@@ -715,6 +820,7 @@ function PermissionAnimSlide({
   styles: ReturnType<typeof makeStyles>;
   isRTL: boolean;
   onComplete: () => void;
+  skipSignal: number;
 }) {
   const lines = useMemo(() => body.split('\n'), [body]);
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -730,6 +836,21 @@ function PermissionAnimSlide({
     if (!active) return;
     if (lineWidths.length !== lines.length) return;
     if (lineWidths.some((w) => !w || w === 0)) return;
+
+    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
+    if (skipSignal > 0) {
+      headerOpacity.stopAnimation();
+      headerOpacity.setValue(1);
+      lineMasksRef.current.forEach((m, i) => {
+        m.stopAnimation();
+        m.setValue(lineWidths[i]);
+      });
+      buttonOpacity.stopAnimation();
+      buttonOpacity.setValue(1);
+      playedRef.current = true;
+      onComplete();
+      return;
+    }
 
     if (playedRef.current) {
       headerOpacity.setValue(1);
@@ -790,7 +911,7 @@ function PermissionAnimSlide({
       buttonOpacity.stopAnimation();
       playedRef.current = true;
     };
-  }, [active, lineWidths, lines, headerOpacity, buttonOpacity, onComplete]);
+  }, [active, lineWidths, lines, headerOpacity, buttonOpacity, onComplete, skipSignal]);
 
   return (
     <View style={styles.slide}>
@@ -851,6 +972,7 @@ function ReadySlide({
   colors,
   styles,
   onComplete,
+  skipSignal,
 }: {
   active: boolean;
   title: string;
@@ -860,6 +982,7 @@ function ReadySlide({
   colors: ThemeColors;
   styles: ReturnType<typeof makeStyles>;
   onComplete: () => void;
+  skipSignal: number;
 }) {
   const iconOp = useRef(new Animated.Value(0)).current;
   const titleOp = useRef(new Animated.Value(0)).current;
@@ -869,6 +992,22 @@ function ReadySlide({
 
   useEffect(() => {
     if (!active) return;
+
+    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
+    if (skipSignal > 0) {
+      iconOp.stopAnimation();
+      iconOp.setValue(1);
+      titleOp.stopAnimation();
+      titleOp.setValue(1);
+      bodyOp.stopAnimation();
+      bodyOp.setValue(1);
+      buttonOp.stopAnimation();
+      buttonOp.setValue(1);
+      playedRef.current = true;
+      onComplete();
+      return;
+    }
+
     if (playedRef.current) {
       iconOp.setValue(1);
       titleOp.setValue(1);
@@ -900,7 +1039,7 @@ function ReadySlide({
       buttonOp.stopAnimation();
       playedRef.current = true;
     };
-  }, [active, iconOp, titleOp, bodyOp, buttonOp, onComplete]);
+  }, [active, iconOp, titleOp, bodyOp, buttonOp, onComplete, skipSignal]);
 
   return (
     <View style={styles.slide}>
@@ -947,6 +1086,7 @@ function HomePreviewSlide({
   tooltipPlayLabel,
   tooltipFavLabel,
   confirmLabel,
+  skipSignal,
 }: {
   active: boolean;
   colors: ThemeColors;
@@ -960,6 +1100,7 @@ function HomePreviewSlide({
   tooltipPlayLabel: string;
   tooltipFavLabel: string;
   confirmLabel: string;
+  skipSignal: number;
 }) {
   // 시퀀스 애니메이션: play tooltip → fav tooltip → 확인 버튼 순차 fade-in
   const playTooltipOp = useRef(new Animated.Value(0)).current;
@@ -972,6 +1113,20 @@ function HomePreviewSlide({
 
   useEffect(() => {
     if (!active) return;
+
+    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
+    if (skipSignal > 0) {
+      playTooltipOp.stopAnimation();
+      playTooltipOp.setValue(1);
+      favTooltipOp.stopAnimation();
+      favTooltipOp.setValue(1);
+      confirmOp.stopAnimation();
+      confirmOp.setValue(1);
+      playedRef.current = true;
+      onCompleteRef.current();
+      return;
+    }
+
     if (playedRef.current) {
       playTooltipOp.setValue(1);
       favTooltipOp.setValue(1);
@@ -1001,7 +1156,7 @@ function HomePreviewSlide({
       stopped = true;
       animation.stop();
     };
-  }, [active, playTooltipOp, favTooltipOp, confirmOp]);
+  }, [active, playTooltipOp, favTooltipOp, confirmOp, skipSignal]);
 
   // 13분 진행 중(일시정지 상태) 시각
   const timeText = '13:00';
@@ -1309,6 +1464,7 @@ function FeatureCardsSlide({
   colors,
   styles,
   onComplete,
+  skipSignal,
 }: {
   active: boolean;
   title: string;
@@ -1316,6 +1472,7 @@ function FeatureCardsSlide({
   colors: ThemeColors;
   styles: ReturnType<typeof makeStyles>;
   onComplete: () => void;
+  skipSignal: number;
 }) {
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const cardOpsRef = useRef<Animated.Value[]>([]);
@@ -1328,6 +1485,24 @@ function FeatureCardsSlide({
 
   useEffect(() => {
     if (!active) return;
+
+    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
+    if (skipSignal > 0) {
+      titleOpacity.stopAnimation();
+      titleOpacity.setValue(1);
+      cardOpsRef.current.forEach((o) => {
+        o.stopAnimation();
+        o.setValue(1);
+      });
+      cardYsRef.current.forEach((y) => {
+        y.stopAnimation();
+        y.setValue(0);
+      });
+      playedRef.current = true;
+      onComplete();
+      return;
+    }
+
     if (playedRef.current) {
       titleOpacity.setValue(1);
       cardOpsRef.current.forEach((o) => o.setValue(1));
@@ -1381,7 +1556,7 @@ function FeatureCardsSlide({
       cardYsRef.current.forEach((y) => y.stopAnimation());
       playedRef.current = true;
     };
-  }, [active, cards.length, titleOpacity, onComplete]);
+  }, [active, cards.length, titleOpacity, onComplete, skipSignal]);
 
   return (
     <View style={styles.slide}>

@@ -283,8 +283,18 @@ public class AlarmkitBridgeModule: Module {
         textColor: .white,
         systemImageName: "play.fill"
       )
+      // v1.8 #LACountdownTitle — countdown title 측 = params.countdownTitle 우선, 미전달 시 params.title fallback.
+      // 직전 = `Optional<Bool> == false` 비교 패턴 → Swift 측 비교 측 부정확 가능. 본 정정 = idiomatic if-let.
+      let countdownTitleStr: String
+      if let ct = params.countdownTitle, !ct.isEmpty {
+        countdownTitleStr = ct
+      } else {
+        countdownTitleStr = params.title
+      }
+      // v1.8 #DBG-CountdownTitle — Swift 측 countdownTitle 수신 측정 (= JS bridge 측 @Field 측 동작 확인용).
+      appendNativeDbg("AlarmKit-DBG-CTitle", "entity=\(params.entityId) type=\(params.type ?? "?") params.countdownTitle=\(params.countdownTitle ?? "(nil)") chosen=\(countdownTitleStr)")
       let countdownAll = AlarmPresentation.Countdown(
-        title: LocalizedStringResource(stringLiteral: params.title),
+        title: LocalizedStringResource(stringLiteral: countdownTitleStr),
         pauseButton: pauseButtonAll
       )
       let pausedAll = AlarmPresentation.Paused(
@@ -669,6 +679,9 @@ struct ScheduleAlarmParams: Record {
   // v1.6+ — entityId (= 카테고리 B 일반화, rename 결정 4-B). 루틴/타이머/알람 식별자 공통.
   @Field var entityId: String
   @Field var title: String
+  // v1.8 #LACountdownTitle — countdown presentation 측 별도 title (= lock screen LA 측).
+  // 미전달 시 = title fallback (= 기존 호환).
+  @Field var countdownTitle: String?
   @Field var fireAt: Double
   @Field var stopLabel: String?
   @Field var soundName: String?

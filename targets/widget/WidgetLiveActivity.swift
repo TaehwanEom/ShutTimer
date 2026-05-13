@@ -264,10 +264,11 @@ struct AlarmKitLockScreenView: View {
         HStack(spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
+                    // v1.8 #LACountdownTitle — routineName 측 2줄 허용 (= "다음 알람\n남은 시간" 측 wrap 정합).
                     Text(context.attributes.metadata?.routineName ?? "타이머")
                         .font(.caption)
                         .foregroundColor(.brand)
-                        .lineLimit(1)
+                        .lineLimit(2)
                     if let total = context.attributes.metadata?.totalSteps, total > 1,
                        let stepName = context.attributes.metadata?.currentStepName, !stepName.isEmpty {
                         let idx = (context.attributes.metadata?.currentStepIndex ?? 0) + 1

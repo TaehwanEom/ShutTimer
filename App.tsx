@@ -54,6 +54,8 @@ import {
   recordAlarmSession,
   cleanupGhostAlarms,
   cancelAlarmsForEntity,
+  scheduleAlarmChainNext,
+  CHAIN_TOTAL_BUDGET,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 import { recordInstallDateIfNeeded } from './src/utils/storeReview';
@@ -365,13 +367,22 @@ function AppNavigator() {
       if (meta.type === 'alarm_main') {
         // sessions 기록 (= 결정 6-B, icon='alarm' 고정)
         await recordAlarmSession().catch(() => {});
-        // 한 번만 모드 측 자동 비활성 (= 결정 5 + alarm.repeat='once' 시)
-        await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        const alarms = await loadAlarms();
+        const a = alarms.find(x => x.id === meta.entityId);
+        // v1.8 #AlarmRepeatLazy — alerting 시 = 다음 chain schedule 또는 chain 종료 처리.
+        const currentChainIndex = meta.chainIndex ?? 0;
+        const chainBaseFireAt = meta.chainBaseFireAt ?? Date.now();
+        if (a && a.enabled && currentChainIndex + 1 < CHAIN_TOTAL_BUDGET) {
+          Logger.warn('AlarmRepeatLazy', `schedule next chainIndex=${currentChainIndex + 1} entityId=${meta.entityId}`);
+          await scheduleAlarmChainNext(a, chainBaseFireAt, currentChainIndex + 1).catch(() => {});
+        } else {
+          // chain 종료 (= 50 도달) 또는 알람 비활성 → 'once' 자동 비활성 처리.
+          Logger.warn('AlarmRepeatLazy', `chain end chainIndex=${currentChainIndex} → disableOnceIfNeeded entityId=${meta.entityId}`);
+          await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        }
         if (currentRoute === 'Alarm') return;
         // 알람별 dismissMethod + soundKey lookup → navigate params 측 전달.
         // v1.7 Phase 2-A — alarmEntityId 전달. AlarmScreen.goHome 측 alarm.steps 분기 사용.
-        const alarms = await loadAlarms();
-        const a = alarms.find(x => x.id === meta.entityId);
         Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
         // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기 (= AlarmScreen 측 = SETTINGS_KEY.ALARM_SOUND 측만 read = alarmScheduler 정합).
         navigationRef.current?.navigate('Alarm', {
@@ -462,10 +473,18 @@ function AppNavigator() {
         // v1.6+ cold-start 시 fire 된 알람 entity (= type='alarm_main').
         if (meta.type === 'alarm_main') {
           await recordAlarmSession().catch(() => {});
-          await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
-          // v1.7 Phase 2-A — alarmEntityId 전달.
           const alarms = await loadAlarms();
           const a = alarms.find(x => x.id === meta.entityId);
+          // v1.8 #AlarmRepeatLazy — cold-start 측도 동일 lazy chain 로직 (= listener 측 정합).
+          const currentChainIndex = meta.chainIndex ?? 0;
+          const chainBaseFireAt = meta.chainBaseFireAt ?? Date.now();
+          if (a && a.enabled && currentChainIndex + 1 < CHAIN_TOTAL_BUDGET) {
+            Logger.warn('AlarmRepeatLazy', `coldStart schedule next chainIndex=${currentChainIndex + 1} entityId=${meta.entityId}`);
+            await scheduleAlarmChainNext(a, chainBaseFireAt, currentChainIndex + 1).catch(() => {});
+          } else {
+            Logger.warn('AlarmRepeatLazy', `coldStart chain end chainIndex=${currentChainIndex} → disableOnceIfNeeded entityId=${meta.entityId}`);
+            await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+          }
           Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
           // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
           navigationRef.current?.navigate('Alarm', {

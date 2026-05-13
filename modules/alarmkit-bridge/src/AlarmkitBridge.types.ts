@@ -30,6 +30,12 @@ export type ScheduleAlarmParams = {
   entityId: string;
   /** 알람 화면 타이틀 */
   title: string;
+  /**
+   * v1.8 #LACountdownTitle — countdown presentation 측 별도 title (= lock screen LA 측 표시).
+   * 미전달 시 = `title` 측 fallback (= 기존 호환).
+   * 사용 예 = alarm_main type 측 = "알람 남은 시간" (= alerting 측 alarm.label 유지).
+   */
+  countdownTitle?: string;
   /** 발화 시각 (ms timestamp). recurrence != nil 시 = 시각 (HH:MM) 추출용으로 사용 */
   fireAt: number;
   /** 정지 버튼 라벨 (기본 "Stop") */

@@ -58,20 +58,21 @@ async function resolveSoundName(): Promise<string | undefined> {
 // ─── 스케줄링 ────────────────────────────────────────────
 
 /**
- * v1.8 #AlarmRepeat — 알람 entity 측 AlarmKit 등록 + 2분 간격 chain 강제.
+ * v1.8 #AlarmRepeatLazy — 알람 entity 측 AlarmKit 등록 + lazy chain (= 발화 후 다음 chain 추가).
  * iOS 26+ + authorized 시만 진입. 그 외 = silent skip (= AlarmListScreen 측 Platform 분기 정합).
  *
  * 정책 (= 사용자분 측 명시 v1.8).
- *   - OS 자체 반복 (= .alarm(schedule:)) 폐기. 모든 repeat 측 .timer(duration:) chain 통일.
- *   - 활성 알람 갯수 측 → chain 갯수 동적 분배 (총 100분 = 50개 max).
- *   - 1개 활성 → 50 chain (100분), 2개 활성 → 25 chain (50분), 10개 활성 → 5 chain (10분).
- *   - 사용자분 측 dismiss → cancelAlarmsForEntity 측 = mapping table 측 entityId 동일 chain 일괄 cancel.
- *   - daily/weekly 다음 occurrence 재예약 측 = 콜드 스타트 측 syncAllAlarms 측 정합 (= 매 기동 시 재예약).
+ *   - OS 자체 반복 (= .alarm(schedule:)) 폐기. 모든 repeat 측 .timer(duration:) lazy chain 통일.
+ *   - 첫 schedule = 1개만 (= lock screen LA 1개). chainIndex=0, chainBaseFireAt=fireAt.
+ *   - 발화 (alerting) 시 → App.tsx onAlarmStateChange listener 측 = scheduleAlarmChainNext 호출.
+ *   - 누적 50회 (= 100분) 도달 시 = 더 schedule ❌.
+ *   - dismiss → cancelAlarmsForEntity → mapping entityId 동일 chain 일괄 cancel.
+ *   - daily/weekly 다음 occurrence 재예약 = 콜드 스타트 syncAllAlarms 측 정합.
  *
- * @returns 첫 chain alarm ID (= 호출처 호환). chain 전체 ID 측 = mapping table 측 entityId 측 lookup.
+ * @returns 첫 alarm ID. chain N개 측 ID = mapping table 측 entityId lookup.
  */
 const CHAIN_INTERVAL_MS = 120000; // 2분
-const CHAIN_TOTAL_BUDGET = 50; // 100분 / 2분
+export const CHAIN_TOTAL_BUDGET = 50; // 100분 / 2분
 
 export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   if (!alarm.enabled) return null;
@@ -80,51 +81,75 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   const baseFireAt = nextAlarmOccurrenceTime(alarm);
   if (baseFireAt === null) return null;
 
-  // v1.8 #AlarmRepeat — 활성 알람 갯수 측 chain 동적 분배.
-  const all = await loadAlarms();
-  const activeCount = Math.max(1, all.filter(a => a.enabled).length);
-  const chainCount = Math.max(1, Math.min(CHAIN_TOTAL_BUDGET, Math.floor(CHAIN_TOTAL_BUDGET / activeCount)));
+  return scheduleChainAlarmAt(alarm, baseFireAt, 0, baseFireAt);
+}
 
+/**
+ * v1.8 #AlarmRepeatLazy — lazy chain 측 다음 chain schedule (= listener 측 호출).
+ * App.tsx onAlarmStateChange listener 측 alerting 시 = 본 함수 호출.
+ * chainIndex >= CHAIN_TOTAL_BUDGET 시 = caller 측 사전 차단 정합 (= 본 함수 측 가드 ❌).
+ */
+export async function scheduleAlarmChainNext(
+  alarm: Alarm,
+  chainBaseFireAt: number,
+  nextChainIndex: number
+): Promise<string | null> {
+  if (!alarm.enabled) return null;
+  if (!(await isAlarmKitReady())) return null;
+  const fireAt = chainBaseFireAt + nextChainIndex * CHAIN_INTERVAL_MS;
+  return scheduleChainAlarmAt(alarm, fireAt, nextChainIndex, chainBaseFireAt);
+}
+
+/** chain 측 단일 schedule + mapping 저장. */
+async function scheduleChainAlarmAt(
+  alarm: Alarm,
+  fireAt: number,
+  chainIndex: number,
+  chainBaseFireAt: number
+): Promise<string | null> {
   const soundName = await resolveSoundName();
-  // v1.7 hotfix Phase 12 G6sub2 — alarm.soundKey 측 폐기 + 매번 설정 사운드 read.
-  Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain alarmId=${alarm.id} soundName=${soundName ?? '(undefined)'} activeCount=${activeCount} chainCount=${chainCount}`);
   const title = alarm.label || '알람';
-
-  // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.
+  // v1.8 #LACountdownTitle — lock screen LA 측 = "다음 알람\n남은 시간" 2줄 표시.
+  // root cause = widget extension (WidgetLiveActivity.swift:267) 측 = `metadata.routineName` 측 직접 렌더링.
+  //   → AlarmPresentation.Countdown.title 측 무시 → countdownTitle param 측 영향 ❌.
+  //   정정 = laRoutineName 측 직접 정정 + widget 측 lineLimit(2) 정정 결합.
+  // alerting 시 화면 title 측 = alarm.label or '알람' 유지 (= AlarmScreen 측 별도 영역 → 회귀 ❌).
+  const countdownTitle = '다음 알람\n남은 시간';
+  Logger.warn(
+    'alarmScheduler-DBG',
+    `scheduleChain alarmId=${alarm.id} chainIndex=${chainIndex} fireAt=${fireAt} soundName=${soundName ?? '(undefined)'}`
+  );
   const laMeta = {
     laStepName: title,
     laStepIndex: 0,
     laTotalSteps: 1,
     laStage: 'step',
     laRoutineId: alarm.id,
-    laRoutineName: title,
+    laRoutineName: '다음 알람\n남은 시간', // v1.8 #LACountdownTitle — widget LA 측 2줄 정합 (lineLimit(2)).
   } as const;
-
-  let firstId: string | null = null;
-  for (let i = 0; i < chainCount; i++) {
-    const fireAt = baseFireAt + i * CHAIN_INTERVAL_MS;
-    try {
-      const id = await AlarmkitBridge.scheduleAlarm({
-        entityId: alarm.id,
-        title,
-        fireAt,
-        type: 'alarm_main',
-        soundName,
-        ...laMeta,
-      });
-      if (!id) continue;
-      await saveAlarmMetadata({
-        alarmId: id,
-        type: 'alarm_main',
-        entityId: alarm.id,
-      });
-      if (firstId === null) firstId = id;
-    } catch (e) {
-      // chain 측 한 개 fail = 전체 fail ❌. 다음 chain 계속.
-      Logger.warn('alarmScheduler', `scheduleAlarmMain chain[${i}] error=${String(e)}`);
-    }
+  try {
+    const id = await AlarmkitBridge.scheduleAlarm({
+      entityId: alarm.id,
+      title,
+      countdownTitle,
+      fireAt,
+      type: 'alarm_main',
+      soundName,
+      ...laMeta,
+    });
+    if (!id) return null;
+    await saveAlarmMetadata({
+      alarmId: id,
+      type: 'alarm_main',
+      entityId: alarm.id,
+      chainIndex,
+      chainBaseFireAt,
+    });
+    return id;
+  } catch (e) {
+    Logger.warn('alarmScheduler', `scheduleChain chainIndex=${chainIndex} error=${String(e)}`);
+    return null;
   }
-  return firstId;
 }
 
 /** 특정 AlarmKit alarm 취소 + metadata 삭제. */

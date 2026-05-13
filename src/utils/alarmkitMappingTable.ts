@@ -16,6 +16,16 @@ export type AlarmMetaRecord = {
   nextStepIndex?: number;
   endMethod?: AlarmKitEndMethod;
   createdAt: number;
+  /**
+   * v1.8 #AlarmRepeatLazy — chain 순번 (= 0..49). type='alarm_main' 측만 사용.
+   * 첫 alarm = 0. listener 측 = chainIndex+1 측 다음 chain schedule.
+   */
+  chainIndex?: number;
+  /**
+   * v1.8 #AlarmRepeatLazy — 첫 chain fireAt (ms timestamp). type='alarm_main' 측만 사용.
+   * 다음 chain fireAt = chainBaseFireAt + chainIndex * 120000.
+   */
+  chainBaseFireAt?: number;
 };
 
 async function loadAll(): Promise<AlarmMetaRecord[]> {

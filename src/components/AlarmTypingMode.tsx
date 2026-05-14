@@ -48,14 +48,41 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
   const inputRef = useRef<TextInput>(null);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const current = problems[currentIdx];
+  // v1.8 #SlotMachine — mount 직후 1.2초 슬롯머신 효과.
+  const [isShuffling, setIsShuffling] = useState(true);
+  const [shuffledPool] = useState<TypingProblem[]>(() => generateTypingProblems(locale, 8));
+  const [shuffleIdx, setShuffleIdx] = useState(0);
+  const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // 첫 마운트 후 keyboard 자동 영역.
+    shuffleIntervalRef.current = setInterval(() => {
+      setShuffleIdx((i) => (i + 1) % shuffledPool.length);
+    }, 60);
+    shuffleTimeoutRef.current = setTimeout(() => {
+      if (shuffleIntervalRef.current) {
+        clearInterval(shuffleIntervalRef.current);
+        shuffleIntervalRef.current = null;
+      }
+      shuffleTimeoutRef.current = null;
+      setIsShuffling(false);
+    }, 1200);
+    return () => {
+      if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
+      if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
+    };
+  }, [shuffledPool.length]);
+
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const current = problems[currentIdx];
+  const displayedProblem = isShuffling ? shuffledPool[shuffleIdx] : current;
+
+  useEffect(() => {
+    // 첫 마운트 후 keyboard 자동 영역. 슬롯머신 종료 후 focus.
+    if (isShuffling) return;
     const tm = setTimeout(() => inputRef.current?.focus(), 200);
     return () => clearTimeout(tm);
-  }, []);
+  }, [isShuffling]);
 
   useEffect(() => {
     if (!wrongFlash) return;
@@ -68,6 +95,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
   }, [wrongFlash, shakeAnim]);
 
   const handleSubmit = () => {
+    if (isShuffling) return; // v1.8 #SlotMachine — 슬롯머신 진행 중 submit 무시.
     if (!current) return;
     if (checkTypingAnswer(input, current)) {
       // 정답.
@@ -156,7 +184,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
 
             <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
               <Text style={styles.problemText} selectable={false}>
-                {current?.text ?? ''}
+                {displayedProblem?.text ?? ''}
               </Text>
             </Animated.View>
 

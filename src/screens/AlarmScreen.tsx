@@ -1003,19 +1003,18 @@ export default function AlarmScreen({ navigation, route }: Props) {
   }, [currentMission, targetLabelsSV, thresholdSV]);
 
   // v1.5 카운트다운 (camera 미션 / math / typing — missionDuration 측 카운트다운 정합).
-  // 슬롯머신 중엔 일시정지 (= camera 측만 해당). math/typing = 슬롯머신 영역 ❌.
+  // v1.8 — 슬롯머신 중에도 카운트다운 계속. 만료 처리 측만 isShuffling 가드 잔존.
   useEffect(() => {
     if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
-    if (isShuffling) return;
     if (matched.value) return;
     const id = setInterval(() => {
       setRemainingMs((prev) => Math.max(0, prev - 1000));
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dismissMethod, resultState, isRetryBannerVisible, isShuffling]);
+  }, [dismissMethod, resultState, isRetryBannerVisible]);
 
   // v1.8 math/typing 미션 만료 처리 — missionDuration 도달 시 즉시 fail (= 재시도 ❌, camera 재시도 패턴과 분리).
   useEffect(() => {

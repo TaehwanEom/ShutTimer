@@ -43,8 +43,36 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
   const [wrongFlash, setWrongFlash] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
+  // v1.8 #SlotMachine — mount 직후 1.2초 슬롯머신 효과 (= 카메라 미션 동일 패턴).
+  const [isShuffling, setIsShuffling] = useState(true);
+  const [shuffledPool] = useState<MathProblem[]>(() =>
+    Array.from({ length: 8 }, () => generateMathProblem())
+  );
+  const [shuffleIdx, setShuffleIdx] = useState(0);
+  const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    shuffleIntervalRef.current = setInterval(() => {
+      setShuffleIdx((i) => (i + 1) % shuffledPool.length);
+    }, 60);
+    shuffleTimeoutRef.current = setTimeout(() => {
+      if (shuffleIntervalRef.current) {
+        clearInterval(shuffleIntervalRef.current);
+        shuffleIntervalRef.current = null;
+      }
+      shuffleTimeoutRef.current = null;
+      setIsShuffling(false);
+    }, 1200);
+    return () => {
+      if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
+      if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
+    };
+  }, [shuffledPool.length]);
+
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const current = problems[currentIdx];
+  const displayedProblem = isShuffling ? shuffledPool[shuffleIdx] : current;
 
   useEffect(() => {
     if (!wrongFlash) return;
@@ -57,6 +85,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
   }, [wrongFlash, shakeAnim]);
 
   const handleKeyPress = (key: string) => {
+    if (isShuffling) return; // v1.8 #SlotMachine — 슬롯머신 진행 중 입력 무시.
     if (!current) return;
     if (key === 'clear') {
       setInput('');
@@ -131,7 +160,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
           </View>
 
           <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-            <Text style={styles.problemText}>{current?.display ?? ''} = ?</Text>
+            <Text style={styles.problemText}>{displayedProblem?.display ?? ''} = ?</Text>
           </Animated.View>
 
           <View style={styles.inputBox}>

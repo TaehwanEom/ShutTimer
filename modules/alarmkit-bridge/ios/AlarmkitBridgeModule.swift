@@ -308,6 +308,8 @@ public class AlarmkitBridgeModule: Module {
       )
       // v1.7 hotfix #LAUnify Phase 3 — metadata 측 step 데이터 명시 영역.
       //   widget extension 측 AlarmAttributes layout (= Phase 6 영역) 측 = 본 metadata 측 사용 → step 표시 영역.
+      // v1.8 #LARelevanceMatch — alarmId 측 = updateActivityRelevance 측 매칭 키 영역.
+      let id = UUID()
       let metadataAll = ShutTimerAlarmMetadata(
         currentStepName: params.laStepName,
         currentStepIndex: params.laStepIndex ?? 0,
@@ -316,7 +318,8 @@ public class AlarmkitBridgeModule: Module {
         paused: params.laPaused ?? false,
         pausedAt: params.laPausedAt,
         routineId: params.laRoutineId ?? params.entityId,
-        routineName: params.laRoutineName ?? params.title
+        routineName: params.laRoutineName ?? params.title,
+        alarmId: id.uuidString
       )
       let timerAttributesAll = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: timerPresentationAll,
@@ -324,7 +327,7 @@ public class AlarmkitBridgeModule: Module {
         tintColor: Color.red
       )
 
-      let id = UUID()
+      // v1.8 #LARelevanceMatch — id 측 = metadataAll 측 이전 영역 이동 (= 위 영역).
 
       // v1.6+ — recurrence 옵션 (= type='alarm_main' 측) → .alarm(schedule:) factory 분기.
       // OS 자동 반복 (= .relative(.weekly([...]))). 재예약 listener 불필요.
@@ -656,7 +659,9 @@ public class AlarmkitBridgeModule: Module {
       //   정정 = 5초 sleep → log 측 post-schedule(timer)+5s 시점 = Activity.activities.count >= 1 정합.
       try? await Task.sleep(nanoseconds: 5_000_000_000)
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
-      guard let activity = activities.first(where: { $0.id == alarmId }) else {
+      // v1.8 #LARelevanceMatch — Activity.id (= system UUID) ≠ Alarm.id (= app UUID) 영역.
+      //   직전 = $0.id == alarmId 측 = 항상 nil 영역. 정정 = metadata.alarmId 측 매칭 영역.
+      guard let activity = activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) else {
         appendNativeDbg("LA-DBG-AKLA-Relevance", "skip alarmId=\(alarmId) activity not found")
         return
       }

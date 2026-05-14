@@ -30,6 +30,9 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
     public var pausedAt: Double? = nil
     public var routineId: String? = nil
     public var routineName: String? = nil
+    // v1.8 #LARelevanceMatch — AlarmKit Alarm.id 측 = Activity.id ≠ 영역 → metadata 측 alarmId 매칭 키 영역.
+    //   updateActivityRelevance 측 = activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) 사용.
+    public var alarmId: String? = nil
 
     public init(
         currentStepName: String? = nil,
@@ -39,7 +42,8 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
         paused: Bool = false,
         pausedAt: Double? = nil,
         routineId: String? = nil,
-        routineName: String? = nil
+        routineName: String? = nil,
+        alarmId: String? = nil
     ) {
         self.currentStepName = currentStepName
         self.currentStepIndex = currentStepIndex
@@ -49,6 +53,7 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
         self.pausedAt = pausedAt
         self.routineId = routineId
         self.routineName = routineName
+        self.alarmId = alarmId
     }
 }
 #endif

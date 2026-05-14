@@ -217,6 +217,8 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
         paused: pausedContent
     )
     // v1.7 hotfix #LAUnify Phase 4 — metadata 측 step 데이터 명시 영역.
+    // v1.8 #LARelevanceMatch — alarmId 측 = updateActivityRelevance 측 매칭 키 영역.
+    let id = UUID()
     let metadata = ShutTimerAlarmMetadata(
         currentStepName: nextStep.name,
         currentStepIndex: nextStepIdx,
@@ -225,7 +227,8 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
         paused: false,
         pausedAt: nil,
         routineId: snapshot.routineId,
-        routineName: snapshot.routineName
+        routineName: snapshot.routineName,
+        alarmId: id.uuidString
     )
     let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,
@@ -239,8 +242,7 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
     } else {
         alertSound = .default
     }
-
-    let id = UUID()
+    // v1.8 #LARelevanceMatch — id 측 = metadata 측 이전 영역 이동 (= 위 영역).
     // v1.6 #13 — 마지막 step = secondaryIntent 제거. stopIntent: OpenAppDismissIntent 만 (밀어서 중단 → 앱 진입 + routine 정지).
     let config: AlarmManager.AlarmConfiguration<ShutTimerAlarmMetadata>
     if isLastStep {

@@ -52,6 +52,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
   const [isShuffling, setIsShuffling] = useState(true);
   const [shuffledPool] = useState<TypingProblem[]>(() => generateTypingProblems(locale, 8));
   const [shuffleIdx, setShuffleIdx] = useState(0);
+  const [shuffleTrigger, setShuffleTrigger] = useState(0);
   const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,7 +75,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
       if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
       if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
     };
-  }, [currentIdx, shuffledPool.length]);
+  }, [currentIdx, shuffleTrigger, shuffledPool.length]);
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const current = problems[currentIdx];
@@ -110,12 +111,13 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
       setInput('');
       return;
     }
-    // 오답 = 새 문제 출제 (= 현재 idx 위치만 교체, 진행도 유지) + 진동 피드백.
+    // 오답 = 새 문제 출제 (= 현재 idx 위치만 교체, 진행도 유지) + 진동 피드백 + 슬롯머신 재발동.
     Vibration.vibrate();
     const replacement = generateTypingProblems(locale, 1)[0];
     setProblems(prev => prev.map((p, i) => (i === currentIdx ? replacement : p)));
     setInput('');
     setWrongFlash(true);
+    setShuffleTrigger(c => c + 1);
   };
 
   const shakeTranslate = shakeAnim.interpolate({
@@ -306,7 +308,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 24,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 16,
-    minWidth: '85%',
+    width: '85%',
     alignItems: 'center',
   },
   problemText: {

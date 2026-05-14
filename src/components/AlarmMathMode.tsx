@@ -49,6 +49,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
     Array.from({ length: 8 }, () => generateMathProblem())
   );
   const [shuffleIdx, setShuffleIdx] = useState(0);
+  const [shuffleTrigger, setShuffleTrigger] = useState(0);
   const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,7 +72,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
       if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
       if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
     };
-  }, [currentIdx, shuffledPool.length]);
+  }, [currentIdx, shuffleTrigger, shuffledPool.length]);
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const current = problems[currentIdx];
@@ -106,11 +107,12 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
         setInput('');
         return;
       }
-      // 오답 = 같은 idx 새 문제로 교체 (= 진행도 유지) + 진동 피드백.
+      // 오답 = 같은 idx 새 문제로 교체 (= 진행도 유지) + 진동 피드백 + 슬롯머신 재발동.
       Vibration.vibrate();
       setProblems(prev => prev.map((p, i) => (i === currentIdx ? generateMathProblem() : p)));
       setInput('');
       setWrongFlash(true);
+      setShuffleTrigger(c => c + 1);
       return;
     }
     // 숫자 입력. 4자리 제한 (= 두 자릿수 × 두 자릿수 최대 영역).
@@ -163,7 +165,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
           </View>
 
           <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-            <Text style={styles.problemText}>{displayedProblem?.display ?? ''} = ?</Text>
+            <Text style={styles.problemText} numberOfLines={1} adjustsFontSizeToFit>{displayedProblem?.display ?? ''} = ?</Text>
           </Animated.View>
 
           <View style={styles.inputBox}>
@@ -280,10 +282,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   problemBox: {
     marginTop: 8,
     paddingVertical: 18,
-    paddingHorizontal: 32,
+    paddingHorizontal: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderRadius: 16,
-    minWidth: '70%',
+    width: '85%',
     alignItems: 'center',
   },
   problemText: {

@@ -729,7 +729,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
           }
         };
 
-        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' })
+        // v1.8 #AudioDuckOthers — 'doNotMix' → 'duckOthers'. CarPlay 측 음악 / 티맵 출력 중 알람 사운드 출력 ✅.
+        setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'duckOthers' })
           .then(() => {
             const preloaded = consumeAlarmSound();
             if (!preloaded) {
@@ -805,7 +806,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (s) {
         // v1.7 hotfix #ExpoAudio — isLoaded + playing 측 sync property + setAudioModeAsync 측 새 API.
         if (s.isLoaded && !s.playing) {
-          setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' })
+          // v1.8 #AudioDuckOthers — resume 시점 측 동일 정정. CarPlay 환경 측 정합.
+          setAudioModeAsync({ playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'duckOthers' })
             .then(() => { try { s.play(); } catch (e: any) { appendAlarmAudioLog(`resume play: ${e?.message || e}`); } })
             .catch((e: any) => appendAlarmAudioLog(`resume setAudioModeAsync: ${e?.message || e}`));
         }

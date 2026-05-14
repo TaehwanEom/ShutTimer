@@ -328,9 +328,12 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
     return null;
   }
 
-  if (!ar.awaitingConfirm) {
-    // v1.8 #CalendarCategory — executionId 측 = `${routineId}_${startedAt}` 측 = 매 실행별 분리 grouping.
+  // v1.8 #CalendarCategory — 사용자 측 "미션 완료" 누름 직후 현재 step 측 record.
+  // 회귀 정정 = 직전 측 `if (!ar.awaitingConfirm)` 가드 측 = markAwaitingConfirm 측 step alerting 시 awaitingConfirm=true 저장 → completeCurrentMission 진입 시 가드 측 차단 → record ❌ 회귀.
+  try {
     await recordStepSession(routine, ar.currentStepIndex, `${routine.id}_${ar.startedAt}`);
+  } catch (e) {
+    Logger.warn('routine', `recordStepSession completeCurrentMission fail idx=${ar.currentStepIndex} err=${String(e)}`);
   }
 
   // v1.6 hotfix — 단일 timer #2 와 동일 안티 패턴 제거. cancelBackgroundNotif 호출 시

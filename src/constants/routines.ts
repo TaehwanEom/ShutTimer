@@ -199,6 +199,10 @@ function isValidSchedule(s: any): s is RoutineSchedule {
   );
 }
 
+// v1.8 — endMethod 허용 목록을 RoutineEndMethod 타입 정의 (= 6개)와 일치시킴.
+// 직전 = 'tap' / 'shake' / 'camera' 3개만 검사 → 'math' / 'typing' / 'random' endMethod 측 routine 이 loadRoutines filter 에서 제외 → findRoutine null → startRoutine 'not_found' → 알람 루틴 step 진행 시작 불가 회귀 원인.
+const VALID_END_METHODS: ReadonlyArray<RoutineEndMethod> = ['tap', 'shake', 'camera', 'math', 'typing', 'random'];
+
 function isValidRoutine(r: any): r is Routine {
   return (
     r &&
@@ -208,7 +212,7 @@ function isValidRoutine(r: any): r is Routine {
     r.steps.every(isValidStep) &&
     (r.schedule === undefined || isValidSchedule(r.schedule)) &&
     typeof r.active === 'boolean' &&
-    (r.endMethod === 'tap' || r.endMethod === 'shake' || r.endMethod === 'camera') &&
+    VALID_END_METHODS.includes(r.endMethod) &&
     typeof r.createdAt === 'number'
   );
 }

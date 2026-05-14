@@ -264,6 +264,32 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         error: t('alarm.validate.daysEmpty', { defaultValue: '요일을 선택해주세요' }),
       };
     }
+    // v1.8 회귀 정정 — step 측 추가 시 라벨 + 각 step 측 이름 + duration 측 필수.
+    const populatedSteps = steps.filter(
+      s => s.name.trim().length > 0 || s.durationSeconds > 0
+    );
+    if (populatedSteps.length > 0) {
+      if (label.trim().length === 0) {
+        return {
+          ok: false,
+          error: t('alarm.validate.labelEmpty', { defaultValue: '알람 라벨을 입력해주세요' }),
+        };
+      }
+      for (const step of populatedSteps) {
+        if (step.name.trim().length === 0) {
+          return {
+            ok: false,
+            error: t('alarm.validate.stepNameEmpty', { defaultValue: '루틴 단계 이름을 입력해주세요' }),
+          };
+        }
+        if (step.durationSeconds <= 0) {
+          return {
+            ok: false,
+            error: t('alarm.validate.stepDurationEmpty', { defaultValue: '루틴 단계 시간을 설정해주세요' }),
+          };
+        }
+      }
+    }
     return { ok: true };
   };
 

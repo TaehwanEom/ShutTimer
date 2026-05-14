@@ -392,9 +392,6 @@ public class AlarmkitBridgeModule: Module {
         let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
         let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
         appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(alarm) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
-        // v1.8 #LARelevance — 발화 시각 가까울수록 relevanceScore 높게 → 잠금화면 LA banner / Dynamic Island 측 우선 표시.
-        // 공식 docs 측 = AlarmKit 자동 생성 Activity 측 relevanceScore set 영역 명시 ❌, 실험 영역.
-        Self.updateActivityRelevance(alarmId: id.uuidString, fireAtMs: params.fireAt)
         return id.uuidString
       }
 
@@ -452,8 +449,6 @@ public class AlarmkitBridgeModule: Module {
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
       appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(timer) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
-      // v1.8 #LARelevance — 동일 처리 (= 알람 + 타이머 동시 = 임박한 영역 우선 표시).
-      Self.updateActivityRelevance(alarmId: id.uuidString, fireAtMs: params.fireAt)
       // v1.7 hotfix #LAUnify Phase 10-G4dbg2 — system sync 시간 race 가능성 검증.
       // 5초 delay 후 다시 측정 → count 측 변화 ❓.
       Task {
@@ -644,55 +639,6 @@ public class AlarmkitBridgeModule: Module {
     }
   }
 
-  // v1.8 #LARelevance — AlarmKit framework 자동 생성 Activity 측 = relevanceScore 후처리 set 시도.
-  // 발화 시각이 가까울수록 score 큼 (= 잠금화면 LA banner + Dynamic Island 측 우선 표시).
-  //
-  // 공식 docs 측 = AlarmKit + relevanceScore 영역 명시 ❌ → 실험 영역.
-  // 실험 결과 = framework 측 update 무시 영역 가능 영역 = 실측 확인 강제.
-  //
-  // score 계산 = 60.0 / 발화까지초. 1분 안 = 1.0, 60초 = 1.0, 600초 = 0.1, 3600초 = 0.017.
-  // 0~1 클램프 영역. AlarmKit framework 측 = 본 update = 다음 state change 시 = 무효 영역 가능.
-  fileprivate static func updateActivityRelevance(alarmId: String, fireAtMs: Double) {
-    Task { @MainActor in
-      // v1.8 #LARelevanceTiming — AlarmKit framework 측 LA 활성 = 비동기 영역.
-      //   직전 = 200ms sleep → Activity.activities 측 = activity not found 다수.
-      //   정정 = 5초 sleep → log 측 post-schedule(timer)+5s 시점 = Activity.activities.count >= 1 정합.
-      try? await Task.sleep(nanoseconds: 5_000_000_000)
-      let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
-      // v1.8 #LARelevanceMatch — Activity.id (= system UUID) ≠ Alarm.id (= app UUID) 영역.
-      //   직전 = $0.id == alarmId 측 = 항상 nil 영역. 정정 = metadata.alarmId 측 매칭 영역.
-      guard let activity = activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) else {
-        appendNativeDbg("LA-DBG-AKLA-Relevance", "skip alarmId=\(alarmId) activity not found")
-        return
-      }
-      let nowMs = Date().timeIntervalSince1970 * 1000
-      let secondsUntilFire = max(1.0, (fireAtMs - nowMs) / 1000.0)
-      let relevanceScore = max(0.0, min(1.0, 60.0 / secondsUntilFire))
-      let currentState = activity.content.state
-      let newContent = ActivityContent(state: currentState, staleDate: nil, relevanceScore: relevanceScore)
-      await activity.update(newContent)
-      appendNativeDbg("LA-DBG-AKLA-Relevance", "set alarmId=\(alarmId) secondsUntilFire=\(Int(secondsUntilFire)) score=\(relevanceScore)")
-
-      // v1.8 #LARelevanceReadback — update 후 framework 측 content.relevanceScore 실측 (A/B/C 판별 측).
-      //   A = framework 측 manual update 무시 → immediate actual = 0 / nil
-      //   B = update 반영 ✅, framework 측 다음 cycle 측 복원 → +10s/+30s 측 = 0 회귀
-      //   C = update 반영 + 유지 → +30s 측 = 우리 측 score 그대로 (= 그러나 잠금화면 정렬 ❌ → iOS score 무관)
-      let scoreImmediate = activity.content.relevanceScore
-      appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "immediate alarmId=\(alarmId) expected=\(relevanceScore) actual=\(scoreImmediate)")
-      try? await Task.sleep(nanoseconds: 10_000_000_000)
-      if let a10 = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) {
-        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+10s alarmId=\(alarmId) actual=\(a10.content.relevanceScore)")
-      } else {
-        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+10s alarmId=\(alarmId) activity not found")
-      }
-      try? await Task.sleep(nanoseconds: 20_000_000_000)
-      if let a30 = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) {
-        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+30s alarmId=\(alarmId) actual=\(a30.content.relevanceScore)")
-      } else {
-        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+30s alarmId=\(alarmId) activity not found")
-      }
-    }
-  }
 }
 
 // v1.6+ — recurrence 옵션 (= AlarmKit `.relative(.weekly([...]))` 측 OS 자동 반복).

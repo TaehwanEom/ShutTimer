@@ -15,6 +15,7 @@ import {
   Alert,
   Linking,
   Switch,
+  Keyboard,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -265,6 +266,8 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   };
 
   const handleStepDurationTap = (idx: number) => {
+    // v1.8 — 시간 설정 진입 시 키보드 닫힘. picker 닫힘 후 키보드 자동 복귀 회귀 차단.
+    Keyboard.dismiss();
     setDurationPickerStepIndex(idx);
     setDurationPickerVisible(true);
   };

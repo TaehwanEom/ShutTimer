@@ -92,7 +92,8 @@ export type RootStackParamList = {
   Notice: undefined;
   MissionSelect: undefined;
   // @v1.6 루틴 기능
-  RoutineList: { initialTab?: 'scheduled' | 'manual' } | undefined;
+  // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측만 사용.
+  // 탭 정보 측 = AsyncStorage 측 'pendingRoutineInitialTab' 키 임시 전달.
   RoutineEdit: {
     routineId?: string;
     /** 신규 생성 시 모드 — 미지정 시 'scheduled' default. 편집 모드면 무시 (기존 routine 의 schedule 유무 유지) */
@@ -404,7 +405,7 @@ function AppNavigator() {
         }
         // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-        if (currentRoute === 'RoutineAlarm' || currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
+        if (currentRoute === 'RoutineAlarm' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
@@ -444,7 +445,7 @@ function AppNavigator() {
         if (!meta) return;
         const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
         // 다른 알림 핸들러가 이미 navigate 했으면 skip
-        if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+        if ((currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
 
         if (meta.type === 'chain') {
           // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). cold-start 잔존 mapping silent cleanup.
@@ -596,7 +597,7 @@ function AppNavigator() {
                 // v1.7 hotfix #routine-tab-unify Phase 2 — 단일 변환. fast 분기 측 'open_app_dismiss' non-adhoc 영역.
                 // Bottom Tab 'RoutineTab' 단일 진입 경로 통합 영역 (= 사용자분 측 = "또다른 루틴 페이지" 정합).
                 // 본 commit = 본 1줄만 변환. 다른 navigate 측 = 다음 phase 영역.
-                if (routeFast !== 'RoutineList' && (routeFast as string) !== 'RoutineTab') {
+                if ((routeFast as string) !== 'RoutineTab') {
                   Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineTab (route=${routeFast})`);
                   (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                 } else {
@@ -657,7 +658,7 @@ function AppNavigator() {
                     Logger.warn('LAControl-DBG', `standard adhoc navigate skip (route=${route})`);
                   }
                 } else {
-                  if (route !== 'RoutineList' && (route as string) !== 'RoutineTab') {
+                  if ((route as string) !== 'RoutineTab') {
                     Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineTab (route=${route})`);
                     Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-stopRoutine currentRoute=${route}`);
                     (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
@@ -675,7 +676,7 @@ function AppNavigator() {
                   (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
                 }
               } else {
-                if (route !== 'Alarm' && route !== 'RoutineList' && (route as string) !== 'RoutineTab') {
+                if (route !== 'Alarm' && (route as string) !== 'RoutineTab') {
                   Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-default currentRoute=${route}`);
                   (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
                 }
@@ -770,7 +771,7 @@ function AppNavigator() {
       // L331 getLastNotificationResponseAsync 핸들러가 이미 RoutineList/RoutineAlarm 로 navigate 했으면 skip
       // (알림 탭으로 앱 진입 시 양쪽 모두 fire → RoutineAlarm 2개 stack 되는 회귀 차단)
       const currentRoute = navigationRef.current.getCurrentRoute()?.name;
-      if (currentRoute === 'RoutineList' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+      if ((currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
       restoreRoutineState()
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
@@ -830,7 +831,6 @@ function AppNavigator() {
         <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
         <Stack.Screen name="MissionSelect" component={MissionSelectScreen} />
-        <Stack.Screen name="RoutineList" component={RoutineListScreen} />
         <Stack.Screen name="RoutineEdit" component={RoutineEditScreen} />
         <Stack.Screen name="RoutineAlarm" component={RoutineAlarmScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />

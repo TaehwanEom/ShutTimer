@@ -173,7 +173,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         globalEndMethod !== 'typing' &&
         globalEndMethod !== 'random'
       ) {
-        navigation.replace('RoutineList');
+        // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측으로 reset.
+        navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
         return;
       }
 

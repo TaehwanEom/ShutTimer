@@ -18,7 +18,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp, useFocusEffect, StackActions } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
@@ -398,9 +399,12 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       await cancelRoutinePrealerts(routine.id);
     }
     if (!isMountedRef.current) return;
-    // RoutineEdit 을 stack 에서 제거하면서 RoutineList 의 initialTab 으로 복귀
-    // navigate 사용 시 RoutineEdit 위에 RoutineList 새 인스턴스가 push 되어 뒤로가기 시 RoutineEdit 노출되는 버그 회피
-    navigation.dispatch(StackActions.popTo('RoutineList', { initialTab: mode }));
+    // v1.8 — RoutineList Stack.Screen 제거 후 popTo → goBack + AsyncStorage 측 탭 정보 임시 전달.
+    // RoutineListScreen mount/focus 시 키 읽음 + 탭 선택 + 즉시 삭제.
+    try {
+      await AsyncStorage.setItem('pendingRoutineInitialTab', mode);
+    } catch {}
+    navigation.goBack();
   };
 
   const handleDelete = () => {

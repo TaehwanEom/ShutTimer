@@ -347,8 +347,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const ar = JSON.parse(arRaw);
         // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측 영역) 시 = RoutineList 강제 이동 ❌ → AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
         if (ar?.routineId && !isAdhocAlarmRoutine(ar.routineId)) {
-          Logger.warn('NAV-DBG-COLD', `AlarmScreen-guard replace RoutineList isRoutineActive=true ar.routineId=${ar.routineId}`);
-          navigation.replace('RoutineList');
+          Logger.warn('NAV-DBG-COLD', `AlarmScreen-guard reset RoutineTab isRoutineActive=true ar.routineId=${ar.routineId}`);
+          // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측으로 reset.
+          navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
         }
       } catch {}
     }).catch(() => {});

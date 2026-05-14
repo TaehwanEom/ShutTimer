@@ -19,7 +19,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
+import { useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import ActiveRoutineSection from '../components/ActiveRoutineSection';
@@ -45,6 +45,7 @@ import {
 } from '../utils/routineScheduler';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { Logger } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   pauseRoutine,
   resumeRoutine,
@@ -55,11 +56,11 @@ import {
   loadCustomCategories,
 } from '../constants/categories';
 import AdBanner from '../components/AdBanner';
-import BottomTabBar from '../components/BottomTabBar';
 
+// v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측만 사용.
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineList'>;
-  route: RouteProp<RootStackParamList, 'RoutineList'>;
+  navigation: NativeStackNavigationProp<RootStackParamList>;
+  route: RouteProp<RootStackParamList, 'RoutineEdit'> | { params?: undefined };
 };
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -745,9 +746,6 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const styles = makeStyles(colors);
-  // v1.8 — Stack.Screen 'RoutineList' 진입 시에만 BottomTabBar 명시 렌더 (= MainTabsNavigator 'RoutineTab' 측은 default tabBar 자동).
-  const currentRouteName = useRoute().name;
-  const showBottomTabBar = currentRouteName === 'RoutineList';
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
   const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
@@ -777,14 +775,18 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const autoFocusedRef = useRef<string | null>(null);
   const scrollOffsetYRef = useRef(0); // ScrollView 현재 contentOffset.y — onScroll 로 갱신
 
-  // RoutineEdit 저장 후 navigate 로 전달된 initialTab → activeTab 동기화 후 params clear
-  useEffect(() => {
-    const initialTab = route.params?.initialTab;
-    if (initialTab) {
-      setActiveTab(initialTab);
-      navigation.setParams({ initialTab: undefined });
-    }
-  }, [route.params?.initialTab, navigation]);
+  // v1.8 — RoutineEdit 저장 후 AsyncStorage 측 pendingRoutineInitialTab 읽기 → activeTab 동기 + 즉시 삭제.
+  // 직전 = route.params?.initialTab 측 popTo 패턴 → AsyncStorage 측 전환 (= RoutineList Stack.Screen 제거 정합).
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('pendingRoutineInitialTab').then((val) => {
+        if (val === 'scheduled' || val === 'manual') {
+          setActiveTab(val);
+          AsyncStorage.removeItem('pendingRoutineInitialTab').catch(() => {});
+        }
+      }).catch(() => {});
+    }, [])
+  );
 
   const formatCategoryLabel = useCallback((id: string): string => {
     const fixed = FIXED_CATEGORIES.find(c => c.id === id);
@@ -1134,7 +1136,6 @@ export default function RoutineListScreen({ navigation, route }: Props) {
       </ScrollView>
       </View>
       <AdBanner />
-      {showBottomTabBar && <BottomTabBar />}
     </SafeAreaView>
   );
 }

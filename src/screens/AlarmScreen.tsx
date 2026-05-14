@@ -762,6 +762,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     return () => {
       audioStateSub.remove();
       try { soundRef.current?.release(); } catch {}
+      // v1.8 #AudioRestore — unmount 시 audio session 복구 (= duckOthers → mixWithOthers).
+      //   직전 = duckOthers 잔존 영역 → 알람 종료 후 = 음악 / 티맵 볼륨 복구 ❌.
+      //   정정 = mixWithOthers 측 = 다른 audio mix 영역 → 볼륨 자동 복구.
+      setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
+        interruptionMode: 'mixWithOthers'
+      }).catch(() => {});
     };
   }, []);
 

@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, PanResponder, Animated, Easing, TouchableOpacity, TextInput } from 'react-native';
-import Svg, { Rect, Path, Defs, RadialGradient, Stop } from 'react-native-svg';
-const AnimatedSvgPath = Animated.createAnimatedComponent(Path);
+import { View, Text, StyleSheet, PanResponder, Animated, TouchableOpacity, TextInput } from 'react-native';
+import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import SevenSegment from './SevenSegment';
 
@@ -29,25 +28,7 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
   const now = new Date();
   const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
 
-  // 초당 800ms 짧은 애니메이션 — 부드럽고 배터리 효율적
-  const smoothGauge = useRef(new Animated.Value(progress)).current;
-  useEffect(() => {
-    if (!isRunning || isPaused) {
-      smoothGauge.stopAnimation();
-      if (!isRunning) smoothGauge.setValue(1);
-      // v1.8 #PausedDialEdit — paused 측 키패드 입력 측 progress 변경 시 게이지 즉시 동기.
-      else if (isPaused) smoothGauge.setValue(progress);
-      return;
-    }
-    const anim = Animated.timing(smoothGauge, {
-      toValue: progress,
-      duration: 1000,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    });
-    anim.start();
-    return () => anim.stop();
-  }, [progress, isRunning, isPaused]);
+  // v1.8 — ring 게이지 제거 후 smoothGauge ref + useEffect 측 dead code 정리.
   const hiddenInputRef = useRef<TextInput>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');

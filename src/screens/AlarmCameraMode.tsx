@@ -21,12 +21,13 @@ import {
   useCameraPermission,
   useFrameProcessor,
 } from 'react-native-vision-camera';
-import { useTensorflowModel } from 'react-native-fast-tflite';
+import { type TensorflowModel } from 'react-native-fast-tflite';
 import { NitroModules } from 'react-native-nitro-modules';
 import { useResizePlugin } from 'vision-camera-resize-plugin';
 import { useRunOnJS, useSharedValue, type ISharedValue } from 'react-native-worklets-core';
 import { parseYolov10Output, type Detection } from '../utils/objectDetection';
 import { MISSION_EMOJI } from '../constants/missionIcons';
+import { getTfliteModel } from '../utils/tfliteModelCache';
 
 const TARGET_CONFIDENCE = 0.4;
 const THROTTLE_MS = 800;
@@ -150,12 +151,23 @@ export default function AlarmCameraMode(props: Props) {
     return candidates[0] ?? device.formats[0];
   }, [device]);
 
-  // tflite 모델 로드 (heavy — 이 컴포넌트가 마운트될 때만 로드)
-  const plugin = useTensorflowModel(
-    require('../../assets/models/yolov10s_float16.tflite'),
-    Platform.OS === 'ios' ? ['core-ml'] : []
-  );
-  const model = plugin.state === 'loaded' ? plugin.model : undefined;
+  // v1.8 #TfliteSingleton — module-level singleton cache (= getTfliteModel).
+  //   직전 = useTensorflowModel hook → 매 mount 시 15MB 모델 새로 load (= 발열 root cause 후보).
+  //   정정 = 첫 load 후 cache → 두 번째 알람부터 0초 영역. tap/shake 모드 측 mount 스킵 의도 잔존 ✅.
+  const [model, setModel] = useState<TensorflowModel | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    getTfliteModel()
+      .then((m) => {
+        if (!cancelled) setModel(m);
+      })
+      .catch((e: any) => {
+        console.warn('[TfliteCache] load fail:', e?.message || e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const boxedModel = useMemo(
     () => (model != null ? NitroModules.box(model) : undefined),
     [model]

@@ -672,6 +672,25 @@ public class AlarmkitBridgeModule: Module {
       let newContent = ActivityContent(state: currentState, staleDate: nil, relevanceScore: relevanceScore)
       await activity.update(newContent)
       appendNativeDbg("LA-DBG-AKLA-Relevance", "set alarmId=\(alarmId) secondsUntilFire=\(Int(secondsUntilFire)) score=\(relevanceScore)")
+
+      // v1.8 #LARelevanceReadback — update 후 framework 측 content.relevanceScore 실측 (A/B/C 판별 측).
+      //   A = framework 측 manual update 무시 → immediate actual = 0 / nil
+      //   B = update 반영 ✅, framework 측 다음 cycle 측 복원 → +10s/+30s 측 = 0 회귀
+      //   C = update 반영 + 유지 → +30s 측 = 우리 측 score 그대로 (= 그러나 잠금화면 정렬 ❌ → iOS score 무관)
+      let scoreImmediate = activity.content.relevanceScore
+      appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "immediate alarmId=\(alarmId) expected=\(relevanceScore) actual=\(scoreImmediate)")
+      try? await Task.sleep(nanoseconds: 10_000_000_000)
+      if let a10 = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) {
+        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+10s alarmId=\(alarmId) actual=\(a10.content.relevanceScore)")
+      } else {
+        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+10s alarmId=\(alarmId) activity not found")
+      }
+      try? await Task.sleep(nanoseconds: 20_000_000_000)
+      if let a30 = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) {
+        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+30s alarmId=\(alarmId) actual=\(a30.content.relevanceScore)")
+      } else {
+        appendNativeDbg("LA-DBG-AKLA-RelevanceReadback", "+30s alarmId=\(alarmId) activity not found")
+      }
     }
   }
 }

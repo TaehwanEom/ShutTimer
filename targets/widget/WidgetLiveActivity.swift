@@ -39,6 +39,20 @@ fileprivate func appendNativeDbgWidget(_ tag: String, _ msg: String, throttle: B
     d.set(lines.joined(separator: "\n"), forKey: NATIVE_DBG_KEY)
 }
 
+// v1.8 — 일반 알람 측 LA 숨김 헬퍼.
+//   routineId 'a_' prefix + 'aa_' prefix ❌ = 일반 알람 (= AlarmListScreen 등록).
+//   alert mode 측 = 발화 시점 = 표시 유지 (= 사용자 dismiss 액션 보장).
+//   ad-hoc routine ('aa_a_xxx') / 일반 routine ('r_xxx') / 타이머 ('main_timer_xxx') 측 = 표시 유지.
+fileprivate func shouldHideForPlainAlarm(_ context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>) -> Bool {
+    let routineId = context.attributes.metadata?.routineId ?? ""
+    let isPlainAlarm = routineId.hasPrefix("a_") && !routineId.hasPrefix("aa_")
+    let isAlertMode: Bool = {
+        if case .alert = context.state.mode { return true }
+        return false
+    }()
+    return isPlainAlarm && !isAlertMode
+}
+
 // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmPresentationState.Mode 측 String 변환 helper.
 // dbg log 측 mode 분기 + associated value 핵심 데이터 명시용.
 fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
@@ -84,29 +98,51 @@ struct AlarmKitLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(context.attributes.metadata?.routineName ?? "타이머")
-                            .font(.caption)
-                            .foregroundColor(.brand)
-                            .lineLimit(1)
-                        AlarmKitCountdownText(context: context, fontStyle: .title2.weight(.bold))
+                    if shouldHideForPlainAlarm(context) {
+                        EmptyView()
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(context.attributes.metadata?.routineName ?? "타이머")
+                                .font(.caption)
+                                .foregroundColor(.brand)
+                                .lineLimit(1)
+                            AlarmKitCountdownText(context: context, fontStyle: .title2.weight(.bold))
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    AlarmKitTrailingButtons(context: context)
+                    if shouldHideForPlainAlarm(context) {
+                        EmptyView()
+                    } else {
+                        AlarmKitTrailingButtons(context: context)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    AlarmKitStepBottomLabel(context: context)
+                    if shouldHideForPlainAlarm(context) {
+                        EmptyView()
+                    } else {
+                        AlarmKitStepBottomLabel(context: context)
+                    }
                 }
             } compactLeading: {
-                Text(context.attributes.metadata?.routineName ?? "타이머")
-                    .font(.caption2)
-                    .foregroundColor(.brand)
-                    .lineLimit(1)
+                if shouldHideForPlainAlarm(context) {
+                    EmptyView()
+                } else {
+                    Text(context.attributes.metadata?.routineName ?? "타이머")
+                        .font(.caption2)
+                        .foregroundColor(.brand)
+                        .lineLimit(1)
+                }
             } compactTrailing: {
-                AlarmKitCompactTrailingView(context: context)
+                if shouldHideForPlainAlarm(context) {
+                    EmptyView()
+                } else {
+                    AlarmKitCompactTrailingView(context: context)
+                }
             } minimal: {
-                if case .paused = context.state.mode {
+                if shouldHideForPlainAlarm(context) {
+                    EmptyView()
+                } else if case .paused = context.state.mode {
                     Image(systemName: "pause.circle.fill").foregroundColor(.brand)
                 } else {
                     Image(systemName: "timer").foregroundColor(.brand)

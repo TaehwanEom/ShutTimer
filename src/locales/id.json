@@ -299,7 +299,33 @@
   },
   "notices": {
     "title": "Pemberitahuan",
-    "empty": "Tidak ada pemberitahuan"
+    "empty": "Tidak ada pemberitahuan",
+    "content": {
+      "v18_dial_edit": {
+        "title": "Sesuaikan waktu saat dijeda",
+        "message": "Saat timer dijeda, Anda kini dapat memutar dial atau menyentuh angka digital untuk membuka keypad dan menambah atau mengurangi waktu."
+      },
+      "v18_calendar_categories": {
+        "title": "Kategori kalender + detik",
+        "message": "Catatan kalender kini terbagi menjadi 3 kategori: Timer, Rutinitas, dan Alarm. Lipatan dua tingkat dan tampilan detik memungkinkan pemeriksaan catatan secara lebih rinci."
+      },
+      "v18_settings_help": {
+        "title": "Bantuan ditambahkan ke Pengaturan",
+        "message": "Menambahkan 5 item bantuan ke layar Pengaturan: Cara berhenti, Panduan rutinitas, Panduan rutinitas alarm, Panduan dial, dan Laporan bug."
+      },
+      "v18_digital_ring_removed": {
+        "title": "Pembenahan timer digital",
+        "message": "Menghapus pengukur cincin dari timer digital untuk tampilan yang lebih bersih."
+      },
+      "v18_mission_slot_machine": {
+        "title": "Efek slot misi + merah saat salah",
+        "message": "Menambahkan efek mesin slot saat misi matematika dan dikte muncul. Jika jawaban salah, teks pertanyaan akan berkedip merah sebentar."
+      },
+      "v18_mission_unlimited": {
+        "title": "Timer misi \"Tanpa batas\"",
+        "message": "Menambahkan opsi \"Tanpa batas\" ke timer misi, sehingga dapat digunakan sebagai terompet bangun tanpa batas waktu."
+      }
+    }
   },
   "onboarding": {
     "greeting": "Halo.",

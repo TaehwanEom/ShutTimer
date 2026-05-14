@@ -74,7 +74,7 @@ export default function NoticeScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const styles = makeStyles(colors);
 
-  const [notices, setNotices] = useState<{ id: string; date: string; title: string; message: string }[]>([]);
+  const [notices, setNotices] = useState<{ id: string; date: string; title?: string; message?: string; i18nKey?: string }[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -105,15 +105,19 @@ export default function NoticeScreen({ navigation }: Props) {
           {notices.length === 0 ? (
             <Text style={styles.empty}>{t('notices.empty')}</Text>
           ) : (
-            notices.map(n => (
-              <View key={n.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardTitle}>{n.title}</Text>
-                  <Text style={styles.cardDate}>{n.date}</Text>
+            notices.map(n => {
+              const title = n.i18nKey ? t(`notices.content.${n.i18nKey}.title`, { defaultValue: n.title ?? '' }) : (n.title ?? '');
+              const message = n.i18nKey ? t(`notices.content.${n.i18nKey}.message`, { defaultValue: n.message ?? '' }) : (n.message ?? '');
+              return (
+                <View key={n.id} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>{title}</Text>
+                    <Text style={styles.cardDate}>{n.date}</Text>
+                  </View>
+                  <Text style={styles.cardMessage}>{message}</Text>
                 </View>
-                <Text style={styles.cardMessage}>{n.message}</Text>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>

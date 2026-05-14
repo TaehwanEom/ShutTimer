@@ -299,7 +299,33 @@
   },
   "notices": {
     "title": "Avisos",
-    "empty": "Nenhum aviso"
+    "empty": "Nenhum aviso",
+    "content": {
+      "v18_dial_edit": {
+        "title": "Ajustar o tempo em pausa",
+        "message": "Enquanto o cronômetro está em pausa, agora você pode girar o disco ou tocar nos dígitos digitais para abrir o teclado e adicionar ou reduzir o tempo."
+      },
+      "v18_calendar_categories": {
+        "title": "Categorias do calendário + segundos",
+        "message": "Os registros do calendário agora estão divididos em 3 categorias: Cronômetro, Rotina e Alarme. O recolhimento em dois níveis e a exibição em segundos permitem inspecionar os registros com mais detalhes."
+      },
+      "v18_settings_help": {
+        "title": "Ajuda adicionada às Configurações",
+        "message": "Foram adicionados 5 itens de ajuda à tela de Configurações: Método de parada, Guia de rotinas, Guia de rotinas de alarme, Guia do disco e Relato de bug."
+      },
+      "v18_digital_ring_removed": {
+        "title": "Cronômetro digital reorganizado",
+        "message": "O medidor em anel do cronômetro digital foi removido para uma exibição mais limpa."
+      },
+      "v18_mission_slot_machine": {
+        "title": "Caça-níqueis nas missões + vermelho ao errar",
+        "message": "Adicionamos um efeito de caça-níqueis ao aparecimento das missões de matemática e ditado. Em caso de resposta errada, o texto da pergunta pisca rapidamente em vermelho."
+      },
+      "v18_mission_unlimited": {
+        "title": "Cronômetro de missão \"Ilimitado\"",
+        "message": "Foi adicionada a opção \"Ilimitado\" ao cronômetro de missão. Pode ser usado como uma corneta de despertar sem limite de tempo."
+      }
+    }
   },
   "onboarding": {
     "greeting": "Olá.",

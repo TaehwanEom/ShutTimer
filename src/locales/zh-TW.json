@@ -306,7 +306,33 @@
   },
   "notices": {
     "title": "通知",
-    "empty": "目前沒有通知"
+    "empty": "目前沒有通知",
+    "content": {
+      "v18_dial_edit": {
+        "title": "暫停時調整時間",
+        "message": "計時器暫停中也可以轉動轉盤，或點擊數字打開鍵盤來增減時間。"
+      },
+      "v18_calendar_categories": {
+        "title": "日曆分類 + 秒級顯示",
+        "message": "日曆記錄現在分為計時器、行程、鬧鐘三個分類。支援兩級摺疊與秒級顯示，可更詳細地檢視記錄。"
+      },
+      "v18_settings_help": {
+        "title": "設定中新增說明",
+        "message": "在設定頁面新增了「停止方式」「行程使用方法」「鬧鐘行程使用方法」「轉盤使用方法」「問題回報」5 項說明。"
+      },
+      "v18_digital_ring_removed": {
+        "title": "數位計時器整理",
+        "message": "移除了數位計時器的環形進度條，顯示更整潔。"
+      },
+      "v18_mission_slot_machine": {
+        "title": "任務老虎機效果 + 錯誤變紅",
+        "message": "數學與聽寫任務出現時新增老虎機滾動效果。回答錯誤時題目文字會短暫閃紅。"
+      },
+      "v18_mission_unlimited": {
+        "title": "任務計時器「無限制」",
+        "message": "任務計時器新增「無限制」選項。可作為沒有時間限制的起床號角使用。"
+      }
+    }
   },
   "onboarding": {
     "greeting": "你好。",

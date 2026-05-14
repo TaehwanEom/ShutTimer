@@ -299,7 +299,33 @@
   },
   "notices": {
     "title": "Bildirimler",
-    "empty": "Bildirim yok"
+    "empty": "Bildirim yok",
+    "content": {
+      "v18_dial_edit": {
+        "title": "Duraklatılmışken süreyi ayarla",
+        "message": "Zamanlayıcı duraklatıldığında bile, kadranı çevirerek veya dijital rakamlara dokunarak klavyeyi açıp süre ekleyip azaltabilirsiniz."
+      },
+      "v18_calendar_categories": {
+        "title": "Takvim kategorileri + saniye",
+        "message": "Takvim kayıtları artık 3 kategoriye bölündü: Zamanlayıcı, Rutin ve Alarm. İki düzey katlanma ve saniye düzeyinde görüntüleme ile kayıtları daha ayrıntılı inceleyebilirsiniz."
+      },
+      "v18_settings_help": {
+        "title": "Ayarlara yardım eklendi",
+        "message": "Ayarlar ekranına 5 yardım maddesi eklendi: Durdurma yöntemi, Rutin rehberi, Alarm rutini rehberi, Kadran rehberi ve Hata bildirimi."
+      },
+      "v18_digital_ring_removed": {
+        "title": "Dijital zamanlayıcı düzenlendi",
+        "message": "Dijital zamanlayıcıdan halka göstergesi kaldırılarak daha sade bir görünüm sağlandı."
+      },
+      "v18_mission_slot_machine": {
+        "title": "Görev slot makinesi + yanlışta kırmızı",
+        "message": "Matematik ve dikte görevleri belirirken slot makinesi efekti eklendi. Yanlış cevap verildiğinde soru metni kısa süreliğine kırmızı yanıp söner."
+      },
+      "v18_mission_unlimited": {
+        "title": "Görev zamanlayıcısı \"Sınırsız\"",
+        "message": "Görev zamanlayıcısına \"Sınırsız\" seçeneği eklendi. Süre sınırı olmadan uyandırma borusu olarak da kullanabilirsiniz."
+      }
+    }
   },
   "onboarding": {
     "greeting": "Merhaba.",

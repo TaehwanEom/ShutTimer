@@ -299,7 +299,33 @@
   },
   "notices": {
     "title": "Mitteilungen",
-    "empty": "Keine Mitteilungen"
+    "empty": "Keine Mitteilungen",
+    "content": {
+      "v18_dial_edit": {
+        "title": "Zeit im Pausenmodus anpassen",
+        "message": "Während der Timer pausiert ist, kannst du jetzt am Wählrad drehen oder auf die Digitalziffern tippen, um das Tastenfeld zu öffnen und Zeit hinzuzufügen oder zu verringern."
+      },
+      "v18_calendar_categories": {
+        "title": "Kalender-Kategorien + Sekunden",
+        "message": "Die Kalendereinträge sind jetzt in 3 Kategorien aufgeteilt: Timer, Routine und Wecker. Zweistufiges Ausklappen und Sekundenanzeige erlauben einen detaillierteren Einblick."
+      },
+      "v18_settings_help": {
+        "title": "Hilfe in den Einstellungen",
+        "message": "Es wurden 5 Hilfeeinträge zu den Einstellungen hinzugefügt: Beendigungsart, Routine-Anleitung, Wecker-Routine-Anleitung, Wählrad-Anleitung und Fehlermeldung."
+      },
+      "v18_digital_ring_removed": {
+        "title": "Digital-Timer aufgeräumt",
+        "message": "Die Ring-Anzeige des Digital-Timers wurde entfernt, damit die Darstellung übersichtlicher wirkt."
+      },
+      "v18_mission_slot_machine": {
+        "title": "Spielautomaten-Effekt + Rot bei Fehler",
+        "message": "Beim Erscheinen von Mathe- und Diktat-Missionen wurde ein Spielautomaten-Effekt ergänzt. Bei einer falschen Antwort blinkt der Fragetext kurz rot."
+      },
+      "v18_mission_unlimited": {
+        "title": "Missions-Timer „Unbegrenzt“",
+        "message": "Der Missions-Timer hat jetzt eine Option „Unbegrenzt“. So lässt er sich wie ein Wecker ohne Zeitlimit verwenden."
+      }
+    }
   },
   "onboarding": {
     "greeting": "Hallo.",

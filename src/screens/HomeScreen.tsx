@@ -611,6 +611,9 @@ export default function HomeScreen({ navigation, route }: Props) {
       date,
       icon,
       minutes: Math.max(1, Math.round(totalSecs / 60)),
+      // v1.8 #CalendarCategory — 타이머 카테고리 + 초 단위 정확 저장.
+      type: 'timer',
+      totalSeconds: Math.max(0, Math.round(totalSecs)),
     };
     const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];

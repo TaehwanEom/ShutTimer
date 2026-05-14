@@ -29,7 +29,7 @@ import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
-import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
+import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
 import { stopRoutine } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
@@ -428,6 +428,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const a = alarms.find(x => x.id === alarmEntityId);
         if (a && a.steps && a.steps.length > 0) {
           await startRoutineFromAlarm(a).catch(() => {});
+        } else if (a) {
+          // v1.8 #CalendarCategory — 일반 알람 (= step ❌) 측 dismiss 시 sessions 기록.
+          await recordAlarmSession(a.label).catch(() => {});
         }
       } catch {
         // alarm 로드 / 시작 실패 = AlarmTab 복귀 정공 유지 (= 시작 위치 보존).

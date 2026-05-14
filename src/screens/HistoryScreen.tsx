@@ -111,6 +111,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   sessionLabel: { fontSize: 15, fontWeight: '700', color: colors.onBackground, flex: 1 },
   sessionMinutes: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  // v1.8 #CalendarCategory — 카테고리 접기 header. fontSize 측만 키움.
+  catHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginBottom: 6, marginTop: 4,
+    gap: 6,
+  },
+  catTitle: {
+    fontSize: 20, fontWeight: '800', color: colors.secondary, flex: 1,
+    letterSpacing: 0.4,
+  },
+  catCount: {
+    fontSize: 12, fontWeight: '700', color: colors.secondary,
+    opacity: 0.6,
+  },
   noSession: {
     textAlign: 'center', color: colors.secondary,
     fontSize: 14, marginTop: 16, opacity: 0.6,
@@ -252,6 +266,36 @@ export default function HistoryScreen({ navigation }: Props) {
     return t('history.minutesOnly', { minutes, defaultValue: `${minutes}분` });
   }, [t]);
 
+  // v1.8 #CalendarCategory — 초 단위 정확 표시 헬퍼. <60초 = "N초", 분 + 초 mix = "N분 M초".
+  const formatDuration = useCallback((totalSeconds: number) => {
+    const s = Math.max(0, Math.round(totalSeconds));
+    if (s < 60) return t('history.secondsOnly', { seconds: s, defaultValue: `${s}초` });
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) {
+      return t('history.hoursMinutes', { hours: h, minutes: m, defaultValue: `${h}시간 ${m}분` });
+    }
+    if (sec === 0) {
+      return t('history.minutesOnly', { minutes: m, defaultValue: `${m}분` });
+    }
+    return t('history.minutesSeconds', { minutes: m, seconds: sec, defaultValue: `${m}분 ${sec}초` });
+  }, [t]);
+
+  // v1.8 #CalendarCategory — type 추정 (= migration fallback. 옛 record 측 type/totalSeconds ❌).
+  const inferType = useCallback((s: SessionRecord): 'timer' | 'routine' | 'alarm' | 'alarmRoutine' => {
+    if (s.type) return s.type;
+    if (s.icon === 'timer') return 'timer';
+    if (s.icon === 'alarm') return 'alarm';
+    return 'routine'; // 옛 step record fallback
+  }, []);
+
+  // v1.8 #CalendarCategory — 카테고리 + executionId/label 측 2단 접기 expand state.
+  const [catExpanded, setCatExpanded] = useState<{ [key: string]: boolean }>({
+    timer: true, routine: true, alarm: true,
+  });
+  const [groupExpanded, setGroupExpanded] = useState<{ [key: string]: boolean }>({});
+
   const goPrevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
     else setMonth(m => m - 1);
@@ -370,23 +414,128 @@ export default function HistoryScreen({ navigation }: Props) {
 
         <View style={styles.divider} />
 
-        {/* 선택된 날 세션 */}
+        {/* 선택된 날 세션 — v1.8 #CalendarCategory: 타이머/루틴/알람 측 카테고리 + 라벨 2단 접기 */}
         <Text style={styles.sectionLabel}>{dateLabel}</Text>
         {sessions.length === 0 ? (
           <Text style={styles.noSession}>{t('history.noSessions')}</Text>
-        ) : (
-          sessions.map((s) => (
-            <View key={s.id} style={styles.sessionCard}>
-              <View style={styles.sessionIconWrap}>
-                <MaterialIcons name={((MaterialIcons as any).glyphMap?.[s.icon] ? s.icon : 'repeat') as any} size={20} color={colors.primary} />
+        ) : (() => {
+          // 카테고리별 분류 (= alarm 측 = 일반 알람 + 알람 루틴 통합 표시).
+          const timerList: SessionRecord[] = [];
+          const routineList: SessionRecord[] = [];
+          const alarmList: SessionRecord[] = []; // 일반 알람 (= step ❌)
+          const alarmRoutineList: SessionRecord[] = []; // 알람 루틴 (= step ✅)
+          for (const s of sessions) {
+            const tp = inferType(s);
+            if (tp === 'timer') timerList.push(s);
+            else if (tp === 'routine') routineList.push(s);
+            else if (tp === 'alarm') alarmList.push(s);
+            else alarmRoutineList.push(s);
+          }
+          // executionId (= routineId_startedAt) 측 = 같은 실행 측 step grouping. fallback = routineId.
+          const groupRoutine = (records: SessionRecord[]): Record<string, SessionRecord[]> => {
+            const map: Record<string, SessionRecord[]> = {};
+            for (const r of records) {
+              const key = r.executionId || r.routineId || r.id;
+              if (!map[key]) map[key] = [];
+              map[key].push(r);
+            }
+            return map;
+          };
+          const routineGroups = groupRoutine(routineList);
+          const alarmRoutineGroups = groupRoutine(alarmRoutineList);
+
+          // v1.8 #CalendarCategory — 카테고리 측 메뉴바 (= BottomTabBar) 측 동일 아이콘 정합.
+          const catIcon = (k: 'timer' | 'routine' | 'alarm'): React.ComponentProps<typeof MaterialIcons>['name'] =>
+            k === 'timer' ? 'timer' : k === 'routine' ? 'repeat' : 'alarm';
+
+          const renderCategory = (
+            catKey: 'timer' | 'routine' | 'alarm',
+            title: string,
+            count: number,
+            children: React.ReactNode
+          ) => {
+            const expanded = catExpanded[catKey] ?? true;
+            return (
+              <View key={catKey} style={{ marginTop: 8 }}>
+                <TouchableOpacity
+                  style={styles.catHeader}
+                  onPress={() => setCatExpanded(s => ({ ...s, [catKey]: !expanded }))}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name={catIcon(catKey)} size={20} color={colors.primary} />
+                  <Text style={styles.catTitle}>{title}</Text>
+                  <Text style={styles.catCount}>{count}</Text>
+                  <MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={22} color={colors.secondary} />
+                </TouchableOpacity>
+                {expanded && children}
               </View>
-              <Text style={styles.sessionLabel}>
-                {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`, { defaultValue: s.icon })}
-              </Text>
-              <Text style={styles.sessionMinutes}>{t('history.minutesFmt', { min: s.minutes })}</Text>
-            </View>
-          ))
-        )}
+            );
+          };
+
+          const renderGroup = (key: string, entries: SessionRecord[]) => {
+            const first = entries[0];
+            const expanded = !!groupExpanded[key];
+            const label = first.label || t('icons.' + first.icon, { defaultValue: first.icon });
+            const totalSecs = entries.reduce((acc, e) => acc + (e.totalSeconds ?? e.minutes * 60), 0);
+            return (
+              <View key={key}>
+                <TouchableOpacity
+                  style={styles.sessionCard}
+                  onPress={() => setGroupExpanded(s => ({ ...s, [key]: !expanded }))}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={20} color={colors.primary} />
+                  <Text style={styles.sessionLabel}>{label}</Text>
+                  {totalSecs > 0 && (
+                    <Text style={styles.sessionMinutes}>{formatDuration(totalSecs)}</Text>
+                  )}
+                </TouchableOpacity>
+                {expanded && entries.map((e) => (
+                  <View key={e.id} style={[styles.sessionCard, { marginLeft: 32, opacity: 0.85 }]}>
+                    <Text style={styles.sessionLabel}>{e.stepName || e.icon}</Text>
+                    <Text style={styles.sessionMinutes}>{formatDuration(e.totalSeconds ?? e.minutes * 60)}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          };
+
+          return (
+            <>
+              {timerList.length > 0 && renderCategory('timer', t('history.categoryTimer', { defaultValue: '타이머' }), timerList.length, (
+                <>
+                  {timerList.map((s) => (
+                    <View key={s.id} style={styles.sessionCard}>
+                      <Text style={styles.sessionLabel}>
+                        {s.icon === 'timer' ? t('history.timer') : t(`icons.${s.icon}`, { defaultValue: s.icon })}
+                      </Text>
+                      <Text style={styles.sessionMinutes}>
+                        {formatDuration(s.totalSeconds ?? s.minutes * 60)}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              ))}
+              {routineList.length > 0 && renderCategory('routine', t('history.categoryRoutine', { defaultValue: '루틴' }), Object.keys(routineGroups).length, (
+                <>
+                  {Object.entries(routineGroups).map(([key, entries]) => renderGroup(key, entries))}
+                </>
+              ))}
+              {(alarmList.length > 0 || alarmRoutineList.length > 0) && renderCategory('alarm', t('history.categoryAlarm', { defaultValue: '알람' }), alarmList.length + Object.keys(alarmRoutineGroups).length, (
+                <>
+                  {alarmList.map((s) => (
+                    <View key={s.id} style={styles.sessionCard}>
+                      <Text style={styles.sessionLabel}>
+                        {s.label || t('history.alarmDefaultLabel', { defaultValue: '알람' })}
+                      </Text>
+                    </View>
+                  ))}
+                  {Object.entries(alarmRoutineGroups).map(([key, entries]) => renderGroup(key, entries))}
+                </>
+              ))}
+            </>
+          );
+        })()}
 
         <View style={{ height: 40 }} />
       </ScrollView>

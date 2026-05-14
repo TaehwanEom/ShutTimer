@@ -236,9 +236,9 @@ export async function disableOnceAlarmIfNeeded(alarmEntityId: string): Promise<v
 
 /**
  * 알람 발화 + 해제 시 sessions 기록 추가.
- * icon='alarm' 고정 (= 결정 6-B). minutes=0 (= 알람 = 미션 ❌).
+ * v1.8 #CalendarCategory — type='alarm' + label 측 저장. 알람 카테고리 측 분리.
  */
-export async function recordAlarmSession(): Promise<void> {
+export async function recordAlarmSession(label?: string): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
@@ -249,6 +249,9 @@ export async function recordAlarmSession(): Promise<void> {
       date,
       icon: 'alarm',
       minutes: 0,
+      type: 'alarm',
+      totalSeconds: 0,
+      label: label && label.trim().length > 0 ? label.trim() : undefined,
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {

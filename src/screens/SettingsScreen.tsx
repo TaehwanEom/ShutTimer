@@ -199,6 +199,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const [missionDuration, setMissionDuration] = useState<MissionDuration>(DEFAULT_SETTINGS.missionDuration);
   const [missionDurationModalVisible, setMissionDurationModalVisible] = useState(false);
   const [selectedMissionsCount, setSelectedMissionsCount] = useState<number>(MISSION_POOL.length);
+  // v1.8 #HelpSection — 도움말 section 측 collapsible expand state. 각 항목 key 측 expand 여부.
+  const [helpExpanded, setHelpExpanded] = useState<{ [key: string]: boolean }>({});
   const [keepScreenOn, setKeepScreenOn] = useState(DEFAULT_SETTINGS.keepScreenOn);
   const previewSoundRef = React.useRef<AudioPlayer | null>(null);
 
@@ -566,6 +568,47 @@ export default function SettingsScreen({ navigation }: Props) {
               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
             </View>
           </TouchableOpacity>
+        </View>
+
+        {/* v1.8 #HelpSection — 앱 사용 도움말. 각 항목 tap → expand. */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.help.title', { defaultValue: '도움말' })}</Text>
+          {[
+            { key: 'stopMethod', titleKey: 'settings.help.stopMethod', titleDefault: '정지 방법', bodyKey: 'settings.help.stopMethodBody', bodyDefault: '알람 종료 방식은 설정에서 카메라 스캔, 흔들기, 탭, 산수, 받아쓰기 5가지 중 선택할 수 있습니다. 알람이 울릴 때 선택한 방식의 미션을 수행하면 종료됩니다.' },
+            { key: 'routine', titleKey: 'settings.help.routine', titleDefault: '루틴 사용법', bodyKey: 'settings.help.routineBody', bodyDefault: '루틴은 여러 단계를 순서대로 진행하는 묶음입니다. 예약 루틴은 정해진 시간에 자동으로 시작되고, 일반 루틴은 직접 누르면 시작됩니다. 단계는 최대 3개까지 추가할 수 있습니다.' },
+            { key: 'alarmRoutine', titleKey: 'settings.help.alarmRoutine', titleDefault: '알람 루틴 사용법', bodyKey: 'settings.help.alarmRoutineBody', bodyDefault: '알람 추가 시 단계를 최대 3개까지 추가하면 알람 루틴이 됩니다. 알람 시각에 울리면 첫 단계 미션이 시작되고, 미션을 완료하면 다음 단계가 자동으로 이어집니다. 모든 단계를 완료하면 종료됩니다.' },
+            { key: 'dial', titleKey: 'settings.help.dial', titleDefault: '다이얼 사용법', bodyKey: 'settings.help.dialBody', bodyDefault: '타이머 시작 전에는 다이얼을 손가락으로 돌리거나 디지털 숫자를 톡 눌러 키패드로 시간을 설정합니다. 일시정지 중에도 똑같이 다이얼이나 키패드로 시간을 늘리거나 줄일 수 있고, 재개를 누르면 변경된 시간으로 다시 시작됩니다.' },
+            { key: 'bug', titleKey: 'settings.help.bug', titleDefault: '버그 문의하기', bodyKey: 'settings.help.bugBody', bodyDefault: '사용 중 버그를 발견하면 메인 화면 우상단 이메일 아이콘을 눌러 버그 제보 화면으로 들어갑니다. 어떤 상황에서 발생했는지(시나리오)와 무엇이 잘못됐는지(설명)를 작성하고 보내기를 누르면 메일 앱이 자동으로 열리고 디바이스 정보가 함께 첨부됩니다.' },
+          ].map(item => {
+            const expanded = !!helpExpanded[item.key];
+            return (
+              <View key={item.key}>
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={() => setHelpExpanded(s => ({ ...s, [item.key]: !s[item.key] }))}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.toggleLeft}>
+                    <MaterialIcons name="help-outline" size={22} color={colors.onBackground} />
+                    <Text style={styles.toggleLabel}>{t(item.titleKey, { defaultValue: item.titleDefault })}</Text>
+                  </View>
+                  <MaterialIcons
+                    name={expanded ? 'expand-less' : 'expand-more'}
+                    size={22}
+                    color={colors.secondary}
+                    style={{ opacity: 0.6 }}
+                  />
+                </TouchableOpacity>
+                {expanded && (
+                  <View style={{ paddingHorizontal: 16, paddingBottom: 14, paddingTop: 4 }}>
+                    <Text style={{ fontSize: 14, color: colors.secondary, lineHeight: 21 }}>
+                      {t(item.bodyKey, { defaultValue: item.bodyDefault })}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
 
         {/*

@@ -264,8 +264,10 @@ export function stepStartTimeStr(r: Routine, stepIdx: number): string | null {
 /**
  * step 단위 세션 기록. step.name 을 icon 필드에 그대로 저장 (B안).
  * 중복 방지는 호출자 측 awaitingConfirm 플래그로 제어.
+ * v1.8 #CalendarCategory — type/label/routineId/stepName/executionId 측 = 카테고리 분리 + 라벨 grouping + 실행별 분리.
+ *   routine.id prefix 측 = a_ → 알람 루틴 / r_ → 일반 루틴. executionId 측 = ActiveRoutine.startedAt 측 기반.
  */
-export async function recordStepSession(r: Routine, stepIdx: number): Promise<void> {
+export async function recordStepSession(r: Routine, stepIdx: number, executionId?: string): Promise<void> {
   const step = r.steps[stepIdx];
   if (!step) return;
   try {
@@ -273,11 +275,18 @@ export async function recordStepSession(r: Routine, stepIdx: number): Promise<vo
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
     const d = new Date();
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const isAlarmRoutine = r.id.startsWith('a_');
     list.push({
       id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       date,
       icon: step.name,
       minutes: Math.round(Math.max(0, step.durationSeconds) / 60),
+      type: isAlarmRoutine ? 'alarmRoutine' : 'routine',
+      totalSeconds: Math.max(0, Math.round(step.durationSeconds)),
+      label: r.name,
+      routineId: r.id,
+      stepName: step.name,
+      executionId,
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {

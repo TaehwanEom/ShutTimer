@@ -329,7 +329,8 @@ export async function completeCurrentMission(): Promise<MissionEndResult | null>
   }
 
   if (!ar.awaitingConfirm) {
-    await recordStepSession(routine, ar.currentStepIndex);
+    // v1.8 #CalendarCategory — executionId 측 = `${routineId}_${startedAt}` 측 = 매 실행별 분리 grouping.
+    await recordStepSession(routine, ar.currentStepIndex, `${routine.id}_${ar.startedAt}`);
   }
 
   // v1.6 hotfix — 단일 timer #2 와 동일 안티 패턴 제거. cancelBackgroundNotif 호출 시
@@ -376,11 +377,13 @@ export async function syncRoutineFromSnapshot(routineId: string): Promise<Missio
 
   // v1.6 hotfix B2-2 — native 가 누적한 완료 step session record flush.
   // record timing = 사용자 active 시점 (실제 진행 시점 ❌). 단 history 누락 회피.
+  // v1.8 #CalendarCategory — executionId 측 = 같은 실행 측 step grouping 정합.
   const completed = snapshot?.completedStepIndices ?? [];
   if (snapshot && completed.length > 0) {
+    const executionId = `${routine.id}_${ar.startedAt}`;
     for (const completedIdx of completed) {
       try {
-        await recordStepSession(routine, completedIdx);
+        await recordStepSession(routine, completedIdx, executionId);
       } catch (e) {
         Logger.warn('routine', `recordStepSession flush fail idx=${completedIdx} err=${String(e)}`);
       }
@@ -422,6 +425,14 @@ export async function confirmAndAdvance(): Promise<MissionEndResult | null> {
   if (!routine) {
     await fullCleanup();
     return null;
+  }
+
+  // v1.8 #CalendarCategory — 사용자가 "다음 진행" 누르는 시점에 현재 step 기록.
+  // 회귀 정정: confirmAndAdvance 가 recordStepSession 호출 안 해서 캘린더에 손자 1개만 보임.
+  try {
+    await recordStepSession(routine, ar.currentStepIndex, `${routine.id}_${ar.startedAt}`);
+  } catch (e) {
+    Logger.warn('routine', `recordStepSession confirmAndAdvance fail idx=${ar.currentStepIndex} err=${String(e)}`);
   }
 
   // v1.7 hotfix — alerting 상태 alarm 명시 cleanup.
@@ -511,6 +522,19 @@ export async function resumeRoutine(): Promise<ActiveRoutine | null> {
 
 /** 전체 중단. */
 export async function stopRoutine(): Promise<void> {
+  // v1.8 #CalendarCategory — 마지막 step alerting 상태에서 "밀어서 중단" 누름 = 마지막 step 완료 의미.
+  // 사용자가 다음 진행 누름 ❌ + 중단으로 종료 시 = 현재 step 기록 누락 회귀 정정.
+  try {
+    const ar = await loadActiveRoutine();
+    if (ar && ar.awaitingConfirm) {
+      const routine = await findRoutine(ar.routineId);
+      if (routine) {
+        await recordStepSession(routine, ar.currentStepIndex, `${routine.id}_${ar.startedAt}`);
+      }
+    }
+  } catch (e) {
+    Logger.warn('routine', `recordStepSession stopRoutine fail err=${String(e)}`);
+  }
   await fullCleanup();
 }
 

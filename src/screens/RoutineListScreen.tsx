@@ -19,7 +19,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useFocusEffect, RouteProp } from '@react-navigation/native';
+import { useFocusEffect, RouteProp, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import ActiveRoutineSection from '../components/ActiveRoutineSection';
@@ -55,6 +55,7 @@ import {
   loadCustomCategories,
 } from '../constants/categories';
 import AdBanner from '../components/AdBanner';
+import BottomTabBar from '../components/BottomTabBar';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'RoutineList'>;
@@ -744,6 +745,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const styles = makeStyles(colors);
+  // v1.8 — Stack.Screen 'RoutineList' 진입 시에만 BottomTabBar 명시 렌더 (= MainTabsNavigator 'RoutineTab' 측은 default tabBar 자동).
+  const currentRouteName = useRoute().name;
+  const showBottomTabBar = currentRouteName === 'RoutineList';
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
   const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
@@ -1130,6 +1134,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
       </ScrollView>
       </View>
       <AdBanner />
+      {showBottomTabBar && <BottomTabBar />}
     </SafeAreaView>
   );
 }

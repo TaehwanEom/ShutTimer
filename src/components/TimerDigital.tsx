@@ -222,50 +222,10 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
             style={[styles.screen, { backgroundColor: colors.surfaceContainerLow, borderRadius: 20 }]}
             onLayout={(e) => setScreenSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
           >
-            {/* 아웃라인 + 게이지 */}
+            {/* 아웃라인 — v1.8 측 ring 게이지 제거 (= 사용자분 부탁). 배경 아웃라인만 잔존. */}
             {screenSize.w > 0 && (
               <Svg width={screenSize.w} height={screenSize.h} style={{ position: 'absolute', top: 0, left: 0 }}>
-                {/* 배경 아웃라인 */}
                 <Rect x={9} y={9} width={screenSize.w - 18} height={screenSize.h - 18} rx={20} ry={20} fill="none" stroke={colors.outlineVariant} strokeWidth={1} />
-                {/* 게이지 — 상단 중앙 시작, 시계방향 */}
-                {(() => {
-                  const r = 20;
-                  const o = 9; // strokeWidth/2 오프셋
-                  const w2 = screenSize.w - 18;
-                  const h2 = screenSize.h - 18;
-                  // Path로 상단 중앙에서 시작, 시계 방향 (strokeDashoffset으로 반시계 방향 줄어듦)
-                  const cx2 = w2 / 2;
-                  const d = [
-                    `M ${o + cx2} ${o}`,                              // 상단 중앙
-                    `L ${o + r} ${o}`,                                // 상단 왼쪽
-                    `A ${r} ${r} 0 0 0 ${o} ${o + r}`,              // 좌상 모서리
-                    `L ${o} ${o + h2 - r}`,                          // 좌측 하단
-                    `A ${r} ${r} 0 0 0 ${o + r} ${o + h2}`,        // 좌하 모서리
-                    `L ${o + w2 - r} ${o + h2}`,                    // 하단 오른쪽
-                    `A ${r} ${r} 0 0 0 ${o + w2} ${o + h2 - r}`,  // 우하 모서리
-                    `L ${o + w2} ${o + r}`,                          // 우측 상단
-                    `A ${r} ${r} 0 0 0 ${o + w2 - r} ${o}`,        // 우상 모서리
-                    `L ${o + cx2} ${o}`,                              // 상단 중앙 (끝)
-                  ].join(' ');
-                  const straight = (cx2 - r) + (h2 - 2 * r) + (w2 - 2 * r) + (h2 - 2 * r) + (cx2 - r);
-                  const curves = 4 * (Math.PI * r / 2);
-                  const perimeter = straight + curves;
-                  const animOffset = smoothGauge.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, perimeter],
-                  });
-                  return (
-                    <AnimatedSvgPath
-                      d={d}
-                      fill="none"
-                      stroke={colors.primary}
-                      strokeWidth={18}
-                      strokeDasharray={perimeter}
-                      strokeDashoffset={animOffset as Animated.AnimatedInterpolation<number>}
-                      strokeLinecap="round"
-                    />
-                  );
-                })()}
               </Svg>
             )}
             {/* 상단: 요일 + 월-일 (작은 세그먼트) */}

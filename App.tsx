@@ -526,37 +526,14 @@ function AppNavigator() {
     return () => clearTimeout(timer);
   }, []);
 
-  // v1.7 hotfix #26 — debug log: AlarmKit alarm 측 주기 polling (= 베너 미노출 추적용).
-  // 30s 주기 = listAlarms 측 모든 alarm + state log. paused/scheduled/alerting 잔존 영역 추적.
-  // 사용자 측 디바이스 console.app / Xcode console = '[ListAlarms]' filter → 캡처 → root cause 분석.
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      try {
-        const alarms = await AlarmkitBridge.listAlarms();
-        if (alarms.length === 0) {
-          console.warn('[ListAlarms] count=0');
-        } else {
-          const summary = alarms.map(a => `${a.id.slice(0, 8)}/${a.state}`).join(', ');
-          console.warn(`[ListAlarms] count=${alarms.length} ${summary}`);
-        }
-      } catch (e: any) {
-        console.warn('[ListAlarms] error', e?.message || e);
-      }
-    };
-    tick();
-    const interval = setInterval(tick, 30000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  // v1.8 #PollingThrottle — 30초 디버그 polling 폐기 (= CPU 영역 ↓, 사용자분 측 측정 ❌ 영역).
+  //   직전 v1.7 hotfix #26 = 30s 주기 listAlarms + console.warn → 디버그 추적용. production 측 측정 ❌ 영역.
+  //   사용자분 측 발열 영역 root cause 후보 → 폐기 진입.
 
   // v1.6 Phase 10-D — LA control signal polling (App Group ↔ RN 동기화)
-  // LiveActivityIntent.perform() 안에서 설정한 control signal 을 cold-start + AppState 'active' + 1초 polling 시 처리.
+  // LiveActivityIntent.perform() 안에서 설정한 control signal 을 cold-start + AppState 'active' + 3초 polling 시 처리.
   // signal.routineId.startsWith('main_timer_') = timer 측 (DeviceEventEmitter emit) / 그 외 = routine 측 (controller 호출).
-  // v1.6 hotfix — 1초 setInterval polling 추가. iPhone foreground active 유지 시 Watch / LA Button 신호 처리 누락 방지.
+  // v1.8 #PollingThrottle — 1초 → 3초 polling. iPhone foreground active 유지 시 Watch / LA Button 신호 처리 누락 방지 영역 + CPU 영역 ↓.
   useEffect(() => {
     let inFlight = false;
     const handleControlSignal = async () => {
@@ -777,8 +754,8 @@ function AppNavigator() {
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active') handleControlSignal();
     });
-    // v1.6 hotfix — 1초 polling (foreground active 유지 시 Watch / LA Button 신호 즉시 반영).
-    const poll = setInterval(handleControlSignal, 1000);
+    // v1.8 #PollingThrottle — 1초 → 3초 polling. foreground active 유지 시 Watch / LA Button 신호 3초 이내 반영 + CPU 영역 ↓.
+    const poll = setInterval(handleControlSignal, 3000);
     return () => {
       clearTimeout(t);
       clearInterval(poll);

@@ -232,47 +232,30 @@ struct AlarmKitLockScreenView: View {
         appendNativeDbgWidget("LA-DBG-AKLA-Init", "AlarmKitLockScreenView.init() mode=\(akModeString(context.state.mode))")
     }
 
-    @ViewBuilder
     var body: some View {
         // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmKit LA widget body 진입 + state.mode 값 native log.
         // 사용자분 보고 = paused 시 "검정 바만 표시" → 본 widget body 호출 여부 + mode 분기 확인용.
         let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitLockScreenView render mode=\(akModeString(context.state.mode)) routineName=\(context.attributes.metadata?.routineName ?? "nil") routineId=\(context.attributes.metadata?.routineId ?? "nil")", throttle: true) }()
-
-        // v1.8 — 일반 알람 측 잠금화면 LA 숨김 정합.
-        //   routineId 'a_' prefix + 'aa_' prefix ❌ = 일반 알람 (= AlarmListScreen 등록).
-        //   ad-hoc routine step (= 'aa_a_xxx') / 일반 routine step (= 'r_xxx') / 타이머 (= 'main_timer_xxx') 측 = 표시 유지.
-        //   alert mode 측 = 발화 시점 = 표시 유지 (= 사용자 dismiss 액션 보장).
-        let routineId = context.attributes.metadata?.routineId ?? ""
-        let isPlainAlarm = routineId.hasPrefix("a_") && !routineId.hasPrefix("aa_")
-        let isAlertMode: Bool = {
-            if case .alert = context.state.mode { return true }
-            return false
-        }()
-
-        if isPlainAlarm && !isAlertMode {
-            EmptyView()
-        } else {
-            // v1.7 hotfix #LAUnify Phase 10-G3 — WWDC25 "Wake up to the AlarmKit API" 강제 정합:
-            // "You MUST handle all three mode cases (.countdown, .paused, .alert) even if they share views."
-            // 직전 = switch 누락 → AlarmKit framework가 widget body 호출 자체 안 함 (= LA-DBG-AKLA 0건 root cause).
-            switch context.state.mode {
-            case .countdown:
-                lockScreenContent
-                    .onAppear {
-                        // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — onAppear 측 widget body 측 SwiftUI evaluation 시점 직접 측정.
-                        appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(countdown) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
-                    }
-            case .paused:
-                lockScreenContent
-                    .onAppear {
-                        appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(paused) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
-                    }
-            case .alert:
-                lockScreenContent
-                    .onAppear {
-                        appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(alert) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
-                    }
-            }
+        // v1.7 hotfix #LAUnify Phase 10-G3 — WWDC25 "Wake up to the AlarmKit API" 강제 정합:
+        // "You MUST handle all three mode cases (.countdown, .paused, .alert) even if they share views."
+        // 직전 = switch 누락 → AlarmKit framework가 widget body 호출 자체 안 함 (= LA-DBG-AKLA 0건 root cause).
+        switch context.state.mode {
+        case .countdown:
+            lockScreenContent
+                .onAppear {
+                    // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — onAppear 측 widget body 측 SwiftUI evaluation 시점 직접 측정.
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(countdown) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
+        case .paused:
+            lockScreenContent
+                .onAppear {
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(paused) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
+        case .alert:
+            lockScreenContent
+                .onAppear {
+                    appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(alert) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
+                }
         }
     }
 

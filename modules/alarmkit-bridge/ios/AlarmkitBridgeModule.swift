@@ -651,8 +651,10 @@ public class AlarmkitBridgeModule: Module {
   // 0~1 클램프 영역. AlarmKit framework 측 = 본 update = 다음 state change 시 = 무효 영역 가능.
   fileprivate static func updateActivityRelevance(alarmId: String, fireAtMs: Double) {
     Task { @MainActor in
-      // schedule 직후 = system sync 영역 = 짧은 delay 영역 필요 영역.
-      try? await Task.sleep(nanoseconds: 200_000_000)
+      // v1.8 #LARelevanceTiming — AlarmKit framework 측 LA 활성 = 비동기 영역.
+      //   직전 = 200ms sleep → Activity.activities 측 = activity not found 다수.
+      //   정정 = 5초 sleep → log 측 post-schedule(timer)+5s 시점 = Activity.activities.count >= 1 정합.
+      try? await Task.sleep(nanoseconds: 5_000_000_000)
       let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
       guard let activity = activities.first(where: { $0.id == alarmId }) else {
         appendNativeDbg("LA-DBG-AKLA-Relevance", "skip alarmId=\(alarmId) activity not found")

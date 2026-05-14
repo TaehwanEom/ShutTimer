@@ -275,7 +275,9 @@ export async function recordStepSession(r: Routine, stepIdx: number, executionId
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
     const d = new Date();
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const isAlarmRoutine = r.id.startsWith('a_');
+    // v1.8 회귀 정정 — adhoc routine id = `aa_a_xxx` (= ADHOC_PREFIX 'aa_' + alarm.id 'a_xxx').
+    // 직전 = startsWith('a_') = 'aa_a_xxx' 측 첫 두 글자 'aa' ≠ 'a_' → false → 모든 알람 루틴 record가 type='routine' 잘못 분류 회귀.
+    const isAlarmRoutine = r.id.startsWith('aa_');
     list.push({
       id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       date,

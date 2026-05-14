@@ -12,6 +12,7 @@ import { RootStackParamList } from '../../App';
 const TABS = [
   { key: 'HomeTab', label: '타이머', icon: 'timer' },
   { key: 'RoutineTab', label: '루틴', icon: 'repeat' },
+  { key: 'AlarmTab', label: '알람', icon: 'alarm' },
   { key: 'CalendarTab', label: '캘린더', icon: 'calendar-today' },
   { key: 'SettingsTab', label: '설정', icon: 'settings' },
 ] as const;

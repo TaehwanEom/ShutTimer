@@ -329,47 +329,55 @@ public class AlarmkitBridgeModule: Module {
 
       // v1.8 #LARelevanceMatch — id 측 = metadataAll 측 이전 영역 이동 (= 위 영역).
 
-      // v1.6+ — recurrence 옵션 (= type='alarm_main' 측) → .alarm(schedule:) factory 분기.
-      // OS 자동 반복 (= .relative(.weekly([...]))). 재예약 listener 불필요.
-      if let recurrence = params.recurrence, recurrence.mode != "never" {
+      // v1.8 — recurrence 측 모든 mode 측 .alarm(schedule:) factory 분기. LA 측 생성 ❌ (= iPhone 기본 알람 정합).
+      //   'never' → .fixed(date) 측 = 1회 fire
+      //   'daily' / 'weekly' → .relative(...) 측 = OS 자동 반복
+      // .alarm() factory + AlarmPresentation 측 alert-only 측 = LA Activity 측 생성 ❌ (= 사용자분 부탁 = "iPhone 기본 알람처럼").
+      if let recurrence = params.recurrence {
         let fireDate = Date(timeIntervalSince1970: params.fireAt / 1000.0)
-        let cal = Calendar.current
-        let comp = cal.dateComponents([.hour, .minute], from: fireDate)
-        guard let hour = comp.hour, let minute = comp.minute else {
-          throw NSError(
-            domain: "AlarmkitBridge",
-            code: 2,
-            userInfo: [NSLocalizedDescriptionKey: "recurrence: invalid fireAt"]
-          )
-        }
 
-        let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
-
-        // JS days[] (0=일~6=토) → Locale.Weekday 변환.
-        let dayMap: [Int: Locale.Weekday] = [
-          0: .sunday, 1: .monday, 2: .tuesday, 3: .wednesday,
-          4: .thursday, 5: .friday, 6: .saturday
-        ]
-        let weekdays: [Locale.Weekday]
-        if recurrence.mode == "daily" {
-          weekdays = [.sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday]
-        } else { // "weekly"
-          let candidates = (recurrence.days ?? []).compactMap { dayMap[$0] }
-          if candidates.isEmpty {
+        let schedule: Alarm.Schedule
+        if recurrence.mode == "never" {
+          // v1.8 — 'once' 알람 = .fixed(date) = 1회 fire, LA 없음 (= 사용자분 부탁 정합)
+          schedule = .fixed(fireDate)
+        } else {
+          let cal = Calendar.current
+          let comp = cal.dateComponents([.hour, .minute], from: fireDate)
+          guard let hour = comp.hour, let minute = comp.minute else {
             throw NSError(
               domain: "AlarmkitBridge",
-              code: 3,
-              userInfo: [NSLocalizedDescriptionKey: "recurrence: weekly requires days"]
+              code: 2,
+              userInfo: [NSLocalizedDescriptionKey: "recurrence: invalid fireAt"]
             )
           }
-          weekdays = candidates
+
+          let time = Alarm.Schedule.Relative.Time(hour: hour, minute: minute)
+
+          // JS days[] (0=일~6=토) → Locale.Weekday 변환.
+          let dayMap: [Int: Locale.Weekday] = [
+            0: .sunday, 1: .monday, 2: .tuesday, 3: .wednesday,
+            4: .thursday, 5: .friday, 6: .saturday
+          ]
+          let weekdays: [Locale.Weekday]
+          if recurrence.mode == "daily" {
+            weekdays = [.sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday]
+          } else { // "weekly"
+            let candidates = (recurrence.days ?? []).compactMap { dayMap[$0] }
+            if candidates.isEmpty {
+              throw NSError(
+                domain: "AlarmkitBridge",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "recurrence: weekly requires days"]
+              )
+            }
+            weekdays = candidates
+          }
+
+          let recurrenceObj = Alarm.Schedule.Relative.Recurrence.weekly(weekdays)
+          schedule = .relative(.init(time: time, repeats: recurrenceObj))
         }
 
-        let recurrenceObj = Alarm.Schedule.Relative.Recurrence.weekly(weekdays)
-        let schedule = Alarm.Schedule.relative(.init(time: time, repeats: recurrenceObj))
-
-        // .alarm(schedule:) presentation = alert 만 사용 (= countdown / paused 영역 ❌).
-        // v1.7 hotfix #LAUnify Phase 3 — metadata 측 = step 데이터 명시 (= alarm_main 측 단순 영역. routine ❌).
+        // .alarm(schedule:) presentation = alert 만 사용 (= countdown / paused 영역 ❌ → LA 측 생성 ❌).
         let alarmPresentation = AlarmPresentation(alert: alert)
         let alarmAttributes = AlarmAttributes<ShutTimerAlarmMetadata>(
           presentation: alarmPresentation,
@@ -385,13 +393,11 @@ public class AlarmkitBridgeModule: Module {
         )
 
         _ = try await AlarmManager.shared.schedule(id: id, configuration: alarmConfig)
-        // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (recurrence 영역).
-        NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=alarm(schedule:)")
-        // v1.7 hotfix #LAUnify Phase 10-G4dbg — ActivityKit Activity 측 active count + ID 측 native log.
-        // root cause 추적: AlarmKit framework 측 .alarm factory 호출 시 Activity 자동 시작 정합 ❓
+        let scheduleKind = recurrence.mode == "never" ? "fixed" : "relative"
+        NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=alarm(schedule:.\(scheduleKind))")
         let activities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
         let activitiesDesc = activities.map { "\($0.id):\($0.activityState)" }.joined(separator: ",")
-        appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(alarm) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)]")
+        appendNativeDbg("LA-DBG-AKLA-Activity", "post-schedule(alarm) alarmId=\(id.uuidString) Activity.activities.count=\(activities.count) [\(activitiesDesc)] factory=\(scheduleKind)")
         return id.uuidString
       }
 

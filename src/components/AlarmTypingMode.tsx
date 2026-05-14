@@ -55,7 +55,10 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
   const shuffleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shuffleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // v1.8 — 매 문제 진입 시 슬롯머신 재발동 (= currentIdx 변경마다).
   useEffect(() => {
+    setIsShuffling(true);
+    setShuffleIdx(0);
     shuffleIntervalRef.current = setInterval(() => {
       setShuffleIdx((i) => (i + 1) % shuffledPool.length);
     }, 60);
@@ -71,7 +74,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
       if (shuffleIntervalRef.current) clearInterval(shuffleIntervalRef.current);
       if (shuffleTimeoutRef.current) clearTimeout(shuffleTimeoutRef.current);
     };
-  }, [shuffledPool.length]);
+  }, [currentIdx, shuffledPool.length]);
 
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const current = problems[currentIdx];

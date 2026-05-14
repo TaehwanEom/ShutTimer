@@ -85,10 +85,9 @@ export type RootStackParamList = {
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
   Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random'; alarmEntityId?: string } | undefined;
-  Settings: undefined;
+  // v1.8 — Settings / History / AlarmList Stack.Screen 제거. MainTabsNavigator Tab.Screen만 사용.
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
-  History: undefined;
   Notice: undefined;
   MissionSelect: undefined;
   // @v1.6 루틴 기능
@@ -106,7 +105,6 @@ export type RootStackParamList = {
   RoutineCategory: { current?: string } | undefined;
   RoutineDays: { current?: number[] } | undefined;
   // v1.6+ 알람 기능
-  AlarmList: undefined;
   AlarmEdit: { alarmId?: string } | undefined;
   // @v1.5-poc — 영구 유지. __DEV__ 가드로 production 빌드 런타임에서 접근 차단.
   PoCPhotoValidation: undefined;
@@ -405,7 +403,7 @@ function AppNavigator() {
         }
         // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-        if (currentRoute === 'RoutineAlarm' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab' || currentRoute === 'AlarmList') return;
+        if (currentRoute === 'RoutineAlarm' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab') return;
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
         if (!r) {
@@ -587,7 +585,7 @@ function AppNavigator() {
               const routeFast = navigationRef.current.getCurrentRoute()?.name;
               Logger.warn('LAControl-DBG', `fast stopRoutine + emit OK route=${routeFast} isAdhoc=${isAdhocFast}`);
               if (isAdhocFast) {
-                if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab' && routeFast !== 'AlarmList') {
+                if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab') {
                   Logger.warn('LAControl-DBG', `fast adhoc navigate AlarmTab (route=${routeFast})`);
                   (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
                 } else {
@@ -651,7 +649,7 @@ function AppNavigator() {
                 DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
                 Logger.warn('LAControl-DBG', `standard stopRoutine + emit OK route=${route} isAdhoc=${isAdhoc}`);
                 if (isAdhoc) {
-                  if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
+                  if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
                     Logger.warn('LAControl-DBG', `standard adhoc navigate AlarmTab (route=${route})`);
                     (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
                   } else {
@@ -672,7 +670,7 @@ function AppNavigator() {
               // navigate trigger 차단. cancelAlarm 측 stop 호출이 stopIntent perform 영역 측
               // 'open_app_dismiss' signal 발생 → 종료 스크린 직후 강제 전환 회귀 차단.
               if (isAdhoc) {
-                if (route !== 'Alarm' && (route as string) !== 'AlarmTab' && route !== 'AlarmList') {
+                if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
                   (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
                 }
               } else {
@@ -825,10 +823,8 @@ function AppNavigator() {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ gestureEnabled: false }} />
         <Stack.Screen name="Home" component={MainTabsNavigator} />
         <Stack.Screen name="Alarm" component={AlarmScreen} options={{ gestureEnabled: false }} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="EditMissions" component={EditMissionsScreen} />
         <Stack.Screen name="AddTimer" component={AddTimerScreen} />
-        <Stack.Screen name="History" component={HistoryScreen} />
         <Stack.Screen name="Notice" component={NoticeScreen} />
         <Stack.Screen name="MissionSelect" component={MissionSelectScreen} />
         <Stack.Screen name="RoutineEdit" component={RoutineEditScreen} />
@@ -836,7 +832,6 @@ function AppNavigator() {
         <Stack.Screen name="RoutineCategory" component={RoutineCategoryScreen} />
         <Stack.Screen name="RoutineDays" component={RoutineDaysScreen} />
         <Stack.Screen name="FavoritesList" component={FavoritesListScreen} />
-        <Stack.Screen name="AlarmList" component={AlarmListScreen} />
         <Stack.Screen name="AlarmEdit" component={AlarmEditScreen} />
         {/*
           ═══════════════════════════════════════════════════════════

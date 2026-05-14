@@ -43,8 +43,9 @@ import {
 import ActiveRoutineSection from '../components/ActiveRoutineSection';
 import AdBanner from '../components/AdBanner';
 
+// v1.8 — AlarmList Stack.Screen 제거. MainTabsNavigator AlarmTab Tab.Screen만 사용.
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'AlarmList'>;
+  navigation: NativeStackNavigationProp<RootStackParamList>;
 };
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];

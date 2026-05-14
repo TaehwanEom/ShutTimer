@@ -18,8 +18,9 @@ import { ThemeColors } from '../constants/theme';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import AdBanner from '../components/AdBanner';
 
+// v1.8 — History Stack.Screen 제거. MainTabsNavigator CalendarTab Tab.Screen만 사용.
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'History'>;
+  navigation: NativeStackNavigationProp<RootStackParamList>;
 };
 
 // ─── 헬퍼 ──────────────────────────────────────────────────────

@@ -37,8 +37,9 @@ import { clearPreloadedSound } from '../utils/alarmSoundPreload';
 // v1.7 hotfix #DebugUIGate — EAS profile env 측 디버그 UI 분기 (production = false / dev + preview = true).
 const SHOW_DEBUG_UI = process.env.EXPO_PUBLIC_SHOW_DEBUG_UI === 'true';
 
+// v1.8 — Settings Stack.Screen 제거. MainTabsNavigator SettingsTab Tab.Screen만 사용.
 type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Settings'>;
+  navigation: NativeStackNavigationProp<RootStackParamList>;
 };
 
 const DISMISS_OPTIONS: { value: DismissMethod; labelKey: string; icon: string; descKey: string }[] = [

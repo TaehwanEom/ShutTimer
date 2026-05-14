@@ -13,7 +13,8 @@ export const SETTINGS_KEY = {
 
 export const MIN_SELECTED_MISSIONS = 1;
 
-export const MISSION_DURATION_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
+// v1.8 — 0 = 제한 없음 (= 무제한 미션 타이머).
+export const MISSION_DURATION_OPTIONS = [10, 20, 30, 40, 50, 60, 0] as const;
 export type MissionDuration = typeof MISSION_DURATION_OPTIONS[number];
 
 export type DialType = 'classic' | 'digital';

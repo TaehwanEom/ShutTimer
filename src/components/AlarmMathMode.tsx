@@ -165,7 +165,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
           </View>
 
           <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-            <Text style={styles.problemText} numberOfLines={1} adjustsFontSizeToFit>{displayedProblem?.display ?? ''} = ?</Text>
+            <Text style={[styles.problemText, wrongFlash && { color: '#ff6b6b' }]} numberOfLines={1} adjustsFontSizeToFit>{displayedProblem?.display ?? ''} = ?</Text>
           </Animated.View>
 
           <View style={styles.inputBox}>

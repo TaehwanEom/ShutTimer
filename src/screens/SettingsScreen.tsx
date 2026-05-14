@@ -502,7 +502,7 @@ export default function SettingsScreen({ navigation }: Props) {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.secondary }}>
-                {missionDuration}{t('settings.secondsUnit', { defaultValue: '초' })}
+                {missionDuration === 0 ? t('settings.missionDurationUnlimited', { defaultValue: '제한 없음' }) : `${missionDuration}${t('settings.secondsUnit', { defaultValue: '초' })}`}
               </Text>
               <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
             </View>
@@ -956,7 +956,9 @@ export default function SettingsScreen({ navigation }: Props) {
                 >
                   <View style={styles.toggleLeft}>
                     <MaterialIcons name="timer" size={22} color={missionDuration === opt ? colors.primary : colors.onBackground} />
-                    <Text style={[styles.toggleLabel, missionDuration === opt && { color: colors.primary }]}>{opt}{t('settings.secondsUnit', { defaultValue: '초' })}</Text>
+                    <Text style={[styles.toggleLabel, missionDuration === opt && { color: colors.primary }]}>
+                      {opt === 0 ? t('settings.missionDurationUnlimited', { defaultValue: '제한 없음' }) : `${opt}${t('settings.secondsUnit', { defaultValue: '초' })}`}
+                    </Text>
                   </View>
                   {missionDuration === opt && <MaterialIcons name="check-circle" size={22} color={colors.primary} />}
                 </TouchableOpacity>

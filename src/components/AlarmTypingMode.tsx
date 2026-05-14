@@ -188,7 +188,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
             </View>
 
             <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-              <Text style={styles.problemText} selectable={false}>
+              <Text style={[styles.problemText, wrongFlash && { color: '#ff6b6b' }]} selectable={false}>
                 {displayedProblem?.text ?? ''}
               </Text>
             </Animated.View>

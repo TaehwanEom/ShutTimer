@@ -189,6 +189,7 @@
     "soundSelect": "Select Sound",
     "missionDuration": "Mission Timer",
     "missionDurationDesc": "Time given to find the mission object",
+    "missionDurationUnlimited": "No limit",
     "secondsUnit": "s",
     "missionSelect": "Mission Selection",
     "screen": "Display",

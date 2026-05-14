@@ -60,6 +60,8 @@ type Props = {
   resultState: 'idle' | 'success' | 'fail';
   isDanger: boolean;
   remainingSeconds: number;
+  // v1.8 — 미션 타이머 제한 없음 (= missionDuration === 0) 측 = 시간 표시 ❌.
+  unlimited?: boolean;
 
   // 애니메이션 값 — 부모에서 생성
   successBlink: Animated.Value;
@@ -88,7 +90,7 @@ export default function AlarmCameraMode(props: Props) {
     matched, lastRun, targetLabelsSV, thresholdSV, consecutiveHits, isShufflingSV,
     currentMission, currentEmoji, missionLabel, missionSentence,
     isShuffling, shuffledList, shuffleIdx,
-    isRetryBannerVisible, successAnimating, resultState, isDanger, remainingSeconds,
+    isRetryBannerVisible, successAnimating, resultState, isDanger, remainingSeconds, unlimited,
     successBlink, successFill, scanLine, dangerBlink,
     boxWidth, boxHeight,
     onMatchDetected, onReshuffle,
@@ -286,14 +288,14 @@ export default function AlarmCameraMode(props: Props) {
                 {isShuffling ? '' : missionSentence}
               </Text>
             </View>
-            {/* 박스 하단 어둠 + 남은 초 */}
+            {/* 박스 하단 어둠 + 남은 초. v1.8 — unlimited 시 = "∞" 표시. */}
             <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
               <Animated.Text style={{
                 color: isDanger ? '#ff3b30' : '#fff',
                 fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'],
                 opacity: isDanger ? dangerBlink.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] }) : 1,
               }}>
-                {remainingSeconds}{t('settings.secondsUnit', { defaultValue: '초' })}
+                {unlimited ? '∞' : `${remainingSeconds}${t('settings.secondsUnit', { defaultValue: '초' })}`}
               </Animated.Text>
             </View>
             {/* 스캔 라인 */}

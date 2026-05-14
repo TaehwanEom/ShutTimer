@@ -41,3 +41,10 @@ ios/ShutTimer/*
 *.mp4
 sound/
 svg/
+
+# v1.8 — Android 빌드 산출물 (= prebuild 측 자동 생성. iOS 측 동일 패턴 정합).
+android/
+# 디바이스 디버그 로그
+log.md
+# Gradle 빌드 캐시
+**/.gradle/

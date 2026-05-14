@@ -1004,32 +1004,38 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
   // v1.5 카운트다운 (camera 미션 / math / typing — missionDuration 측 카운트다운 정합).
   // v1.8 — 슬롯머신 중에도 카운트다운 계속. 만료 처리 측만 isShuffling 가드 잔존.
+  // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 카운트다운 ❌.
   useEffect(() => {
     if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (matched.value) return;
+    if (missionDuration === 0) return;
     const id = setInterval(() => {
       setRemainingMs((prev) => Math.max(0, prev - 1000));
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dismissMethod, resultState, isRetryBannerVisible]);
+  }, [dismissMethod, resultState, isRetryBannerVisible, missionDuration]);
 
   // v1.8 math/typing 미션 만료 처리 — missionDuration 도달 시 즉시 fail (= 재시도 ❌, camera 재시도 패턴과 분리).
+  // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 만료 처리 ❌.
   useEffect(() => {
     if (dismissMethod !== 'math' && dismissMethod !== 'typing') return;
     if (resultState !== 'idle') return;
+    if (missionDuration === 0) return;
     if (remainingMs > 0) return;
     enterResult('fail');
-  }, [dismissMethod, resultState, remainingMs, enterResult]);
+  }, [dismissMethod, resultState, remainingMs, enterResult, missionDuration]);
 
   // v1.5 만료 처리 (setTimeout useRef로 취소 버그 방지)
+  // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 만료 처리 ❌.
   useEffect(() => {
     if (dismissMethod !== 'camera') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (isShuffling) return;
+    if (missionDuration === 0) return;
     if (remainingMs > 0) return;
     if (matched.value) return;
 
@@ -1047,7 +1053,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       enterResult('fail');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remainingMs, dismissMethod, resultState, isRetryBannerVisible, attemptCount, isShuffling]);
+  }, [remainingMs, dismissMethod, resultState, isRetryBannerVisible, attemptCount, isShuffling, missionDuration]);
 
   // 언마운트 시 재시도 타이머 정리
   useEffect(() => {
@@ -1191,7 +1197,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'math') {
     return (
       <View style={{ flex: 1 }}>
-        <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} remainingMs={remainingMs} />
+        <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} remainingMs={missionDuration === 0 ? undefined : remainingMs} />
         <AdBanner />
       </View>
     );
@@ -1201,7 +1207,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'typing') {
     return (
       <View style={{ flex: 1 }}>
-        <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} remainingMs={remainingMs} />
+        <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} remainingMs={missionDuration === 0 ? undefined : remainingMs} />
         <AdBanner />
       </View>
     );
@@ -1251,6 +1257,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
             resultState={resultState}
             isDanger={isDanger}
             remainingSeconds={remainingSeconds}
+            unlimited={missionDuration === 0}
             successBlink={successBlink}
             successFill={successFill}
             scanLine={scanLine}

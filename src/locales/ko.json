@@ -189,6 +189,7 @@
     "soundSelect": "사운드 선택",
     "missionDuration": "미션 타이머",
     "missionDurationDesc": "미션 객체를 찾을 때 주어지는 시간",
+    "missionDurationUnlimited": "제한 없음",
     "secondsUnit": "초",
     "missionSelect": "미션 선택",
     "screen": "화면",

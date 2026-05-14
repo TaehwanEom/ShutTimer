@@ -125,6 +125,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const [resultState] = useState<'idle' | 'success' | 'fail'>('idle'); // routine 에선 'idle' 고정 (인식 후 즉시 handleDismiss)
   const [attemptCount, setAttemptCount] = useState<1 | 2>(1);
   const [remainingMs, setRemainingMs] = useState<number>(ROUTINE_CAMERA_DURATION_SEC * 1000);
+  // v1.8 — SettingsScreen 측 missionDuration 동적 load (= 0 시 제한 없음).
+  const [missionDuration, setMissionDuration] = useState<number>(ROUTINE_CAMERA_DURATION_SEC);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentMissionRef = useRef<string | null>(null);
   const missionDurationRef = useRef<number>(ROUTINE_CAMERA_DURATION_SEC);
@@ -214,11 +216,20 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       }
 
       // 사운드/진동 시작
-      const [soundId, alarmRaw, vibRaw] = await Promise.all([
+      const [soundId, alarmRaw, vibRaw, missionDurRaw] = await Promise.all([
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
         AsyncStorage.getItem(SETTINGS_KEY.VIBRATION_ENABLED),
+        AsyncStorage.getItem(SETTINGS_KEY.MISSION_DURATION),
       ]);
+      // v1.8 — SettingsScreen 측 missionDuration 동적 load (= 0 시 제한 없음).
+      const n = parseInt(missionDurRaw ?? '', 10);
+      const validDur = !isNaN(n) && (n === 0 || (n >= 10 && n <= 60)) ? n : ROUTINE_CAMERA_DURATION_SEC;
+      if (!cancelled) {
+        setMissionDuration(validDur);
+        missionDurationRef.current = validDur;
+        if (validDur > 0) setRemainingMs(validDur * 1000);
+      }
       const alarmEnabled = alarmRaw !== 'false';
       const vibrationEnabled = vibRaw !== 'false';
       const effectiveId = soundId ?? DEFAULT_SOUND_ID;
@@ -453,12 +464,13 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     if (isRetryBannerVisible) return;
     if (isShuffling) return;
     if (matched.value) return;
+    if (missionDuration === 0) return; // v1.8 — 제한 없음 시 카운트다운 skip.
     const id = setInterval(() => {
       setRemainingMs((prev) => Math.max(0, prev - 1000));
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routine?.endMethod, dismissed, resultState, isRetryBannerVisible, isShuffling]);
+  }, [routine?.endMethod, dismissed, resultState, isRetryBannerVisible, isShuffling, missionDuration]);
 
   // 만료 처리 — 1차 시간 초과 = 재시도 배너 1초 후 시간 리셋. 2차 시간 초과 = handleDismiss (routine 다음 흐름).
   useEffect(() => {
@@ -467,6 +479,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (isShuffling) return;
+    if (missionDuration === 0) return; // v1.8 — 제한 없음 시 만료 처리 skip.
     if (remainingMs > 0) return;
     if (matched.value) return;
 
@@ -484,7 +497,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       handleDismiss();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remainingMs, routine?.endMethod, dismissed, resultState, isRetryBannerVisible, attemptCount, isShuffling]);
+  }, [remainingMs, routine?.endMethod, dismissed, resultState, isRetryBannerVisible, attemptCount, isShuffling, missionDuration]);
 
   // retryTimeoutRef cleanup
   useEffect(() => {
@@ -697,6 +710,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
           resultState={resultState}
           isDanger={isDanger}
           remainingSeconds={remainingSeconds}
+          unlimited={missionDuration === 0}
           successBlink={successBlink}
           successFill={successFill}
           scanLine={scanLine}

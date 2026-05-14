@@ -347,6 +347,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
   const endAtRef = useRef<number>(0);
   const pausedAtRef = useRef<number | null>(null);
+  // v1.8 #PausedDialEdit — 일시정지 측 dial 회전 측 변경 여부 추적용. pause 진입 시점 endAtRef 저장.
+  const pausedOriginalEndAtRef = useRef<number | null>(null);
   // v1.6 Phase 9 — AlarmKit alarm id (timer_main type)
   // v1.7 hotfix #LAUnify Phase 10-G1 — activeLiveActivityIdRef 제거 (LiveActivityBridge 폐기 영역).
   const alarmkitIdRef = useRef<string | null>(null);
@@ -758,6 +760,9 @@ export default function HomeScreen({ navigation, route }: Props) {
         setIsRunning(true);
         setIsPaused(true);
         isPausedRef.current = true;
+        // v1.8 #PausedDialEdit — cold start 측 paused 복원 시 = 변경 비교 기준 측 = 복원된 endAt 측 저장.
+        // 없으면 = 복원 후 dial 회전 + resume 시 = chain 미동작 + native fireAt 측 옛 값 + JS endAt 측 새 값 측 불일치.
+        pausedOriginalEndAtRef.current = endAt;
         AsyncStorage.setItem('isTimerActive', 'true').catch(() => {});
         return;
       }
@@ -821,25 +826,48 @@ export default function HomeScreen({ navigation, route }: Props) {
         ? await AlarmkitBridge.pauseAlarm(alarmkitIdRef.current).catch(() => 0)
         : 0;
       pausedAtRef.current = pausedAtMs > 0 ? pausedAtMs : now;
+      // v1.8 #PausedDialEdit — pause 진입 시점 endAtRef 저장. resume 시 변경 여부 비교용.
+      pausedOriginalEndAtRef.current = endAtRef.current;
       // v1.7 hotfix #WidgetAppPausedAlign — pause 시점 remaining 강제 update (= setInterval stale value 회피).
       const remaining = Math.max(0, Math.ceil((endAtRef.current - pausedAtRef.current) / 1000));
       remainingSecondsRef.current = remaining;
       setRemainingSeconds(remaining);
       // 타이머 플래그 잔존 (= isTimerActive=true 잔존, paused state 측 = AlarmKit framework 잔존).
     } else {
-      // resume: AlarmKit framework 측 .resume(id:) 호출 → native 측 = resume 시점 측 측정 + return.
-      // v1.7 hotfix #G5 Phase B-2 — pauseDuration 측 = native 측 측정 시점 정확 측정 (= JS bridge 통신 영역 ❌).
-      const resumedAtMs = alarmkitIdRef.current
-        ? await AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => 0)
-        : 0;
-      const resumedAt = resumedAtMs > 0 ? resumedAtMs : now;
-      const pauseDuration = resumedAt - (pausedAtRef.current ?? resumedAt);
-      endAtRef.current += pauseDuration;
-      pausedAtRef.current = null;
-      const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - resumedAt) / 1000));
-      // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
-      remainingSecondsRef.current = remainingSecs;
-      setRemainingSeconds(remainingSecs);
+      // v1.8 #PausedDialEdit — paused 측 dial 측 사용자 회전 측 변경 여부 측 endAtRef 비교.
+      // 변경 ✅ → cancel + reschedule chain (= AlarmKit framework 측 fireAt update API 공식 ❌).
+      // 변경 ❌ → 기존 resumeAlarm 흐름 (= framework 자동 pauseDuration 연장).
+      const original = pausedOriginalEndAtRef.current;
+      const changed = original !== null && endAtRef.current !== original;
+      if (changed) {
+        const newRemainingSecs = Math.max(1, Math.ceil((endAtRef.current - now) / 1000));
+        totalSecondsRef.current = newRemainingSecs;
+        // scheduleAlarm 내부 = 기존 alarmkitIdRef cancel + 새 alarm schedule + alarmkitIdRef swap 자동.
+        await scheduleAlarm(newRemainingSecs);
+        // scheduleAlarm 내부 측 = Date.now() + seconds × 1000 측 fireAt 재계산 = JS bridge 영역 drift ~100ms.
+        // = endAtRef 측 재정렬 (= UI 측 dial / 남은 시간 측 정확 표시).
+        const reAlignedNow = Date.now();
+        endAtRef.current = reAlignedNow + newRemainingSecs * 1000;
+        remainingSecondsRef.current = newRemainingSecs;
+        setRemainingSeconds(newRemainingSecs);
+        pausedAtRef.current = null;
+        pausedOriginalEndAtRef.current = null;
+      } else {
+        // resume: AlarmKit framework 측 .resume(id:) 호출 → native 측 = resume 시점 측 측정 + return.
+        // v1.7 hotfix #G5 Phase B-2 — pauseDuration 측 = native 측 측정 시점 정확 측정 (= JS bridge 통신 영역 ❌).
+        const resumedAtMs = alarmkitIdRef.current
+          ? await AlarmkitBridge.resumeAlarm(alarmkitIdRef.current).catch(() => 0)
+          : 0;
+        const resumedAt = resumedAtMs > 0 ? resumedAtMs : now;
+        const pauseDuration = resumedAt - (pausedAtRef.current ?? resumedAt);
+        endAtRef.current += pauseDuration;
+        pausedAtRef.current = null;
+        pausedOriginalEndAtRef.current = null;
+        const remainingSecs = Math.max(0, Math.ceil((endAtRef.current - resumedAt) / 1000));
+        // v1.7 hotfix #WidgetAppPausedAlign — resume 시점 remaining 강제 update (= 위젯 ceil 정합).
+        remainingSecondsRef.current = remainingSecs;
+        setRemainingSeconds(remainingSecs);
+      }
     }
     // AsyncStorage 업데이트 (cold start 복원용)
     AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
@@ -856,6 +884,19 @@ export default function HomeScreen({ navigation, route }: Props) {
     }).catch(() => {});
   };
 
+  // v1.8 #PausedDialEdit — paused 측 dial/키패드 변경 시 AsyncStorage 측 endAt 동기.
+  // cold start 복원 시 = 변경 endAt 측 정합 (= 미동기 시 회귀: 강제 종료 후 복원 = 옛 endAt 측 잃어버림).
+  const persistPausedEndAt = () => {
+    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const tt: ActiveTimer = JSON.parse(raw);
+        const updated: ActiveTimer = { ...tt, endAt: endAtRef.current };
+        AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated)).catch(() => {});
+      } catch {}
+    }).catch(() => {});
+  };
+
   // --- 취소 ---
   const handleCancel = () => {
     cancelAlarms();
@@ -867,6 +908,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     isPausedRef.current = false;
     endAtRef.current = 0;
     pausedAtRef.current = null;
+    pausedOriginalEndAtRef.current = null;
   };
 
   // --- 길게 누르기 게이지 ---
@@ -958,9 +1000,23 @@ export default function HomeScreen({ navigation, route }: Props) {
             progress={dialProgress}
             timeText={timeText}
             subText={isRunning ? t('running.minutesLeft') : t('home.minutes')}
-            onSeek={isRunning ? undefined : (m) => { setSelectedMinutes(m); setSelectedSeconds(0); setSelectedIndex(-1); }}
+            onSeek={
+              isRunning && !isPaused
+                ? undefined
+                : isPaused
+                  ? (m) => {
+                      // v1.8 #PausedDialEdit — paused 측 dial 회전 측 = 남은 시간 재설정.
+                      const newRemainingSecs = m * 60;
+                      if (newRemainingSecs <= 0) return; // 0초 차단 가드
+                      const nowMs = Date.now();
+                      endAtRef.current = nowMs + newRemainingSecs * 1000;
+                      remainingSecondsRef.current = newRemainingSecs;
+                      setRemainingSeconds(newRemainingSecs);
+                    }
+                  : (m) => { setSelectedMinutes(m); setSelectedSeconds(0); setSelectedIndex(-1); }
+            }
             onSeekStart={() => {}}
-            onSeekEnd={() => {}}
+            onSeekEnd={() => { if (isPaused) persistPausedEndAt(); }}
             isWarning={isRunning && remainingSeconds <= 60}
           />
         )}
@@ -969,9 +1025,25 @@ export default function HomeScreen({ navigation, route }: Props) {
             progress={digitalProgress}
             timeText={timeText}
             subText={isRunning ? t('running.minutesLeft') : t('home.minutes')}
-            onSeek={isRunning ? undefined : (m: number, s?: number) => { setSelectedMinutes(m); setSelectedSeconds(s ?? 0); setSelectedIndex(-1); }}
+            onSeek={
+              isRunning && !isPaused
+                ? undefined
+                : isPaused
+                  ? (m: number, s?: number) => {
+                      // v1.8 #PausedDialEdit — paused 측 키패드 입력 측 = 남은 시간 재설정 (분 + 초) + AsyncStorage 동기.
+                      // 키패드 측 = onSeekEnd 측 호출 ❌ → onSeek 측 직접 AsyncStorage 갱신 (= cold start 복원 정합).
+                      const newRemainingSecs = m * 60 + (s ?? 0);
+                      if (newRemainingSecs <= 0) return; // 0초 차단 가드
+                      const nowMs = Date.now();
+                      endAtRef.current = nowMs + newRemainingSecs * 1000;
+                      remainingSecondsRef.current = newRemainingSecs;
+                      setRemainingSeconds(newRemainingSecs);
+                      persistPausedEndAt();
+                    }
+                  : (m: number, s?: number) => { setSelectedMinutes(m); setSelectedSeconds(s ?? 0); setSelectedIndex(-1); }
+            }
             onSeekStart={() => {}}
-            onSeekEnd={() => {}}
+            onSeekEnd={() => { if (isPaused) persistPausedEndAt(); }}
             isWarning={isRunning && remainingSeconds <= 60}
             isRunning={isRunning}
             isPaused={isPaused}

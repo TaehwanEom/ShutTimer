@@ -35,6 +35,8 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
     if (!isRunning || isPaused) {
       smoothGauge.stopAnimation();
       if (!isRunning) smoothGauge.setValue(1);
+      // v1.8 #PausedDialEdit — paused 측 키패드 입력 측 progress 변경 시 게이지 즉시 동기.
+      else if (isPaused) smoothGauge.setValue(progress);
       return;
     }
     const anim = Animated.timing(smoothGauge, {
@@ -69,7 +71,8 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
   }, [isEditing]);
 
   const handleTap = () => {
-    if (!onSeek || isRunning) return;
+    // v1.8 #PausedDialEdit — paused 측 = 키패드 노출 활성. running + !paused 측만 차단.
+    if (!onSeek || (isRunning && !isPaused)) return;
     setIsEditing(true);
     setEditValue('');
     setTimeout(() => {
@@ -79,7 +82,8 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
   };
 
   const handleDigitTap = (digitIndex: number) => {
-    if (!onSeek || isRunning) return;
+    // v1.8 #PausedDialEdit — paused 측 = 개별 숫자 tap 활성.
+    if (!onSeek || (isRunning && !isPaused)) return;
     if (!isEditing) {
       setIsEditing(true);
       setEditValue('');

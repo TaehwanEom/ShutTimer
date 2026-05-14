@@ -273,6 +273,12 @@ export async function recordStepSession(r: Routine, stepIdx: number, executionId
   try {
     const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
+    // v1.8 — step record 중복 방지. 같은 executionId + 같은 stepIdx + 같은 routineId 측 이미 저장된 record 있으면 skip.
+    // 원인 = LA "다음 진행" 흐름 측 = native AdvanceNextStepIntent (advance_done signal) + secondaryIntent (NextStepIntent) 두 경로 record 호출 가능.
+    if (executionId) {
+      const dup = list.some(s => s.executionId === executionId && s.routineId === r.id && s.stepName === step.name);
+      if (dup) return;
+    }
     const d = new Date();
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     // v1.8 회귀 정정 — adhoc routine id = `aa_a_xxx` (= ADHOC_PREFIX 'aa_' + alarm.id 'a_xxx').

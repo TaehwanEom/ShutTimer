@@ -478,7 +478,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       {/* v1.6 후속 — 헤더와 카테고리 사이 AdBanner */}
       <AdBanner />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* 카테고리 — 최상단 */}
         <TouchableOpacity style={styles.topCard} onPress={handleNavCategory} activeOpacity={0.85}>
           <View style={styles.topCardLabelRow}>

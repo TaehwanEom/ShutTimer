@@ -361,6 +361,7 @@
     "emptyTitleScheduled": "No scheduled routines",
     "emptyTitleManual": "No manual routines",
     "emptyHint": "Tap + in the top right to add one",
+    "add": "Add Routine",
     "stepsCount": "{{count}} steps",
     "totalDurationFmt": "Time {{duration}}\n{{count}} steps",
     "fieldName": "Routine name",
@@ -561,5 +562,9 @@
     "prealertBody5m": "Your routine is about to start",
     "prealertTitle30m": "Routine starts in 30 minutes",
     "prealertTitle5m": "Routine starts soon"
+  },
+  "favorites": {
+    "empty": "No favorites",
+    "addButton": "Add Favorite"
   }
 }

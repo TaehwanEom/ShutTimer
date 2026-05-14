@@ -361,6 +361,7 @@
     "emptyTitleScheduled": "예약 루틴이 없습니다",
     "emptyTitleManual": "일반 루틴이 없습니다",
     "emptyHint": "우측 상단 + 버튼으로 추가하세요",
+    "add": "루틴 추가",
     "stepsCount": "{{count}}단계",
     "totalDurationFmt": "루틴 시간 {{duration}}\n루틴 {{count}}단계",
     "fieldName": "루틴 이름",
@@ -561,5 +562,9 @@
       "hourUnit": "시",
       "minuteUnit": "분"
     }
+  },
+  "favorites": {
+    "empty": "즐겨찾기가 없습니다",
+    "addButton": "즐겨찾기 추가"
   }
 }

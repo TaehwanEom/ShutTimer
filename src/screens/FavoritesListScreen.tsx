@@ -270,12 +270,15 @@ export default function FavoritesListScreen({ navigation }: Props) {
       </View>
 
       {missionList.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons name="bookmark-border" size={64} color={colors.outlineVariant} />
-          <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={handleAdd}>
+        <View style={styles.emptyBox}>
+          <MaterialIcons name="bookmark-border" size={48} color={colors.secondary} />
+          <Text style={[styles.emptyText, { color: colors.secondary }]}>
+            {t('favorites.empty', { defaultValue: '즐겨찾기가 없습니다' })}
+          </Text>
+          <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: colors.primary }]} onPress={handleAdd}>
             <MaterialIcons name="add" size={20} color={colors.onPrimary} />
-            <Text style={[styles.addButtonText, { color: colors.onPrimary }]}>
-              {t('home.add', { defaultValue: '추가' })}
+            <Text style={[styles.emptyBtnText, { color: colors.onPrimary }]}>
+              {t('favorites.addButton', { defaultValue: '즐겨찾기 추가' })}
             </Text>
           </TouchableOpacity>
         </View>
@@ -338,20 +341,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  emptyContainer: {
+  emptyBox: {
     flex: 1,
-    justifyContent: 'center',
+    marginTop: 80,
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  addButton: {
+  emptyText: {
+    fontSize: 15,
+    marginTop: 12,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  emptyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 24,
+    borderRadius: 8,
   },
-  addButtonText: {
+  emptyBtnText: {
     fontSize: 14,
     fontWeight: '600',
   },

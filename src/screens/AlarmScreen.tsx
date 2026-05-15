@@ -12,7 +12,7 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Accelerometer } from 'expo-sensors';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,9 +30,10 @@ import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
-import { stopRoutine } from '../utils/routineController';
+import { stopRoutine, confirmAndAdvance } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
+import { loadActiveRoutine } from '../constants/routines';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { incrementAlarmSuccessCount, maybeRequestReview } from '../utils/storeReview';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
@@ -165,6 +166,7 @@ const RESULT_BG = {
 export default function AlarmScreen({ navigation, route }: Props) {
   const { t, i18n } = useTranslation();
   const { width: screenW } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree } = usePurchase();
   // @v1.5 Phase A — 카메라/tflite 관련 hook은 AlarmCameraMode child로 이동
@@ -428,7 +430,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === alarmEntityId);
         if (a && a.steps && a.steps.length > 0) {
-          await startRoutineFromAlarm(a).catch(() => {});
+          // v1.8 #MissionFailContinue — fail + activeRoutine 진행 중 = handleAfterAd 측 confirmAndAdvance 가 이미 schedule. 중복 차단.
+          // activeRoutine ❌ (= 알람 trigger 첫 순간 실패) → startRoutineFromAlarm 호출 → ad-hoc routine 시작 (= 다음 step 진행 흐름).
+          const arNow = await loadActiveRoutine();
+          if (!(pendingResultRef.current === 'fail' && arNow)) {
+            await startRoutineFromAlarm(a).catch(() => {});
+          }
         } else if (a) {
           // v1.8 #CalendarCategory — 일반 알람 (= step ❌) 측 dismiss 시 sessions 기록.
           await recordAlarmSession(a.label).catch(() => {});
@@ -450,8 +457,22 @@ export default function AlarmScreen({ navigation, route }: Props) {
   }, [navigation, route.params, dismissMethod]);
 
   // 광고 종료 후 분기: 카메라 결과 화면 OR 홈
-  const handleAfterAd = useCallback(() => {
+  // v1.8 #MissionFailContinue — fail 시 루틴 다음 step 자동 진행 (= 사용자 부탁: 실패해도 진행, 캔슬 ❌).
+  // activeRoutine 진행 중 → confirmAndAdvance (다음 step schedule).
+  // activeRoutine ❌ + alarmEntityId 있음 → goHome 측 startRoutineFromAlarm 가 ad-hoc routine 시작 (= 첫 trigger).
+  // 마지막 step 실패 = confirmAndAdvance 내부 `nextIdx >= steps.length` 분기에서 fullCleanup → 정상 종료.
+  const handleAfterAd = useCallback(async () => {
     if (dismissedRef.current) return;
+    if (pendingResultRef.current === 'fail') {
+      try {
+        const ar = await loadActiveRoutine();
+        if (ar) {
+          await confirmAndAdvance();
+        }
+      } catch (e) {
+        Logger.warn('routine', `confirmAndAdvance fail-path err=${String(e)}`);
+      }
+    }
     if (afterAdActionRef.current === 'result' && pendingResultRef.current) {
       setResultState(pendingResultRef.current);
       if (autoResultTimeoutRef.current) clearTimeout(autoResultTimeoutRef.current);
@@ -1229,7 +1250,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const boxHeight = boxWidth * 1.25; // 세로로 살짝 긴 박스 (높이 축소)
 
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: '#000' }]}>
+      <View style={[styles.container, { backgroundColor: '#000', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>ShutTimer</Text>
@@ -1271,7 +1292,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
             permissionButtonTextStyle={styles.permissionButtonText}
           />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 

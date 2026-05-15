@@ -281,6 +281,8 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   useFocusEffect(
     useCallback(() => {
+      // v1.8 #TimerEndGlitch — HomeScreen 재진입 시 hasJustEnded reset (= AlarmScreen unmount 후 복귀).
+      setHasJustEnded(false);
       Promise.all([
         fetch(NOTICES_URL).then(r => r.json()).catch(() => ({ notices: [] })),
         AsyncStorage.getItem(NOTICES_READ_KEY),
@@ -343,6 +345,10 @@ export default function HomeScreen({ navigation, route }: Props) {
   const remainingSecondsRef = useRef(0);
   const totalSecondsRef = useRef(0);
   const [isPaused, setIsPaused] = useState(false);
+  // v1.8 #TimerEndGlitch — 타이머 0 도달 ~ AlarmScreen mount 사이 frame race 차단용.
+  // setIsRunning(false) 후 timeText 계산이 selectedMinutes/selectedSeconds (= 초기값) 으로 평가돼 한 프레임 깜빡임 발생.
+  // hasJustEnded=true 동안은 timeText = formatTime(remainingSeconds=0) 유지 → AlarmScreen mount 후 HomeScreen focus 복귀 시 reset.
+  const [hasJustEnded, setHasJustEnded] = useState(false);
   const isPausedRef = useRef(false);
   // v1.5: timestamp 기반 카운트다운용 (pause/play 연타 race 방지)
   const endAtRef = useRef<number>(0);
@@ -632,6 +638,9 @@ export default function HomeScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (isRunning && remainingSeconds === 0) {
       setIsRunning(false);
+      // v1.8 #TimerEndGlitch — isRunning=false 전환 직후 frame 측 timeText 가 초기값 (= 사용자 세팅 5초) 으로 평가되어 깜빡임 발생.
+      // hasJustEnded=true 동안은 timeText = formatTime(0) 유지.
+      setHasJustEnded(true);
       const mission = missionList[selectedIndex] ?? null;
       const icon = mission?.icon ?? 'timer';
       saveSession(totalSecondsRef.current, icon);
@@ -966,7 +975,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     ? remainingSeconds / totalSecondsRef.current
     : (selectedMinutes * 60 + selectedSeconds) / (60 * 60);
 
-  const timeText = isRunning
+  // v1.8 #TimerEndGlitch — 타이머 0 도달 ~ AlarmScreen mount 사이 한 프레임 동안 timeText 가
+  // 초기 세팅값으로 평가되어 깜빡임 발생. hasJustEnded 동안은 formatTime(0) 유지.
+  const timeText = isRunning || hasJustEnded
     ? formatTime(remainingSeconds)
     : formatTime(selectedMinutes * 60 + selectedSeconds);
 

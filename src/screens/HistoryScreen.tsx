@@ -123,8 +123,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     letterSpacing: 0.4,
   },
   catCount: {
-    fontSize: 12, fontWeight: '700', color: colors.secondary,
-    opacity: 0.6,
+    fontSize: 13, fontWeight: '700', color: colors.primary,
   },
   noSession: {
     textAlign: 'center', color: colors.secondary,
@@ -449,10 +448,12 @@ export default function HistoryScreen({ navigation }: Props) {
           const catIcon = (k: 'timer' | 'routine' | 'alarm'): React.ComponentProps<typeof MaterialIcons>['name'] =>
             k === 'timer' ? 'timer' : k === 'routine' ? 'repeat' : 'alarm';
 
+          // v1.8 #CalendarCategoryTotalTime — 갯수 대신 카테고리별 총 사용 시간 (분/초) 표시.
+          // 통계 카드에 카테고리별 시간 통계가 따로 없어서 캘린더 헤더에서 확인하도록 정합.
           const renderCategory = (
             catKey: 'timer' | 'routine' | 'alarm',
             title: string,
-            count: number,
+            totalSecondsSum: number,
             children: React.ReactNode
           ) => {
             const expanded = catExpanded[catKey] ?? true;
@@ -465,7 +466,7 @@ export default function HistoryScreen({ navigation }: Props) {
                 >
                   <MaterialIcons name={catIcon(catKey)} size={20} color={colors.primary} />
                   <Text style={styles.catTitle}>{title}</Text>
-                  <Text style={styles.catCount}>{count}</Text>
+                  <Text style={styles.catCount}>{formatDuration(totalSecondsSum)}</Text>
                   <MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={22} color={colors.secondary} />
                 </TouchableOpacity>
                 {expanded && children}
@@ -473,6 +474,8 @@ export default function HistoryScreen({ navigation }: Props) {
             );
           };
 
+          // v1.8 #CalendarCategoryTotalTime — 자식 항목 측 chevron icon 제거 (= 사용자 부탁).
+          // 측 = 측 = 카테고리 헤더 측 펼치기 chevron 만 유지. 자식 row 는 단순 탭으로 손자 열기.
           const renderGroup = (key: string, entries: SessionRecord[]) => {
             const first = entries[0];
             const expanded = !!groupExpanded[key];
@@ -485,7 +488,6 @@ export default function HistoryScreen({ navigation }: Props) {
                   onPress={() => setGroupExpanded(s => ({ ...s, [key]: !expanded }))}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons name={expanded ? 'expand-less' : 'expand-more'} size={20} color={colors.primary} />
                   <Text style={styles.sessionLabel}>{label}</Text>
                   {totalSecs > 0 && (
                     <Text style={styles.sessionMinutes}>{formatDuration(totalSecs)}</Text>
@@ -503,7 +505,7 @@ export default function HistoryScreen({ navigation }: Props) {
 
           return (
             <>
-              {timerList.length > 0 && renderCategory('timer', t('history.categoryTimer', { defaultValue: '타이머' }), timerList.length, (
+              {timerList.length > 0 && renderCategory('timer', t('history.categoryTimer', { defaultValue: '타이머' }), timerList.reduce((acc, s) => acc + (s.totalSeconds ?? s.minutes * 60), 0), (
                 <>
                   {timerList.map((s) => (
                     <View key={s.id} style={styles.sessionCard}>
@@ -517,12 +519,12 @@ export default function HistoryScreen({ navigation }: Props) {
                   ))}
                 </>
               ))}
-              {routineList.length > 0 && renderCategory('routine', t('history.categoryRoutine', { defaultValue: '루틴' }), Object.keys(routineGroups).length, (
+              {routineList.length > 0 && renderCategory('routine', t('history.categoryRoutine', { defaultValue: '루틴' }), routineList.reduce((acc, e) => acc + (e.totalSeconds ?? e.minutes * 60), 0), (
                 <>
                   {Object.entries(routineGroups).map(([key, entries]) => renderGroup(key, entries))}
                 </>
               ))}
-              {(alarmList.length > 0 || alarmRoutineList.length > 0) && renderCategory('alarm', t('history.categoryAlarm', { defaultValue: '알람' }), alarmList.length + Object.keys(alarmRoutineGroups).length, (
+              {(alarmList.length > 0 || alarmRoutineList.length > 0) && renderCategory('alarm', t('history.categoryAlarm', { defaultValue: '알람' }), [...alarmList, ...alarmRoutineList].reduce((acc, e) => acc + (e.totalSeconds ?? e.minutes * 60), 0), (
                 <>
                   {alarmList.map((s) => (
                     <View key={s.id} style={styles.sessionCard}>

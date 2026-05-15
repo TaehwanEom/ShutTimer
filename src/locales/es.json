@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Detén la rutina primero para iniciar un temporizador.",
       "title": "Rutina en curso"
-    }
+    },
+    "alarmTitleTap": "Listo\nTocar para parar",
+    "alarmTitleShake": "Listo\nAgitar para parar",
+    "alarmTitleCamera": "Listo\nEscanear para parar",
+    "alarmTitleMath": "Listo\nCalcular para parar",
+    "alarmTitleTyping": "Listo\nEscribir para parar",
+    "alarmTitleRandom": "Listo"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

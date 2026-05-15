@@ -440,15 +440,20 @@ export default function HomeScreen({ navigation, route }: Props) {
       const fireAt = Date.now() + seconds * 1000;
       const routineId = timerRoutineIdRef.current ?? `main_timer_${Date.now()}`;
       timerRoutineIdRef.current = routineId;
-      // v1.6 hotfix — title 동적 생성. dismiss method 별 분기.
-      // tap=띄어쓰기 (system 자동 wrap), shake/camera=\n 강제 줄바꿈. 둘 중 어느게 정상 표시되는지 디바이스 검증용.
+      // v1.8 — 잠금화면 알람 제목 = dismissMethod 6가지 분기. random = 안내 빼고 "타이머 완료"만.
       const dismissMethodForTitle = await AsyncStorage.getItem(SETTINGS_KEY.DISMISS_METHOD) ?? 'camera';
       const alarmTitle =
         dismissMethodForTitle === 'tap'
           ? t('home.alarmTitleTap', { defaultValue: '타이머 완료\n탭하여 종료' })
           : dismissMethodForTitle === 'shake'
             ? t('home.alarmTitleShake', { defaultValue: '타이머 완료\n흔들어서 종료' })
-            : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물 스캔 종료' });
+            : dismissMethodForTitle === 'math'
+              ? t('home.alarmTitleMath', { defaultValue: '타이머 완료\n산수 문제 종료' })
+              : dismissMethodForTitle === 'typing'
+                ? t('home.alarmTitleTyping', { defaultValue: '타이머 완료\n받아쓰기 종료' })
+                : dismissMethodForTitle === 'random'
+                  ? t('home.alarmTitleRandom', { defaultValue: '타이머 완료' })
+                  : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물 스캔 종료' });
       try {
         const id = await AlarmkitBridge.scheduleAlarm({
           entityId: routineId,

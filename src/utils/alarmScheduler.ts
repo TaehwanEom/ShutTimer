@@ -155,10 +155,73 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   const targets = all.filter(
     m => m.type === 'alarm_main' && m.entityId === alarmEntityId
   );
+  // v1.8 #AlarmChainRevive — race 안전: metadata 먼저 삭제 → native cancel 호출 순서.
+  //   직전 cancelAlarm() = native cancel → metadata 삭제 순 → .removed 이벤트 시 metadata 살아있어
+  //   listener 측 chain+1 schedule 측 race 측 가능. 본 순서 = listener meta=NULL → silent skip 정합.
   for (const meta of targets) {
-    await cancelAlarm(meta.alarmId);
+    await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+    await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
   }
   await disableOnceAlarmIfNeeded(alarmEntityId).catch(() => {});
+}
+
+// v1.8 #AlarmChainRevive — 2분 간격 chain 재발화 (대기 LA 표시 ❌ 그대로 유지).
+//   사용자분 명시 부탁 = "잠금화면 대기 위젯 안 보이게" 측만 + "2분마다 사운드 출력 살리기" 측만.
+//   직전 16eedb2 측 chain 폐기 = LA 폐기와 함께 잘못 묶인 영역 → 본 복원 = chain 측만 다시 도입.
+//   factory 측 .alarm(schedule: .fixed(...)) 그대로 유지 = 대기 LA 안 생김.
+//   호출 = App.tsx listener 측 .removed 분기 (= framework auto-dismiss 후 다음 chain 1개 등록).
+//   once 알람 = listener 분기 측 조건 차단 = 본 함수 도달 ❌.
+export const ALARM_CHAIN_INTERVAL_MS = 120000; // 2분
+export const ALARM_CHAIN_MAX_INDEX = 49; // chainIndex 0..49 = 총 50회 = 100분
+
+export async function scheduleAlarmChainNext(
+  alarmEntityId: string,
+  nextChainIndex: number
+): Promise<string | null> {
+  if (!(await isAlarmKitReady())) return null;
+  if (nextChainIndex > ALARM_CHAIN_MAX_INDEX) return null;
+
+  const alarms = await loadAlarms();
+  const alarm = alarms.find(a => a.id === alarmEntityId);
+  if (!alarm || !alarm.enabled) return null;
+
+  const soundName = await resolveSoundName();
+  const title = alarm.label || '알람';
+  const nextFireAt = Date.now() + ALARM_CHAIN_INTERVAL_MS;
+  const countdownTitle = '다음 알람\n남은 시간';
+  Logger.warn(
+    'alarmScheduler-DBG',
+    `scheduleAlarmChainNext entityId=${alarmEntityId} chainIndex=${nextChainIndex} nextFireAt=${nextFireAt}`
+  );
+  try {
+    const id = await AlarmkitBridge.scheduleAlarm({
+      entityId: alarmEntityId,
+      title,
+      countdownTitle,
+      fireAt: nextFireAt,
+      type: 'alarm_main',
+      soundName,
+      recurrence: { mode: 'never' }, // chain 측 = 단발 .fixed = 대기 LA ❌ 유지
+      laStepName: title,
+      laStepIndex: 0,
+      laTotalSteps: 1,
+      laStage: 'step',
+      laRoutineId: alarmEntityId,
+      laRoutineName: countdownTitle,
+    });
+    if (!id) return null;
+    await saveAlarmMetadata({
+      alarmId: id,
+      type: 'alarm_main',
+      entityId: alarmEntityId,
+      chainIndex: nextChainIndex,
+      chainBaseFireAt: nextFireAt,
+    });
+    return id;
+  } catch (e) {
+    Logger.warn('alarmScheduler', `scheduleAlarmChainNext error=${String(e)}`);
+    return null;
+  }
 }
 
 /**

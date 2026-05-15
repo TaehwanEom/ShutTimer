@@ -29,7 +29,13 @@
       "emptyBody": "Please enter a scenario or description.",
       "errorTitle": "No Mail App",
       "errorBody": "No mail app configured. Please add a mail account in Settings and retry."
-    }
+    },
+    "alarmTitleTap": "Done\nTap to stop",
+    "alarmTitleShake": "Done\nShake to stop",
+    "alarmTitleCamera": "Done\nScan to stop",
+    "alarmTitleMath": "Done\nSolve to stop",
+    "alarmTitleTyping": "Done\nType to stop",
+    "alarmTitleRandom": "Done"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

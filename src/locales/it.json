@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Interrompi prima la routine per avviare un singolo timer.",
       "title": "Routine in corso"
-    }
+    },
+    "alarmTitleTap": "Fatto\nTocca per fermare",
+    "alarmTitleShake": "Fatto\nScuoti per fermare",
+    "alarmTitleCamera": "Fatto\nScansiona per fermare",
+    "alarmTitleMath": "Fatto\nCalcola per fermare",
+    "alarmTitleTyping": "Fatto\nScrivi per fermare",
+    "alarmTitleRandom": "Fatto"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

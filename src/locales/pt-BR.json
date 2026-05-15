@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Pare a rotina primeiro para iniciar um cronômetro.",
       "title": "Rotina em andamento"
-    }
+    },
+    "alarmTitleTap": "Pronto\nToque para parar",
+    "alarmTitleShake": "Pronto\nAgite para parar",
+    "alarmTitleCamera": "Pronto\nEscaneie para parar",
+    "alarmTitleMath": "Pronto\nCalcule para parar",
+    "alarmTitleTyping": "Pronto\nDigite para parar",
+    "alarmTitleRandom": "Pronto"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

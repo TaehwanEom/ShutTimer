@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Arrêtez d'abord la routine pour lancer un minuteur.",
       "title": "Routine en cours"
-    }
+    },
+    "alarmTitleTap": "Fini\nToucher pour stop",
+    "alarmTitleShake": "Fini\nAgiter pour stop",
+    "alarmTitleCamera": "Fini\nScanner pour stop",
+    "alarmTitleMath": "Fini\nCalculer pour stop",
+    "alarmTitleTyping": "Fini\nÉcrire pour stop",
+    "alarmTitleRandom": "Fini"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

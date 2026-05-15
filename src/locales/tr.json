@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Tekli zamanlayıcıyı başlatmak için önce rutini durdurun.",
       "title": "Rutin devam ediyor"
-    }
+    },
+    "alarmTitleTap": "Bitti\nDokun ve durdur",
+    "alarmTitleShake": "Bitti\nSalla ve durdur",
+    "alarmTitleCamera": "Bitti\nTara ve durdur",
+    "alarmTitleMath": "Bitti\nÇöz ve durdur",
+    "alarmTitleTyping": "Bitti\nYaz ve durdur",
+    "alarmTitleRandom": "Bitti"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

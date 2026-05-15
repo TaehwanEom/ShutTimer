@@ -29,7 +29,13 @@
     "timerBlocked": {
       "body": "請先停止例程,以啟動單一計時器。",
       "title": "例程進行中"
-    }
+    },
+    "alarmTitleTap": "完成\n點擊結束",
+    "alarmTitleShake": "完成\n搖動結束",
+    "alarmTitleCamera": "完成\n掃描結束",
+    "alarmTitleMath": "完成\n答題結束",
+    "alarmTitleTyping": "完成\n輸入結束",
+    "alarmTitleRandom": "完成"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

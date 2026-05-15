@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "أوقف الروتين أولاً لبدء مؤقت واحد.",
       "title": "الروتين قيد التشغيل"
-    }
+    },
+    "alarmTitleTap": "انتهى\nانقر للإيقاف",
+    "alarmTitleShake": "انتهى\nهز للإيقاف",
+    "alarmTitleCamera": "انتهى\nمسح للإيقاف",
+    "alarmTitleMath": "انتهى\nحل للإيقاف",
+    "alarmTitleTyping": "انتهى\nاكتب للإيقاف",
+    "alarmTitleRandom": "انتهى"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

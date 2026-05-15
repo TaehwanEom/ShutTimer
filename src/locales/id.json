@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Hentikan rutinitas dulu untuk memulai timer tunggal.",
       "title": "Rutinitas berjalan"
-    }
+    },
+    "alarmTitleTap": "Selesai\nKetuk untuk berhenti",
+    "alarmTitleShake": "Selesai\nGoyang untuk berhenti",
+    "alarmTitleCamera": "Selesai\nPindai untuk berhenti",
+    "alarmTitleMath": "Selesai\nHitung untuk berhenti",
+    "alarmTitleTyping": "Selesai\nKetik untuk berhenti",
+    "alarmTitleRandom": "Selesai"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

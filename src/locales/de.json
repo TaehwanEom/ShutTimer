@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "Beende zuerst die Routine, um einen einzelnen Timer zu starten.",
       "title": "Routine läuft"
-    }
+    },
+    "alarmTitleTap": "Fertig\nTippen zum Stopp",
+    "alarmTitleShake": "Fertig\nSchütteln zum Stopp",
+    "alarmTitleCamera": "Fertig\nScannen zum Stopp",
+    "alarmTitleMath": "Fertig\nRechnen zum Stopp",
+    "alarmTitleTyping": "Fertig\nTippen zum Stopp",
+    "alarmTitleRandom": "Fertig"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

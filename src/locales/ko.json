@@ -29,7 +29,13 @@
       "emptyBody": "시나리오 또는 설명을 입력해주세요.",
       "errorTitle": "메일 앱 없음",
       "errorBody": "메일 앱이 설정되지 않았습니다. 설정 측 메일 계정 추가 후 재시도 부탁드립니다."
-    }
+    },
+    "alarmTitleTap": "타이머 완료\n탭하여 종료",
+    "alarmTitleShake": "타이머 완료\n흔들어서 종료",
+    "alarmTitleCamera": "타이머 완료\n사물 스캔 종료",
+    "alarmTitleMath": "타이머 완료\n산수 문제 종료",
+    "alarmTitleTyping": "타이머 완료\n받아쓰기 종료",
+    "alarmTitleRandom": "타이머 완료"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

@@ -22,7 +22,13 @@
     "timerBlocked": {
       "body": "หยุดกิจวัตรก่อนเพื่อเริ่มจับเวลาเดี่ยว",
       "title": "กิจวัตรกำลังทำงาน"
-    }
+    },
+    "alarmTitleTap": "เสร็จ\nแตะเพื่อหยุด",
+    "alarmTitleShake": "เสร็จ\nเขย่าเพื่อหยุด",
+    "alarmTitleCamera": "เสร็จ\nสแกนเพื่อหยุด",
+    "alarmTitleMath": "เสร็จ\nคำนวณเพื่อหยุด",
+    "alarmTitleTyping": "เสร็จ\nพิมพ์เพื่อหยุด",
+    "alarmTitleRandom": "เสร็จ"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

@@ -29,7 +29,13 @@
     "timerBlocked": {
       "body": "シングルタイマーを開始するには、まずルーティンを停止してください。",
       "title": "ルーティン実行中"
-    }
+    },
+    "alarmTitleTap": "終了\nタップで停止",
+    "alarmTitleShake": "終了\n振って停止",
+    "alarmTitleCamera": "終了\nスキャン停止",
+    "alarmTitleMath": "終了\n計算で停止",
+    "alarmTitleTyping": "終了\n入力で停止",
+    "alarmTitleRandom": "終了"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",

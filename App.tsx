@@ -54,6 +54,8 @@ import {
   recordAlarmSession,
   cleanupGhostAlarms,
   cancelAlarmsForEntity,
+  scheduleAlarmChainNext,
+  ALARM_CHAIN_MAX_INDEX,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 import { recordInstallDateIfNeeded } from './src/utils/storeReview';
@@ -316,6 +318,8 @@ function AppNavigator() {
       // v1.7 hotfix #DBG-C — listener 진입 + suppress flag (= banner 잔존 / banner 미노출 분기 추적용).
       // Logger.warn (= AsyncStorage 영역 → 설정 측 "로그 공유" 측 조회 영역. TestFlight console 미라우팅 회피).
       Logger.warn('onAlarmStateChange-DBG', `alarmId=${event.alarmId} state=${event.state} AppState=${AppState.currentState} suppressFlag=${SUPPRESS_ALARMKIT_BANNER_IN_FG}`);
+      // v1.8 #ChainMarker — bundle 적용 검증용 마커. 본 로그 안 보이면 = 디바이스 측 옛 bundle.
+      Logger.warn('CHAIN-MARKER-V18', `listener entered state=${event.state} alarmId=${event.alarmId}`);
       if (event.state !== 'alerting') return;
       // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
       if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active') {
@@ -364,14 +368,25 @@ function AppNavigator() {
       if (meta.type === 'alarm_main') {
         // sessions 기록 (= 결정 6-B, icon='alarm' 고정)
         await recordAlarmSession().catch(() => {});
-        // v1.8 — chain 정책 폐기 (= LA 강제 root cause). native .alarm(schedule:) factory 측 OS 자동 반복으로 대체.
-        // 'once' 측 = 발화 후 자동 disable (= 호환성 유지).
-        await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        // v1.8 #AlarmChainRevive — 발화 시점에 2분 뒤 다음 chain 1개 등록. alarm.repeat 무관 모두 진입.
+        //   .removed trigger 측 = daily/weekly alarm framework .relative() 측 = .alerting → .scheduled 자동 전이 →
+        //     .removed 측 안 들어옴 → chain 진입 ❌ 회귀. 본 분기 측 = .alerting 시점 = 모든 repeat 동일 진입.
+        //   사용자 dismiss 경로 = cancelAlarmsForEntity → entityId 묶음 일괄 cancel + once disable.
+        //   chain budget 끝 (chainIndex >= 49) = 마지막 발화 시점 = once 측 disable 호출 + 후속 chain ❌.
+        const curIdx = meta.chainIndex ?? 0;
+        if (curIdx < ALARM_CHAIN_MAX_INDEX) {
+          Logger.warn('onAlarmStateChange-DBG', `chain+1 schedule entityId=${meta.entityId} curIdx=${curIdx} → nextIdx=${curIdx + 1}`);
+          await scheduleAlarmChainNext(meta.entityId, curIdx + 1).catch(() => {});
+        } else {
+          await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        }
         if (currentRoute === 'Alarm') return;
-        // 알람별 dismissMethod + soundKey lookup → navigate params 측 전달.
-        // v1.7 Phase 2-A — alarmEntityId 전달. AlarmScreen.goHome 측 alarm.steps 분기 사용.
+        // v1.8 #AlarmChainRevive — background AlarmScreen mount 차단 (= 잠금 그대로 두면 30초 missionDuration
+        //   만료 → cancelAlarmsForEntity → chain 일괄 cancel 회귀). 사용자 잠금 해제 후 앱 진입 시점은
+        //   cold-start path (= 본 file 아래 alerting alarm lookup useEffect) 가 잡아 navigate.
+        if (AppState.currentState === 'background') return;
+        // 알람별 dismissMethod + soundKey lookup → navigate params 전달.
         Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
-        // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기 (= AlarmScreen 측 = SETTINGS_KEY.ALARM_SOUND 측만 read = alarmScheduler 정합).
         navigationRef.current?.navigate('Alarm', {
           endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
           alarmEntityId: meta.entityId,

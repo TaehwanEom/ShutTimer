@@ -40,8 +40,10 @@ import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMapping
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 import { stopRoutine } from '../utils/routineController';
-import { loadActiveRoutine } from '../constants/routines';
+import { loadActiveRoutine, PENDING_DISABLED_ALARMS_KEY } from '../constants/routines';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
+import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
 
 // v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
 async function shouldUseAlarmKitInTimer(): Promise<boolean> {
@@ -565,6 +567,69 @@ export default function HomeScreen({ navigation, route }: Props) {
       );
       return;
     }
+    const nowMs = Date.now();
+    // v1.8 #AlarmTimerConflict — 단일 타이머 시작 시 알람 다음 트리거 시각 검사.
+    // 타이머 종료 + 5분 버퍼 안에 알람 트리거 있으면 경고 dialog → 사용자 선택 후 시작.
+    // "시작" 누름 시 = 충돌 알람 임시 disable + AlarmKit cancel + AsyncStorage 측 ID 저장 → AlarmScreen goHome 측 측 복원.
+    try {
+      const alarms = await loadAlarms();
+      const enabledAlarms = alarms.filter(a => a.enabled);
+      const limitMs = nowMs + (total + 300) * 1000;
+      let conflict: { time: number; label: string; alarmId: string } | null = null;
+      for (const a of enabledAlarms) {
+        const next = nextAlarmOccurrenceTime(a, new Date(nowMs));
+        if (next !== null && next >= nowMs && next <= limitMs) {
+          if (!conflict || next < conflict.time) {
+            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id };
+          }
+        }
+      }
+      if (conflict) {
+        const d = new Date(conflict.time);
+        const h = d.getHours();
+        const m = d.getMinutes();
+        const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
+        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const timeText = `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+        const c = conflict;
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            t('routine.alarmConflictTitle'),
+            t('routine.alarmConflictBody', { time: timeText, alarmLabel: c.label }),
+            [
+              { text: t('routine.alarmConflictCancel'), style: 'cancel', onPress: () => resolve() },
+              {
+                text: t('routine.alarmConflictProceed'),
+                onPress: async () => {
+                  try {
+                    const target = enabledAlarms.find(x => x.id === c.alarmId);
+                    if (target) {
+                      await upsertAlarm({ ...target, enabled: false });
+                      await cancelAlarmsForEntity(c.alarmId);
+                      const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+                      const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
+                      if (!prev.includes(c.alarmId)) prev.push(c.alarmId);
+                      await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
+                    }
+                  } catch (e) {
+                    Logger.warn('timer', `alarmConflict disable fail err=${String(e)}`);
+                  }
+                  await proceedTimerStart();
+                  resolve();
+                },
+              },
+            ],
+            { cancelable: true, onDismiss: () => resolve() }
+          );
+        });
+        return;
+      }
+    } catch (e) {
+      Logger.warn('timer', `alarmConflict check fail err=${String(e)}`);
+    }
+    await proceedTimerStart();
+
+    async function proceedTimerStart() {
     const mission = missionList[selectedIndex] ?? null;
     const now = Date.now();
     totalSecondsRef.current = total;
@@ -590,6 +655,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       missionId: mission?.id ?? null,
       missionIcon: mission?.icon ?? null,
     } satisfies ActiveTimer)).catch(() => {});
+    }
   };
 
   // --- interval (v1.5 timestamp 기반) ---

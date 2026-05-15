@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Impostazioni",
+    "shareApp": "Consiglia agli amici",
+    "shareAppMessage": "Scopri ShutTimer! Un'app timer dove puoi impostare qualsiasi durata e fermare le sveglie con foto, scuotimenti, tocchi e altro ancora.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Metodo di chiusura",
     "camera": "Scansione foto",
     "cameraDesc": "Scansiona con la fotocamera per fermare la sveglia",
@@ -182,6 +184,7 @@
     "soundSelect": "Seleziona suono",
     "missionDuration": "Timer missione",
     "missionDurationDesc": "Tempo per trovare l'oggetto della missione",
+    "missionDurationUnlimited": "Illimitato",
     "secondsUnit": "s",
     "missionSelect": "Selezione missione",
     "screen": "Schermo",
@@ -194,6 +197,19 @@
     "comingSoon": "IN ARRIVO",
     "language": "Lingua",
     "languageAuto": "Rilevamento auto",
+    "help": {
+      "title": "Aiuto",
+      "stopMethod": "Metodo di arresto",
+      "stopMethodBody": "Il metodo di chiusura della sveglia può essere scelto nelle impostazioni tra 5 opzioni: scansione foto, scuotere, toccare, calcolo e dettatura. Quando suona la sveglia, completa la missione scelta per fermarla.",
+      "routine": "Uso delle routine",
+      "routineBody": "Una routine è una sequenza di vari passaggi. Le routine programmate iniziano automaticamente all'orario impostato, quelle normali si avviano manualmente. Si possono aggiungere fino a 3 passaggi.",
+      "alarmRoutine": "Uso delle routine di sveglia",
+      "alarmRoutineBody": "Aggiungendo fino a 3 passaggi quando crei una sveglia, diventa una routine di sveglia. Quando suona la sveglia, inizia la prima missione e il passaggio successivo continua automaticamente. La routine termina al completamento di tutti i passaggi.",
+      "dial": "Uso della manopola",
+      "dialBody": "Prima di avviare il timer, ruota la manopola o tocca le cifre per impostare il tempo con la tastiera. Anche durante la pausa puoi regolare il tempo con manopola o tastiera; toccando riprendi il timer riparte con il nuovo tempo.",
+      "bug": "Segnala bug",
+      "bugBody": "Se trovi un bug durante l'uso, tocca l'icona email in alto a destra della schermata principale per accedere alla segnalazione. Descrivi la situazione (scenario) e il problema (descrizione), poi premi invia; l'app email si apre automaticamente con le informazioni del dispositivo allegate."
+    },
     "removeAdsPrice": "$2.99 · A vita",
     "restoreSuccess": "Acquisto ripristinato con successo",
     "restoreNone": "Nessun acquisto da ripristinare",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}h {{minutes}}min",
     "minutesOnly": "{{minutes}}min",
     "streakDays": "{{days}} giorni di fila",
+    "minutesSeconds": "{{minutes}} min {{seconds}} s",
+    "secondsOnly": "{{seconds}} s",
+    "categoryTimer": "Timer",
+    "categoryRoutine": "Routine",
+    "categoryAlarm": "Sveglia",
+    "alarmDefaultLabel": "Sveglia",
     "empty": "-",
     "statsDailyUsage": "Uso giornaliero"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Un timer singolo è attivo. Annullare e avviare la routine?",
     "timerConflictProceed": "Avvia routine",
+    "alarmConflictTitle": "Conflitto sveglia programmata",
+    "alarmConflictBody": "C'è una sveglia '{{alarmLabel}}' programmata alle {{time}}.\nLa sveglia potrebbe suonare prima della fine della routine.",
+    "alarmConflictProceed": "Avvia",
+    "alarmConflictCancel": "Annulla",
     "timerConflictTitle": "Timer attivo",
     "totalDurationFmt": "Tempo {{duration}}\n{{count}} step",
     "uncategorized": "Senza categoria",
@@ -580,5 +606,9 @@
       "tue": "Mar",
       "wed": "Mer"
     }
+  },
+  "favorites": {
+    "empty": "Nessun preferito",
+    "addButton": "Aggiungi preferito"
   }
 }

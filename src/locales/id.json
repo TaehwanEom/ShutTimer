@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Pengaturan",
+    "shareApp": "Rekomendasikan ke teman",
+    "shareAppMessage": "Coba ShutTimer! Aplikasi timer yang dapat diatur waktu sesuai kebutuhan dan mematikan alarm dengan foto, goyangan, ketukan, dan lainnya.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Cara Menutup Alarm",
     "camera": "Pindai foto",
     "cameraDesc": "Pindai dengan kamera untuk mematikan alarm",
@@ -182,6 +184,7 @@
     "soundSelect": "Pilih Suara",
     "missionDuration": "Timer Misi",
     "missionDurationDesc": "Waktu untuk menemukan objek misi",
+    "missionDurationUnlimited": "Tanpa batas",
     "secondsUnit": "d",
     "missionSelect": "Pilih Misi",
     "screen": "Tampilan",
@@ -194,6 +197,19 @@
     "comingSoon": "SEGERA HADIR",
     "language": "Bahasa",
     "languageAuto": "Deteksi Otomatis",
+    "help": {
+      "title": "Bantuan",
+      "stopMethod": "Cara berhenti",
+      "stopMethodBody": "Cara mengakhiri alarm dapat dipilih di pengaturan dari 5 metode: pindai foto, goyang, ketuk, matematika, dan dikte. Saat alarm berbunyi, selesaikan misi sesuai metode yang dipilih untuk menghentikannya.",
+      "routine": "Cara menggunakan rutinitas",
+      "routineBody": "Rutinitas adalah serangkaian langkah yang dijalankan berurutan. Rutinitas terjadwal dimulai otomatis pada waktu yang ditetapkan, rutinitas biasa dimulai manual. Maksimum 3 langkah dapat ditambahkan.",
+      "alarmRoutine": "Cara menggunakan rutinitas alarm",
+      "alarmRoutineBody": "Saat menambah alarm dengan maksimum 3 langkah, itu menjadi rutinitas alarm. Saat alarm berbunyi, misi langkah pertama dimulai, setelah selesai langkah berikutnya otomatis berlanjut. Selesai saat semua langkah selesai.",
+      "dial": "Cara menggunakan dial",
+      "dialBody": "Sebelum timer dimulai, putar dial dengan jari atau ketuk angka digital untuk mengatur waktu dengan keypad. Saat dijeda juga bisa menambah/mengurangi waktu dengan dial atau keypad, tekan lanjutkan untuk memulai ulang dengan waktu baru.",
+      "bug": "Laporkan bug",
+      "bugBody": "Jika menemukan bug saat menggunakan, ketuk ikon email di kanan atas layar utama untuk masuk ke halaman laporan bug. Tulis situasi yang terjadi (skenario) dan deskripsi masalah (penjelasan) lalu kirim, aplikasi email akan terbuka otomatis dengan info perangkat terlampir."
+    },
     "removeAdsPrice": "$2.99 · Seumur hidup",
     "restoreSuccess": "Pembelian berhasil dipulihkan",
     "restoreNone": "Tidak ada pembelian untuk dipulihkan",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}j {{minutes}}m",
     "minutesOnly": "{{minutes}}m",
     "streakDays": "{{days}} hari berturut",
+    "minutesSeconds": "{{minutes}} menit {{seconds}} detik",
+    "secondsOnly": "{{seconds}} detik",
+    "categoryTimer": "Timer",
+    "categoryRoutine": "Rutinitas",
+    "categoryAlarm": "Alarm",
+    "alarmDefaultLabel": "Alarm",
     "empty": "-",
     "statsDailyUsage": "Penggunaan Harian"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Timer tunggal sedang berjalan. Batalkan dan mulai rutinitas?",
     "timerConflictProceed": "Mulai rutinitas",
+    "alarmConflictTitle": "Konflik alarm terjadwal",
+    "alarmConflictBody": "Alarm '{{alarmLabel}}' terjadwal pada {{time}}.\nAlarm mungkin berbunyi sebelum rutinitas selesai.",
+    "alarmConflictProceed": "Mulai",
+    "alarmConflictCancel": "Batal",
     "timerConflictTitle": "Timer berjalan",
     "totalDurationFmt": "Waktu {{duration}}\n{{count}} langkah",
     "uncategorized": "Tanpa kategori",
@@ -580,5 +606,9 @@
       "tue": "Sel",
       "wed": "Rab"
     }
+  },
+  "favorites": {
+    "empty": "Tidak ada favorit",
+    "addButton": "Tambah favorit"
   }
 }

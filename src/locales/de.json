@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Einstellungen",
+    "shareApp": "Freunden empfehlen",
+    "shareAppMessage": "Probier ShutTimer aus! Eine Timer-App, mit der du jede Dauer einstellen und Alarme per Foto, Schütteln, Tippen und mehr beenden kannst.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Alarm-Beendigung",
     "camera": "Foto-Scan",
     "cameraDesc": "Mit der Kamera scannen, um den Alarm zu beenden",
@@ -182,6 +184,7 @@
     "soundSelect": "Ton auswählen",
     "missionDuration": "Missionstimer",
     "missionDurationDesc": "Zeit, um das Missionsobjekt zu finden",
+    "missionDurationUnlimited": "Unbegrenzt",
     "secondsUnit": "s",
     "missionSelect": "Missionsauswahl",
     "screen": "Anzeige",
@@ -194,6 +197,19 @@
     "comingSoon": "DEMNÄCHST",
     "language": "Sprache",
     "languageAuto": "Automatisch",
+    "help": {
+      "title": "Hilfe",
+      "stopMethod": "Beendigungsmethode",
+      "stopMethodBody": "Die Alarm-Beendigungsmethode kann in den Einstellungen aus 5 Optionen gewählt werden: Foto-Scan, Schütteln, Tippen, Rechnen und Diktat. Wenn der Alarm klingelt, schließe die Mission der gewählten Methode ab, um zu beenden.",
+      "routine": "Routine verwenden",
+      "routineBody": "Eine Routine ist eine Folge mehrerer Schritte. Geplante Routinen starten automatisch zur festgelegten Zeit, normale Routinen werden manuell gestartet. Bis zu 3 Schritte können hinzugefügt werden.",
+      "alarmRoutine": "Wecker-Routine verwenden",
+      "alarmRoutineBody": "Wenn beim Hinzufügen eines Weckers bis zu 3 Schritte ergänzt werden, wird daraus eine Wecker-Routine. Sobald der Wecker klingelt, beginnt die erste Mission; nach Abschluss folgt automatisch der nächste Schritt. Sind alle Schritte fertig, endet die Routine.",
+      "dial": "Wählrad verwenden",
+      "dialBody": "Vor Timer-Start kannst du am Wählrad drehen oder auf die Digitalzahlen tippen, um die Zeit per Tastatur einzustellen. Auch in der Pause kannst du Zeit per Wählrad oder Tastatur erhöhen oder verringern; nach „Fortsetzen“ startet der Timer mit der neuen Zeit.",
+      "bug": "Bug melden",
+      "bugBody": "Wenn du beim Verwenden einen Bug findest, tippe oben rechts auf dem Hauptbildschirm auf das E-Mail-Symbol, um zum Bug-Melde-Bildschirm zu gelangen. Beschreibe die Situation (Szenario) und das Problem (Beschreibung) und drücke Senden – die E-Mail-App öffnet sich automatisch mit angehängten Geräteinformationen."
+    },
     "removeAdsPrice": "$2.99 · Dauerhaft",
     "restoreSuccess": "Kauf erfolgreich wiederhergestellt",
     "restoreNone": "Keine Käufe zum Wiederherstellen",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}h {{minutes}}min",
     "minutesOnly": "{{minutes}}min",
     "streakDays": "{{days}} Tage Streak",
+    "minutesSeconds": "{{minutes}} Min. {{seconds}} Sek.",
+    "secondsOnly": "{{seconds}} Sek.",
+    "categoryTimer": "Timer",
+    "categoryRoutine": "Routine",
+    "categoryAlarm": "Wecker",
+    "alarmDefaultLabel": "Wecker",
     "empty": "-",
     "statsDailyUsage": "Tägliche Nutzung"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Ein einzelner Timer läuft. Abbrechen und Routine starten?",
     "timerConflictProceed": "Routine starten",
+    "alarmConflictTitle": "Geplanter Wecker-Konflikt",
+    "alarmConflictBody": "Um {{time}} ist der Wecker „{{alarmLabel}}\" geplant.\nDer Wecker könnte vor Ende der Routine klingeln.",
+    "alarmConflictProceed": "Starten",
+    "alarmConflictCancel": "Abbrechen",
     "timerConflictTitle": "Timer läuft",
     "totalDurationFmt": "Zeit {{duration}}\n{{count}} Schritte",
     "uncategorized": "Ohne Kategorie",
@@ -580,5 +606,9 @@
       "tue": "Di",
       "wed": "Mi"
     }
+  },
+  "favorites": {
+    "empty": "Keine Favoriten",
+    "addButton": "Favorit hinzufügen"
   }
 }

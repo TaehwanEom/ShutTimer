@@ -373,6 +373,19 @@ export default function SettingsScreen({ navigation }: Props) {
     }
   };
 
+  // v1.8 #ShareApp — 친구 추천 기능. iOS native Share Sheet 노출.
+  // App Store 링크 + 안내 메시지. 다운로드 + 리뷰 수 증가로 검색 가중치 향상 효과.
+  const handleShareApp = async () => {
+    try {
+      await Share.share({
+        message: t('settings.shareAppMessage', { defaultValue: 'ShutTimer 추천! 원하는 시간을 설정하고 사진, 흔들기, 탭 등 다양한 방식으로 타이머를 종료하는 앱입니다.\n\nhttps://apps.apple.com/app/id6761991860' }),
+        title: 'ShutTimer',
+      });
+    } catch (e) {
+      // 사용자 취소 또는 공유 실패 — silent fail.
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -385,6 +398,17 @@ export default function SettingsScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* v1.8 #ShareApp — 친구 추천 (= 설정 최상단 배치, 검색 노출 + 사용자 유입 효과) */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.toggleRow} onPress={handleShareApp}>
+            <View style={styles.toggleLeft}>
+              <MaterialIcons name="share" size={22} color={colors.primary} />
+              <Text style={styles.toggleLabel}>{t('settings.shareApp', { defaultValue: '친구에게 추천하기' })}</Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+          </TouchableOpacity>
+        </View>
+
         {/* 컬러 팔레트 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Colors</Text>

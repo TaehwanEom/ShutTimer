@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Ajustes",
+    "shareApp": "Recomendar a amigos",
+    "shareAppMessage": "¡Prueba ShutTimer! Una app de temporizador donde puedes configurar cualquier duración y detener alarmas con fotos, sacudidas, toques y más.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Método de cierre",
     "camera": "Escaneo de foto",
     "cameraDesc": "Escanea con la cámara para detener la alarma",
@@ -182,6 +184,7 @@
     "soundSelect": "Seleccionar sonido",
     "missionDuration": "Temporizador de misión",
     "missionDurationDesc": "Tiempo para encontrar el objeto de la misión",
+    "missionDurationUnlimited": "Ilimitado",
     "secondsUnit": "s",
     "missionSelect": "Selección de misión",
     "screen": "Pantalla",
@@ -194,6 +197,19 @@
     "comingSoon": "PRÓXIMAMENTE",
     "language": "Idioma",
     "languageAuto": "Detección automática",
+    "help": {
+      "title": "Ayuda",
+      "stopMethod": "Método de parada",
+      "stopMethodBody": "El método de cierre de la alarma se puede elegir en ajustes entre 5 opciones: escaneo de foto, sacudida, toque, cálculo y dictado. Cuando suene la alarma, completa la misión según el método elegido para detenerla.",
+      "routine": "Uso de rutinas",
+      "routineBody": "Una rutina es una secuencia de varios pasos. Las rutinas programadas comienzan automáticamente a la hora establecida, las normales se inician manualmente. Se pueden añadir hasta 3 pasos.",
+      "alarmRoutine": "Uso de rutinas de alarma",
+      "alarmRoutineBody": "Al añadir hasta 3 pasos al crear una alarma, se convierte en rutina de alarma. Al sonar la alarma, comienza la primera misión y el siguiente paso continúa automáticamente. La rutina termina cuando todos los pasos se completan.",
+      "dial": "Uso del dial",
+      "dialBody": "Antes de iniciar el temporizador, gira el dial o toca los dígitos para configurar el tiempo con el teclado. Durante la pausa también puedes ajustar el tiempo con el dial o teclado; al pulsar reanudar, el temporizador inicia con el nuevo tiempo.",
+      "bug": "Reportar error",
+      "bugBody": "Si encuentras un error al usar, toca el icono de correo en la esquina superior derecha de la pantalla principal para acceder al reporte. Describe la situación (escenario) y el problema (descripción), luego pulsa enviar; la app de correo se abrirá automáticamente con la información del dispositivo adjunta."
+    },
     "removeAdsPrice": "$2.99 · De por vida",
     "restoreSuccess": "Compra restaurada con éxito",
     "restoreNone": "No hay compras para restaurar",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}h {{minutes}}min",
     "minutesOnly": "{{minutes}}min",
     "streakDays": "{{days}} días seguidos",
+    "minutesSeconds": "{{minutes}} min {{seconds}} s",
+    "secondsOnly": "{{seconds}} s",
+    "categoryTimer": "Temporizador",
+    "categoryRoutine": "Rutina",
+    "categoryAlarm": "Alarma",
+    "alarmDefaultLabel": "Alarma",
     "empty": "-",
     "statsDailyUsage": "Uso diario"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Un temporizador está en curso. ¿Cancelar e iniciar la rutina?",
     "timerConflictProceed": "Iniciar rutina",
+    "alarmConflictTitle": "Conflicto de alarma programada",
+    "alarmConflictBody": "Hay una alarma '{{alarmLabel}}' programada a las {{time}}.\nLa alarma puede sonar antes de que termine la rutina.",
+    "alarmConflictProceed": "Iniciar",
+    "alarmConflictCancel": "Cancelar",
     "timerConflictTitle": "Temporizador en curso",
     "totalDurationFmt": "Tiempo {{duration}}\n{{count}} pasos",
     "uncategorized": "Sin categoría",
@@ -580,5 +606,9 @@
       "tue": "Mar",
       "wed": "Mié"
     }
+  },
+  "favorites": {
+    "empty": "Sin favoritos",
+    "addButton": "Añadir favorito"
   }
 }

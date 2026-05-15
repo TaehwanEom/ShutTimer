@@ -176,6 +176,8 @@
   },
   "settings": {
     "title": "設定",
+    "shareApp": "推薦給朋友",
+    "shareAppMessage": "推薦 ShutTimer！可以自由設定時間，並透過拍照、搖晃、點擊等多種方式停止鬧鐘的應用程式。\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "鬧鐘關閉方式",
     "camera": "拍照掃描",
     "cameraDesc": "用相機掃描關閉鬧鐘",
@@ -189,6 +191,7 @@
     "soundSelect": "選擇鈴聲",
     "missionDuration": "任務計時",
     "missionDurationDesc": "尋找任務物品的時間",
+    "missionDurationUnlimited": "無限制",
     "secondsUnit": "秒",
     "missionSelect": "任務選擇",
     "screen": "顯示",
@@ -201,6 +204,19 @@
     "comingSoon": "即將推出",
     "language": "語言",
     "languageAuto": "自動偵測",
+    "help": {
+      "title": "說明",
+      "stopMethod": "停止方式",
+      "stopMethodBody": "鬧鐘終止方式可以在設定中從拍照掃描、搖晃、點擊、計算、聽寫五種中選擇。鬧鐘響起時完成所選方式的任務即可結束。",
+      "routine": "行程使用方法",
+      "routineBody": "行程是按順序執行多個步驟的組合。預約行程會在設定時間自動開始，一般行程需要手動開始。最多可新增 3 個步驟。",
+      "alarmRoutine": "鬧鐘行程使用方法",
+      "alarmRoutineBody": "新增鬧鐘時最多新增 3 個步驟即成為鬧鐘行程。在鬧鐘時間響起時第一步任務開始，完成後下一步自動繼續。所有步驟完成後結束。",
+      "dial": "轉盤使用方法",
+      "dialBody": "計時器開始前可以轉動轉盤或點擊數字打開鍵盤設定時間。暫停中也可以同樣轉動轉盤或鍵盤增減時間，按恢復時按新設的時間重新開始。",
+      "bug": "問題回報",
+      "bugBody": "使用中發現問題時，點擊主畫面右上角的郵件圖示進入問題回報頁面。填寫發生情況（情境）與問題描述（說明）並送出，郵件應用程式會自動開啟，並附上裝置資訊。"
+    },
     "removeAdsPrice": "$2.99 · 永久",
     "restoreSuccess": "購買已恢復",
     "restoreNone": "沒有可恢復的購買記錄",
@@ -297,7 +313,13 @@
     "minutesOnly": "{{minutes}}分鐘",
     "streakDays": "連續{{days}}天",
     "empty": "-",
-    "statsDailyUsage": "每日使用"
+    "statsDailyUsage": "每日使用",
+    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
+    "secondsOnly": "{{seconds}}秒",
+    "categoryTimer": "計時器",
+    "categoryRoutine": "行程",
+    "categoryAlarm": "鬧鐘",
+    "alarmDefaultLabel": "鬧鐘"
   },
   "forceUpdate": {
     "title": "需要更新",
@@ -573,6 +595,10 @@
     },
     "timerConflictBody": "單一計時器正在執行。取消並開始例程?",
     "timerConflictProceed": "開始例程",
+    "alarmConflictTitle": "預定的鬧鐘衝突",
+    "alarmConflictBody": "{{time}} 已預定「{{alarmLabel}}」鬧鐘。\n例程結束前鬧鐘可能響起。",
+    "alarmConflictProceed": "開始",
+    "alarmConflictCancel": "取消",
     "timerConflictTitle": "計時器執行中",
     "totalDurationFmt": "時間 {{duration}}\n{{count}} 步",
     "uncategorized": "未分類",
@@ -587,5 +613,9 @@
       "tue": "二",
       "wed": "三"
     }
+  },
+  "favorites": {
+    "empty": "沒有收藏",
+    "addButton": "新增收藏"
   }
 }

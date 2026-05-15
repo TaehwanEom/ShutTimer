@@ -30,7 +30,7 @@ import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
-import { stopRoutine, confirmAndAdvance } from '../utils/routineController';
+import { stopRoutine, confirmAndAdvance, restorePendingDisabledAlarms } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
 import { loadActiveRoutine } from '../constants/routines';
@@ -452,6 +452,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       });
       return;
     }
+    // v1.8 #AlarmTimerConflict — 단일 타이머 종료 시 임시 disable 한 알람 복원 (= 루틴 컨텍스트 아닌 일반 타이머 경로).
+    await restorePendingDisabledAlarms();
     Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset Home dismissMethod=${dismissMethod}`);
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation, route.params, dismissMethod]);

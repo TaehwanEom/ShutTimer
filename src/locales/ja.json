@@ -176,6 +176,8 @@
   },
   "settings": {
     "title": "設定",
+    "shareApp": "友達におすすめ",
+    "shareAppMessage": "ShutTimer おすすめ！お好みの時間を設定し、写真スキャン、振動、タップなど様々な方法でアラームを終了できるアプリです。\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "アラーム解除方法",
     "camera": "写真スキャン",
     "cameraDesc": "カメラでスキャンしてアラーム解除",
@@ -189,6 +191,7 @@
     "soundSelect": "サウンド選択",
     "missionDuration": "ミッションタイマー",
     "missionDurationDesc": "ミッション対象を探す制限時間",
+    "missionDurationUnlimited": "制限なし",
     "secondsUnit": "秒",
     "missionSelect": "ミッション選択",
     "screen": "画面",
@@ -201,6 +204,19 @@
     "comingSoon": "近日公開",
     "language": "言語",
     "languageAuto": "自動検出",
+    "help": {
+      "title": "ヘルプ",
+      "stopMethod": "停止方法",
+      "stopMethodBody": "アラーム終了方法は設定からカメラスキャン、振動、タップ、計算、書き取りの5種類から選択できます。アラームが鳴ったら選んだ方式のミッションを完了すると終了します。",
+      "routine": "ルーティンの使い方",
+      "routineBody": "ルーティンは複数のステップを順番に実行する仕組みです。予約ルーティンは決められた時間に自動的に開始し、一般ルーティンは手動で開始します。ステップは最大3つまで追加できます。",
+      "alarmRoutine": "アラームルーティンの使い方",
+      "alarmRoutineBody": "アラーム追加時にステップを最大3つまで追加するとアラームルーティンになります。アラーム時刻に鳴ると最初のステップミッションが開始され、ミッション完了後に次のステップが自動的に続きます。すべてのステップが完了すると終了します。",
+      "dial": "ダイヤルの使い方",
+      "dialBody": "タイマー開始前はダイヤルを指で回すか、デジタル数字をタップしてキーパッドで時間を設定します。一時停止中も同様にダイヤルやキーパッドで時間を増減でき、再開を押すと変更された時間で再び開始します。",
+      "bug": "バグ報告",
+      "bugBody": "使用中にバグを発見した場合はメイン画面右上のメールアイコンをタップしてバグ報告画面に入ります。どのような状況で発生したか（シナリオ）と何が間違っていたか（説明）を記入して送信すると、メールアプリが自動的に開き、デバイス情報も添付されます。"
+    },
     "removeAdsPrice": "$2.99 · 永続",
     "restoreSuccess": "購入が復元されました",
     "restoreNone": "復元できる購入履歴がありません",
@@ -297,7 +313,13 @@
     "minutesOnly": "{{minutes}}分",
     "streakDays": "{{days}}日連続",
     "empty": "-",
-    "statsDailyUsage": "1日の使用時間"
+    "statsDailyUsage": "1日の使用時間",
+    "minutesSeconds": "{{minutes}}分{{seconds}}秒",
+    "secondsOnly": "{{seconds}}秒",
+    "categoryTimer": "タイマー",
+    "categoryRoutine": "ルーティン",
+    "categoryAlarm": "アラーム",
+    "alarmDefaultLabel": "アラーム"
   },
   "forceUpdate": {
     "title": "アップデートが必要です",
@@ -573,6 +595,10 @@
     },
     "timerConflictBody": "シングルタイマーが実行中です。キャンセルしてルーティンを開始しますか?",
     "timerConflictProceed": "ルーティン開始",
+    "alarmConflictTitle": "予定されたアラーム競合",
+    "alarmConflictBody": "{{time}}に「{{alarmLabel}}」アラームが予定されています。\nルーティン終了前にアラームが鳴る可能性があります。",
+    "alarmConflictProceed": "開始",
+    "alarmConflictCancel": "キャンセル",
     "timerConflictTitle": "タイマー実行中",
     "totalDurationFmt": "時間 {{duration}}\n{{count}}ステップ",
     "uncategorized": "未分類",
@@ -587,5 +613,9 @@
       "tue": "火",
       "wed": "水"
     }
+  },
+  "favorites": {
+    "empty": "お気に入りがありません",
+    "addButton": "お気に入り追加"
   }
 }

@@ -232,6 +232,29 @@ export async function markAwaitingConfirm(entityId: string): Promise<void> {
 
 // v1.6 Phase 12 — reinstallChainsIfAuto 함수 제거 (auto 모드 영구 미사용).
 
+// v1.8 #AlarmTimerConflict — 단일 타이머 종료 시점에서도 호출 가능한 공용 복원 함수.
+// AlarmScreen goHome 측 측 단일 타이머 dismiss 시 직접 호출.
+export async function restorePendingDisabledAlarms(): Promise<void> {
+  try {
+    const pendingRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+    if (!pendingRaw) return;
+    const pendingIds: string[] = JSON.parse(pendingRaw);
+    if (pendingIds.length > 0) {
+      const alarms = await loadAlarms();
+      for (const id of pendingIds) {
+        const target = alarms.find(a => a.id === id);
+        if (target && !target.enabled) {
+          await upsertAlarm({ ...target, enabled: true });
+        }
+      }
+      await syncAllAlarms();
+    }
+    await AsyncStorage.removeItem(PENDING_DISABLED_ALARMS_KEY);
+  } catch (e) {
+    Logger.warn('routine', `pendingDisabledAlarms restore fail err=${String(e)}`);
+  }
+}
+
 async function fullCleanup(): Promise<void> {
   // v1.6 #9 — native cleanup: snapshot 기반 currentAlarm cancel + chain alarm 정리 (cancelBackgroundNotif loop 외 fallback).
   const snapshot = readRoutineSnapshot();
@@ -246,27 +269,8 @@ async function fullCleanup(): Promise<void> {
   await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
   // v1.6 #9 — snapshot 명시적 정리 (cancelBackgroundNotif 끝에서 이미 호출, idempotent).
   clearRoutineSnapshot();
-  // v1.8 #AlarmRoutineConflict — 본 루틴 시작 시 임시 disable 한 알람 ID 복원.
-  // enabled=true + syncAllAlarms → 매일 반복 알람 측 다음 회차부터 정상 schedule.
-  try {
-    const pendingRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
-    if (pendingRaw) {
-      const pendingIds: string[] = JSON.parse(pendingRaw);
-      if (pendingIds.length > 0) {
-        const alarms = await loadAlarms();
-        for (const id of pendingIds) {
-          const target = alarms.find(a => a.id === id);
-          if (target && !target.enabled) {
-            await upsertAlarm({ ...target, enabled: true });
-          }
-        }
-        await syncAllAlarms();
-      }
-      await AsyncStorage.removeItem(PENDING_DISABLED_ALARMS_KEY);
-    }
-  } catch (e) {
-    Logger.warn('routine', `pendingDisabledAlarms restore fail err=${String(e)}`);
-  }
+  // v1.8 #AlarmRoutineConflict — 임시 disable 한 알람 ID 복원.
+  await restorePendingDisabledAlarms();
 }
 
 // ─── 공개 API ───────────────────────────────────────────────

@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Ayarlar",
+    "shareApp": "Arkadaşlara öner",
+    "shareAppMessage": "ShutTimer'ı keşfedin! İstediğiniz süreyi ayarlayıp fotoğraf, sallama, dokunma ve daha fazlasıyla alarmları durdurabileceğiniz bir zamanlayıcı uygulaması.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Alarm kapatma yöntemi",
     "camera": "Fotoğraf taraması",
     "cameraDesc": "Alarmı durdurmak için kamerayla tarayın",
@@ -182,6 +184,7 @@
     "soundSelect": "Ses seçin",
     "missionDuration": "Görev zamanlayıcı",
     "missionDurationDesc": "Görev nesnesini bulma süresi",
+    "missionDurationUnlimited": "Sınırsız",
     "secondsUnit": "sn",
     "missionSelect": "Görev seçimi",
     "screen": "Ekran",
@@ -194,6 +197,19 @@
     "comingSoon": "YAKINDA",
     "language": "Dil",
     "languageAuto": "Otomatik Algıla",
+    "help": {
+      "title": "Yardım",
+      "stopMethod": "Durdurma yöntemi",
+      "stopMethodBody": "Alarm kapatma yöntemi ayarlardan 5 seçenek arasından seçilebilir: fotoğraf taraması, sallama, dokunma, hesaplama ve dikte. Alarm çaldığında seçilen yönteme göre görevi tamamlayarak durdurun.",
+      "routine": "Rutin kullanımı",
+      "routineBody": "Rutin, sırayla yürütülen birden fazla adımın birleşimidir. Planlanmış rutinler belirlenen saatte otomatik başlar, normal rutinler manuel başlatılır. En fazla 3 adım eklenebilir.",
+      "alarmRoutine": "Alarm rutini kullanımı",
+      "alarmRoutineBody": "Alarm oluştururken en fazla 3 adım eklediğinizde alarm rutinine dönüşür. Alarm çaldığında ilk görev başlar, tamamlandıktan sonra bir sonraki adım otomatik devam eder. Tüm adımlar tamamlandığında biter.",
+      "dial": "Kadran kullanımı",
+      "dialBody": "Zamanlayıcıyı başlatmadan önce, süreyi ayarlamak için kadranı çevirin veya dijital rakamlara dokunarak klavyeyi açın. Duraklatma sırasında da kadran veya klavye ile süreyi artırıp azaltabilirsiniz; sürdür dokunduğunuzda zamanlayıcı yeni süreyle yeniden başlar.",
+      "bug": "Hata bildir",
+      "bugBody": "Kullanım sırasında bir hata bulursanız, ana ekranın sağ üst köşesindeki e-posta simgesine dokunarak hata bildirme ekranına erişin. Durumu (senaryo) ve sorunu (açıklama) yazıp gönder'e basın; e-posta uygulaması cihaz bilgileri ekli olarak otomatik açılır."
+    },
     "removeAdsPrice": "$2.99 · Ömür boyu",
     "restoreSuccess": "Satın alma başarıyla geri yüklendi",
     "restoreNone": "Geri yüklenecek satın alma yok",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}sa {{minutes}}dk",
     "minutesOnly": "{{minutes}}dk",
     "streakDays": "{{days}} gün üst üste",
+    "minutesSeconds": "{{minutes}} dk {{seconds}} sn",
+    "secondsOnly": "{{seconds}} sn",
+    "categoryTimer": "Zamanlayıcı",
+    "categoryRoutine": "Rutin",
+    "categoryAlarm": "Alarm",
+    "alarmDefaultLabel": "Alarm",
     "empty": "-",
     "statsDailyUsage": "Günlük kullanım"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Tekli zamanlayıcı çalışıyor. İptal edip rutini başlat?",
     "timerConflictProceed": "Rutini başlat",
+    "alarmConflictTitle": "Planlanmış alarm çakışması",
+    "alarmConflictBody": "{{time}} saatinde '{{alarmLabel}}' alarmı planlı.\nRutin bitmeden alarm çalabilir.",
+    "alarmConflictProceed": "Başlat",
+    "alarmConflictCancel": "İptal",
     "timerConflictTitle": "Zamanlayıcı çalışıyor",
     "totalDurationFmt": "Süre {{duration}}\n{{count}} adım",
     "uncategorized": "Kategorisiz",
@@ -580,5 +606,9 @@
       "tue": "Sal",
       "wed": "Çar"
     }
+  },
+  "favorites": {
+    "empty": "Favori yok",
+    "addButton": "Favori ekle"
   }
 }

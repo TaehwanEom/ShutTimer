@@ -176,6 +176,8 @@
   },
   "settings": {
     "title": "설정",
+    "shareApp": "친구에게 추천하기",
+    "shareAppMessage": "ShutTimer 추천! 원하는 시간을 설정하고 사진, 흔들기, 탭 등 다양한 방식으로 타이머를 종료하는 앱입니다.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "알람 종료 방식",
     "camera": "사진 스캔",
     "cameraDesc": "사진을 스캔해 알람 종료",

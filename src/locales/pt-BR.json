@@ -169,6 +169,8 @@
   },
   "settings": {
     "title": "Configurações",
+    "shareApp": "Recomendar a amigos",
+    "shareAppMessage": "Confira o ShutTimer! Um app de cronômetro onde você pode definir qualquer duração e encerrar alarmes com foto, sacudir, toque e mais.\n\nhttps://apps.apple.com/app/id6761991860",
     "dismissMethod": "Método de encerramento",
     "camera": "Escanear foto",
     "cameraDesc": "Escaneie com a câmera para parar o alarme",
@@ -182,6 +184,7 @@
     "soundSelect": "Selecionar som",
     "missionDuration": "Timer da missão",
     "missionDurationDesc": "Tempo para encontrar o objeto da missão",
+    "missionDurationUnlimited": "Ilimitado",
     "secondsUnit": "s",
     "missionSelect": "Seleção de missão",
     "screen": "Tela",
@@ -194,6 +197,19 @@
     "comingSoon": "EM BREVE",
     "language": "Idioma",
     "languageAuto": "Detecção automática",
+    "help": {
+      "title": "Ajuda",
+      "stopMethod": "Método de parada",
+      "stopMethodBody": "O método de encerramento do alarme pode ser escolhido nas configurações entre 5 opções: escaneamento de foto, sacudir, toque, cálculo e ditado. Quando o alarme tocar, complete a missão escolhida para parar.",
+      "routine": "Uso de rotinas",
+      "routineBody": "Uma rotina é uma sequência de várias etapas. Rotinas agendadas começam automaticamente no horário definido, rotinas comuns são iniciadas manualmente. Até 3 etapas podem ser adicionadas.",
+      "alarmRoutine": "Uso de rotinas de alarme",
+      "alarmRoutineBody": "Ao adicionar até 3 etapas criando um alarme, ele se torna uma rotina de alarme. Quando o alarme tocar, a primeira missão começa e a próxima etapa continua automaticamente. A rotina termina quando todas as etapas são concluídas.",
+      "dial": "Uso do disco",
+      "dialBody": "Antes de iniciar o cronômetro, gire o disco ou toque os dígitos para definir o tempo com o teclado. Durante a pausa também é possível ajustar o tempo com disco ou teclado; ao tocar retomar, o cronômetro reinicia com o novo tempo.",
+      "bug": "Reportar bug",
+      "bugBody": "Se encontrar um bug durante o uso, toque o ícone de e-mail no canto superior direito da tela principal para acessar o relatório. Descreva a situação (cenário) e o problema (descrição), então pressione enviar; o app de e-mail abrirá automaticamente com as informações do dispositivo anexadas."
+    },
     "removeAdsPrice": "$2.99 · Vitalício",
     "restoreSuccess": "Compra restaurada com sucesso",
     "restoreNone": "Nenhuma compra para restaurar",
@@ -289,6 +305,12 @@
     "hoursMinutes": "{{hours}}h {{minutes}}min",
     "minutesOnly": "{{minutes}}min",
     "streakDays": "{{days}} dias seguidos",
+    "minutesSeconds": "{{minutes}} min {{seconds}} s",
+    "secondsOnly": "{{seconds}} s",
+    "categoryTimer": "Cronômetro",
+    "categoryRoutine": "Rotina",
+    "categoryAlarm": "Alarme",
+    "alarmDefaultLabel": "Alarme",
     "empty": "-",
     "statsDailyUsage": "Uso diário"
   },
@@ -566,6 +588,10 @@
     },
     "timerConflictBody": "Um cronômetro está em execução. Cancelar e iniciar a rotina?",
     "timerConflictProceed": "Iniciar rotina",
+    "alarmConflictTitle": "Conflito de alarme agendado",
+    "alarmConflictBody": "Há um alarme '{{alarmLabel}}' agendado às {{time}}.\nO alarme pode tocar antes do fim da rotina.",
+    "alarmConflictProceed": "Iniciar",
+    "alarmConflictCancel": "Cancelar",
     "timerConflictTitle": "Cronômetro em execução",
     "totalDurationFmt": "Tempo {{duration}}\n{{count}} passos",
     "uncategorized": "Sem categoria",
@@ -580,5 +606,9 @@
       "tue": "Ter",
       "wed": "Qua"
     }
+  },
+  "favorites": {
+    "empty": "Sem favoritos",
+    "addButton": "Adicionar favorito"
   }
 }

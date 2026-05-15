@@ -66,6 +66,10 @@ export type ActiveRoutine = {
   awaitingConfirm: boolean;
 };
 
+// v1.8 #AlarmRoutineConflict — 일반 루틴 시작 시 임시 disable 한 알람 entity ID 목록 AsyncStorage key.
+// fullCleanup 진입 시 read → enabled=true 복원 → syncAllAlarms → key 삭제.
+export const PENDING_DISABLED_ALARMS_KEY = 'shuttimer_pending_disabled_alarms';
+
 // ─── AsyncStorage 키 ─────────────────────────────────────────
 
 export const ROUTINES_KEY = 'shuttimer_routines';

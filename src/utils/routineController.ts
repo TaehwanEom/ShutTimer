@@ -13,7 +13,10 @@ import {
   saveActiveRoutine,
   clearActiveRoutine,
   recordStepSession,
+  PENDING_DISABLED_ALARMS_KEY,
 } from '../constants/routines';
+import { loadAlarms, upsertAlarm } from '../constants/alarms';
+import { syncAllAlarms } from './alarmScheduler';
 import { clearPreloadedSound } from './alarmSoundPreload';
 import {
   scheduleRoutineConfirmPrompt,
@@ -243,6 +246,27 @@ async function fullCleanup(): Promise<void> {
   await AsyncStorage.removeItem(IS_ROUTINE_ACTIVE_KEY).catch(() => {});
   // v1.6 #9 — snapshot 명시적 정리 (cancelBackgroundNotif 끝에서 이미 호출, idempotent).
   clearRoutineSnapshot();
+  // v1.8 #AlarmRoutineConflict — 본 루틴 시작 시 임시 disable 한 알람 ID 복원.
+  // enabled=true + syncAllAlarms → 매일 반복 알람 측 다음 회차부터 정상 schedule.
+  try {
+    const pendingRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+    if (pendingRaw) {
+      const pendingIds: string[] = JSON.parse(pendingRaw);
+      if (pendingIds.length > 0) {
+        const alarms = await loadAlarms();
+        for (const id of pendingIds) {
+          const target = alarms.find(a => a.id === id);
+          if (target && !target.enabled) {
+            await upsertAlarm({ ...target, enabled: true });
+          }
+        }
+        await syncAllAlarms();
+      }
+      await AsyncStorage.removeItem(PENDING_DISABLED_ALARMS_KEY);
+    }
+  } catch (e) {
+    Logger.warn('routine', `pendingDisabledAlarms restore fail err=${String(e)}`);
+  }
 }
 
 // ─── 공개 API ───────────────────────────────────────────────

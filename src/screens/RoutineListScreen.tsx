@@ -36,6 +36,7 @@ import {
   loadActiveRoutine,
   getRoutineMode,
   getRoutineTotalSeconds,
+  PENDING_DISABLED_ALARMS_KEY,
 } from '../constants/routines';
 import {
   cancelRoutinePrealerts,
@@ -44,6 +45,8 @@ import {
   ScheduleStatus,
 } from '../utils/routineScheduler';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
+import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
 import { Logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -901,10 +904,74 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   // 통일된 ▶ 핸들러 — 예약/일반 모두 inline ActiveRoutineSection 마운트.
   // 분기/needs_override/needs_timer_override 는 ActiveRoutineSection 의 init 에서 askUser 로 처리.
   // 진행 시작 시 다른 펼친 카드들 자동 접기 (collapseSignal trigger)
-  const handlePlay = (routine: Routine) => {
+  // v1.8 #AlarmRoutineConflict — 일반 루틴 시작 시 알람 루틴 다음 트리거 시각 검사.
+  // 루틴 총 소요 시간 + 5분 버퍼 안에 알람 트리거 있으면 경고 dialog → 사용자 "시작" 누름 시
+  // 충돌 알람 임시 disable + AlarmKit cancel + AsyncStorage 측 ID 저장 → fullCleanup 측 측 재활성화.
+  const proceedPlay = useCallback(async (routine: Routine, conflictAlarmId?: string) => {
+    if (conflictAlarmId) {
+      try {
+        const alarms = await loadAlarms();
+        const target = alarms.find(a => a.id === conflictAlarmId);
+        if (target && target.enabled) {
+          await upsertAlarm({ ...target, enabled: false });
+          await cancelAlarmsForEntity(conflictAlarmId);
+          const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+          const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
+          if (!prev.includes(conflictAlarmId)) prev.push(conflictAlarmId);
+          await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
+        }
+      } catch (e) {
+        Logger.warn('routine', `alarmConflict disable fail err=${String(e)}`);
+      }
+    }
     setActiveManualRoutineId(routine.id);
     setCollapseSignal(Date.now());
-  };
+  }, []);
+
+  const formatConflictTime = useCallback((ms: number) => {
+    const d = new Date(ms);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+  }, [t]);
+
+  const handlePlay = useCallback(async (routine: Routine) => {
+    try {
+      const alarms = await loadAlarms();
+      const alarmRoutines = alarms.filter(a => a.enabled && a.steps && a.steps.length > 0);
+      const now = Date.now();
+      const totalSec = getRoutineTotalSeconds(routine);
+      const limitMs = now + (totalSec + 300) * 1000; // 5분 버퍼
+      let conflict: { time: number; label: string; alarmId: string } | null = null;
+      for (const a of alarmRoutines) {
+        const next = nextAlarmOccurrenceTime(a, new Date(now));
+        if (next !== null && next >= now && next <= limitMs) {
+          if (!conflict || next < conflict.time) {
+            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id };
+          }
+        }
+      }
+      if (conflict) {
+        const timeText = formatConflictTime(conflict.time);
+        const c = conflict;
+        Alert.alert(
+          t('routine.alarmConflictTitle'),
+          t('routine.alarmConflictBody', { time: timeText, alarmLabel: c.label }),
+          [
+            { text: t('routine.alarmConflictCancel'), style: 'cancel' },
+            { text: t('routine.alarmConflictProceed'), onPress: () => proceedPlay(routine, c.alarmId) },
+          ],
+          { cancelable: true }
+        );
+        return;
+      }
+    } catch (e) {
+      Logger.warn('routine', `alarmConflict check fail err=${String(e)}`);
+    }
+    proceedPlay(routine);
+  }, [t, formatConflictTime, proceedPlay]);
 
   // ActiveRoutineSection onClose — useCallback 으로 stable. 매 부모 리렌더마다 새 inline arrow 가
   // 자식 useCallback (handleAutoNow 등) dep cascade 트리거하던 문제 차단 → auto countdown setTimeout 정상 fire.

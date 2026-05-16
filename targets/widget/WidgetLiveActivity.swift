@@ -62,8 +62,6 @@ fileprivate func akModeString(_ mode: AlarmPresentationState.Mode) -> String {
 // v1.8 #WatchLA — Apple Watch Smart Stack 측 전용 View 추가 (= supplementalActivityFamilies([.small]) + activityFamily 분기).
 //   WWDC24 "Bring your Live Activity to Apple Watch" 패턴 정합.
 struct AlarmKitLiveActivity: Widget {
-    @Environment(\.activityFamily) var activityFamily: ActivityFamily
-
     init() {
         // v1.7 hotfix #LAUnify Phase 10-G4dbg4 — Widget struct init 시점 측정.
         appendNativeDbgWidget("LA-DBG-AKLA-WidgetInit", "AlarmKitLiveActivity.init() called")
@@ -75,12 +73,11 @@ struct AlarmKitLiveActivity: Widget {
     var body: some WidgetConfiguration {
         let _ = appendNativeDbgWidget("LA-DBG-AKLA-WidgetBody", "AlarmKitLiveActivity.body accessed")
         return ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
-            // v1.8 #WatchLA — activityFamily 분기 (= Apple Watch Smart Stack = .small, iPhone Lock Screen = 기존)
-            if activityFamily == .small {
-                AlarmKitWatchView(context: context)
-            } else {
-                AlarmKitLockScreenView(context: context)
-            }
+            // v1.8 #WatchLAFix — @Environment(\.activityFamily) wrapper view 안 선언 정정 (Apple Forum #766878 패턴).
+            //   직전 = AlarmKitLiveActivity struct 최상위 @Environment 선언 → iPhone activity 생성 시점 1회 evaluate
+            //   → Apple Watch 측 .small 분기 fail (= 항상 LockScreen view 적용 → 워치 reject 가능).
+            //   정정 = AlarmKitLiveActivityContent wrapper 측 @Environment 선언 → 각 platform 정확 evaluate.
+            AlarmKitLiveActivityContent(context: context)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -115,6 +112,27 @@ struct AlarmKitLiveActivity: Widget {
             .keylineTint(Color.brand)
         }
         .supplementalActivityFamilies([.small])
+    }
+}
+
+// MARK: - v1.8 #WatchLAFix — activityFamily 분기 wrapper view (Apple Forum #766878 패턴)
+// @Environment(\.activityFamily) 측 widget configuration body가 아닌 view body 안에서 선언해야 각 platform
+// (iPhone Dynamic Island = .medium, Apple Watch Smart Stack = .small) 측 정확 evaluate.
+
+struct AlarmKitLiveActivityContent: View {
+    @Environment(\.activityFamily) var activityFamily
+    let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
+
+    var body: some View {
+        let _ = appendNativeDbgWidget("LA-DBG-AKLA-Family", "AlarmKitLiveActivityContent render activityFamily=\(activityFamily)", throttle: true)
+        switch activityFamily {
+        case .small:
+            AlarmKitWatchView(context: context)
+        case .medium:
+            AlarmKitLockScreenView(context: context)
+        @unknown default:
+            AlarmKitLockScreenView(context: context)
+        }
     }
 }
 

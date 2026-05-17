@@ -44,5 +44,8 @@ struct exportWidgets: WidgetBundle {
     //         Apple Forum #762688 https://forums.developer.apple.com/forums/thread/762688
     var body: some Widget {
         AlarmKitLiveActivity()
+        // v1.8 #WatchLADirect — Apple Watch Smart Stack 전용 별도 LA widget. ActivityKit Activity.request
+        //   직접 호출 측 LA 측 등록 → Activity.activities 등록 ✅ → 워치 자동 mirror ✅ 보장.
+        ShutTimerWatchLAWidget()
     }
 }

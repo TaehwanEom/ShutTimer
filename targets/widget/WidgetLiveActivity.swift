@@ -460,3 +460,177 @@ struct AlarmKitStepBottomLabel: View {
         }
     }
 }
+
+// MARK: - v1.8 #WatchLADirect — Apple Watch Smart Stack 전용 별도 ActivityKit Live Activity
+
+// AlarmKit framework 자동 LA 측 Activity.activities 등록 측 측정 ❌ (= alerting 시점 count=0 단서) →
+// WWDC24 자동 워치 mirror 메커니즘 측 전제 fail. 본 widget = 별도 ShutTimerWatchLAAttributes type 측
+// 측 ActivityKit `Activity.request` 직접 호출 측 LA 측 등록 → Activity.activities 등록 ✅ →
+// 워치 Smart Stack 자동 mirror ✅ 보장.
+// iPhone 측 = `.medium` 측 EmptyView 측 → framework auto LA 측 그대로 표시 (= 시각 충돌 ❌).
+
+struct ShutTimerWatchLAWidget: Widget {
+    init() {
+        appendNativeDbgWidget("LA-DBG-WatchLA-WidgetInit", "ShutTimerWatchLAWidget.init() called")
+    }
+
+    var body: some WidgetConfiguration {
+        let _ = appendNativeDbgWidget("LA-DBG-WatchLA-WidgetBody", "ShutTimerWatchLAWidget.body accessed")
+        return ActivityConfiguration(for: ShutTimerWatchLAAttributes.self) { context in
+            ShutTimerWatchLAContent(context: context)
+        } dynamicIsland: { _ in
+            // iPhone Dynamic Island 측 = framework auto LA 측 사용 → 본 widget DI 측 = 최소 stub (= reject 측 회피).
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) { EmptyView() }
+                DynamicIslandExpandedRegion(.trailing) { EmptyView() }
+            } compactLeading: {
+                EmptyView()
+            } compactTrailing: {
+                EmptyView()
+            } minimal: {
+                EmptyView()
+            }
+        }
+        .supplementalActivityFamilies([.small])
+    }
+}
+
+struct ShutTimerWatchLAContent: View {
+    @Environment(\.activityFamily) var activityFamily
+    let context: ActivityViewContext<ShutTimerWatchLAAttributes>
+
+    var body: some View {
+        let _ = appendNativeDbgWidget("LA-DBG-WatchLA-Family", "ShutTimerWatchLAContent render activityFamily=\(activityFamily) mode=\(context.state.mode)", throttle: true)
+        switch activityFamily {
+        case .small:
+            ShutTimerWatchLAView(context: context)
+        case .medium:
+            EmptyView()
+        @unknown default:
+            EmptyView()
+        }
+    }
+}
+
+struct ShutTimerWatchLAView: View {
+    let context: ActivityViewContext<ShutTimerWatchLAAttributes>
+
+    init(context: ActivityViewContext<ShutTimerWatchLAAttributes>) {
+        self.context = context
+        appendNativeDbgWidget("LA-DBG-WatchLA-View", "ShutTimerWatchLAView.init() mode=\(context.state.mode)")
+    }
+
+    var body: some View {
+        let state = context.state
+        let total = state.totalSteps
+        let idx = state.stepIndex + 1
+        let routineId = state.routineId
+
+        VStack(spacing: 4) {
+            Text(state.routineName)
+                .font(.caption2)
+                .foregroundColor(.brand)
+                .lineLimit(1)
+
+            if total > 1 && !state.stepName.isEmpty {
+                Text("\(state.stepName) (\(idx)/\(total))")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+
+            ShutTimerWatchLATimeText(state: state)
+
+            HStack(spacing: 6) {
+                ShutTimerWatchLAPauseResumeButton(routineId: routineId, mode: state.mode)
+
+                if total > 1 && idx < total && state.mode == "countdown" {
+                    Button(intent: AdvanceNextStepIntent(routineId: routineId)) {
+                        Image(systemName: "forward.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.gray.opacity(0.5)))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button(intent: StopRoutineIntent(routineId: routineId)) {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.gray.opacity(0.5)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .activityBackgroundTint(Color.black.opacity(0.85))
+        .activitySystemActionForegroundColor(Color.white)
+    }
+}
+
+struct ShutTimerWatchLATimeText: View {
+    let state: ShutTimerWatchLAAttributes.ContentState
+
+    var body: some View {
+        switch state.mode {
+        case "countdown":
+            Text(timerInterval: state.startDate...state.fireDate, countsDown: true)
+                .monospacedDigit()
+                .font(.title3.weight(.bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+        case "paused":
+            let remaining = Duration.seconds(state.pausedRemainingSec)
+            let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60)
+                ? .hourMinuteSecond(padHourToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
+                : .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
+            Text(remaining.formatted(.time(pattern: pattern)))
+                .monospacedDigit()
+                .font(.title3.weight(.bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+        default:
+            Text("알람")
+                .font(.title3.weight(.bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
+        }
+    }
+}
+
+struct ShutTimerWatchLAPauseResumeButton: View {
+    let routineId: String
+    let mode: String
+
+    var body: some View {
+        switch mode {
+        case "paused":
+            Button(intent: ResumeRoutineIntent(routineId: routineId)) {
+                Image(systemName: "play.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.brand))
+            }
+            .buttonStyle(.plain)
+        case "countdown":
+            Button(intent: PauseRoutineIntent(routineId: routineId)) {
+                Image(systemName: "pause.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Color.brand))
+            }
+            .buttonStyle(.plain)
+        default:
+            EmptyView()
+        }
+    }
+}

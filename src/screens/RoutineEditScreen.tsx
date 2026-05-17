@@ -163,6 +163,9 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const originalActiveRef = useRef<boolean>(true);
   const loadedRef = useRef(false);
   const isMountedRef = useRef(true);
+  // v1.8 #StepPickerScrollFix — 다이얼 표시 시 step 측 화면 위쪽 scroll (= sheet 가림 회피).
+  const scrollViewRef = useRef<ScrollView>(null);
+  const stepLayoutsRef = useRef<Record<number, number>>({});
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -270,6 +273,11 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     Keyboard.dismiss();
     setDurationPickerStepIndex(idx);
     setDurationPickerVisible(true);
+    // v1.8 #StepPickerScrollFix — 다이얼 표시 후 step 측 = 화면 위쪽 scroll (= sheet 측 가림 회피).
+    const y = stepLayoutsRef.current[idx] ?? 0;
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
+    }, 50);
   };
 
   const handleStartTimeTap = () => {
@@ -478,7 +486,13 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       {/* v1.6 후속 — 헤더와 카테고리 사이 AdBanner */}
       <AdBanner />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
+      >
         {/* 카테고리 — 최상단 */}
         <TouchableOpacity style={styles.topCard} onPress={handleNavCategory} activeOpacity={0.85}>
           <View style={styles.topCardLabelRow}>
@@ -525,7 +539,13 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('routine.edit.stepsSection')}</Text>
         {steps.map((step, idx) => {
           return (
-            <View key={step.id} style={styles.slotCard}>
+            <View
+              key={step.id}
+              style={styles.slotCard}
+              onLayout={(e) => {
+                stepLayoutsRef.current[idx] = e.nativeEvent.layout.y;
+              }}
+            >
               <View style={styles.slotRow}>
                 <TextInput
                   value={step.name}

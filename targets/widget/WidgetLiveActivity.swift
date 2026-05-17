@@ -522,30 +522,17 @@ struct ShutTimerWatchLAView: View {
 
     var body: some View {
         let state = context.state
-        let alarmId = state.alarmId
 
-        VStack(spacing: 2) {
+        // v1.8 #WatchLADisplayOnly — iOS-only 앱 측 Watch app target 측 ❌ → Button(intent:) 측 perform 호출 ❌
+        //   (Apple Forum #757358 정합). 버튼 측 제거 + 시간 + routineName 측만 표시. 워치 측 tap → 시스템 측
+        //   "iPhone에서 열기" 측 자동 표시 (= supplementalActivityFamilies + iOS-only 앱 측 자동) → 폰 측 정밀 조작.
+        VStack(spacing: 4) {
             Text(state.routineName)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundColor(.brand)
                 .lineLimit(1)
 
             ShutTimerWatchLATimeText(state: state)
-
-            // v1.8 #WatchLATimerIntent — timer_main 측 = routine ❌ + step 1개 측 → AdvanceNextStepIntent 측 ❌.
-            //   pause/resume + stop 측만 사용 + 새 PauseTimerIntent / ResumeTimerIntent / StopTimerIntent 측 alarmId 직접 호출.
-            HStack(spacing: 4) {
-                ShutTimerWatchLAPauseResumeButton(alarmId: alarmId, mode: state.mode)
-
-                Button(intent: StopTimerIntent(alarmId: alarmId)) {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.gray.opacity(0.5)))
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -587,32 +574,6 @@ struct ShutTimerWatchLATimeText: View {
     }
 }
 
-struct ShutTimerWatchLAPauseResumeButton: View {
-    let alarmId: String
-    let mode: String
-
-    var body: some View {
-        switch mode {
-        case "paused":
-            Button(intent: ResumeTimerIntent(alarmId: alarmId)) {
-                Image(systemName: "play.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.white)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(Color.brand))
-            }
-            .buttonStyle(.plain)
-        case "countdown":
-            Button(intent: PauseTimerIntent(alarmId: alarmId)) {
-                Image(systemName: "pause.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.white)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(Color.brand))
-            }
-            .buttonStyle(.plain)
-        default:
-            EmptyView()
-        }
-    }
-}
+// v1.8 #WatchLADisplayOnly — ShutTimerWatchLAPauseResumeButton 측 폐기 (= 사용 site ❌).
+//   Apple Forum #757358 정합 = iOS-only 앱 Watch app target ❌ → Button(intent:) 측 perform 호출 ❌.
+//   다음 cycle 측 Watch app 추가 시 = PauseTimerIntent / ResumeTimerIntent / StopTimerIntent 측 재사용 가능.

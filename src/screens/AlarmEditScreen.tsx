@@ -250,6 +250,9 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
     if (repeat === 'once') return 'once';
     if (repeat === 'daily') return 'daily';
     // weekly
+    // v1.8 #DailyMatchFix — weekly + 7일 모두 측 = '매일' 정합 (= AlarmKit framework 측 daily 측 = weekly + all weekdays 저장).
+    //   직전 = 매칭 ❌ → null return → 표식 ❌ root cause.
+    if (days.length === 7) return 'daily';
     if (days.length === 5 && [1, 2, 3, 4, 5].every(d => days.includes(d))) return 'weekday';
     if (days.length === 2 && [0, 6].every(d => days.includes(d))) return 'weekend';
     return null;

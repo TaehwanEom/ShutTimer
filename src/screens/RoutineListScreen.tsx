@@ -47,6 +47,7 @@ import {
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
 import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { Logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -938,6 +939,38 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   }, [t]);
 
   const handlePlay = useCallback(async (routine: Routine) => {
+    // v1.8 #RoutineTimerConflict — 루틴 시작 시 진행 중 타이머 측 충돌 검사 추가.
+    //   직전 = 알람 측 충돌 검사 측만 정합 → 진행 중 타이머 측 = 충돌 ❌ + 루틴 시작 시 측 작동 ❌ root cause.
+    //   정정 = AlarmkitBridge.listAlarms 측 = countdown + preAlertSeconds + relativeHour ❌ 측 = 타이머 측 측정 → 경고 dialog → 사용자 측 선택.
+    try {
+      const frameworkAlarms: any[] = await AlarmkitBridge.listAlarms();
+      const activeTimer = frameworkAlarms.find(a => a.state === 'countdown' && (a.preAlertSeconds || 0) > 0 && a.relativeHour === undefined);
+      if (activeTimer) {
+        Alert.alert(
+          t('routine.timerConflictTitle', { defaultValue: '타이머 진행 중' }),
+          t('routine.timerConflictBody', { defaultValue: '진행 중인 타이머가 있습니다. 루틴을 시작하시려면 타이머를 종료해야 합니다.' }),
+          [
+            { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel' },
+            {
+              text: t('routine.timerConflictProceed', { defaultValue: '타이머 종료 후 시작' }),
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await AlarmkitBridge.cancelAlarm(activeTimer.id);
+                } catch (e) {
+                  Logger.warn('routine', `timerConflict cancel fail err=${String(e)}`);
+                }
+                proceedPlay(routine);
+              },
+            },
+          ],
+          { cancelable: true }
+        );
+        return;
+      }
+    } catch (e) {
+      Logger.warn('routine', `timerConflict check fail err=${String(e)}`);
+    }
     try {
       const alarms = await loadAlarms();
       const alarmRoutines = alarms.filter(a => a.enabled && a.steps && a.steps.length > 0);

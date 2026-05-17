@@ -8,7 +8,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   Platform,
   type NativeSyntheticEvent,
@@ -201,12 +200,8 @@ export default function DurationWheelPicker(props: Props) {
 
   return (
     <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onCancel}>
-      {/* v1.8 #PickerBackdropClose — backdrop tap 측 = 자동 닫힘 추가. 사용자분 보고 = 다이얼 → 텍스트 ❌ root cause.
-          sheet 측 TouchableWithoutFeedback 측 차단 (= sheet tap → 닫힘 ❌). */}
-      <TouchableWithoutFeedback onPress={onCancel}>
-        <View style={styles.backdrop}>
-          <TouchableWithoutFeedback>
-            <View style={[styles.sheet, { backgroundColor: bgColor }]}>
+      <View style={styles.backdrop}>
+        <View style={[styles.sheet, { backgroundColor: bgColor }]}>
           <View style={styles.row}>
             <View style={styles.column}>
               <Wheel
@@ -257,10 +252,8 @@ export default function DurationWheelPicker(props: Props) {
               <Text style={[styles.actionText, { color: accentColor, fontWeight: '600' }]}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
-            </View>
-          </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
   );
 }

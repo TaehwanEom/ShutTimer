@@ -58,7 +58,8 @@ fileprivate actor WatchLAManager {
             return
         }
         let attributes = ShutTimerWatchLAAttributes(alarmId: alarmId, entityId: entityId)
-        let content = ActivityContent(state: state, staleDate: nil)
+        // v1.8 #LAStaleDate — staleDate 추가 (= fireDate + 8h = 시스템 측 만료 시점 명시 → 동의 dialog 빈도 ↓).
+        let content = ActivityContent(state: state, staleDate: state.fireDate.addingTimeInterval(8 * 3600))
         do {
             let activity = try Activity<ShutTimerWatchLAAttributes>.request(
                 attributes: attributes,
@@ -80,7 +81,8 @@ fileprivate actor WatchLAManager {
         guard let activity = activities[alarmId], var state = contentStates[alarmId] else { return }
         state.mode = mode
         contentStates[alarmId] = state
-        let content = ActivityContent(state: state, staleDate: nil)
+        // v1.8 #LAStaleDate — staleDate 추가 (= fireDate + 8h = 시스템 측 만료 시점 명시 → 동의 dialog 빈도 ↓).
+        let content = ActivityContent(state: state, staleDate: state.fireDate.addingTimeInterval(8 * 3600))
         await activity.update(content)
         appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.updateMode alarmId=\(alarmId) mode=\(mode)")
     }

@@ -529,49 +529,10 @@ export default function HomeScreen({ navigation, route }: Props) {
   const handleStart = async () => {
     const total = selectedMinutes * 60 + selectedSeconds;
     if (total <= 0) return;
-    // v1.7 hotfix #15 — 루틴 진행 중 + 단일 타이머 시작 시 = 사용자 측 선택권 부여 (= "취소" / "루틴 종료 후 시작").
-    // 직전: "확인" 1개 button + RoutineList stack push (= ad-hoc 측 비노출 + tab bar ❌).
-    // 본 fix: 2 button + isAdhoc 분기 (= AlarmTab / RoutineTab nested) + 종료 후 자동 시작.
-    const isRoutineActive = await AsyncStorage.getItem('isRoutineActive');
-    if (isRoutineActive === 'true') {
-      const ar = await loadActiveRoutine();
-      const isAdhoc = ar ? isAdhocAlarmRoutine(ar.routineId) : false;
-      Alert.alert(
-        t('home.timerBlocked.title', { defaultValue: '루틴 진행 중' }),
-        t('home.timerBlocked.body2', { defaultValue: '진행 중인 루틴을 종료하고 단일 타이머를 시작하시겠습니까?' }),
-        [
-          {
-            text: t('common.cancel', { defaultValue: '취소' }),
-            style: 'cancel',
-            onPress: () => {
-              // 사용자 = routine 유지. 진행 중 페이지 navigate (= ad-hoc → AlarmTab / 일반 → RoutineTab).
-              // v1.7 hotfix — dial 초기화 (= 루틴 탭 진입 후 다시 HomeScreen 진입 시 dial 잔존 영역 회피).
-              setSelectedMinutes(0);
-              setSelectedSeconds(0);
-              if (isAdhoc) {
-                (navigation as any).navigate('Home', { screen: 'AlarmTab' });
-              } else {
-                (navigation as any).navigate('Home', { screen: 'RoutineTab' });
-              }
-            },
-          },
-          {
-            text: t('home.timerBlocked.stopAndStart', { defaultValue: '루틴 종료 후 시작' }),
-            style: 'destructive',
-            onPress: async () => {
-              const clearedRoutineId = ar?.routineId;
-              await stopRoutine().catch(() => {});
-              // stopRoutine → fullCleanup → AsyncStorage.removeItem('isRoutineActive').
-              // v1.7 hotfix — RoutineListScreen 측 activeManualRoutineId 정리 트리거 (= 다시 루틴 탭 진입 시 잔존 ActiveRoutineSection 영역 회피).
-              DeviceEventEmitter.emit('routineClearedExternally', { routineId: clearedRoutineId });
-              // handleStart 재호출 → isRoutineActive 'false' / null → 정상 진입 → timer 시작.
-              await handleStart();
-            },
-          },
-        ],
-      );
-      return;
-    }
+    // v1.8 #TimerRoutineCoexist — 루틴 진행 중 + 메인 타이머 시작 시 dialog 측 제거.
+    //   직전 = isRoutineActive dialog 측 = "루틴 종료 후 시작" 측만 → 동시 진행 ❌ 회귀 root cause.
+    //   정정 = dialog 측 폐기 + 그대로 진행. AlarmKit framework 측 = scheduled (= 루틴 step) + countdown (= 타이머)
+    //     측 = 동시 활성 가능 측 추정 → 동시 진행 ✅. 64개 측 한계 도달 시 = 다음 cycle 측 별도 처리.
     const nowMs = Date.now();
     // v1.8 #AlarmTimerConflict — 단일 타이머 시작 시 알람 다음 트리거 시각 검사.
     // 타이머 종료 + 5분 버퍼 안에 알람 트리거 있으면 경고 dialog → 사용자 선택 후 시작.

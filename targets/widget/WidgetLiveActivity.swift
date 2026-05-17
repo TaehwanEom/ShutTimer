@@ -580,10 +580,10 @@ struct ShutTimerWatchLATimeText: View {
         case "countdown":
             Text(timerInterval: state.startDate...state.fireDate, countsDown: true)
                 .monospacedDigit()
-                .font(.title3.weight(.bold))
+                .font(.system(size: 28).weight(.bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .minimumScaleFactor(0.7)
         case "paused":
             let remaining = Duration.seconds(state.pausedRemainingSec)
             let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60)
@@ -591,16 +591,16 @@ struct ShutTimerWatchLATimeText: View {
                 : .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
             Text(remaining.formatted(.time(pattern: pattern)))
                 .monospacedDigit()
-                .font(.title3.weight(.bold))
+                .font(.system(size: 28).weight(.bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .minimumScaleFactor(0.7)
         default:
             Text("알람")
-                .font(.title3.weight(.bold))
+                .font(.system(size: 28).weight(.bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .minimumScaleFactor(0.7)
         }
     }
 }

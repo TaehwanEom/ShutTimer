@@ -11,6 +11,10 @@ module.exports = config => ({
   //   `if #available(iOS 18.0, *)` 별도 wrapping 가능, deployment target 26.0 호환).
   //   증거 = SwiftLee + Apple Forum #762688: WidgetBundleBuilder lacks support for control flow.
   deploymentTarget: '26.0',
+  // v1.8 #WatchLAIcon — Apple Watch Smart Stack 측 corner icon 측 = ShutTimer logo 정상 표시 위해 추가.
+  //   직전 = widget extension 측 AppIcon 측 ❌ → system default placeholder (= 회색 사각형) 측 표시.
+  //   정정 = @bacons/apple-targets 측 icon property 측 → prebuild 시 AppIcon.appiconset 자동 생성.
+  icon: '../../assets/icon.png',
   entitlements: {
     // Widget ↔ App 데이터 공유 (App Group)
     'com.apple.security.application-groups': ['group.com.shuttimer.app'],

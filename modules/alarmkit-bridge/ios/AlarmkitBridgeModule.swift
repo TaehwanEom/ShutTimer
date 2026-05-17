@@ -135,11 +135,15 @@ public class AlarmkitBridgeModule: Module {
           guard let self = self else { return }
           let currentIds = Set(alarms.map { $0.id })
           // removed 감지
-          for (id, _) in lastStates where !currentIds.contains(id) {
+          for (id, prevState) in lastStates where !currentIds.contains(id) {
             // v1.7 hotfix #DBG-B — removed 감지.
-            appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(id.uuidString) state=removed")
-            // v1.8 #WatchLADirect — 별도 WatchLA 측 end 호출 (= mapping ❌ 시 = skip).
-            await WatchLAManager.shared.end(alarmId: id.uuidString)
+            appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(id.uuidString) state=removed prev=\(Self.alarmStateToString(prevState))")
+            // v1.8 #WatchLAAlertKeep — alerting → removed 자동 transition 시 end ❌ (= 워치 측 알람 표시 유지).
+            //   AlarmKit framework 측 alerting 측 = preAlert 측 후 자동 removed transition → 우리 측 워치 widget 즉시 종료 회귀 정정.
+            //   사용자분 측 정지 시점 (= prev countdown / paused) 측만 end 호출. 정지 측 = cancelAlarm / stopAlarm 측 직접 end 호출 측도 잔존.
+            if prevState != .alerting {
+              await WatchLAManager.shared.end(alarmId: id.uuidString)
+            }
             self.sendEvent("onAlarmStateChange", [
               "alarmId": id.uuidString,
               "state": "removed",
@@ -524,7 +528,8 @@ public class AlarmkitBridgeModule: Module {
           stepName: params.laStepName ?? "",
           stepIndex: params.laStepIndex ?? 0,
           totalSteps: params.laTotalSteps ?? 1,
-          routineId: params.laRoutineId ?? params.entityId
+          routineId: params.laRoutineId ?? params.entityId,
+          alarmId: id.uuidString
         )
         await WatchLAManager.shared.register(alarmId: id.uuidString, entityId: params.entityId, state: watchState)
       }

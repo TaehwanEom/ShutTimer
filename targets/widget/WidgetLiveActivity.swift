@@ -522,44 +522,26 @@ struct ShutTimerWatchLAView: View {
 
     var body: some View {
         let state = context.state
-        let total = state.totalSteps
-        let idx = state.stepIndex + 1
-        let routineId = state.routineId
+        let alarmId = state.alarmId
 
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text(state.routineName)
                 .font(.caption2)
                 .foregroundColor(.brand)
                 .lineLimit(1)
 
-            if total > 1 && !state.stepName.isEmpty {
-                Text("\(state.stepName) (\(idx)/\(total))")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.75))
-                    .lineLimit(1)
-            }
-
             ShutTimerWatchLATimeText(state: state)
 
-            HStack(spacing: 6) {
-                ShutTimerWatchLAPauseResumeButton(routineId: routineId, mode: state.mode)
+            // v1.8 #WatchLATimerIntent — timer_main 측 = routine ❌ + step 1개 측 → AdvanceNextStepIntent 측 ❌.
+            //   pause/resume + stop 측만 사용 + 새 PauseTimerIntent / ResumeTimerIntent / StopTimerIntent 측 alarmId 직접 호출.
+            HStack(spacing: 4) {
+                ShutTimerWatchLAPauseResumeButton(alarmId: alarmId, mode: state.mode)
 
-                if total > 1 && idx < total && state.mode == "countdown" {
-                    Button(intent: AdvanceNextStepIntent(routineId: routineId)) {
-                        Image(systemName: "forward.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Circle().fill(Color.gray.opacity(0.5)))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Button(intent: StopRoutineIntent(routineId: routineId)) {
+                Button(intent: StopTimerIntent(alarmId: alarmId)) {
                     Image(systemName: "xmark")
                         .font(.caption.weight(.bold))
                         .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 24, height: 24)
                         .background(Circle().fill(Color.gray.opacity(0.5)))
                 }
                 .buttonStyle(.plain)
@@ -606,26 +588,26 @@ struct ShutTimerWatchLATimeText: View {
 }
 
 struct ShutTimerWatchLAPauseResumeButton: View {
-    let routineId: String
+    let alarmId: String
     let mode: String
 
     var body: some View {
         switch mode {
         case "paused":
-            Button(intent: ResumeRoutineIntent(routineId: routineId)) {
+            Button(intent: ResumeTimerIntent(alarmId: alarmId)) {
                 Image(systemName: "play.fill")
                     .font(.caption.weight(.bold))
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.brand))
             }
             .buttonStyle(.plain)
         case "countdown":
-            Button(intent: PauseRoutineIntent(routineId: routineId)) {
+            Button(intent: PauseTimerIntent(alarmId: alarmId)) {
                 Image(systemName: "pause.fill")
                     .font(.caption.weight(.bold))
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 24, height: 24)
                     .background(Circle().fill(Color.brand))
             }
             .buttonStyle(.plain)

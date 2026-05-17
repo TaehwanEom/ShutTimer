@@ -444,3 +444,66 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
         return .result()
     }
 }
+
+// MARK: - v1.8 #WatchLATimerIntent — Apple Watch Smart Stack widget 측 단일 타이머 (= timer_main, routine ❌) 측 alarmId 직접 호출
+
+// 기존 PauseRoutineIntent / ResumeRoutineIntent / StopRoutineIntent 측 = routineId 측 = chain_alarms / routineSnapshot lookup →
+//   timer_main 측 = routine ❌ → AlarmManager 호출 ❌ → 워치 측 조작 sync ❌ root cause 정정.
+// 본 신규 Intent 측 = alarmId 측 직접 parameter 측 → AlarmManager.shared.pause/resume/stop 직접 호출.
+
+struct PauseTimerIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "일시정지"
+    static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+    @Parameter(title: "Alarm ID")
+    var alarmId: String
+
+    init() { self.alarmId = "" }
+    init(alarmId: String) { self.alarmId = alarmId }
+
+    func perform() async throws -> some IntentResult {
+        appendNativeDbg("Intent-DBG-Widget", "PauseTimerIntent.perform alarmId=\(alarmId)")
+        if let uuid = UUID(uuidString: alarmId) {
+            try? AlarmManager.shared.pause(id: uuid)
+        }
+        return .result()
+    }
+}
+
+struct ResumeTimerIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "재개"
+    static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+    @Parameter(title: "Alarm ID")
+    var alarmId: String
+
+    init() { self.alarmId = "" }
+    init(alarmId: String) { self.alarmId = alarmId }
+
+    func perform() async throws -> some IntentResult {
+        appendNativeDbg("Intent-DBG-Widget", "ResumeTimerIntent.perform alarmId=\(alarmId)")
+        if let uuid = UUID(uuidString: alarmId) {
+            try? AlarmManager.shared.resume(id: uuid)
+        }
+        return .result()
+    }
+}
+
+struct StopTimerIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "정지"
+    static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+    @Parameter(title: "Alarm ID")
+    var alarmId: String
+
+    init() { self.alarmId = "" }
+    init(alarmId: String) { self.alarmId = alarmId }
+
+    func perform() async throws -> some IntentResult {
+        appendNativeDbg("Intent-DBG-Widget", "StopTimerIntent.perform alarmId=\(alarmId)")
+        if let uuid = UUID(uuidString: alarmId) {
+            try? await AlarmManager.shared.stop(id: uuid)
+        }
+        return .result()
+    }
+}

@@ -273,11 +273,16 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     Keyboard.dismiss();
     setDurationPickerStepIndex(idx);
     setDurationPickerVisible(true);
-    // v1.8 #StepPickerScrollFix — 다이얼 표시 후 step 측 = 화면 위쪽 scroll (= sheet 측 가림 회피).
+    // v1.8 #StepPickerScrollFix-v2 — setTimeout 50 → 300ms 정정. Modal animationType="fade" ~250ms 완료 후 scroll 측 시각 정합.
+    //   직전 50ms = Modal fade 진행 중 → scroll animation 시각 ❌ → 사용자분 보고 "다이얼 패드로 가려진다" root cause.
+    //   Logger.warn 2개 추가 = 실제 stepY + targetY 측정 (= 측정 ❌ 시 정확 root cause 측정 가능).
     const y = stepLayoutsRef.current[idx] ?? 0;
+    const targetY = Math.max(0, y - 80);
+    Logger.warn('RoutineEdit', `[StepPickerScroll] tap idx=${idx} stepY=${y} → targetY=${targetY}`);
     setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 80), animated: true });
-    }, 50);
+      scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
+      Logger.warn('RoutineEdit', `[StepPickerScroll] scrollTo invoked idx=${idx} y=${targetY}`);
+    }, 300);
   };
 
   const handleStartTimeTap = () => {

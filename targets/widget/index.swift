@@ -43,9 +43,8 @@ struct exportWidgets: WidgetBundle {
     //   증거 = SwiftLee https://www.avanderlee.com/swiftui/variable-widgetbundle-configuration/
     //         Apple Forum #762688 https://forums.developer.apple.com/forums/thread/762688
     var body: some Widget {
+        // v1.8 #WatchLAConsolidate — ShutTimerWatchLAWidget 폐기 (= iPhone 잠금화면 빈 검은 박스 root cause).
+        // 워치 표시 = AlarmKitLiveActivity 측 supplementalActivityFamilies([.small]) + AlarmKitWatchView 측 처리.
         AlarmKitLiveActivity()
-        // v1.8 #WatchLADirect — Apple Watch Smart Stack 전용 별도 LA widget. ActivityKit Activity.request
-        //   직접 호출 측 LA 측 등록 → Activity.activities 등록 ✅ → 워치 자동 mirror ✅ 보장.
-        ShutTimerWatchLAWidget()
     }
 }

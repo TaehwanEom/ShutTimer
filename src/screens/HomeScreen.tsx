@@ -28,6 +28,8 @@ import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
 import AdBanner from '../components/AdBanner';
 import BugReportModal from '../components/BugReportModal';
+import RecommendModal from '../components/RecommendModal';
+import { markRecommendShown } from '../utils/storeReview';
 import { SETTINGS_KEY, DialType } from '../constants/settings';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
@@ -280,6 +282,27 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [hasUnread, setHasUnread] = useState(false);
   // v1.7 — 버그 제보 모달.
   const [bugReportVisible, setBugReportVisible] = useState(false);
+  // v1.8 #RecommendModal — AlarmScreen 측 enterResult 시 AsyncStorage 'recommend_pending' = true set →
+  //   HomeScreen mount 시점 + AppState=active 시 검사 + 표시.
+  const [recommendVisible, setRecommendVisible] = useState(false);
+
+  useEffect(() => {
+    const checkRecommendPending = async () => {
+      try {
+        const pending = await AsyncStorage.getItem('recommend_pending');
+        if (pending === 'true') {
+          setRecommendVisible(true);
+          await AsyncStorage.removeItem('recommend_pending');
+        }
+      } catch {}
+    };
+    checkRecommendPending();
+  }, []);
+
+  const handleRecommendClose = useCallback(() => {
+    setRecommendVisible(false);
+    markRecommendShown().catch(() => {});
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -1187,6 +1210,11 @@ export default function HomeScreen({ navigation, route }: Props) {
       <BugReportModal
         visible={bugReportVisible}
         onClose={() => setBugReportVisible(false)}
+      />
+      {/* v1.8 #RecommendModal — 평가 모달 직후 측 친구 추천 모달 (= 15일 간격 = 월 2회) */}
+      <RecommendModal
+        visible={recommendVisible}
+        onClose={handleRecommendClose}
       />
     </SafeAreaView>
   );

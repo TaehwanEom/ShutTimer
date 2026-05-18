@@ -623,5 +623,12 @@
   "favorites": {
     "empty": "沒有收藏",
     "addButton": "新增收藏"
+  },
+  "recommend": {
+    "title": "您要推薦給朋友嗎？",
+    "body": "把使用 ShutTimer 挑戰鬧鐘任務的體驗告訴朋友吧。",
+    "yes": "是",
+    "no": "否",
+    "shareMessage": "用 ShutTimer 來挑戰鬧鐘任務吧！ "
   }
 }

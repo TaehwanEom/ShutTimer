@@ -140,7 +140,12 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       originalCreatedAtRef.current = target.createdAt;
       setTime(target.time);
       setRepeat(target.repeat);
-      setDays(target.days);
+      // v1.8 #DailyDaysFix — repeat='daily' 측 save 시 days=[] 저장 정합. load 시 days 자동 fill → 하단 요일 체크 표시.
+      if (target.repeat === 'daily') {
+        setDays([0, 1, 2, 3, 4, 5, 6]);
+      } else {
+        setDays(target.days);
+      }
       setLabel(target.label);
       setSteps(target.steps ?? []);
       loadedRef.current = true;

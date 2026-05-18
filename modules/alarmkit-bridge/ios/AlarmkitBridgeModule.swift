@@ -38,18 +38,14 @@ import ActivityKit
 // v1.7 hotfix #LAUnify Phase 10-G1 — 옛 Activity.request/update/end manual 호출 제거 (= AlarmKit framework가 LA Activity 자동 관리).
 // v1.7 hotfix #LAUnify Phase 10-G1b — ActivityKit import 복원. AlertConfiguration.AlertSound (= AlarmKit alarm sound 측 ActivityKit type 채택 영역) 측 = ActivityKit import 필요.
 //   증거 = https://developer.apple.com/documentation/activitykit/alertconfiguration/alertsound (= URL path activitykit/alertconfiguration/alertsound).
-// v1.8 #WatchLADirect — Activity.request/update/end manual 호출 재도입 (= 별도 ShutTimerWatchLAAttributes type 측만).
-//   정당화 = AlarmKit framework auto LA 측 Activity.activities 등록 측 측정 ❌ (= alerting 시점 count=0 단서 강력) →
-//     WWDC24 자동 워치 mirror 메커니즘 (= Activity.activities 등록 측 LA 측만 워치 mirror) 측 전제 fail.
-//   진입 = 별도 type 측 ActivityKit Activity 측 직접 호출 → Activity.activities 등록 ✅ → 워치 Smart Stack
-//     자동 mirror ✅. iPhone 측 = framework auto LA 측 그대로 (= AlarmAttributes<ShutTimerAlarmMetadata>) +
-//     본 별도 LA 측 widget 측 .medium 측 EmptyView 측 → 시각 충돌 ❌.
+// v1.8 #WatchLADirect — Manual ShutTimerWatchLAAttributes Activity 재도입 (= 7c042bf commit 정확 동일 코드).
+//   사용자분 명령 = 직전 manual LA 측 = 워치 표시 ✅ 확정 측 → 새로 측 작성 측.
+//   dialog + 흰색 바 부작용 측 = 별도 정정 측 진입 측 후만 측.
 
 @available(iOS 26.0, *)
 fileprivate actor WatchLAManager {
     static let shared = WatchLAManager()
     private var activities: [String: Activity<ShutTimerWatchLAAttributes>] = [:]  // key = alarmId
-    private var contentStates: [String: ShutTimerWatchLAAttributes.ContentState] = [:]  // key = alarmId
 
     func register(alarmId: String, entityId: String, state: ShutTimerWatchLAAttributes.ContentState) async {
         // 이미 등록된 측 = skip (= duplicate request 방지).
@@ -58,8 +54,7 @@ fileprivate actor WatchLAManager {
             return
         }
         let attributes = ShutTimerWatchLAAttributes(alarmId: alarmId, entityId: entityId)
-        // v1.8 #LAStaleDate — staleDate 추가 (= fireDate + 8h = 시스템 측 만료 시점 명시 → 동의 dialog 빈도 ↓).
-        let content = ActivityContent(state: state, staleDate: state.fireDate.addingTimeInterval(8 * 3600))
+        let content = ActivityContent(state: state, staleDate: nil)
         do {
             let activity = try Activity<ShutTimerWatchLAAttributes>.request(
                 attributes: attributes,
@@ -67,37 +62,23 @@ fileprivate actor WatchLAManager {
                 pushType: nil
             )
             activities[alarmId] = activity
-            contentStates[alarmId] = state
             appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.register OK alarmId=\(alarmId) entityId=\(entityId) activityId=\(activity.id) mode=\(state.mode)")
         } catch {
             appendNativeDbg("LA-DBG-WatchLA-WARN", "WatchLAManager.register FAIL alarmId=\(alarmId) error=\(error)")
         }
     }
 
-    // v1.8 #WatchLAAlertMode — alerting 시점 측 = end ❌ + mode 측만 변경 → 워치 측 알람 표시 ✅.
-    //   직전 = alerting 시 end 호출 → 워치 측 즉시 종료 (= 사용자분 보고 "알람출력 되는데 워치는 무반응" root cause).
-    //   정정 = updateMode 측 = 저장된 ContentState 측 mode 측만 변경 + Activity.update → 워치 측 표시 유지.
-    // v1.8 #WatchLAPausedSync — pausedRemainingSec optional 측 함께 update.
-    //   직전 = mode 측만 변경 + pausedRemainingSec 측 초기값 측 그대로 → paused 진입 시 잔여 측 정확 ❌ +
-    //   시간 흘러감 + 동기화 ❌ (= 사용자분 보고 root cause). 정정 = paused 진입 시점 측 잔여 측 함께 update.
-    func updateMode(alarmId: String, mode: String, pausedRemainingSec: Double? = nil) async {
-        guard let activity = activities[alarmId], var state = contentStates[alarmId] else { return }
-        state.mode = mode
-        if let remaining = pausedRemainingSec {
-            state.pausedRemainingSec = remaining
-        }
-        contentStates[alarmId] = state
-        // v1.8 #LAStaleDate — staleDate 추가 (= fireDate + 8h = 시스템 측 만료 시점 명시 → 동의 dialog 빈도 ↓).
-        let content = ActivityContent(state: state, staleDate: state.fireDate.addingTimeInterval(8 * 3600))
+    func update(alarmId: String, state: ShutTimerWatchLAAttributes.ContentState) async {
+        guard let activity = activities[alarmId] else { return }
+        let content = ActivityContent(state: state, staleDate: nil)
         await activity.update(content)
-        appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.updateMode alarmId=\(alarmId) mode=\(mode) pausedRemainingSec=\(pausedRemainingSec.map { String($0) } ?? "nil")")
+        appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.update alarmId=\(alarmId) mode=\(state.mode)")
     }
 
     func end(alarmId: String) async {
         guard let activity = activities[alarmId] else { return }
         await activity.end(nil, dismissalPolicy: .immediate)
         activities.removeValue(forKey: alarmId)
-        contentStates.removeValue(forKey: alarmId)
         appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.end alarmId=\(alarmId)")
     }
 }
@@ -146,12 +127,7 @@ public class AlarmkitBridgeModule: Module {
           for (id, prevState) in lastStates where !currentIds.contains(id) {
             // v1.7 hotfix #DBG-B — removed 감지.
             appendNativeDbg("AlarmKit-DBG", "observer alarmId=\(id.uuidString) state=removed prev=\(Self.alarmStateToString(prevState))")
-            // v1.8 #WatchLAAlertKeep — alerting → removed 자동 transition 시 end ❌ (= 워치 측 알람 표시 유지).
-            //   AlarmKit framework 측 alerting 측 = preAlert 측 후 자동 removed transition → 우리 측 워치 widget 즉시 종료 회귀 정정.
-            //   사용자분 측 정지 시점 (= prev countdown / paused) 측만 end 호출. 정지 측 = cancelAlarm / stopAlarm 측 직접 end 호출 측도 잔존.
-            if prevState != .alerting {
-              await WatchLAManager.shared.end(alarmId: id.uuidString)
-            }
+            // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기 (= AlarmKit framework auto LA 측 supplementalActivityFamilies 측 워치 처리).
             self.sendEvent("onAlarmStateChange", [
               "alarmId": id.uuidString,
               "state": "removed",
@@ -182,27 +158,7 @@ public class AlarmkitBridgeModule: Module {
               // = schedule + countdownDuration 측 출력 = alerting 시점 fire 정보 영역 (= 사운드 fire 시점 + duration root cause 영역).
               if alarm.state == .alerting {
                 appendNativeDbg("AlarmKit-DBG", "alerting alarmId=\(alarm.id.uuidString) schedule=\(String(describing: alarm.schedule)) countdownDuration=\(String(describing: alarm.countdownDuration))")
-                // v1.8 #WatchLAAlertMode — alerting 시 = end ❌ + mode 측 "alert" 측 update → 워치 측 알람 표시 ✅.
-                //   직전 = end 호출 → 워치 측 즉시 종료 (= 사용자분 보고 root cause).
-                //   종료 측 = cancelAlarm / stopAlarm 측 end 호출 측 의존 (= 사용자분 측 정지 시점).
-                await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "alert")
-              } else if alarm.state == .paused {
-                // v1.8 #WatchLAPausedSync — paused 진입 시 폰 LA Activity 측 잔여 측 측정 + 함께 update.
-                //   root cause = updateMode 측 mode 측만 변경 + pausedRemainingSec 측 초기값 그대로 → 워치 측 잔여 정확 ❌ + 시간 흘러감 + 동기화 ❌.
-                //   매칭 = 폰 LA Activity 측 = AlarmAttributes<ShutTimerAlarmMetadata>.activities 측 = metadata.alarmId == alarm.id.uuidString.
-                //   잔여 측정 = state.mode = .paused(let p) 측 = p.totalCountdownDuration - p.previouslyElapsedDuration (= 폰 측 AlarmKitCountdownText 동일 패턴).
-                let phoneActivities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
-                var pausedRemaining: Double? = nil
-                if let phoneAct = phoneActivities.first(where: { $0.attributes.metadata?.alarmId == alarm.id.uuidString }) {
-                    if case .paused(let p) = phoneAct.content.state.mode {
-                        pausedRemaining = p.totalCountdownDuration - p.previouslyElapsedDuration
-                    }
-                }
-                appendNativeDbg("LA-DBG-WatchLA", "observer paused alarmId=\(alarm.id.uuidString) phoneActivities=\(phoneActivities.count) pausedRemaining=\(pausedRemaining.map { String($0) } ?? "nil")")
-                await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "paused", pausedRemainingSec: pausedRemaining)
-              } else if alarm.state == .countdown {
-                // v1.8 #WatchLACountdownMode — countdown 복귀 시 (= 재개) mode "countdown" 측 update.
-                await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "countdown")
+                // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기.
               }
 
               // v1.7 hotfix #5 — alerting 시점 native 측 LA stage='manual_prompt' 자동 갱신.
@@ -533,25 +489,8 @@ public class AlarmkitBridgeModule: Module {
       _ = try await AlarmManager.shared.schedule(id: id, configuration: config)
       // v1.7 hotfix #26 — debug log: scheduleAlarm 결과 (timer 영역).
       NSLog("[AlarmKit][schedule] 결과 OK alarmId=\(id.uuidString) entity=\(params.entityId) factory=timer(duration:) durationSec=\(durationSecAll)")
-      // v1.8 #WatchLADirect — Apple Watch Smart Stack 자동 mirror 위해 별도 ActivityKit Activity 등록.
-      //   1차 진입 = timer_main 측만 (= 사용자분 측 메인 타이머 측). 정상 측정 후 다른 type 측 (= chain / hasSecondary
-      //   / confirm_prompt) 측 확장 측 다음 cycle.
-      if params.type == "timer_main" {
-        let watchNow = Date()
-        let watchState = ShutTimerWatchLAAttributes.ContentState(
-          mode: "countdown",
-          startDate: watchNow,
-          fireDate: watchNow.addingTimeInterval(durationSecAll),
-          pausedRemainingSec: 0,
-          routineName: params.laRoutineName ?? params.title,
-          stepName: params.laStepName ?? "",
-          stepIndex: params.laStepIndex ?? 0,
-          totalSteps: params.laTotalSteps ?? 1,
-          routineId: params.laRoutineId ?? params.entityId,
-          alarmId: id.uuidString
-        )
-        await WatchLAManager.shared.register(alarmId: id.uuidString, entityId: params.entityId, state: watchState)
-      }
+      // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기. 워치 표시 = AlarmKitLiveActivity 측
+      // supplementalActivityFamilies([.small]) + AlarmKitWatchView 측 framework auto LA mirror 측 처리.
       // v1.7 hotfix #LAUnify Phase 10-G4dbg5 — main app process 측 type fully qualified name 측정.
       // widget extension process 측 (= RoutineControlIntents 측 PauseIntent) 측 같은 측정 → 직접 비교.
       // 두 process 측 type name 같음 = static_framework 측 cause 아님 (= 다른 cause 측정 필요).
@@ -584,8 +523,7 @@ public class AlarmkitBridgeModule: Module {
       //   (= 위젯 ✕ tap 시 cancelAlarm → stop trigger → 'open_app_dismiss' signal → 회귀 차단).
       // alarms throw 시 = state 미상 → stop + cancel 둘 다 try? fallback (= alerting alarm 지속 ring 버그 의도 보존).
       // v1.7 hotfix #DBG-Sound (B5) — cancelAlarm 진입 = state + alarmId 추적 (= 사운드 종료 root cause 영역).
-      // v1.8 #WatchLADirect — cancel 시 별도 WatchLA 종료 보장 (= mapping ❌ 시 = skip).
-      await WatchLAManager.shared.end(alarmId: alarmId)
+      // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기.
       do {
         let alarms = try AlarmManager.shared.alarms
         if let alarm = alarms.first(where: { $0.id == uuid }), alarm.state == .alerting {
@@ -607,8 +545,7 @@ public class AlarmkitBridgeModule: Module {
       guard let uuid = UUID(uuidString: alarmId) else { return }
       // v1.7 hotfix #DBG-Sound (B6) — stopAlarm 진입 = alarmId 추적.
       appendNativeDbg("AlarmKit-DBG", "stopAlarm 진입 alarmId=\(alarmId)")
-      // v1.8 #WatchLADirect — stop 시 별도 WatchLA 종료 보장.
-      await WatchLAManager.shared.end(alarmId: alarmId)
+      // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기.
       try await AlarmManager.shared.stop(id: uuid)
     }
 

@@ -616,5 +616,12 @@
   "favorites": {
     "empty": "Tidak ada favorit",
     "addButton": "Tambah favorit"
+  },
+  "recommend": {
+    "title": "Apakah Anda ingin merekomendasikan kepada teman?",
+    "body": "Beritahu teman Anda tentang mengerjakan misi alarm dengan ShutTimer.",
+    "yes": "Ya",
+    "no": "Tidak",
+    "shareMessage": "Coba misi alarm dengan ShutTimer! "
   }
 }

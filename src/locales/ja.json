@@ -623,5 +623,12 @@
   "favorites": {
     "empty": "お気に入りがありません",
     "addButton": "お気に入り追加"
+  },
+  "recommend": {
+    "title": "友達におすすめしますか？",
+    "body": "ShutTimerでアラームミッションに挑戦することを友達に教えてあげてください。",
+    "yes": "はい",
+    "no": "いいえ",
+    "shareMessage": "ShutTimerでアラームミッションに挑戦してみてください！ "
   }
 }

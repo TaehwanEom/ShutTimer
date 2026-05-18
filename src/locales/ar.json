@@ -616,5 +616,12 @@
   "favorites": {
     "empty": "لا توجد مفضلات",
     "addButton": "إضافة إلى المفضلة"
+  },
+  "recommend": {
+    "title": "هل تريد أن توصي به صديقًا؟",
+    "body": "أخبر أصدقاءك عن خوض مهام المنبه مع ShutTimer.",
+    "yes": "نعم",
+    "no": "لا",
+    "shareMessage": "جرب مهام المنبه مع ShutTimer! "
   }
 }

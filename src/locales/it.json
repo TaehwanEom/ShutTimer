@@ -616,5 +616,12 @@
   "favorites": {
     "empty": "Nessun preferito",
     "addButton": "Aggiungi preferito"
+  },
+  "recommend": {
+    "title": "Vuoi consigliarlo a un amico?",
+    "body": "Fai conoscere ai tuoi amici le missioni sveglia con ShutTimer.",
+    "yes": "Sì",
+    "no": "No",
+    "shareMessage": "Prova le missioni sveglia con ShutTimer! "
   }
 }

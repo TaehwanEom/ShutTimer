@@ -616,5 +616,12 @@
   "favorites": {
     "empty": "Sem favoritos",
     "addButton": "Adicionar favorito"
+  },
+  "recommend": {
+    "title": "Você gostaria de recomendar a um amigo?",
+    "body": "Conte aos seus amigos sobre as missões de alarme com o ShutTimer.",
+    "yes": "Sim",
+    "no": "Não",
+    "shareMessage": "Experimente as missões de alarme com o ShutTimer! "
   }
 }

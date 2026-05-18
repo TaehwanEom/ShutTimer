@@ -26,10 +26,6 @@ public struct ShutTimerWatchLAAttributes: ActivityAttributes {
         public var stepIndex: Int
         public var totalSteps: Int
         public var routineId: String
-        // v1.8 #WatchLAAlarmId — AppIntent 측 AlarmManager.pause/resume/stop 측 직접 호출 위해 alarmId 측 추가.
-        //   직전 = AppIntent 측 routineId 측 = chain_alarms / routineSnapshot 측 lookup ❌ (= timer_main 측 = routine ❌)
-        //   → AlarmManager 측 호출 ❌ → 워치 측 조작 sync ❌ root cause.
-        public var alarmId: String
 
         public init(
             mode: String,
@@ -40,8 +36,7 @@ public struct ShutTimerWatchLAAttributes: ActivityAttributes {
             stepName: String,
             stepIndex: Int,
             totalSteps: Int,
-            routineId: String,
-            alarmId: String
+            routineId: String
         ) {
             self.mode = mode
             self.startDate = startDate
@@ -52,7 +47,6 @@ public struct ShutTimerWatchLAAttributes: ActivityAttributes {
             self.stepIndex = stepIndex
             self.totalSteps = totalSteps
             self.routineId = routineId
-            self.alarmId = alarmId
         }
     }
 

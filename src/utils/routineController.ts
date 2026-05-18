@@ -119,7 +119,17 @@ async function scheduleBackgroundNotif(r: Routine, ar: ActiveRoutine, callerHint
   // v1.6 hotfix B1 — alerting UI title 에 다음 step name 포함 ("다음 루틴 조깅"). 마지막 step 시 undefined.
   const nextStepName = r.steps[ar.currentStepIndex + 1]?.name;
   Logger.warn('routine', `schedBgNotif fireAt=${fireAt.toISOString()} stepIdx=${ar.currentStepIndex} next=${nextStepName ?? '(end)'}`);
-  const id = await scheduleRoutineConfirmPrompt(r.id, fireAt, nextStepName);
+  // v1.8 #WatchLARoutine — 워치 Smart Stack LA 표시용 메타데이터 전달.
+  const currentStep = r.steps[ar.currentStepIndex];
+  const id = await scheduleRoutineConfirmPrompt(
+    r.id,
+    fireAt,
+    nextStepName,
+    r.name,
+    currentStep?.name,
+    ar.currentStepIndex,
+    r.steps.length,
+  );
   Logger.warn('routine', `schedBgNotif id=${id}`);
   currentConfirmPromptId = id;
 

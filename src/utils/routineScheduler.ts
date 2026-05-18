@@ -387,7 +387,12 @@ export async function scheduleRoutineConfirmPrompt(
   fireAt: Date,
   // v1.6 hotfix B1 — alerting UI title 에 다음 step name 포함 ("다음 루틴 조깅" 형식).
   // 마지막 step 종료 시점 = nextStepName undefined → 기본 "다음 루틴" 만 표시.
-  nextStepName?: string
+  nextStepName?: string,
+  // v1.8 #WatchLARoutine — 워치 Smart Stack LA 표시용 메타데이터.
+  laRoutineName?: string,
+  laStepName?: string,
+  laStepIndex?: number,
+  laTotalSteps?: number,
 ): Promise<string | null> {
   // v1.7 hotfix #12 — fireAt 측 과거 시 = 1초 future 강제 (= scheduleBackgroundNotif id=null 회귀 차단).
   // 직전: fireAt < now 시 null 반환 → confirm_prompt alarm 등록 ❌ → 다음 step alarm fire ❌ → routine 진행 정지.
@@ -398,14 +403,18 @@ export async function scheduleRoutineConfirmPrompt(
   // v1.7 hotfix Phase 13 G4-E — AlarmKit 측만 사용 (= expo-notifications 폴백 폐기).
   const useAlarmKit = await shouldUseAlarmKit();
   if (!useAlarmKit) return null;
-  return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName);
+  return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName, laRoutineName, laStepName, laStepIndex, laTotalSteps);
 }
 
 /** AlarmKit 경로 — iOS 26+. */
 async function scheduleConfirmPromptViaAlarmKit(
   routineId: string,
   fireAt: Date,
-  nextStepName?: string
+  nextStepName?: string,
+  laRoutineName?: string,
+  laStepName?: string,
+  laStepIndex?: number,
+  laTotalSteps?: number,
 ): Promise<string | null> {
   try {
     // v1.6 hotfix — confirm_prompt 사운드 통일. 사용자 설정 사운드 (단일 timer 와 동일 정책).
@@ -431,6 +440,12 @@ async function scheduleConfirmPromptViaAlarmKit(
       // 마지막 step 일 때 secondaryLabel 미전달 → AlarmkitBridgeModule 측 hasSecondary=false 분기로 진입 → "다음 진행" 버튼 미노출.
       secondaryLabel: isLastStep ? undefined : i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
       soundName: soundItem.pushSound,
+      // v1.8 #WatchLARoutine — 워치 Smart Stack LA 표시용 메타데이터.
+      laRoutineName,
+      laStepName,
+      laStepIndex,
+      laTotalSteps,
+      laRoutineId: routineId,
     });
     Logger.warn('routine', `confirm_prompt akId=${id}`);
     if (!id) return null;

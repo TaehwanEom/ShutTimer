@@ -476,6 +476,7 @@ export default function HistoryScreen({ navigation }: Props) {
 
           // v1.8 #CalendarCategoryTotalTime — 자식 항목 측 chevron icon 제거 (= 사용자 부탁).
           // 측 = 측 = 카테고리 헤더 측 펼치기 chevron 만 유지. 자식 row 는 단순 탭으로 손자 열기.
+          // v1.8 #CalendarGroupChevron — 루틴 + 알람 루틴 그룹 헤더 측 우측 끝 chevron 추가.
           const renderGroup = (key: string, entries: SessionRecord[]) => {
             const first = entries[0];
             const expanded = !!groupExpanded[key];
@@ -492,6 +493,11 @@ export default function HistoryScreen({ navigation }: Props) {
                   {totalSecs > 0 && (
                     <Text style={styles.sessionMinutes}>{formatDuration(totalSecs)}</Text>
                   )}
+                  <MaterialIcons
+                    name={expanded ? 'expand-less' : 'expand-more'}
+                    size={22}
+                    color={colors.secondary}
+                  />
                 </TouchableOpacity>
                 {expanded && entries.map((e) => (
                   <View key={e.id} style={[styles.sessionCard, { marginLeft: 32, opacity: 0.85 }]}>

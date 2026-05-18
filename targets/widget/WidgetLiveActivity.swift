@@ -73,10 +73,9 @@ struct AlarmKitLiveActivity: Widget {
     var body: some WidgetConfiguration {
         let _ = appendNativeDbgWidget("LA-DBG-AKLA-WidgetBody", "AlarmKitLiveActivity.body accessed")
         return ActivityConfiguration(for: AlarmAttributes<ShutTimerAlarmMetadata>.self) { context in
-            // v1.8 #WatchLAFix — @Environment(\.activityFamily) wrapper view 안 선언 정정 (Apple Forum #766878 패턴).
-            //   직전 = AlarmKitLiveActivity struct 최상위 @Environment 선언 → iPhone activity 생성 시점 1회 evaluate
-            //   → Apple Watch 측 .small 분기 fail (= 항상 LockScreen view 적용 → 워치 reject 가능).
-            //   정정 = AlarmKitLiveActivityContent wrapper 측 @Environment 선언 → 각 platform 정확 evaluate.
+            // v1.8 #WatchLAMirrorRestore — supplementalActivityFamilies + wrapper view + AlarmKitWatchView 복원.
+            //   직전 #WatchLAFrameworkAuto 측 = Apple sample 추정 정합 시도 측이었음. 다만 = 사용자분 실측 = iPhone 정상 + 워치 안 보임 확정 → 추정 잘못된 측 root cause 확정.
+            //   복원 = 옛 정정 마침 시점 layout 측 = supplementalActivityFamilies([.small]) + activityFamily 분기 wrapper + AlarmKitWatchView 측 = 폰 잠금화면 lockScreenContent 동일 layout (사용자분 명령 정합).
             AlarmKitLiveActivityContent(context: context)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -115,16 +114,15 @@ struct AlarmKitLiveActivity: Widget {
     }
 }
 
-// MARK: - v1.8 #WatchLAFix — activityFamily 분기 wrapper view (Apple Forum #766878 패턴)
-// @Environment(\.activityFamily) 측 widget configuration body가 아닌 view body 안에서 선언해야 각 platform
-// (iPhone Dynamic Island = .medium, Apple Watch Smart Stack = .small) 측 정확 evaluate.
+// MARK: - v1.8 #WatchLAMirrorRestore — activityFamily 분기 wrapper view (Apple Forum #766878 패턴)
+// @Environment(\.activityFamily) 측 widget configuration body 안 ❌ + view body 안 측만 측 정확 evaluate.
 
 struct AlarmKitLiveActivityContent: View {
     @Environment(\.activityFamily) var activityFamily
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
 
     var body: some View {
-        let _ = appendNativeDbgWidget("LA-DBG-AKLA-Family", "AlarmKitLiveActivityContent render activityFamily=\(activityFamily)", throttle: true)
+        let _ = appendNativeDbgWidget("LA-DBG-AKLA-Family", "AlarmKitLiveActivityContent render activityFamily=\(activityFamily) mode=\(akModeString(context.state.mode))")
         switch activityFamily {
         case .small:
             AlarmKitWatchView(context: context)
@@ -136,7 +134,7 @@ struct AlarmKitLiveActivityContent: View {
     }
 }
 
-// MARK: - v1.8 #WatchLA — Apple Watch Smart Stack 전용 View (= ~150x150 pt 정합)
+// MARK: - v1.8 #WatchLAMirrorRestore — Apple Watch Smart Stack 전용 View (= 사용자분 명령 = 폰 잠금화면 lockScreenContent 동일 layout)
 
 struct AlarmKitWatchView: View {
     let context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>
@@ -146,94 +144,31 @@ struct AlarmKitWatchView: View {
         appendNativeDbgWidget("LA-DBG-AKLA-Watch", "AlarmKitWatchView.init() mode=\(akModeString(context.state.mode))")
     }
 
+    // v1.8 #WatchLAReadOnly — 사용자분 명령 = 잔여 시간 표시 전용 + 가운데 정렬.
+    // root cause = WatchKit App ❌ → Button(intent:) 워치 작동 ❌ (= WWDC24 #10098).
+    // 컨트롤 = 카드 탭 → AlarmKit framework auto fullscreen → X / pause.
     var body: some View {
-        let routineId = context.attributes.metadata?.routineId ?? ""
-        let stepName = context.attributes.metadata?.currentStepName ?? ""
-        let total = context.attributes.metadata?.totalSteps ?? 1
-        let idx = (context.attributes.metadata?.currentStepIndex ?? 0) + 1
-
-        VStack(spacing: 4) {
-            // 루틴 이름 (= 가장 위, 작게)
+        VStack(alignment: .leading, spacing: 4) {
             Text(context.attributes.metadata?.routineName ?? "타이머")
                 .font(.caption2)
                 .foregroundColor(.brand)
                 .lineLimit(1)
-
-            // step 진행 (= 루틴 측만 표시, 알람 단독 ❌)
-            if total > 1 && !stepName.isEmpty {
+            if let total = context.attributes.metadata?.totalSteps, total > 1,
+               let stepName = context.attributes.metadata?.currentStepName, !stepName.isEmpty {
+                let idx = (context.attributes.metadata?.currentStepIndex ?? 0) + 1
                 Text("\(stepName) (\(idx)/\(total))")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.75))
+                    .foregroundColor(.white.opacity(0.7))
                     .lineLimit(1)
             }
-
-            // 잔여 시간 (= 큰 글자, monospaced)
-            AlarmKitCountdownText(context: context, fontStyle: .title3.weight(.bold))
-
-            // 버튼 영역 (= 일시정지/재개 + 다음 step + 종료)
-            HStack(spacing: 6) {
-                // 일시정지 / 재개
-                AlarmKitWatchPauseResumeButton(routineId: routineId, mode: context.state.mode)
-
-                // 다음 step (= 루틴 측만 표시 + countdown 모드만)
-                if total > 1 && idx < total {
-                    if case .countdown = context.state.mode {
-                        Button(intent: AdvanceNextStepIntent(routineId: routineId)) {
-                            Image(systemName: "forward.fill")
-                                .font(.caption.weight(.bold))
-                                .foregroundColor(.white)
-                                .frame(width: 32, height: 32)
-                                .background(Circle().fill(Color.gray.opacity(0.5)))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                // 종료
-                Button(intent: StopRoutineIntent(routineId: routineId)) {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.gray.opacity(0.5)))
-                }
-                .buttonStyle(.plain)
-            }
+            AlarmKitCountdownText(context: context, fontStyle: .system(size: 56, weight: .bold))
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .activityBackgroundTint(Color.black.opacity(0.85))
         .activitySystemActionForegroundColor(Color.white)
-    }
-}
-
-struct AlarmKitWatchPauseResumeButton: View {
-    let routineId: String
-    let mode: AlarmPresentationState.Mode
-
-    var body: some View {
-        switch mode {
-        case .paused:
-            Button(intent: ResumeRoutineIntent(routineId: routineId)) {
-                Image(systemName: "play.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.brand))
-            }
-            .buttonStyle(.plain)
-        case .countdown:
-            Button(intent: PauseRoutineIntent(routineId: routineId)) {
-                Image(systemName: "pause.fill")
-                    .font(.caption.weight(.bold))
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Color.brand))
-            }
-            .buttonStyle(.plain)
-        case .alert:
-            EmptyView()
-        }
     }
 }
 
@@ -244,24 +179,15 @@ struct AlarmKitLockScreenView: View {
 
     init(context: ActivityViewContext<AlarmAttributes<ShutTimerAlarmMetadata>>) {
         self.context = context
-        // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — struct init 시점 측 widget body 호출 직접 측정.
-        // 직전 = view body 측 `let _ = { ... }()` 측 closure compiler dead code elimination 가능성 의심.
-        // init() 측 = side effects 보존 정합 → widget body 호출 시 = 본 log 측 정상 발생 정합.
         appendNativeDbgWidget("LA-DBG-AKLA-Init", "AlarmKitLockScreenView.init() mode=\(akModeString(context.state.mode))")
     }
 
     var body: some View {
-        // v1.7 hotfix #LAUnify Phase 9-A 진단 — AlarmKit LA widget body 진입 + state.mode 값 native log.
-        // 사용자분 보고 = paused 시 "검정 바만 표시" → 본 widget body 호출 여부 + mode 분기 확인용.
         let _ = { appendNativeDbgWidget("LA-DBG-AKLA", "AlarmKitLockScreenView render mode=\(akModeString(context.state.mode)) routineName=\(context.attributes.metadata?.routineName ?? "nil") routineId=\(context.attributes.metadata?.routineId ?? "nil")", throttle: true) }()
-        // v1.7 hotfix #LAUnify Phase 10-G3 — WWDC25 "Wake up to the AlarmKit API" 강제 정합:
-        // "You MUST handle all three mode cases (.countdown, .paused, .alert) even if they share views."
-        // 직전 = switch 누락 → AlarmKit framework가 widget body 호출 자체 안 함 (= LA-DBG-AKLA 0건 root cause).
         switch context.state.mode {
         case .countdown:
             lockScreenContent
                 .onAppear {
-                    // v1.7 hotfix #LAUnify Phase 10-G4dbg3 — onAppear 측 widget body 측 SwiftUI evaluation 시점 직접 측정.
                     appendNativeDbgWidget("LA-DBG-AKLA-Appear", "AlarmKitLockScreenView.onAppear(countdown) routineId=\(context.attributes.metadata?.routineId ?? "nil")")
                 }
         case .paused:
@@ -461,13 +387,12 @@ struct AlarmKitStepBottomLabel: View {
     }
 }
 
-// MARK: - v1.8 #WatchLADirect — Apple Watch Smart Stack 전용 별도 ActivityKit Live Activity
+// MARK: - v1.8 #WatchLADirect — Apple Watch Smart Stack 전용 별도 ActivityKit Live Activity (= 7c042bf commit 정확 동일 패턴 재도입)
 
-// AlarmKit framework 자동 LA 측 Activity.activities 등록 측 측정 ❌ (= alerting 시점 count=0 단서) →
-// WWDC24 자동 워치 mirror 메커니즘 측 전제 fail. 본 widget = 별도 ShutTimerWatchLAAttributes type 측
-// 측 ActivityKit `Activity.request` 직접 호출 측 LA 측 등록 → Activity.activities 등록 ✅ →
-// 워치 Smart Stack 자동 mirror ✅ 보장.
+// AlarmKit framework 자동 LA 측 + 별도 ShutTimerWatchLAAttributes type 측 ActivityKit Activity.request
+// 직접 호출 → Activity.activities 등록 ✅ → 워치 Smart Stack 자동 mirror ✅ 보장.
 // iPhone 측 = `.medium` 측 EmptyView 측 → framework auto LA 측 그대로 표시 (= 시각 충돌 ❌).
+// 워치 측 = `.small` 측 ShutTimerWatchLAView 측 표시 (= 사용자분 명령 = 폰 잠금화면 lockScreenContent 동일 layout).
 
 struct ShutTimerWatchLAWidget: Widget {
     init() {
@@ -500,14 +425,20 @@ struct ShutTimerWatchLAContent: View {
     let context: ActivityViewContext<ShutTimerWatchLAAttributes>
 
     var body: some View {
-        let _ = appendNativeDbgWidget("LA-DBG-WatchLA-Family", "ShutTimerWatchLAContent render activityFamily=\(activityFamily) mode=\(context.state.mode)", throttle: true)
+        let _ = appendNativeDbgWidget("LA-DBG-WatchLA-Family", "ShutTimerWatchLAContent render activityFamily=\(activityFamily) mode=\(context.state.mode)")
         switch activityFamily {
         case .small:
             ShutTimerWatchLAView(context: context)
         case .medium:
-            EmptyView()
+            // v1.8 #WatchLAHideOnPhone — iPhone 잠금화면 측 framework auto LA (AlarmKitLiveActivity) 만 표시.
+            // 본 widget 측 .medium family 측 frame 0 + activityBackgroundTint clear 강제 = 빈 검은 박스 잔재 제거 시도.
+            Color.clear
+                .frame(width: 0, height: 0)
+                .activityBackgroundTint(.clear)
         @unknown default:
-            EmptyView()
+            Color.clear
+                .frame(width: 0, height: 0)
+                .activityBackgroundTint(.clear)
         }
     }
 }
@@ -520,43 +451,29 @@ struct ShutTimerWatchLAView: View {
         appendNativeDbgWidget("LA-DBG-WatchLA-View", "ShutTimerWatchLAView.init() mode=\(context.state.mode)")
     }
 
+    // v1.8 #WatchLAReadOnly — 사용자분 명령 = 잔여 시간 표시 전용 (= 버튼 컨트롤 제거).
+    // root cause = WatchKit App target 없는 iOS-only widget extension 측 = Button(intent:) perform 워치 호출 ❌
+    //   (= WWDC24 #10098 명시: "If you don't have an Apple Watch app, it will expand into a system provided fullscreen view").
+    // 컨트롤 = 카드 탭 → AlarmKit framework auto fullscreen 측 X / pause 사용.
     var body: some View {
         let state = context.state
-        let alarmId = state.alarmId
-
-        // v1.8 #WatchLASync — 폰 잠금화면 LA (= AlarmKitLockScreenView) 측 layout 정합 + step 표시 복구.
-        //   layout = VStack(라벨 + step + HStack(시간 + Spacer + PauseResume + Stop)).
-        //   Apple Forum #757358 = iOS-only 앱 Watch app target ❌ → Button(intent:) perform ❌ (= tap → 시스템
-        //   "iPhone에서 열기" 자동). 시각 동기화만 ✅ + 실제 tap 작동 ❌ 한계 유지 (= 사용자분 확인 마침).
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(state.routineName)
                 .font(.caption2)
                 .foregroundColor(.brand)
                 .lineLimit(1)
-
             if state.totalSteps > 1 && !state.stepName.isEmpty {
                 Text("\(state.stepName) (\(state.stepIndex + 1)/\(state.totalSteps))")
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.75))
+                    .foregroundColor(.white.opacity(0.7))
                     .lineLimit(1)
             }
-
-            HStack(spacing: 6) {
-                ShutTimerWatchLATimeText(state: state)
-                Spacer(minLength: 0)
-                ShutTimerWatchLAPauseResumeButton(alarmId: alarmId, mode: state.mode)
-                Button(intent: StopTimerIntent(alarmId: alarmId)) {
-                    Image(systemName: "xmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundColor(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Color.gray.opacity(0.6)))
-                }
-                .buttonStyle(.plain)
-            }
+            ShutTimerWatchLATimeText(state: state)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .activityBackgroundTint(Color.black.opacity(0.85))
         .activitySystemActionForegroundColor(Color.white)
     }
@@ -570,10 +487,10 @@ struct ShutTimerWatchLATimeText: View {
         case "countdown":
             Text(timerInterval: state.startDate...state.fireDate, countsDown: true)
                 .monospacedDigit()
-                .font(.system(size: 22).weight(.bold))
+                .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.4)
         case "paused":
             let remaining = Duration.seconds(state.pausedRemainingSec)
             let pattern: Duration.TimeFormatStyle.Pattern = remaining > .seconds(60 * 60)
@@ -581,26 +498,25 @@ struct ShutTimerWatchLATimeText: View {
                 : .minuteSecond(padMinuteToLength: 1, fractionalSecondsLength: 0, roundFractionalSeconds: .up)
             Text(remaining.formatted(.time(pattern: pattern)))
                 .monospacedDigit()
-                .font(.system(size: 22).weight(.bold))
+                .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.4)
         default:
             Text("알람")
-                .font(.system(size: 22).weight(.bold))
+                .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.4)
         }
     }
 }
 
-// v1.8 #WatchLASync — 폰 AlarmKitPauseResumeButton 측 동일 구조 (= mode 분기 + brand 배경 + play/pause icon).
-//   워치 .small 정합 = 32x32 (폰 측 44x44 축소). state.mode = "paused" / "countdown" / 기타 분기.
-//   AppIntent = PauseTimerIntent / ResumeTimerIntent (= alarmId 측 직접 사용).
-struct ShutTimerWatchLAPauseResumeButton: View {
-    let alarmId: String
+// v1.8 #WatchLAButton — Button(intent:) wrap → 워치 위젯 카드 안 버튼 직접 작동.
+// v1.8 #WatchLALayout — 버튼 44x44 → 28x28 축소 (= 사용자분 명령 = 시간 가림 정정).
+struct ShutTimerWatchLAPauseResumeIcon: View {
     let mode: String
+    let alarmId: String
 
     var body: some View {
         switch mode {
@@ -609,7 +525,7 @@ struct ShutTimerWatchLAPauseResumeButton: View {
                 Image(systemName: "play.fill")
                     .font(.caption.weight(.bold))
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(Color.brand))
             }
             .buttonStyle(.plain)
@@ -618,7 +534,7 @@ struct ShutTimerWatchLAPauseResumeButton: View {
                 Image(systemName: "pause.fill")
                     .font(.caption.weight(.bold))
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .background(Circle().fill(Color.brand))
             }
             .buttonStyle(.plain)

@@ -35,7 +35,7 @@ import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
 import { loadActiveRoutine } from '../constants/routines';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
-import { incrementAlarmSuccessCount, maybeRequestReview } from '../utils/storeReview';
+import { incrementAlarmSuccessCount, maybeRequestReview, shouldShowRecommend } from '../utils/storeReview';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
 import { useSharedValue } from 'react-native-worklets-core';
 import { type Detection } from '../utils/objectDetection';
@@ -512,9 +512,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (resultEnteredRef.current) return;
     resultEnteredRef.current = true;
     // v1.8 #StoreReview — 알람 미션 성공 시 카운터 증가 + 트리거 조건 만족 시 별점 요청 (= fire-and-forget, 핵심 흐름 영향 ❌)
+    // v1.8 #RecommendModal — 평가 모달 호출 후 = 추천 모달 표시 가능 측 검사 + pending flag set → HomeScreen mount 시 표시.
     if (result === 'success') {
       incrementAlarmSuccessCount()
         .then(() => maybeRequestReview())
+        .then(() => shouldShowRecommend())
+        .then((show) => {
+          if (show) AsyncStorage.setItem('recommend_pending', 'true').catch(() => {});
+        })
         .catch((e) => Logger.warn('StoreReview', `enterResult flow failed: ${String(e)}`));
     }
     // cancel/dismiss/sound stop 완료 후 광고/네비게이션 진행 (race 방지)
@@ -714,17 +719,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
         const alarmEnabled = alarmRaw !== 'false';
         if (!alarmEnabled) return;
         // v1.7 hotfix #SoundMismatch — alarm.soundKey 측 폐기 (= alarmScheduler.ts 정합 = SETTINGS_KEY.ALARM_SOUND 측만 read).
-        //   직전 = navigate params 측 alarmSoundKey 우선 영역 → AlarmEditScreen 측 = soundKey: DEFAULT_SOUND_ID 'alarm_01' 항상 저장 영역 → AlarmScreen 측 = 'alarm_01' 우선 read → 잠금 사운드 (= SettingsScreen 셋팅) ↔ 앱 진입 후 사운드 (= alarm_01) mismatch.
-        //   본 정정 = alarmSoundKey 측 read 폐기 → SETTINGS_KEY.ALARM_SOUND 측만 read → 잠금 + 앱 진입 후 동일 사운드 보장.
         const soundId = soundIdRaw ?? DEFAULT_SOUND_ID;
 
         // v1.7 hotfix #ExpoAudio Phase 4-C — expo-av → expo-audio swap.
-        //   createAsync (= async + Promise) → createAudioPlayer (= sync) + loop property.
-        //   getStatusAsync (= async + status.isLoaded) → isLoaded (= sync property).
-        //   stopAsync + unloadAsync → release() (= 통합).
-        // v1.7 hotfix #ExpoAudio-LoadGate — createAudioPlayer 측 = sync 단 = 실제 사운드 load 측 = async 영역
-        //   → 즉시 play() 호출 시 = silent fail / 지연 (= 사용자분 = "끊어지는 느낌" 영역 정합).
-        //   본 정정 = playbackStatusUpdate listener 측 = isLoaded event 후 play 진입 (= Expo 공식 권장 패턴).
+        // v1.7 hotfix #ExpoAudio-LoadGate — playbackStatusUpdate listener 측 = isLoaded event 후 play.
         const playWhenLoaded = (player: AudioPlayer, tag: string) => {
           if (player.isLoaded) {
             try { player.play(); } catch (e: any) { appendAlarmAudioLog(`${tag} play fail: ${e?.message || e}`); }
@@ -739,7 +737,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
           });
         };
 
-        // Fallback: createAudioPlayer (preload 없거나 invalid 상태에서 호출)
         const runFallback = () => {
           const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
           try {
@@ -768,8 +765,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
               try { preloaded.release(); } catch {}
               return;
             }
-            // preload 측 = 타이머 시작 시점 측 사전 로드 영역 → 대개 isLoaded=true 영역.
-            // 단 = isLoaded=false 시도 = playWhenLoaded 측 = listener 진입 + 로드 완료 후 play.
             soundRef.current = preloaded;
             playWhenLoaded(preloaded, 'preloaded');
           })
@@ -790,8 +785,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
       audioStateSub.remove();
       try { soundRef.current?.release(); } catch {}
       // v1.8 #AudioRestore — unmount 시 audio session 복구 (= duckOthers → mixWithOthers).
-      //   직전 = duckOthers 잔존 영역 → 알람 종료 후 = 음악 / 티맵 볼륨 복구 ❌.
-      //   정정 = mixWithOthers 측 = 다른 audio mix 영역 → 볼륨 자동 복구.
       setAudioModeAsync({
         playsInSilentMode: true,
         shouldPlayInBackground: true,

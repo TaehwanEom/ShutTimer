@@ -624,5 +624,12 @@
   "favorites": {
     "empty": "즐겨찾기가 없습니다",
     "addButton": "즐겨찾기 추가"
+  },
+  "recommend": {
+    "title": "친구에게 추천하시겠어요?",
+    "body": "ShutTimer 로 알람 미션에 도전해 보는 걸 친구에게 알려 주세요.",
+    "yes": "예",
+    "no": "아니오",
+    "shareMessage": "ShutTimer 로 알람 미션에 도전해 보세요! "
   }
 }

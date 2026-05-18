@@ -616,5 +616,12 @@
   "favorites": {
     "empty": "Favori yok",
     "addButton": "Favori ekle"
+  },
+  "recommend": {
+    "title": "Bir arkadaşınıza önermek ister misiniz?",
+    "body": "ShutTimer ile alarm görevlerine katılmayı arkadaşlarınıza bildirin.",
+    "yes": "Evet",
+    "no": "Hayır",
+    "shareMessage": "ShutTimer ile alarm görevlerini deneyin! "
   }
 }

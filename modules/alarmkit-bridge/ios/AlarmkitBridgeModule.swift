@@ -77,14 +77,20 @@ fileprivate actor WatchLAManager {
     // v1.8 #WatchLAAlertMode — alerting 시점 측 = end ❌ + mode 측만 변경 → 워치 측 알람 표시 ✅.
     //   직전 = alerting 시 end 호출 → 워치 측 즉시 종료 (= 사용자분 보고 "알람출력 되는데 워치는 무반응" root cause).
     //   정정 = updateMode 측 = 저장된 ContentState 측 mode 측만 변경 + Activity.update → 워치 측 표시 유지.
-    func updateMode(alarmId: String, mode: String) async {
+    // v1.8 #WatchLAPausedSync — pausedRemainingSec optional 측 함께 update.
+    //   직전 = mode 측만 변경 + pausedRemainingSec 측 초기값 측 그대로 → paused 진입 시 잔여 측 정확 ❌ +
+    //   시간 흘러감 + 동기화 ❌ (= 사용자분 보고 root cause). 정정 = paused 진입 시점 측 잔여 측 함께 update.
+    func updateMode(alarmId: String, mode: String, pausedRemainingSec: Double? = nil) async {
         guard let activity = activities[alarmId], var state = contentStates[alarmId] else { return }
         state.mode = mode
+        if let remaining = pausedRemainingSec {
+            state.pausedRemainingSec = remaining
+        }
         contentStates[alarmId] = state
         // v1.8 #LAStaleDate — staleDate 추가 (= fireDate + 8h = 시스템 측 만료 시점 명시 → 동의 dialog 빈도 ↓).
         let content = ActivityContent(state: state, staleDate: state.fireDate.addingTimeInterval(8 * 3600))
         await activity.update(content)
-        appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.updateMode alarmId=\(alarmId) mode=\(mode)")
+        appendNativeDbg("LA-DBG-WatchLA", "WatchLAManager.updateMode alarmId=\(alarmId) mode=\(mode) pausedRemainingSec=\(pausedRemainingSec.map { String($0) } ?? "nil")")
     }
 
     func end(alarmId: String) async {
@@ -181,8 +187,19 @@ public class AlarmkitBridgeModule: Module {
                 //   종료 측 = cancelAlarm / stopAlarm 측 end 호출 측 의존 (= 사용자분 측 정지 시점).
                 await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "alert")
               } else if alarm.state == .paused {
-                // v1.8 #WatchLAPausedMode — paused 시 mode "paused" 측 update. paused 잔여 시간 측 sync 측 = 다음 cycle.
-                await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "paused")
+                // v1.8 #WatchLAPausedSync — paused 진입 시 폰 LA Activity 측 잔여 측 측정 + 함께 update.
+                //   root cause = updateMode 측 mode 측만 변경 + pausedRemainingSec 측 초기값 그대로 → 워치 측 잔여 정확 ❌ + 시간 흘러감 + 동기화 ❌.
+                //   매칭 = 폰 LA Activity 측 = AlarmAttributes<ShutTimerAlarmMetadata>.activities 측 = metadata.alarmId == alarm.id.uuidString.
+                //   잔여 측정 = state.mode = .paused(let p) 측 = p.totalCountdownDuration - p.previouslyElapsedDuration (= 폰 측 AlarmKitCountdownText 동일 패턴).
+                let phoneActivities = Activity<AlarmAttributes<ShutTimerAlarmMetadata>>.activities
+                var pausedRemaining: Double? = nil
+                if let phoneAct = phoneActivities.first(where: { $0.attributes.metadata?.alarmId == alarm.id.uuidString }) {
+                    if case .paused(let p) = phoneAct.content.state.mode {
+                        pausedRemaining = p.totalCountdownDuration - p.previouslyElapsedDuration
+                    }
+                }
+                appendNativeDbg("LA-DBG-WatchLA", "observer paused alarmId=\(alarm.id.uuidString) phoneActivities=\(phoneActivities.count) pausedRemaining=\(pausedRemaining.map { String($0) } ?? "nil")")
+                await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "paused", pausedRemainingSec: pausedRemaining)
               } else if alarm.state == .countdown {
                 // v1.8 #WatchLACountdownMode — countdown 복귀 시 (= 재개) mode "countdown" 측 update.
                 await WatchLAManager.shared.updateMode(alarmId: alarm.id.uuidString, mode: "countdown")

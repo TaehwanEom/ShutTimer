@@ -130,19 +130,39 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
   const prevMinutesRef = React.useRef<number | null>(null);
   const isDragging = useRef(false);
 
-  // 초당 800ms 짧은 애니메이션 — 부드럽고 배터리 효율적
-  const progressAnim = useRef(new Animated.Value(progress)).current;
-  const [displayProgress, setDisplayProgress] = useState(progress);
+  // v1.8 #PerfTickStep — 매 frame 측 Animated.timing + addListener + setState 측 폐기 (= 30분 측 86,400회 React re-render 측 root cause).
+  //   직전 = useNativeDriver: false + addListener({value}) => setDisplayProgress(value) 측 매 frame 측 React re-render.
+  //   정정 = progress props 측 직접 사용 → 매 초 측 1회 측 React re-render.
+  //   시각 측 변화 = 부드러운 측 → 짹깍 측 step 측 (= 시계 초침 측). 발열 측 매우 감소.
+  // v1.8 #PerfTickStep-ResetSmooth — 정지 시점 (= progress=0 + 직전>0) 측만 500ms 부드러운 animation 추가.
+  //   30분 측 누적 = 1회 측만 (= 500ms × 60fps = 30 frame) → 발열 영향 ❌.
+  const [animatedProgress, setAnimatedProgress] = useState(progress);
+  const animValue = useRef(new Animated.Value(progress)).current;
+  const prevProgressRef = useRef(progress);
   useEffect(() => {
-    const id = progressAnim.addListener(({ value }) => setDisplayProgress(value));
-    return () => progressAnim.removeListener(id);
+    const id = animValue.addListener(({ value }) => setAnimatedProgress(value));
+    return () => animValue.removeListener(id);
   }, []);
   useEffect(() => {
-    if (isDragging.current) { progressAnim.setValue(progress); return; }
-    const anim = Animated.timing(progressAnim, { toValue: progress, duration: 800, useNativeDriver: false, easing: Easing.linear });
-    anim.start();
-    return () => anim.stop();
+    // 큰 jump 감지 (= 정지 시점 측 dial 측 시작 위치 측 reset 또는 측 = 외부 측 progress 측 점프 측).
+    //   동작 중 = 매 초 측 0.03% 측 정도 측 작은 측 감소 → step.
+    //   정지 시 = 시작 위치 측 (= 30분 측 0.5 측) 측 갑자기 측 jump → 부드러운 animation.
+    //   drag 중 = 사용자 측 직접 측 jump → step (= drag 측 정합).
+    const delta = Math.abs(progress - prevProgressRef.current);
+    const isJump = delta > 0.01 && !isDragging.current;
+    prevProgressRef.current = progress;
+    if (isJump) {
+      // 정지 측 = 500ms 부드러운 animation.
+      const anim = Animated.timing(animValue, { toValue: progress, duration: 500, useNativeDriver: false, easing: Easing.linear });
+      anim.start();
+      return () => anim.stop();
+    } else {
+      // 일반 측 = step (= 매 초 1회 update).
+      animValue.setValue(progress);
+      setAnimatedProgress(progress);
+    }
   }, [progress]);
+  const displayProgress = animatedProgress;
 
   const blinkAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {

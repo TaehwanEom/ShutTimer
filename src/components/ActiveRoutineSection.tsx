@@ -229,7 +229,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       if (remainMs <= 0) handleMissionEnd();
     };
     update();
-    tickRef.current = setInterval(update, 500);
+    // v1.8 #PerfTickStep — 500ms → 1000ms. setRemainingSec(Math.ceil(remainMs/1000)) 측 같은 초 측 같은 값 → React skip → re-render 측 1초 1회 측 동일. 호출 빈도 측 절반 ↓.
+    tickRef.current = setInterval(update, 1000);
     return () => {
       Logger.warn('V1 timer-tick', 'EFFECT CLEANUP');
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }

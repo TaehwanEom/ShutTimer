@@ -21,11 +21,23 @@ export default function AdBanner() {
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree, loading } = usePurchase();
   const [npa, setNpa] = useState(true);
+  // v1.8 #PerfInstrument — AdBanner render count + onAdLoaded 빈도 측정 (= 30분 동안 광고 갱신 빈도 측 root cause 확정).
+  const renderCountRef = React.useRef(0);
+  const loadCountRef = React.useRef(0);
+  const failCountRef = React.useRef(0);
+  const mountedAtRef = React.useRef(Date.now());
+  renderCountRef.current += 1;
 
   useEffect(() => {
     AsyncStorage.getItem('attStatus').then(status => {
       if (status === 'granted') setNpa(false);
     }).catch(() => {});
+    // v1.8 #PerfInstrument — 매 1분 마다 종합 log.
+    const id = setInterval(() => {
+      const elapsedSec = ((Date.now() - mountedAtRef.current) / 1000).toFixed(0);
+      Logger.warn('Perf-AdBanner', `elapsedSec=${elapsedSec} renderCount=${renderCountRef.current} loadCount=${loadCountRef.current} failCount=${failCountRef.current}`);
+    }, 60000);
+    return () => clearInterval(id);
   }, []);
 
   /**
@@ -55,10 +67,15 @@ export default function AdBanner() {
           unitId={BANNER_UNIT_ID}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           requestOptions={{ requestNonPersonalizedAdsOnly: npa }}
-          onAdFailedToLoad={(error: any) =>
-            Logger.warn('AdMob', `Banner failed: code=${error?.code} domain=${error?.domain} msg=${error?.message}`)
-          }
-          onAdLoaded={() => Logger.info('AdMob', 'Banner loaded')}
+          onAdFailedToLoad={(error: any) => {
+            failCountRef.current += 1;
+            Logger.warn('AdMob', `Banner failed: code=${error?.code} domain=${error?.domain} msg=${error?.message}`);
+          }}
+          onAdLoaded={() => {
+            loadCountRef.current += 1;
+            // v1.8 #PerfInstrument — info → warn 변경 (= memory-first capture 보장).
+            Logger.warn('AdMob', `Banner loaded count=${loadCountRef.current} renderCount=${renderCountRef.current}`);
+          }}
         />
       </View>
     );

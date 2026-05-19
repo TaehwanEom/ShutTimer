@@ -649,14 +649,41 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // --- interval (v1.5 timestamp 기반) ---
   // endAtRef 기준으로 남은 시간 계산. pause/play 연타해도 실시간 정확히 반영.
+  // v1.8 #PerfInstrument — tick 처리 시간 측정 (= 16ms 초과 시 frame drop 가능성).
+  //   tickCountRef = 누적 호출 수. lastTickAtRef = 직전 tick 시각. 매 60 tick 마다 = 1회 종합 log.
+  const tickCountRef = useRef(0);
+  const tickMaxDurationRef = useRef(0);
+  const tickTotalDurationRef = useRef(0);
+  const lastTickAtRef = useRef(0);
+  const tickIntervalMaxRef = useRef(0);
   useEffect(() => {
     if (!isRunning || isPaused) return;
+    tickCountRef.current = 0;
+    tickMaxDurationRef.current = 0;
+    tickTotalDurationRef.current = 0;
+    lastTickAtRef.current = 0;
+    tickIntervalMaxRef.current = 0;
 
     const tick = () => {
+      const t0 = Date.now();
       const remainingMs = endAtRef.current - Date.now();
       const next = Math.max(0, Math.ceil(remainingMs / 1000));
       remainingSecondsRef.current = next;
       setRemainingSeconds(next);
+      const dur = Date.now() - t0;
+      tickCountRef.current += 1;
+      tickTotalDurationRef.current += dur;
+      if (dur > tickMaxDurationRef.current) tickMaxDurationRef.current = dur;
+      if (lastTickAtRef.current > 0) {
+        const interval = t0 - lastTickAtRef.current;
+        if (interval > tickIntervalMaxRef.current) tickIntervalMaxRef.current = interval;
+      }
+      lastTickAtRef.current = t0;
+      // 60 tick (= 1분) 마다 1회 종합 log.
+      if (tickCountRef.current % 60 === 0) {
+        const avg = (tickTotalDurationRef.current / tickCountRef.current).toFixed(2);
+        Logger.warn('Perf-Tick', `count=${tickCountRef.current} avgMs=${avg} maxMs=${tickMaxDurationRef.current} maxIntervalMs=${tickIntervalMaxRef.current} remaining=${next}`);
+      }
     };
     tick(); // 즉시 1회 갱신 (pause/resume 직후 UI 즉각 반영)
     const id = setInterval(tick, 1000);

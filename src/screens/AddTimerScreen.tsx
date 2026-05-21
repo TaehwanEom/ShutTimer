@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Modal,
   ScrollView,
   useWindowDimensions,
   Animated,
   PanResponder,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ICONS_PER_PAGE = 8;
 import AsyncStorage from '@react-native-async-storage/async-storage';

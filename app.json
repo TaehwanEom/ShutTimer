@@ -189,13 +189,14 @@
         "./plugins/withSoundResources.js",
         {
           "sounds": [
-            "./assets/sounds/notification_alarm.wav",
-            "./assets/sounds/notification_ringtone.wav",
-            "./assets/sounds/notification_alarm01.wav",
-            "./assets/sounds/ringtone_05.wav",
+            "./assets/sounds/alarm_01.wav",
             "./assets/sounds/alarm_02.wav",
-            "./assets/sounds/ringtone_12.wav",
-            "./assets/sounds/notification_silent_vibe.wav"
+            "./assets/sounds/alarm_03.wav",
+            "./assets/sounds/alarm_04.wav",
+            "./assets/sounds/ringtone_01.wav",
+            "./assets/sounds/ringtone_02.wav",
+            "./assets/sounds/ringtone_03.wav",
+            "./assets/sounds/ringtone_04.wav"
           ]
         }
       ],

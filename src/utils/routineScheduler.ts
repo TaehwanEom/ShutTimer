@@ -125,10 +125,10 @@ async function resolveSound(): Promise<string | false> {
     if (!enabled) return false;
     const effective = soundId ?? 'alarm_01';
     return effective.startsWith('ringtone_')
-      ? 'notification_ringtone.wav'
-      : 'notification_alarm.wav';
+      ? 'ringtone_02.wav'
+      : 'alarm_01.wav';
   } catch {
-    return 'notification_alarm.wav';
+    return 'alarm_01.wav';
   }
 }
 

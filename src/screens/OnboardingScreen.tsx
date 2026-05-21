@@ -615,7 +615,6 @@ export default function OnboardingScreen({ navigation }: Props) {
           addLabel={t('home.add', { defaultValue: 'Add' })}
           minutesLabel={t('home.minutes', { defaultValue: 'MINUTES' })}
           tooltipPlayLabel={t('onboarding.tooltipPlay', { defaultValue: '재생 버튼을 길게 누르면 타이머를 정지할 수 있습니다' })}
-          tooltipFavLabel={t('onboarding.tooltipFav', { defaultValue: '즐겨찾기를 길게 누르면 편집할 수 있습니다' })}
           confirmLabel={t('onboarding.confirm', { defaultValue: '확인' })}
           onComplete={() => markPageComplete(slides.length)}
           skipSignal={skipSignal[slides.length] ?? 0}
@@ -1084,7 +1083,6 @@ function HomePreviewSlide({
   addLabel,
   minutesLabel,
   tooltipPlayLabel,
-  tooltipFavLabel,
   confirmLabel,
   skipSignal,
 }: {
@@ -1098,13 +1096,11 @@ function HomePreviewSlide({
   addLabel: string;
   minutesLabel: string;
   tooltipPlayLabel: string;
-  tooltipFavLabel: string;
   confirmLabel: string;
   skipSignal: number;
 }) {
-  // 시퀀스 애니메이션: play tooltip → fav tooltip → 확인 버튼 순차 fade-in
+  // 시퀀스 애니메이션: play tooltip → 확인 버튼 순차 fade-in
   const playTooltipOp = useRef(new Animated.Value(0)).current;
-  const favTooltipOp = useRef(new Animated.Value(0)).current;
   const confirmOp = useRef(new Animated.Value(0)).current;
   const playedRef = useRef(false);
   // onComplete를 ref로 — parent re-render로 인한 useEffect 재실행 방지
@@ -1118,8 +1114,6 @@ function HomePreviewSlide({
     if (skipSignal > 0) {
       playTooltipOp.stopAnimation();
       playTooltipOp.setValue(1);
-      favTooltipOp.stopAnimation();
-      favTooltipOp.setValue(1);
       confirmOp.stopAnimation();
       confirmOp.setValue(1);
       playedRef.current = true;
@@ -1129,20 +1123,16 @@ function HomePreviewSlide({
 
     if (playedRef.current) {
       playTooltipOp.setValue(1);
-      favTooltipOp.setValue(1);
       confirmOp.setValue(1);
       onCompleteRef.current();
       return;
     }
     let stopped = false;
     playTooltipOp.setValue(0);
-    favTooltipOp.setValue(0);
     confirmOp.setValue(0);
 
     const animation = Animated.sequence([
       Animated.timing(playTooltipOp, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.delay(500),
-      Animated.timing(favTooltipOp, { toValue: 1, duration: 800, useNativeDriver: true }),
       Animated.delay(500),
       Animated.timing(confirmOp, { toValue: 1, duration: 600, useNativeDriver: true }),
     ]);
@@ -1156,7 +1146,7 @@ function HomePreviewSlide({
       stopped = true;
       animation.stop();
     };
-  }, [active, playTooltipOp, favTooltipOp, confirmOp, skipSignal]);
+  }, [active, playTooltipOp, confirmOp, skipSignal]);
 
   // 13분 진행 중(일시정지 상태) 시각
   const timeText = '13:00';
@@ -1199,7 +1189,8 @@ function HomePreviewSlide({
         </View>
 
         {/* 13:00 pill + Pause button + 게이지바 링 (long-press 취소 indicator 배경) */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
+        {/* Android — 재생 버튼 링이 Favorites 구분선과 겹쳐 섹션 간격 확대. iOS는 6 유지. */}
+        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 36 : 6, gap: 8 }}>
           <View style={{ borderWidth: 2, borderColor: colors.outlineVariant, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
             <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onBackground, letterSpacing: 1 }}>
               13 : 00
@@ -1296,13 +1287,27 @@ function HomePreviewSlide({
               <Text style={[hp.headerTitle, { color: colors.onBackground }]}>ShutTimer</Text>
             </View>
           </View>
-          {/* Dial 공간 spacer (TimerDial 330 + 다이얼 switcher ~44 + margin) */}
+          {/* Dial 공간 spacer — TimerDial 330 고정 + 스위처 행 spacer.
+              Android — includeFontPadding으로 실제 스위처 행이 하드코딩 32보다 ~20px 높음 → 실제 행 미러로 자동 정합.
+              iOS — ~32로 맞아 기존 하드코딩 유지 (iOS 무변경 보장, Android 작업이 iOS 회귀 일으키지 않도록 분기). */}
           <View style={[hp.dialSection, { opacity: 0 }]}>
             <View style={{ width: 330, height: 330 }} />
-            <View style={{ height: 32, marginTop: 12 }} />
+            {Platform.OS === 'android' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+                <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
+                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} />
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.outlineVariant }} />
+                </View>
+                <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
+              </View>
+            ) : (
+              <View style={{ height: 32, marginTop: 12 }} />
+            )}
           </View>
           {/* Play button 섹션 (링 + tooltip) */}
-          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
+          {/* Android — preview 측과 동일 간격 확대 (레이어 정렬 유지). iOS는 6 유지. */}
+          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 36 : 6, gap: 8 }}>
             <View style={{ opacity: 0, borderWidth: 2, borderColor: 'transparent', borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '800', letterSpacing: 1 }}>13 : 00</Text>
             </View>
@@ -1334,7 +1339,7 @@ function HomePreviewSlide({
               </Animated.Text>
             </View>
           </View>
-          {/* Favorites 섹션 — divider/Add/TV 모두 spacer (메인에서 렌더), TV 우측에 tooltip만 표시 */}
+          {/* Favorites 섹션 — divider/Add/TV 모두 spacer (메인에서 렌더). 확인 버튼 위치용 */}
           <View style={{ width: '100%', marginBottom: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: '100%', opacity: 0 }}>
               <View style={{ flex: 1, height: 1 }} />
@@ -1346,36 +1351,41 @@ function HomePreviewSlide({
               <View style={[hp.missionItem, { opacity: 0 }]}>
                 <View style={hp.addBtn} />
               </View>
-              {/* TV + 텍스트 — 적당한 간격 */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
-                <View style={[hp.missionItem, { opacity: 0 }]}>
-                  <View style={hp.missionIcon} />
-                </View>
-                <Animated.Text style={{ flex: 1, fontSize: 13, fontWeight: '600', color: colors.onBackground, lineHeight: 18, opacity: favTooltipOp }}>
-                  {tooltipFavLabel}
-                </Animated.Text>
+              {/* TV spacer */}
+              <View style={[hp.missionItem, { opacity: 0 }]}>
+                <View style={hp.missionIcon} />
               </View>
             </View>
           </View>
+          {/* Android — 확인 버튼: 미러 flow 안 즐겨찾기 다음에 배치. 위 spacer들이 위치 결정 → 화면 높이 무관 */}
+          {Platform.OS === 'android' && (
+            <Animated.View style={{ opacity: confirmOp, alignItems: 'center', marginTop: 24 }}>
+              <TouchableOpacity style={styles.startButton} onPress={onStart}>
+                <Text style={styles.startButtonText}>{confirmLabel}</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
         </View>
-        {/* 확인 버튼 — 화면 정중앙 (absolute, center both axes). 버튼 폭은 텍스트 길이에 맞춰 자동 조정 (minWidth 제거) */}
-        <Animated.View
-          pointerEvents="box-none"
-          style={{
-            opacity: confirmOp,
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <TouchableOpacity style={styles.startButton} onPress={onStart}>
-            <Text style={styles.startButtonText}>{confirmLabel}</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {/* iOS — 확인 버튼: 화면 정중앙 (absolute, center both axes). iOS 현행 유지 */}
+        {Platform.OS === 'ios' && (
+          <Animated.View
+            pointerEvents="box-none"
+            style={{
+              opacity: confirmOp,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <TouchableOpacity style={styles.startButton} onPress={onStart}>
+              <Text style={styles.startButtonText}>{confirmLabel}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </View>
     </View>
   );

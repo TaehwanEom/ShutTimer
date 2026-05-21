@@ -54,7 +54,6 @@ import {
   recordAlarmSession,
   cleanupGhostAlarms,
   cancelAlarmsForEntity,
-  scheduleAlarmChainNext,
   ALARM_CHAIN_MAX_INDEX,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
@@ -368,16 +367,12 @@ function AppNavigator() {
       if (meta.type === 'alarm_main') {
         // sessions 기록 (= 결정 6-B, icon='alarm' 고정)
         await recordAlarmSession().catch(() => {});
-        // v1.8 #AlarmChainRevive — 발화 시점에 2분 뒤 다음 chain 1개 등록. alarm.repeat 무관 모두 진입.
-        //   .removed trigger 측 = daily/weekly alarm framework .relative() 측 = .alerting → .scheduled 자동 전이 →
-        //     .removed 측 안 들어옴 → chain 진입 ❌ 회귀. 본 분기 측 = .alerting 시점 = 모든 repeat 동일 진입.
+        // v1.8 #AlarmChainEager — chain 전체는 scheduleAlarmMain 측 등록 시점에 미리 예약됨.
+        //   listener 측 추가 schedule ❌ (= 잠금 상태 앱 suspend 시 listener 미발화 → lazy chain 끊김 회귀 차단).
         //   사용자 dismiss 경로 = cancelAlarmsForEntity → entityId 묶음 일괄 cancel + once disable.
-        //   chain budget 끝 (chainIndex >= 49) = 마지막 발화 시점 = once 측 disable 호출 + 후속 chain ❌.
+        //   마지막 chain (chainIndex >= 49) 발화 시 = 'once' 알람 자동 disable.
         const curIdx = meta.chainIndex ?? 0;
-        if (curIdx < ALARM_CHAIN_MAX_INDEX) {
-          Logger.warn('onAlarmStateChange-DBG', `chain+1 schedule entityId=${meta.entityId} curIdx=${curIdx} → nextIdx=${curIdx + 1}`);
-          await scheduleAlarmChainNext(meta.entityId, curIdx + 1).catch(() => {});
-        } else {
+        if (curIdx >= ALARM_CHAIN_MAX_INDEX) {
           await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
         }
         if (currentRoute === 'Alarm') return;

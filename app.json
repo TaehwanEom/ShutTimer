@@ -208,7 +208,16 @@
         }
       ],
       "expo-localization",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              "./assets/fonts/material.ttf"
+            ]
+          }
+        }
+      ],
       [
         "expo-build-properties",
         {

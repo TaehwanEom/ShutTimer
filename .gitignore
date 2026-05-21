@@ -44,6 +44,10 @@ svg/
 
 # v1.8 — Android 빌드 산출물 (= prebuild 측 자동 생성. iOS 측 동일 패턴 정합).
 android/
+# 모듈 자체의 android 소스는 추적 (prebuild 최상위 android/ 와 구분; build·.gradle 산출물 제외). 위 !modules/**/ios/ 와 정합.
+!modules/**/android/
+!modules/**/android/build.gradle
+!modules/**/android/src/**
 # 디바이스 디버그 로그
 log.md
 # Gradle 빌드 캐시

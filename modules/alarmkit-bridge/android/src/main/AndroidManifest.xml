@@ -1,2 +1,24 @@
-<manifest>
+<!-- 알람 엔진 권한/컴포넌트 선언 — 빌드 시 앱(com.shuttimer.app) manifest에 자동 병합됨.
+     MainActivity 잠금화면 속성은 Step 4에서 추가. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <application>
+        <!-- 알람 발화 수신기 — AlarmManager가 예약 시각에 broadcast. 외부 노출 불필요 → exported=false -->
+        <receiver
+            android:name="expo.modules.alarmkitbridge.AlarmReceiver"
+            android:exported="false"/>
+        <!-- 알람 발화 서비스 — foreground service. 소리·진동·전체화면 알림. -->
+        <service
+            android:name="expo.modules.alarmkitbridge.AlarmService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false"/>
+    </application>
 </manifest>

@@ -372,6 +372,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     //   본 정정 = AppState change listener 측 = active 진입 시점만 호출 → background mount 시점 호출 ❌ + active 진입 (= banner 누름) 시점만 dismiss.
     //   stopAudioAndVibration 측 = 잔존 cleanup 영역 보존 ✅ (= mapping table + dismissMethod 별 정리 영역).
     const dismissAlertingBanner = async () => {
+      // v1.8 #AndroidNativeSound — 안드로이드는 포그라운드 진입 시 네이티브 알람을 멈추지 않음
+      //   (= 네이티브가 사운드 단일 소스로 끝까지 재생). 실제 해제는 미션 완료 시 stopAudioAndVibration.
+      if (Platform.OS === 'android') return;
       try {
         const alarms = await AlarmkitBridge.listAlarms();
         for (const a of alarms) {
@@ -712,6 +715,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const startAlarmAudio = () => {
       if (audioStarted) return;
       audioStarted = true;
+      // v1.8 #AndroidNativeSound — 안드로이드는 네이티브 AlarmService가 사운드를 단일 재생함.
+      //   앱 자체 사운드(expo-av)는 안 냄 → 겹침/작은음 회피. iOS는 기존대로 (포그라운드 = 앱 사운드).
+      if (Platform.OS === 'android') return;
       Promise.all([
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),

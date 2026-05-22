@@ -321,7 +321,8 @@ function AppNavigator() {
       Logger.warn('CHAIN-MARKER-V18', `listener entered state=${event.state} alarmId=${event.alarmId}`);
       if (event.state !== 'alerting') return;
       // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
-      if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active') {
+      // v1.8 #AndroidNativeSound — 안드로이드 제외 (네이티브 AlarmService가 포그라운드에서도 계속 재생).
+      if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active' && Platform.OS !== 'android') {
         Logger.warn('onAlarmStateChange-DBG', `suppressFlag 진입 → cancelAlarm ${event.alarmId}`);
         await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
       }

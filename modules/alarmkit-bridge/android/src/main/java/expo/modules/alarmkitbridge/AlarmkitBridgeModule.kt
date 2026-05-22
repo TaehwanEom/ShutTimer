@@ -3,6 +3,7 @@ package expo.modules.alarmkitbridge
 
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -74,11 +75,15 @@ class AlarmkitBridgeModule : Module() {
 
     AsyncFunction("cancelAlarm") { alarmId: String ->
       AlarmScheduler.cancel(context, alarmId)
+      // 취소 대상이 발화 중이면 AlarmService(소리·진동)도 중단.
+      if (AlarmScheduler.getAlertingId(context) == alarmId) stopAlarmService()
     }
 
-    // Step 3에서 alerting 서비스 중단 로직 추가. 현재는 예약 취소와 동일.
+    // 발화 중인 알람 정지 — 예약 취소 + AlarmService(소리·진동) 중단.
+    // JS(AlarmScreen)가 alerting 알람에 호출. 정리(사운드·진동·볼륨·alerting)는 서비스 onDestroy가 수행.
     AsyncFunction("stopAlarm") { alarmId: String ->
       AlarmScheduler.cancel(context, alarmId)
+      stopAlarmService()
     }
 
     AsyncFunction("listAlarms") {
@@ -106,5 +111,10 @@ class AlarmkitBridgeModule : Module() {
   private fun authorizationState(): String {
     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     return if (nm.areNotificationsEnabled()) "authorized" else "denied"
+  }
+
+  // 실행 중인 AlarmService 중단 → onDestroy에서 사운드·진동 정지, 볼륨 원복, alerting 클리어.
+  private fun stopAlarmService() {
+    context.stopService(Intent(context, AlarmService::class.java))
   }
 }

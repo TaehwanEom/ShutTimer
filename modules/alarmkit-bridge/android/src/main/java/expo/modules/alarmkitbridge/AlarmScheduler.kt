@@ -60,6 +60,29 @@ object AlarmScheduler {
 
   fun getAlertingId(context: Context): String? = prefs(context).getString(KEY_ALERTING, null)
 
+  // ── 재부팅 복원 ──
+
+  // 재부팅 후 호출 (BootReceiver) — AlarmManager 예약은 재부팅 시 전부 소실되므로,
+  // 영속된 레코드 중 아직 미래(fireAt > now)인 알람을 다시 등록. 과거 건은 영속에서 정리.
+  fun rescheduleAllFromBoot(context: Context): Int {
+    val now = System.currentTimeMillis()
+    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val survivors = mutableListOf<AlarmRecord>()
+    for (record in readAll(context)) {
+      if (record.fireAt > now) {
+        am.setAlarmClock(
+          AlarmManager.AlarmClockInfo(record.fireAt, showIntent(context)),
+          firePendingIntent(context, record.id)
+        )
+        survivors.add(record)
+      }
+      // fireAt <= now = 다운타임 중 놓친 알람 → 재등록 안 함 (survivors 제외 = 영속 정리).
+    }
+    writeAll(context, survivors)
+    clearAlerting(context)  // 재부팅 = 발화 중인 알람 없음.
+    return survivors.size
+  }
+
   // ── PendingIntent ──
 
   // 발화용 — AlarmReceiver로 broadcast.

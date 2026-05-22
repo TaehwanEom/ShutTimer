@@ -20,6 +20,14 @@
             android:name="expo.modules.alarmkitbridge.AlarmService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false"/>
+        <!-- 재부팅 복원 수신기 — 부팅 완료 시 소실된 AlarmManager 예약 재등록. 시스템 broadcast 수신 → exported 필수. -->
+        <receiver
+            android:name="expo.modules.alarmkitbridge.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
         <!-- 전체화면 알람용 — 앱 MainActivity가 잠금화면 위에 뜨도록 속성 병합. -->
         <activity
             android:name="com.shuttimer.app.MainActivity"

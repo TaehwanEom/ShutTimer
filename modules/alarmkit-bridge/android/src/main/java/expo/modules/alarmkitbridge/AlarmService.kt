@@ -14,6 +14,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -53,7 +54,7 @@ class AlarmService : Service() {
     }
 
     forceAlarmVolume()
-    startSound()
+    startSound(record?.soundName)
     startVibration()
 
     // 발화 상태 기록 + JS emit — 콜드스타트는 listAlarms로, 앱 생존 시는 이벤트로 알람 화면 이동.
@@ -116,11 +117,10 @@ class AlarmService : Service() {
       .build()
   }
 
-  // ── 사운드 (알람 스트림 — 무음모드 우회). 커스텀 사운드 매핑은 후속 ──
-  private fun startSound() {
+  // ── 사운드 (알람 스트림 — 무음모드 우회). soundName → res/raw 우리 wav, 없으면 시스템 기본음 ──
+  private fun startSound(soundName: String?) {
     try {
-      val uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
-        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+      val uri = resolveSoundUri(soundName)
       mediaPlayer = MediaPlayer().apply {
         setDataSource(this@AlarmService, uri)
         setAudioAttributes(
@@ -136,6 +136,21 @@ class AlarmService : Service() {
     } catch (e: Exception) {
       Log.w(TAG, "startSound fail: $e")
     }
+  }
+
+  // soundName("alarm_01.wav") → res/raw 리소스 URI. 미존재 시 시스템 기본 알람음 폴백.
+  private fun resolveSoundUri(soundName: String?): Uri {
+    if (!soundName.isNullOrBlank()) {
+      val stem = soundName.substringBeforeLast('.')
+      val resId = resources.getIdentifier(stem, "raw", packageName)
+      if (resId != 0) {
+        Log.w(TAG, "startSound — res/raw 사용 name=$soundName resId=$resId")
+        return Uri.parse("android.resource://$packageName/$resId")
+      }
+      Log.w(TAG, "startSound — res/raw 미발견 name=$soundName → 시스템 기본음 폴백")
+    }
+    return RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
+      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
   }
 
   private fun stopSound() {

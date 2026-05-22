@@ -29,6 +29,7 @@ class AlarmService : Service() {
   private var vibrator: Vibrator? = null
   private var priorAlarmVolume: Int = -1
   private var volumeObserver: ContentObserver? = null
+  private var currentAlarmId: String? = null
 
   companion object {
     private const val CHANNEL_ID = "alarmkit_alarm"
@@ -40,6 +41,7 @@ class AlarmService : Service() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     val alarmId = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID)
+    currentAlarmId = alarmId
     val record = alarmId?.let { AlarmScheduler.get(this, it) }
     Log.w(TAG, "AlarmService start — alarmId=$alarmId title=${record?.title}")
 
@@ -53,6 +55,12 @@ class AlarmService : Service() {
     forceAlarmVolume()
     startSound()
     startVibration()
+
+    // 발화 상태 기록 + JS emit — 콜드스타트는 listAlarms로, 앱 생존 시는 이벤트로 알람 화면 이동.
+    if (alarmId != null) {
+      AlarmScheduler.setAlerting(this, alarmId)
+      AlarmEventBus.emit(alarmId, "alerting")
+    }
     return START_REDELIVER_INTENT
   }
 
@@ -61,6 +69,10 @@ class AlarmService : Service() {
     stopVibration()
     unregisterVolumeObserver()
     restoreAlarmVolume()
+    currentAlarmId?.let {
+      AlarmScheduler.clearAlerting(this)
+      AlarmEventBus.emit(it, "removed")
+    }
     super.onDestroy()
   }
 

@@ -1,6 +1,6 @@
-<!-- 알람 엔진 권한/컴포넌트 선언 — 빌드 시 앱(com.shuttimer.app) manifest에 자동 병합됨.
-     MainActivity 잠금화면 속성은 Step 4에서 추가. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- 알람 엔진 권한/컴포넌트 선언 — 빌드 시 앱(com.shuttimer.app) manifest에 자동 병합됨. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -20,5 +20,11 @@
             android:name="expo.modules.alarmkitbridge.AlarmService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false"/>
+        <!-- 전체화면 알람용 — 앱 MainActivity가 잠금화면 위에 뜨도록 속성 병합. -->
+        <activity
+            android:name="com.shuttimer.app.MainActivity"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            tools:node="merge"/>
     </application>
 </manifest>

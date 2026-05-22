@@ -12,6 +12,7 @@ object AlarmScheduler {
   const val EXTRA_ALARM_ID = "alarmkit_alarm_id"
   private const val PREFS_NAME = "alarmkit_bridge_alarms"
   private const val KEY_ALARMS = "alarms"
+  private const val KEY_ALERTING = "alerting_id"
 
   // 알람 한 건의 영속 정의.
   data class AlarmRecord(
@@ -46,6 +47,18 @@ object AlarmScheduler {
 
   fun get(context: Context, alarmId: String): AlarmRecord? =
     readAll(context).firstOrNull { it.id == alarmId }
+
+  // ── 발화 중(alerting) 상태 — AlarmService가 set/clear, listAlarms·콜드스타트가 조회 ──
+
+  fun setAlerting(context: Context, alarmId: String) {
+    prefs(context).edit().putString(KEY_ALERTING, alarmId).apply()
+  }
+
+  fun clearAlerting(context: Context) {
+    prefs(context).edit().remove(KEY_ALERTING).apply()
+  }
+
+  fun getAlertingId(context: Context): String? = prefs(context).getString(KEY_ALERTING, null)
 
   // ── PendingIntent ──
 

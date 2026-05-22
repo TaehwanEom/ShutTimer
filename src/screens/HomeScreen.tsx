@@ -47,9 +47,9 @@ import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
 import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
 
-// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
+// iOS = AlarmKit / Android = 네이티브 알람 엔진. 양쪽 다 권한 확인(getAuthorizationState) 후 사용.
 async function shouldUseAlarmKitInTimer(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return false;
   try {
     const state = await AlarmkitBridge.getAuthorizationState();
     return state === 'authorized';

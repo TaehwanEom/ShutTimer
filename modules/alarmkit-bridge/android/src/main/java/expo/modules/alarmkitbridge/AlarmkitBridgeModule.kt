@@ -30,6 +30,16 @@ class AlarmkitBridgeModule : Module() {
     Name("AlarmkitBridge")
     Events("onAlarmStateChange")
 
+    // 모듈 생존 동안 AlarmService 발화 콜백 연결 — 발화 시 onAlarmStateChange emit (앱 살아있을 때).
+    OnCreate {
+      AlarmEventBus.listener = { alarmId, state ->
+        sendEvent("onAlarmStateChange", mapOf("alarmId" to alarmId, "state" to state))
+      }
+    }
+    OnDestroy {
+      AlarmEventBus.listener = null
+    }
+
     // ── 가용성 / 권한 ──
     Function("isAvailable") { true }
 
@@ -72,8 +82,13 @@ class AlarmkitBridgeModule : Module() {
     }
 
     AsyncFunction("listAlarms") {
+      val alertingId = AlarmScheduler.getAlertingId(context)
       AlarmScheduler.list(context).map { r ->
-        mapOf("id" to r.id, "state" to "scheduled", "fixedFireMs" to r.fireAt.toDouble())
+        mapOf(
+          "id" to r.id,
+          "state" to if (r.id == alertingId) "alerting" else "scheduled",
+          "fixedFireMs" to r.fireAt.toDouble()
+        )
       }
     }
 

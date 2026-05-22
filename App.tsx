@@ -53,7 +53,6 @@ import {
   disableOnceAlarmIfNeeded,
   recordAlarmSession,
   cleanupGhostAlarms,
-  cancelAlarmsForEntity,
   ALARM_CHAIN_MAX_INDEX,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
@@ -625,11 +624,10 @@ function AppNavigator() {
               const alarms = await loadAlarms();
               const alarmEntity = alarms.find(x => x.id === signal.routineId);
               if (alarmEntity) {
-                // v1.8 #AlarmRepeat — slide-to-stop 측 = chain 형제 일괄 cancel.
-                // 직전 = alerting 1개만 stop (= OpenAppDismissIntent perform 측) → scheduled 측 chain 49개 잔존 → 2분 뒤 또 울림.
-                // 정정 = mapping table 측 entityId 동일 모든 alarm cancel.
-                await cancelAlarmsForEntity(alarmEntity.id).catch(() => {});
-                Logger.warn('LAControl-DBG', `alarm entity chain cancel entityId=${alarmEntity.id}`);
+                // v1.8 #AlarmRepeat 제거 — 밀어서 중지 시 체인 일괄 cancel 삭제.
+                //   체인은 미션 완료할 때까지 살아남아야 한다 (= 미션 유도 장치). cancel은 미션 완료
+                //   경로(AlarmScreen.stopAudioAndVibration)에만 존재. 여기선 navigate만.
+                //   plan: docs/plan-2026-05-22-ios-slide-stop-chain-cancel-fix.md (FIX-2026-05-22-slide-stop-cancel)
                 const route = navigationRef.current.getCurrentRoute()?.name;
                 if (route !== 'Alarm') {
                   Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);

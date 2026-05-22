@@ -29,7 +29,7 @@ import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
-import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
+import { cancelAlarmsForEntity, recordAlarmSession, scheduleAlarmMain } from '../utils/alarmScheduler';
 import { stopRoutine, confirmAndAdvance, restorePendingDisabledAlarms } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { loadAlarms } from '../constants/alarms';
@@ -299,6 +299,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (alarmEntityIdParam) {
         Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration chain cancel entityId=${alarmEntityIdParam}`);
         await cancelAlarmsForEntity(alarmEntityIdParam).catch(() => {});
+        // v1.8 #ChainRearm — 미션 완료 cancel 직후 daily/weekly 체인 재무장.
+        //   cancelAlarmsForEntity가 .relative 반복까지 제거하므로 다음 발화분을 즉시 재예약.
+        //   once는 cancelAlarmsForEntity 내부 disableOnceAlarmIfNeeded로 enabled=false → scheduleAlarmMain no-op.
+        const rearmTarget = (await loadAlarms()).find(a => a.id === alarmEntityIdParam);
+        if (rearmTarget) {
+          await scheduleAlarmMain(rearmTarget).catch(() => {});
+        }
       }
       // v1.6 후속 hotfix — 시스템 측 잔존 alerting 알람 cleanup (= mapping table 측 ❌ 영역).
       // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).

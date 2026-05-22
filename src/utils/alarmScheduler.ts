@@ -62,7 +62,7 @@ async function resolveSoundName(): Promise<string | undefined> {
  * 정책 (= 사용자분 측 명시):
  *   - native 측 .alarm(schedule:) factory 측 사용 = AlarmPresentation 측 alert-only = LA 측 생성 ❌
  *   - chain = 알람 등록 시점에 전체 미리 예약 (= 활성 알람 갯수 분배, 최대 50개) → 잠금/앱 종료 상태에서도 OS가 전부 발화.
- *   - chainIndex 0 = 기준 알람 (repeat='daily'/'weekly' 시 .relative OS 반복 유지), 1+ = .fixed 단발 chain.
+ *   - v1.8 #AlarmChainRecurring — chainIndex 0/1+ 모두 .relative OS 반복 (daily/weekly) → 재예약 없이 매주/매일 자동 갱신. 'once' 만 .fixed 단발.
  *   - 직전 lazy chain (= 발화 listener 측 다음 1개 등록) 폐기 — 잠금 상태 앱 suspend 시 listener 미발화 → chain 끊김 회귀 root cause.
  *   - 발화 (alerting) 시 → 'once' 측 자동 disable (= disableOnceAlarmIfNeeded 측 listener 분기 정합).
  *   - dismiss → cancelAlarmsForEntity → mapping entityId 일괄 cancel.
@@ -75,6 +75,41 @@ function mapAlarmRepeatToRecurrence(alarm: Alarm): { mode: 'never' | 'daily' | '
   if (alarm.repeat === 'daily') return { mode: 'daily' };
   if (alarm.repeat === 'weekly') return { mode: 'weekly', days: alarm.days };
   return { mode: 'never' }; // 'once' → never (= native 측 .fixed(date) 분기)
+}
+
+// v1.8 #AlarmChainRecurring — 체인 멤버가 기준 알람 대비 며칠 뒤 날짜에 발화하는지.
+// 체인 길이 최대 100분 (50회 × 2분) → 자정은 1회만 넘을 수 있어 결과는 0 또는 1.
+// weekly 알람의 자정-크로스 멤버 요일 보정용. 로컬 시각 기준 (= nextAlarmOccurrenceTime 정합).
+function chainMemberDayOffset(baseFireAt: number, memberFireAt: number): number {
+  const startOfDay = (ms: number): number => {
+    const d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+  return Math.round((startOfDay(memberFireAt) - startOfDay(baseFireAt)) / 86400000);
+}
+
+// v1.8 #AlarmChainRecurring — 체인 멤버 1건의 recurrence 계산.
+// 직전 = chainIndex 1+ 가 { mode:'never' } → native .fixed(단발) → 예약 당일 1회만 →
+//   앱 미실행 시 다음날부터 chainIndex 0 하나만 남아 체인 소멸 (= 잠금화면 슬라이드 중지 시 회귀 root cause).
+// 정정 = chainIndex 1+ 도 chainIndex 0 처럼 .relative 반복 → 재예약 없이 OS 자동 매주/매일 반복.
+//   - chainIndex 0 = 기준 알람 → 현행 mapAlarmRepeatToRecurrence 유지 (= 회귀 차단).
+//   - 'once' = 1회성 → 체인 멤버도 never(.fixed) 유지 (= 반복 ❌, 발화 후 disableOnceAlarmIfNeeded 정합).
+//   - 'daily' = 자정 넘어도 매일 → daily 그대로.
+//   - 'weekly' = 자정 넘는 멤버는 요일 +dayOffset shift (= 다음날 새벽 올바른 요일에 반복).
+function chainMemberRecurrence(
+  alarm: Alarm,
+  chainIndex: number,
+  fireAt: number,
+  chainBaseFireAt: number
+): { mode: 'never' | 'daily' | 'weekly'; days?: number[] } {
+  if (chainIndex === 0) return mapAlarmRepeatToRecurrence(alarm);
+  if (alarm.repeat === 'once') return { mode: 'never' };
+  if (alarm.repeat === 'daily') return { mode: 'daily' };
+  // weekly — 자정 크로스 시 요일 shift.
+  const dayOffset = chainMemberDayOffset(chainBaseFireAt, fireAt);
+  const shiftedDays = alarm.days.map(d => (d + dayOffset) % 7);
+  return { mode: 'weekly', days: shiftedDays };
 }
 
 export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
@@ -101,7 +136,7 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   return firstId;
 }
 
-/** v1.8 #AlarmChainEager — 단일 chain alarm schedule + mapping 저장. chainIndex 0 = 기준(recurrence 유지), 1+ = .fixed. */
+/** v1.8 #AlarmChainEager — 단일 chain alarm schedule + mapping 저장. recurrence = chainMemberRecurrence (chainIndex 1+ 도 .relative 반복, 'once' 만 .fixed). */
 async function scheduleAlarmAt(
   alarm: Alarm,
   fireAt: number,
@@ -113,8 +148,8 @@ async function scheduleAlarmAt(
   // v1.8 — alarm 측 = LA 안 만듦 (= native .alarm(schedule:) factory + alert-only presentation 측).
   // countdownTitle / laMeta 측 = .alarm 분기 측 unused. 호환성 위해 전달은 유지.
   const countdownTitle = '다음 알람\n남은 시간';
-  // v1.8 #AlarmChainEager — chainIndex 0 = 기준 알람 (daily/weekly = .relative OS 반복 유지), 1+ = .fixed 단발.
-  const recurrence = chainIndex === 0 ? mapAlarmRepeatToRecurrence(alarm) : { mode: 'never' as const };
+  // v1.8 #AlarmChainRecurring — chainIndex 0/1+ 모두 .relative OS 반복 (daily/weekly). 'once' 만 .fixed 단발.
+  const recurrence = chainMemberRecurrence(alarm, chainIndex, fireAt, chainBaseFireAt);
   Logger.warn(
     'alarmScheduler-DBG',
     `scheduleAlarm alarmId=${alarm.id} chainIndex=${chainIndex} fireAt=${fireAt} recurrence=${recurrence.mode} soundName=${soundName ?? '(undefined)'}`

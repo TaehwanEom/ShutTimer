@@ -186,10 +186,21 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
 
   return (
     <View style={styles.container} {...(!isEditing && onSeek ? panResponder.panHandlers : {})}>
-      {/* 숨겨진 입력 필드 */}
+      {/* v1.8 #DigitalKeypadAndroid — 숨겨진 입력 필드.
+          Android는 opacity:0 / 1×1 TextInput 에 focus() 해도 소프트 키보드를 안 띄움 (iOS는 띄움).
+          → 화면에 실제 크기로 배치하되 글자·커서·밑줄을 투명 처리 = 눈엔 안 보이지만 Android가 정상 입력칸으로 인식.
+          크기·위치는 디스플레이 영역 안쪽 → 위 TouchableOpacity 에 완전히 가려져 직접 탭은 안 받음 (focus()로만 진입). */}
       <TextInput
         ref={hiddenInputRef}
-        style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+        style={{
+          position: 'absolute',
+          top: (SIZE - 90) / 2,
+          left: (SIZE - 160) / 2,
+          width: 160,
+          height: 90,
+          color: 'transparent',
+        }}
+        underlineColorAndroid="transparent"
         keyboardType="number-pad"
         maxLength={4}
         onChangeText={handleInput}

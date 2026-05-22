@@ -224,25 +224,70 @@ export const ALARM_CHAIN_INTERVAL_MS = 120000; // 2분
 export const ALARM_CHAIN_MAX_INDEX = 49; // chainIndex 0..49 = 총 50회 = 100분
 
 /**
- * 앱 기동 시 호출. stale 'alarm_main' mapping cleanup + enabled=true 알람 재예약.
+ * 앱 기동 / 루틴 복원 시 호출. alarm_main 체인 정합성 동기화.
+ * v1.8 #ChainWipeFix — 멱등화. "전부 cancel + 재예약" → "이미 정상인 체인은 그대로 둔다".
+ *   직전: 콜드 스타트마다 alarm_main 전체 cancel 후 nextAlarmOccurrenceTime(=오늘 지나면 내일)로
+ *     재예약 → 밀어서 중지로 콜드 스타트 시 오늘 진행 중이던 체인이 통째로 소멸하던 회귀.
+ *   정정: entityId 그룹별 분기 — 고아 정리(A) / 살아있는 체인 skip(B) / 체인 없는 알람만 신규 예약(C).
+ *   호출자: App.tsx 콜드 스타트, routineController.restorePendingDisabledAlarms (루틴 복원).
+ *   plan: docs/plan-2026-05-22-ios-chain-wipe-fix.md (FIX-2026-05-22-chain-wipe).
  * routineScheduler.syncRollingSchedule 와 별개 영역.
  */
 export async function syncAllAlarms(): Promise<void> {
   if (!isAlarmKitAvailableSync()) return;
 
-  // 1. stale 'alarm_main' mapping cleanup (= 이전 빌드 등록 영역)
+  const now = Date.now();
+  // 'once' 체인 수명 = 50회 × 2분 = 100분. 기준시각 + 수명 < now → 전 멤버 발화 완료 = 죽은 체인.
+  const chainLifespanMs = (ALARM_CHAIN_MAX_INDEX + 1) * ALARM_CHAIN_INTERVAL_MS;
+
+  // alarm_main mapping을 entityId 기준 그룹화.
   const allMeta = await listAllAlarmMetadata();
-  for (const meta of allMeta) {
-    if (meta.type === 'alarm_main') {
-      await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
-      await deleteAlarmMetadata(meta.alarmId).catch(() => {});
-    }
+  const chainMeta = allMeta.filter(m => m.type === 'alarm_main');
+  const byEntity = new Map<string, typeof chainMeta>();
+  for (const meta of chainMeta) {
+    const list = byEntity.get(meta.entityId);
+    if (list) list.push(meta);
+    else byEntity.set(meta.entityId, [meta]);
   }
 
-  // 2. enabled=true 알람 재예약
-  const alarms = await loadAlarms();
-  for (const alarm of alarms) {
-    if (alarm.enabled) {
+  const alarmById = new Map<string, Alarm>();
+  for (const a of await loadAlarms()) alarmById.set(a.id, a);
+
+  // ── 분기 A/B — mapping이 있는 entityId 처리 ──
+  for (const [entityId, metas] of Array.from(byEntity.entries())) {
+    const alarm = alarmById.get(entityId);
+
+    // 분기 A — 대응 알람 없음(삭제) / enabled=false(인앱 OFF) → 고아 mapping 정리.
+    if (!alarm || !alarm.enabled) {
+      for (const meta of metas) await cancelAlarm(meta.alarmId);
+      continue;
+    }
+
+    // 분기 B-once — 체인이 죽었으면(전 멤버 발화 완료) 정리 + 알람 disable. 살아있으면 skip.
+    if (alarm.repeat === 'once') {
+      const base = metas.find(m => m.chainBaseFireAt != null)?.chainBaseFireAt;
+      const chainDead = base == null || base + chainLifespanMs < now;
+      if (chainDead) {
+        for (const meta of metas) await cancelAlarm(meta.alarmId);
+        await disableOnceAlarmIfNeeded(entityId).catch(() => {});
+      }
+      continue;
+    }
+
+    // 분기 B-skip — daily/weekly: .relative OS 반복 체인. 진행 중/미래 유효 → 그대로 둔다.
+    //   ← 이번 버그 핵심 수정. 콜드 스타트가 진행 중인 체인을 더 이상 건드리지 않는다.
+  }
+
+  // ── 분기 C — enabled인데 alarm_main 체인이 하나도 없는 알람 신규 예약 ──
+  //   분기 B가 once 알람을 disable 했을 수 있어 알람·mapping 상태 재로드.
+  const freshAlarms = await loadAlarms();
+  const entitiesWithChain = new Set(
+    (await listAllAlarmMetadata())
+      .filter(m => m.type === 'alarm_main')
+      .map(m => m.entityId)
+  );
+  for (const alarm of freshAlarms) {
+    if (alarm.enabled && !entitiesWithChain.has(alarm.id)) {
       await scheduleAlarmMain(alarm).catch(() => {});
     }
   }

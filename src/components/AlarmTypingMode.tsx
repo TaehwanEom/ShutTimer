@@ -126,10 +126,10 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
   });
 
   // v1.8 — 실시간 피드백. input 글자별 = 정답 측 동일 idx 영역 비교 → 연두 / 빨강.
-  // 공백 / 대소문자 무시 (= 정답 체크 측과 동일).
+  // 2026-05-25 사용자 요구 — 대소문자만 무시. 띄어쓰기 포함 정확 일치 (정답 체크 측과 동일).
   const charColors: string[] = (() => {
     if (!input || !current) return [];
-    const norm = (c: string) => c.toLowerCase().replace(/\s/g, '');
+    const norm = (c: string) => c.toLowerCase();
     const nTarget = norm(current.text);
     const colors: string[] = [];
     let targetIdx = 0;

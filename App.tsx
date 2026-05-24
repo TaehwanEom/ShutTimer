@@ -1,7 +1,7 @@
 import './src/i18n';
 import { useTranslation } from 'react-i18next';
 import * as ExpoSplashScreen from 'expo-splash-screen';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { AppState, Platform, DeviceEventEmitter, View, Text } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
@@ -41,7 +41,7 @@ import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState, pauseRoutineFromLA, resumeRoutineFromLA, stopRoutine, advanceRoutineFromLA, syncRoutineFromSnapshot, markAwaitingConfirm } from './src/utils/routineController';
+import { restoreRoutineState, stopRoutine, advanceRoutineFromLA, syncRoutineFromSnapshot } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal, readRoutineSnapshot } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
@@ -53,10 +53,20 @@ import {
   disableOnceAlarmIfNeeded,
   recordAlarmSession,
   cleanupGhostAlarms,
+  migrateSoundRename,
   ALARM_CHAIN_MAX_INDEX,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 import { recordInstallDateIfNeeded } from './src/utils/storeReview';
+// v2.0 P3.6 — Session 모델 ⑨ guard 결합. additive 변경 (기존 흐름 차단 X).
+import {
+  bootstrapEffectRunner,
+  isGhostAlarmFire,
+  cleanupDisabledEntityChains,
+  SESSION_EVENT_NAVIGATE,
+} from './src/state/effectRunner';
+import { onAlarmFire, onLAControlSignal, onAppActive } from './src/state/ActionDispatcher';
+import { migrateLegacyToSession } from './src/state/SessionStore';
 /*
   ═══════════════════════════════════════════════════════════
    @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
@@ -343,6 +353,28 @@ function AppNavigator() {
         }
       }
       if (!meta) return;
+      // v2.0 영역 B — Session dispatch 흡수. alarm_main 측 navigate + ⑨ guard 모두 dispatch 가 처리.
+      //   confirm_prompt / prealert 는 옛 흐름 유지 (영역 D 미흡수).
+      //   ghost=true 시 옛 흐름 즉시 종료 (silent native cleanup 완료).
+      if (meta.type === 'alarm_main' || meta.type === 'confirm_prompt' || meta.type === 'prealert') {
+        const fireResult = await onAlarmFire({
+          alarmId: event.alarmId,
+          entityId: meta.entityId,
+          alarmType: meta.type === 'alarm_main' ? 'main' : meta.type,
+        }).catch(() => ({ ghost: false }));
+        if (fireResult.ghost) return;
+      }
+      // 옵션 4 fix (2026-05-25, log02 버그 — 포그라운드 알람 무반응) — alarm_main + AppState='active' 시 SESSION_EVENT_NAVIGATE Alarm emit.
+      //   원인: suppressFlag 가드 (line 332-337) 가 포그라운드 알람 즉시 cancel → native UI X. 위반-11 fix 후 NavigateAlarmScreen effect 제거 → in-app mount path X.
+      //   옵션 2 fix (transition OnAppActive)는 background→active transition만 trigger. 이미 active 상태에서 fire = transition 없음 → 무작동.
+      //   정정: 포그라운드 알람 fire 시 직접 SESSION_EVENT_NAVIGATE Alarm emit → AlarmScreen mount.
+      if (meta.type === 'alarm_main' && AppState.currentState === 'active') {
+        Logger.warn('onAlarmStateChange-DBG', `포그라운드 알람 → SESSION_EVENT_NAVIGATE Alarm entityId=${meta.entityId}`);
+        DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, {
+          target: 'Alarm',
+          alarmEntityId: meta.entityId,
+        });
+      }
       if (!navigationRef.current?.isReady()) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
@@ -364,28 +396,15 @@ function AppNavigator() {
       }
 
       // v1.6+ 알람 entity 측 발화 분기 (= type='alarm_main').
+      // v2.0 영역 B — ⑨ guard + navigate 는 dispatch 가 처리 (위 onAlarmFire). 본 분기는 부수 작업만.
       if (meta.type === 'alarm_main') {
         // sessions 기록 (= 결정 6-B, icon='alarm' 고정)
         await recordAlarmSession().catch(() => {});
-        // v1.8 #AlarmChainEager — chain 전체는 scheduleAlarmMain 측 등록 시점에 미리 예약됨.
-        //   listener 측 추가 schedule ❌ (= 잠금 상태 앱 suspend 시 listener 미발화 → lazy chain 끊김 회귀 차단).
-        //   사용자 dismiss 경로 = cancelAlarmsForEntity → entityId 묶음 일괄 cancel + once disable.
-        //   마지막 chain (chainIndex >= 49) 발화 시 = 'once' 알람 자동 disable.
+        // v1.8 #AlarmChainEager — chain 마지막 (chainIndex >= max) 발화 시 'once' 알람 자동 disable.
         const curIdx = meta.chainIndex ?? 0;
         if (curIdx >= ALARM_CHAIN_MAX_INDEX) {
           await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
         }
-        if (currentRoute === 'Alarm') return;
-        // v1.8 #AlarmChainRevive — background AlarmScreen mount 차단 (= 잠금 그대로 두면 30초 missionDuration
-        //   만료 → cancelAlarmsForEntity → chain 일괄 cancel 회귀). 사용자 잠금 해제 후 앱 진입 시점은
-        //   cold-start path (= 본 file 아래 alerting alarm lookup useEffect) 가 잡아 navigate.
-        if (AppState.currentState === 'background') return;
-        // 알람별 dismissMethod + soundKey lookup → navigate params 전달.
-        Logger.warn('NAV-DBG-COLD', `onAlarmState-alarm_main navigate Alarm currentRoute=${currentRoute} entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
-        navigationRef.current?.navigate('Alarm', {
-          endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
-          alarmEntityId: meta.entityId,
-        });
         return;
       }
 
@@ -393,24 +412,13 @@ function AppNavigator() {
         // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거.
         // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입 → "다음 진행" 버튼 표시.
         Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
-        // v1.7 hotfix #6 — ar.awaitingConfirm=true 동기 갱신.
-        await markAwaitingConfirm(meta.entityId).catch(() => {});
-        // v1.7 hotfix #LastStepDirectNavigate — 마지막 step 측 = AlarmScreen navigate 직접.
-        // listener 측 navigate('RoutineList') / ('AlarmTab') 측 = 마지막 step 측 = 시각 race
-        // (= RoutineList → AlarmScreen 잠깐 표시) 회피.
-        const snap = readRoutineSnapshot();
-        if (snap && snap.routineId === meta.entityId && snap.currentStepIndex + 1 >= snap.totalSteps) {
-          if (currentRoute !== 'Alarm') {
-            const lastRoutines = await loadRoutines();
-            const lastR = lastRoutines.find(x => x.id === meta.entityId);
-            navigationRef.current?.navigate('Alarm', {
-              fromRoutine: 'last_step',
-              routineId: meta.entityId,
-              endMethod: lastR?.endMethod ?? 'tap',
-            });
-          }
-          return;
-        }
+        // v2.0 P2-3 — markAwaitingConfirm 호출 폐기 (dual SoT 해소).
+        //   transition OnAlarmFire confirm_prompt 측 effect (SaveActiveRoutine + EmitEvent 'routineAwaitingConfirmExternally') 가 통합 처리.
+        // 옵션 A fix (정식 사이클 §3-B 7번, 2026-05-25 사용자 요구) — lastStep confirm_prompt fire 자동 navigate 제거.
+        //   옛 동작: 마지막 step alarm fire 시 자동 navigate AlarmScreen (= 사용자 입력 X) → 종료방식 화면 자동 진입.
+        //   정식 사이클 §3-B 7번: "마지막 루틴 후 사용자 행위 → 종료방식 스크린". 사용자 입력 trigger 필수.
+        //   정정: confirm_prompt fire 시점 자동 navigate X. 사용자 잠금 해제 (= OpenAppDismissIntent perform) 시점에 종료방식 진입.
+        //   진입 trigger 위치: ActionDispatcher.onLAControlSignal('open_app_dismiss') lastStep 분기 (A-2 fix).
         // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
         if (currentRoute === 'RoutineAlarm' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab') return;
@@ -441,77 +449,103 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
-  // v1.6 T1 — 콜드스타트 시 AlarmKit alerting 알람 조회 (앱 kill 후 알람 발화 case)
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (!navigationRef.current?.isReady()) return;
-      try {
-        const alarms = await AlarmkitBridge.listAlarms();
-        const alerting = alarms.find(a => a.state === 'alerting');
-        if (!alerting) return;
-        const meta = await loadAlarmMetadata(alerting.id);
-        if (!meta) return;
-        const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
-        // 다른 알림 핸들러가 이미 navigate 했으면 skip
-        if ((currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
+  // v1.6 T1 / v1.8 FIX-④ — alerting 알람 조회 + navigate.
+  //   호출 시점:
+  //     (1) 콜드 스타트 1.5초 뒤 (= 앱 kill 후 알람 발화 case)
+  //     (2) AppState 'background → active' 전환 시 (= 백그라운드 발화 → 배너 탭으로 진입 case)
+  //   직전 (1)만 있어서 — 백그라운드 알람 발화 후 배너 탭으로 active 진입 시 다음 체인 멤버(최대 2분)
+  //   까지 AlarmScreen 미마운트. 이때 onAlarmStateChange listener 는 'background return' 가드로 skip.
+  const runAlertingAlarmCheck = useCallback(async () => {
+    if (!navigationRef.current?.isReady()) return;
+    // v1.8 FIX-⑥ #SplashGate — Splash 상태에서 navigate 시 Splash→Home 전환 중 pop 회귀 차단. 최대 5초 polling.
+    for (let i = 0; i < 50; i++) {
+      const curRoute = navigationRef.current?.getCurrentRoute()?.name;
+      if (curRoute !== 'Splash') break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    try {
+      const alarms = await AlarmkitBridge.listAlarms();
+      const alerting = alarms.find(a => a.state === 'alerting');
+      if (!alerting) return;
+      const meta = await loadAlarmMetadata(alerting.id);
+      if (!meta) return;
+      const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
+      // 다른 알림 핸들러가 이미 navigate 했으면 skip
+      if ((currentRoute as string) === 'RoutineTab' || currentRoute === 'RoutineAlarm' || currentRoute === 'Alarm') return;
 
-        if (meta.type === 'chain') {
-          // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). cold-start 잔존 mapping silent cleanup.
-          await deleteAlarmMetadata(alerting.id);
-          return;
-        }
-        if (meta.type === 'timer_main') {
-          // v1.6 Phase 9: cold-start 시 fire 된 timer_main 알람
-          // v1.6 hotfix — deleteAlarmMetadata 호출 제거. AlarmScreen 가 cleanup 책임 통합.
-          Logger.warn('NAV-DBG-COLD', `coldStart-timer_main navigate Alarm alarmId=${alerting.id}`);
-          navigationRef.current?.navigate('Alarm');
-          return;
-        }
-        // v1.6+ cold-start 시 fire 된 알람 entity (= type='alarm_main').
-        if (meta.type === 'alarm_main') {
-          await recordAlarmSession().catch(() => {});
-          // v1.8 — chain 정책 폐기. cold-start 측도 동일 흐름 (= 'once' 측만 자동 disable).
-          await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
-          Logger.warn('NAV-DBG-COLD', `coldStart-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
-          // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
-          navigationRef.current?.navigate('Alarm', {
-            endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
-            alarmEntityId: meta.entityId,
-          });
-          return;
-        }
-        if (meta.type === 'confirm_prompt') {
-          // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거 (AlarmKit 자동 처리).
-          // v1.7 hotfix #6 — cold-start 측 동일 ar 동기 갱신.
-          await markAwaitingConfirm(meta.entityId).catch(() => {});
-          // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (nested = tab bar 보존).
-          const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-          const routines = await loadRoutines();
-          const r = routines.find(x => x.id === meta.entityId);
-          if (!r) {
-            if (isAdhoc) {
-              navigationRef.current?.reset({
-                index: 0,
-                routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
-              });
-            } else {
-              Logger.warn('NAV-DBG', `reset target=RoutineTab source=cold-start-1.5s/listAlarms-confirm_prompt-noRoutine`);
-              navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
-            }
-            return;
-          }
-          // v1.6 A-1 — 모달 통일. 일반 routine = RoutineList. (v1.7 Phase 2-B — ad-hoc = AlarmTab nested)
+      if (meta.type === 'chain') {
+        // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). 잔존 mapping silent cleanup.
+        await deleteAlarmMetadata(alerting.id);
+        return;
+      }
+      if (meta.type === 'timer_main') {
+        Logger.warn('NAV-DBG-COLD', `alertingCheck-timer_main navigate Alarm alarmId=${alerting.id}`);
+        navigationRef.current?.navigate('Alarm');
+        return;
+      }
+      if (meta.type === 'alarm_main') {
+        await recordAlarmSession().catch(() => {});
+        await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
+        Logger.warn('NAV-DBG-COLD', `alertingCheck-alarm_main navigate Alarm entityId=${meta.entityId} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
+        navigationRef.current?.navigate('Alarm', {
+          endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
+          alarmEntityId: meta.entityId,
+        });
+        return;
+      }
+      if (meta.type === 'confirm_prompt') {
+        // v2.0 P2-3 — markAwaitingConfirm 호출 폐기. dispatch OnAlarmFire(confirm_prompt) 측 통합.
+        //   cold-start 측 잔존 alerting 검증 path → onAlarmStateChange listener 부착 후 state 변경 X case 안전망.
+        await onAlarmFire({
+          alarmId: alerting.id,
+          entityId: meta.entityId,
+          alarmType: 'confirm_prompt',
+        }).catch(() => ({ ghost: false }));
+        const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
+        const routines = await loadRoutines();
+        const r = routines.find(x => x.id === meta.entityId);
+        if (!r) {
           if (isAdhoc) {
-            (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+            navigationRef.current?.reset({
+              index: 0,
+              routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
+            });
           } else {
-            Logger.warn('NAV-DBG', `navigate target=RoutineTab source=cold-start-1.5s/listAlarms-confirm_prompt-routine`);
-            (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
+            Logger.warn('NAV-DBG', `reset target=RoutineTab source=alertingCheck-confirm_prompt-noRoutine`);
+            navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
           }
+          return;
         }
-      } catch {}
-    }, 1500);
-    return () => clearTimeout(timer);
+        if (isAdhoc) {
+          (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+        } else {
+          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=alertingCheck-confirm_prompt-routine`);
+          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
+        }
+      }
+    } catch {}
   }, []);
+
+  // 콜드 스타트 1.5초 뒤 1회 체크.
+  useEffect(() => {
+    const timer = setTimeout(runAlertingAlarmCheck, 1500);
+    return () => clearTimeout(timer);
+  }, [runAlertingAlarmCheck]);
+
+  // v1.8 FIX-④ — AppState 'active' 전환 시 alerting 알람 즉시 체크 + navigate.
+  //   백그라운드 알람 발화 → 배너 탭/앱 진입 시 AlarmScreen 즉시 마운트 (= 다음 체인 멤버 2분 대기 회귀 차단).
+  // 옵션 2 fix 보완 (2026-05-25) — onAppActive dispatch 추가.
+  //   사용자 자발 앱 진입 (= background → active transition) 시 dispatch OnAppActive 호출 → transition OnAppActive 측 STEP_ALERTING + alarmBinding 시 NavigateAlarmScreen effect 발동 → AlarmScreen mount + chain 회수.
+  //   기존엔 cold start 시 restoreRoutineState → dispatch OnAppActive만 호출 → background → active transition 시 호출 X → 옵션 2 fix 무작동 회귀.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        onAppActive().catch(() => {});
+        runAlertingAlarmCheck();
+      }
+    });
+    return () => sub.remove();
+  }, [runAlertingAlarmCheck]);
 
   // v1.8 #PollingThrottle — 30초 디버그 polling 폐기 (= CPU 영역 ↓, 사용자분 측 측정 ❌ 영역).
   //   직전 v1.7 hotfix #26 = 30s 주기 listAlarms + console.warn → 디버그 추적용. production 측 측정 ❌ 영역.
@@ -562,170 +596,37 @@ function AppNavigator() {
           // 사용자 명시 누름 vs 시스템 자동 dismiss 구분 ❌ 영역. routine 정지 ❌가 사용자 의도.
           // → stopRoutine() 호출 ❌. navigate 만 + routine 진행 보존. 명시적 정지는 위젯 ✕ 또는 휴지통.
           if (signal.action === 'open_app_dismiss') {
-            // v1.7 hotfix #DBG-LA — open_app_dismiss signal 진입 (= 이중 이동 / 종료 ❌ root cause 추적용).
-            Logger.warn('LAControl-DBG', `open_app_dismiss 분기 진입 routineId=${signal.routineId}`);
-            // v1.7 hotfix #16 — AlarmScreen mount race 회귀 차단.
-            // 알람 entity banner 터치 시 stopIntent (OpenAppDismissIntent) perform → signal 작성 →
-            // polling 처리 시점 = AlarmScreen mount 진행 중 = currentRoute='Home' → 가드 통과 →
-            // navigate('RoutineList'/'AlarmTab') 강제 호출 → AlarmScreen 잠깐 표시 후 강제 전환.
-            // fix: isAlarmActive AsyncStorage 검사 + 200ms 지연 후 currentRoute 재확인.
-            const isAlarmActiveRaw = await AsyncStorage.getItem('isAlarmActive');
-            Logger.warn('LAControl-DBG', `isAlarmActive=${isAlarmActiveRaw}`);
-            if (isAlarmActiveRaw === 'true') {
-              Logger.warn('LAControl-DBG', 'isAlarmActive=true → return');
-              return;
-            }
-
-            // v1.7 hotfix #33 — adhoc + awaitingConfirm 측 = setTimeout 200ms 우회 (= 즉시 stopRoutine).
-            // 본 영역 = AlarmScreen mount 영역 ❌ (= AlarmTab 측 모달 영역만) → setTimeout race 회피 영역 영역 ❌.
-            // 200ms 단축 + AppState change wake-up + stopRoutine 영역 = 사용자분 측 체감 딜레이 영역 단축.
-            const arRawFast = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
-            let arParsedFast: any = null;
-            try { arParsedFast = arRawFast ? JSON.parse(arRawFast) : null; } catch {}
-            const isAdhocFast = isAdhocAlarmRoutine(signal.routineId);
-            const routeNameFast = navigationRef.current?.getCurrentRoute()?.name;
-            Logger.warn('LAControl-DBG', `fast 분기 검사 awaitingConfirm=${arParsedFast?.awaitingConfirm} isAdhoc=${isAdhocFast} route=${routeNameFast} navReady=${navigationRef.current?.isReady()}`);
-            if (arParsedFast?.awaitingConfirm === true && navigationRef.current?.isReady()) {
-              Logger.warn('LAControl-DBG', 'fast 분기 진입 → stopRoutine 호출');
-              await stopRoutine().catch(() => {});
-              // v1.7 hotfix O1 — routineClearedExternally emit (= RoutineList / AlarmList / ActiveRoutineSection listener trigger).
-              // 패턴 정합 = "stop" signal 측 (= L757 영역) + HomeScreen 측 = stopRoutine + emit 영역.
-              // 직전 = emit ❌ → listener trigger ❌ → UI 갱신 ❌ → 사용자분 측 "중단 ❌" 회귀 영역.
-              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
-              const routeFast = navigationRef.current.getCurrentRoute()?.name;
-              Logger.warn('LAControl-DBG', `fast stopRoutine + emit OK route=${routeFast} isAdhoc=${isAdhocFast}`);
-              if (isAdhocFast) {
-                if (routeFast !== 'Alarm' && (routeFast as string) !== 'AlarmTab') {
-                  Logger.warn('LAControl-DBG', `fast adhoc navigate AlarmTab (route=${routeFast})`);
-                  (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
-                } else {
-                  Logger.warn('LAControl-DBG', `fast adhoc navigate skip (route=${routeFast})`);
-                }
-              } else {
-                // v1.7 hotfix #routine-tab-unify Phase 2 — 단일 변환. fast 분기 측 'open_app_dismiss' non-adhoc 영역.
-                // Bottom Tab 'RoutineTab' 단일 진입 경로 통합 영역 (= 사용자분 측 = "또다른 루틴 페이지" 정합).
-                // 본 commit = 본 1줄만 변환. 다른 navigate 측 = 다음 phase 영역.
-                if ((routeFast as string) !== 'RoutineTab') {
-                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate RoutineTab (route=${routeFast})`);
-                  (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-                } else {
-                  Logger.warn('LAControl-DBG', `fast non-adhoc navigate skip (route=${routeFast})`);
-                }
-              }
-              return;
-            }
-
-            Logger.warn('LAControl-DBG', 'fast 분기 skip → setTimeout 200ms 진입');
-            await new Promise(resolve => setTimeout(resolve, 200));
-            if (navigationRef.current?.isReady()) {
-              // v1.7 hotfix #22 — alarm entity 측 = AlarmScreen navigate (= 베너 터치 무반응 정정).
-              // OpenAppDismissIntent.perform 측 routineId = alarm.id (= alarmScheduler.ts entityId).
-              // 일반 routine 분기 진입 전 = alarms lookup → 매칭 시 AlarmScreen navigate.
-              const alarms = await loadAlarms();
-              const alarmEntity = alarms.find(x => x.id === signal.routineId);
-              if (alarmEntity) {
-                // v1.8 #AlarmRepeat 제거 — 밀어서 중지 시 체인 일괄 cancel 삭제.
-                //   체인은 미션 완료할 때까지 살아남아야 한다 (= 미션 유도 장치). cancel은 미션 완료
-                //   경로(AlarmScreen.stopAudioAndVibration)에만 존재. 여기선 navigate만.
-                //   plan: docs/plan-2026-05-22-ios-slide-stop-chain-cancel-fix.md (FIX-2026-05-22-slide-stop-cancel)
-                const route = navigationRef.current.getCurrentRoute()?.name;
-                if (route !== 'Alarm') {
-                  Logger.warn('NAV-DBG-COLD', `polling-standard navigate Alarm route=${route} entityId=${alarmEntity.id} endMethod=${getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod}`);
-                  // v1.7 hotfix #SoundMismatch — alarmSoundKey 측 폐기.
-                  navigationRef.current.navigate('Alarm', {
-                    endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
-                    alarmEntityId: alarmEntity.id,
-                  } as never);
-                }
-                return;
-              }
-              const isAdhoc = isAdhocAlarmRoutine(signal.routineId);
-              const route = navigationRef.current.getCurrentRoute()?.name;
-              // v1.7 hotfix #31 — confirm_prompt alerting 시 밀어서 종료 (= Slide to Stop) = routine 정지 의도.
-              // ar.awaitingConfirm === true 시 = stopRoutine 호출 + navigate (= 정지 화면).
-              // false 시 = 기존 흐름 (= 일반 step alerting 측 진행 보존).
-              // v1.7 hotfix — b967967 측 추측 회귀 정정 (= "위로 밀어 잠금 해제 = OpenAppDismiss" 가정 ❌).
-              // 정공 = OpenAppDismissIntent perform = "밀어서 종료 (Slide to Stop)" 측만 호출 = 사용자 명시 정지 의도.
-              // adhoc + non-adhoc 모두 = stopRoutine 영역. navigate 영역만 분기 (= adhoc → AlarmTab / non-adhoc → RoutineList).
-              const arRaw2 = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
-              let arParsed: any = null;
-              try { arParsed = arRaw2 ? JSON.parse(arRaw2) : null; } catch {}
-              Logger.warn('LAControl-DBG', `standard 분기 검사 awaitingConfirm=${arParsed?.awaitingConfirm} isAdhoc=${isAdhoc} route=${route}`);
-              if (arParsed?.awaitingConfirm === true) {
-                Logger.warn('LAControl-DBG', 'standard 분기 진입 → stopRoutine 호출');
-                await stopRoutine().catch(() => {});
-                // v1.7 hotfix O1 — routineClearedExternally emit (= 패턴 정합 영역).
-                DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
-                Logger.warn('LAControl-DBG', `standard stopRoutine + emit OK route=${route} isAdhoc=${isAdhoc}`);
-                if (isAdhoc) {
-                  if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
-                    Logger.warn('LAControl-DBG', `standard adhoc navigate AlarmTab (route=${route})`);
-                    (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
-                  } else {
-                    Logger.warn('LAControl-DBG', `standard adhoc navigate skip (route=${route})`);
-                  }
-                } else {
-                  if ((route as string) !== 'RoutineTab') {
-                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate RoutineTab (route=${route})`);
-                    Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-stopRoutine currentRoute=${route}`);
-                    (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-                  } else {
-                    Logger.warn('LAControl-DBG', `standard non-adhoc navigate skip (route=${route})`);
-                  }
-                }
-                return;
-              }
-              // v1.7 hotfix #2 — AlarmScreen 활성 시 (= 사용자 정상 dismiss flow 진행 중)
-              // navigate trigger 차단. cancelAlarm 측 stop 호출이 stopIntent perform 영역 측
-              // 'open_app_dismiss' signal 발생 → 종료 스크린 직후 강제 전환 회귀 차단.
-              if (isAdhoc) {
-                if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
-                  (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
-                }
-              } else {
-                if (route !== 'Alarm' && (route as string) !== 'RoutineTab') {
-                  Logger.warn('NAV-DBG', `navigate target=RoutineTab source=la-control/open_app_dismiss-standard-default currentRoute=${route}`);
-                  (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-                }
+            // v2.0 영역 C — 옛 fast/standard 5분기 + isAlarmActive 가드 + SplashGate 모두 ActionDispatcher 흡수.
+            //   비즈니스 로직 (awaitingConfirm/alarm_main/ad-hoc) → onLAControlSignal. navigate 측 SplashGate 는 SESSION_EVENT_NAVIGATE listener 측.
+            await onLAControlSignal({
+              action: 'open_app_dismiss',
+              routineId: signal.routineId,
+              timestamp: signal.timestamp,
+            });
+          }
+          // v2.0 영역 F — pause/resume/stop/advance/advance_done 모두 ActionDispatcher 흡수.
+          //   옛 함수 호출 + emit + dispatch 모두 onLAControlSignal 안에서 처리.
+          else if (
+            signal.action === 'pause' ||
+            signal.action === 'resume' ||
+            signal.action === 'stop' ||
+            signal.action === 'advance' ||
+            signal.action === 'advance_done'
+          ) {
+            // M0 진단 보존 — advance_done caller 추적 로그.
+            if (signal.action === 'advance_done') {
+              try {
+                const snap = readRoutineSnapshot();
+                Logger.warn('LAControl-DBG', `advance_done 진입 routineId=${signal.routineId} AppState=${AppState.currentState} route=${navigationRef.current?.getCurrentRoute()?.name} snapshot=${JSON.stringify(snap)}`);
+              } catch (e) {
+                Logger.warn('LAControl-DBG', `advance_done snapshot read fail err=${String(e)}`);
               }
             }
-          }
-          else if (signal.action === 'pause') {
-            // v1.6 #4-B Fix 2 — emit try/finally 분리. pauseRoutineFromLA throw 시에도 emit 보장 (UI 동기화).
-            try {
-              await pauseRoutineFromLA(signal.timestamp);
-            } finally {
-              DeviceEventEmitter.emit('routinePausedExternally', { routineId: signal.routineId, timestamp: signal.timestamp });
-            }
-          }
-          else if (signal.action === 'resume') {
-            try {
-              await resumeRoutineFromLA(signal.timestamp);
-            } finally {
-              DeviceEventEmitter.emit('routineResumedExternally', { routineId: signal.routineId, timestamp: signal.timestamp });
-            }
-          }
-          else if (signal.action === 'stop') {
-            // v1.6 Phase 12 — 위젯 ✕ stop 시 RoutineListScreen 의 activeManualRoutineId 정리 트리거.
-            // (onClose 콜백은 JS 내부 stop 에서만 호출 → 외부 stop 경로 별도 emit 필요)
-            try {
-              await stopRoutine();
-            } finally {
-              DeviceEventEmitter.emit('routineClearedExternally', { routineId: signal.routineId });
-            }
-          }
-          // v1.6 hotfix — AdvanceNextStepIntent.perform() native 처리 완료 신호.
-          // native 가 alarm stop + 다음 step schedule + snapshot 갱신 완료 → RN 은 ar/LA 동기화만.
-          else if (signal.action === 'advance_done') {
-            await syncRoutineFromSnapshot(signal.routineId);
-            // 앱 active 시 ActiveRoutineSection modal 자동 dismiss + 사운드 stop
-            DeviceEventEmitter.emit('routineAdvancedExternally', { routineId: signal.routineId });
-          }
-          // v1.6 Phase 12 — 위젯 "다음 진행" Button (AdvanceNextStepIntent) perform 후 routine advance
-          // (native 처리 fallback 또는 iOS<26 경로).
-          else if (signal.action === 'advance') {
-            await advanceRoutineFromLA(signal.routineId);
-            DeviceEventEmitter.emit('routineAdvancedExternally', { routineId: signal.routineId });
+            await onLAControlSignal({
+              action: signal.action,
+              routineId: signal.routineId,
+              timestamp: signal.timestamp,
+            });
           }
         }
       } catch (e) {
@@ -750,7 +651,67 @@ function AppNavigator() {
   }, []);
 
   // v1.6: 앱 기동 시 루틴 알림 rolling 재동기화 + ActiveRoutine 자동 복원
+  // v2.0 영역 B+C — Session NavigateAlarmScreen / Tab navigate effect → 실 navigate 위임.
+  //   옛 onAlarmStateChange / open_app_dismiss handler 의 직접 navigate 제거 + 본 listener 가 대체.
+  //   가드: currentRoute='Alarm' 시 중복 차단, AppState='background' 시 mount 차단, Splash 시 polling.
   useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(SESSION_EVENT_NAVIGATE, async (payload: { target: string; alarmEntityId?: string; fromRoutine?: string; routineId?: string; endMethod?: string }) => {
+      if (!navigationRef.current?.isReady()) return;
+
+      if (payload.target === 'Alarm') {
+        // 옛 setTimeout 200ms + SplashGate polling (FIX-⑥) 흡수.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        for (let i = 0; i < 50; i++) {
+          const curRoute = navigationRef.current?.getCurrentRoute()?.name;
+          if (curRoute !== 'Splash') break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        Logger.warn('LAControl-DBG', `SESSION_EVENT_NAVIGATE Alarm SplashGate 종료 route=${navigationRef.current?.getCurrentRoute()?.name}`);
+
+        const route = navigationRef.current?.getCurrentRoute()?.name;
+        if (route === 'Alarm') return; // 중복 차단
+        // v2.0 P0-C R-1 fix — AppState='background' 가드 제거 (옛 시스템 정합).
+        //   log02 측 5번 alarm fire 중 1번만 mount 회귀 (사용자 메모 "종료 미션 안나옴").
+        //   원인: LA Intent perform 측 AppState transition delay → 가드 측 navigate skip.
+        //   옛 listener 측 alarm_main 분기 = 가드 0 + navigate 직접 호출 → background 측에서도 navigate OK.
+        //   본 fix = 옛 동작 정합. navigate 호출 후 사용자 active 진입 시 화면 표시.
+
+        // 옵션 A fix (2026-05-25) — lastStep payload 측 fromRoutine + routineId + endMethod 처리.
+        //   payload.endMethod 우선 (routine.endMethod), 미제공 시 settings cache → default.
+        const resolvedEndMethod = payload.endMethod ?? getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod;
+        Logger.warn('NAV-DBG-COLD', `SESSION_EVENT_NAVIGATE Alarm alarmEntityId=${payload.alarmEntityId} endMethod=${resolvedEndMethod} fromRoutine=${payload.fromRoutine ?? '(none)'} routineId=${payload.routineId ?? '(none)'}`);
+        navigationRef.current?.navigate('Alarm', {
+          endMethod: resolvedEndMethod,
+          alarmEntityId: payload.alarmEntityId,
+          fromRoutine: payload.fromRoutine,
+          routineId: payload.routineId,
+        } as never);
+      } else if (payload.target === 'AlarmTab') {
+        const route = navigationRef.current?.getCurrentRoute()?.name;
+        if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
+          (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
+        }
+      } else if (payload.target === 'RoutineTab') {
+        const route = navigationRef.current?.getCurrentRoute()?.name;
+        if (route !== 'Alarm' && (route as string) !== 'RoutineTab') {
+          Logger.warn('NAV-DBG', `SESSION_EVENT_NAVIGATE RoutineTab route=${route}`);
+          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
+        }
+      } else if (payload.target === 'Home') {
+        navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    // v2.0 P3.6 — Session 모델 effect runner 부트스트랩. 1회성 가드 내장.
+    bootstrapEffectRunner();
+    // v2.0 J — 옛 keys (shuttimer_active_routine / activeTimer / isRoutineActive) → Session 1회성 복원.
+    //   flag (@shuttimer/session_migration_v1) 가드 → 첫 cold-start 만 실행. 옛 ar 보존 (rollback 안전).
+    migrateLegacyToSession()
+      .then((r) => Logger.info('AppNavigator', `migrateLegacyToSession result=${JSON.stringify(r)}`))
+      .catch((e) => Logger.warn('AppNavigator', `migrateLegacyToSession failed: ${String(e)}`));
     syncRollingSchedule().catch((e) => {
       Logger.warn('AppNavigator', `syncRollingSchedule failed: ${e}`);
     });
@@ -758,8 +719,15 @@ function AppNavigator() {
     // v1.7 hotfix #GhostAlarmCleanup — syncAllAlarms 후 = framework 측 mapping table 측 등록 ❌ 유령 알람 cleanup. 순차 호출 (= race 회피).
     (async () => {
       try {
+        // v1.8 #SoundRenameMigration — 사운드 리네임 회귀 1회성 정정. syncAllAlarms 앞에서 실행
+        //   → 옛 체인 재등록 후 syncAllAlarms 가 fresh 체인을 live 로 인식해 skip.
+        await migrateSoundRename();
         await syncAllAlarms();
         await cleanupGhostAlarms();
+        // v2.0 P3.6 ⑨ guard — disabled alarm entity 의 chain 잔존 정리 (cleanupGhostAlarms 가 못 잡는 영역).
+        //   cleanupGhostAlarms = framework 측 ≠ mapping 측 ghost 만 정리. enabled=false alarm 의 정상 mapping 은 별건.
+        //   본 호출 = enabled=false alarm 의 alarm_main chain 전체 mapping + native cancel.
+        await cleanupDisabledEntityChains();
       } catch (e) {
         Logger.warn('AppNavigator', `syncAllAlarms / cleanupGhostAlarms failed: ${String(e)}`);
       }

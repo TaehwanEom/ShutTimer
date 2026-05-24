@@ -29,9 +29,14 @@ import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
-import { cancelAlarmsForEntity, recordAlarmSession, scheduleAlarmMain } from '../utils/alarmScheduler';
-import { stopRoutine, confirmAndAdvance, restorePendingDisabledAlarms } from '../utils/routineController';
+import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
+import { stopRoutine, restorePendingDisabledAlarms } from '../utils/routineController';
 import { Logger } from '../utils/logger';
+import { dispatchDismiss } from '../state/ActionDispatcher';
+// v2.0 R-7 fix — Session.state 측 외부 Stop trigger 측 자동 reset
+import { useSession } from '../state/useSession';
+import { getCurrentSession } from '../state/SessionController';
+import { Session } from '../types/session';
 import { loadAlarms } from '../constants/alarms';
 import { loadActiveRoutine } from '../constants/routines';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
@@ -150,13 +155,7 @@ const SHAKE_THRESHOLD = 1.8;
 const SHAKE_COUNT_REQUIRED = 3;
 const SHAKE_COOLDOWN_MS = 500;
 // v1.5: camera 미션은 사용자 설정 타이머 × 2회로 관리되므로 제거. tap/shake만 기존 5분 유지.
-// tap/shake 측만 5분 자동 종료 (= 사용자가 안 끄면 5분 후 silent 종료).
-// math/typing = missionDuration 카운트다운 + 만료 시 즉시 fail (= 별도 useEffect 처리, 본 영역 ❌).
-// camera = 자체 만료 useEffect 영역 (= 재시도 1회 + 2차 만료 시 fail).
-const AUTO_DISMISS_MS: Record<string, number> = {
-  tap: 5 * 60 * 1000,
-  shake: 5 * 60 * 1000,
-};
+// 위반-5 fix (정식 사이클 §4) — AUTO_DISMISS_MS 제거. autoDismissNoResult 본체/호출 폐기로 unused.
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
 const RESULT_BG = {
   success: '#2e7d32',
@@ -274,6 +273,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // v1.7 hotfix #DBG-C — stopAudioAndVibration 진입 (= dismiss 시점 + AlarmKit cleanup 결과 추적용).
     // Logger.warn (= AsyncStorage 영역 → 설정 측 "로그 공유" 측 조회 영역. TestFlight console 미라우팅 회피).
     Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration 진입 AppState=${AppState.currentState}`);
+    // v2.0 P2-2 재검토 — C-1 simple_alarm kind 통합 후 dismissedRef 가드 제거 (옛 무조건 호출 복원).
+    //   이유: simple_alarm Session 측 STEP_ALERTING 진입 후 미션 완료 시 stopAudioAndVibration 호출 = dismissedRef.current=false 시점 (goHome 측 true 설정 전).
+    //   dismissedRef 가드 시 dispatch skip → transition Dismiss 측 STEP_ALERTING 처리 X → ShowInterstitialAd / Advance effect 미실행 → 미션 완료 흐름 회귀.
+    //   가드 제거 + transition Dismiss 측 STEP_ALERTING 가드 (state !== 'STEP_ALERTING' return) 측 무력 호출 차단 (효율만 손해).
+    dispatchDismiss('success').catch(() => {});
     Vibration.cancel();
     // v1.5: Vibration interval도 함께 정리 (dismiss 시 진동 재시작 방지)
     if (vibrationIntervalRef.current) {
@@ -299,13 +303,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (alarmEntityIdParam) {
         Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration chain cancel entityId=${alarmEntityIdParam}`);
         await cancelAlarmsForEntity(alarmEntityIdParam).catch(() => {});
-        // v1.8 #ChainRearm — 미션 완료 cancel 직후 daily/weekly 체인 재무장.
-        //   cancelAlarmsForEntity가 .relative 반복까지 제거하므로 다음 발화분을 즉시 재예약.
-        //   once는 cancelAlarmsForEntity 내부 disableOnceAlarmIfNeeded로 enabled=false → scheduleAlarmMain no-op.
-        const rearmTarget = (await loadAlarms()).find(a => a.id === alarmEntityIdParam);
-        if (rearmTarget) {
-          await scheduleAlarmMain(rearmTarget).catch(() => {});
-        }
       }
       // v1.6 후속 hotfix — 시스템 측 잔존 alerting 알람 cleanup (= mapping table 측 ❌ 영역).
       // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).
@@ -325,9 +322,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
     } catch (e) {
       Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration outer throw=${String(e)}`);
     }
-    // v1.7 hotfix Phase 13 G4-B — expo-notifications 측 cancel/dismiss 폐기 (= AlarmKit only).
-    // AlarmScreen 비활성 플래그 먼저 제거 (App.tsx listener가 즉시 navigate 차단 해제)
-    await AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+    // v2.0 C-4 — 옛 isAlarmActive AsyncStorage 측 remove 폐기.
+    //   Session.state 측 동기 check (LAControl signal open_app_dismiss 측 STEP_ALERTING 가드 = 등가).
     const s = soundRef.current;
     soundRef.current = null;
     if (s) {
@@ -364,15 +360,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }).catch(() => {});
   }, [navigation, route.params]);
 
-  // AlarmScreen 마운트 즉시 isAlarmActive 플래그 설정 (사운드 로드보다 먼저)
-  // 언마운트 시 플래그 확실히 제거 (비정상 종료 복구)
+  // v2.0 C-4 — isAlarmActive AsyncStorage 측 mount/unmount write 폐기.
+  //   Session.state === 'STEP_ALERTING' 측 동기 check (C-1 simple_alarm Session 통합 후 transition 측 갱신).
   useEffect(() => {
     // v1.7 hotfix #DBG-C — mount 시점 + route.params 영역 (= AlarmScreen 1초 사라짐 root cause 추적용).
     // v1.7 hotfix #DBG-Remount — 사용자 보고 "광고 도중 갑자기 알람" root cause 추적용. mount stack trace 추가.
     const stack = new Error().stack;
     const stackTop = stack?.split('\n').slice(1, 6).join(' | ') ?? '(no stack)';
     Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})} stack=${stackTop}`);
-    AsyncStorage.setItem('isAlarmActive', 'true').catch(() => {});
     // v1.7 hotfix Phase 13 G4-B — expo banner dismiss 폐기 (= AlarmKit only).
     // v1.7 hotfix #BannerDismissOnActive — AppState=active 진입 시점 측만 stopAlarm 호출 (= 사용자분 측 banner 누름 + 앱 진입 시점만 dismiss).
     //   직전 (= #BannerDismissOnMount = 모든 mount 시점 호출) = 백그라운드 측 App.tsx onAlarmStateChange 측 자동 navigate 시점 측도 호출 → 알람 즉시 종료 회귀.
@@ -401,11 +396,31 @@ export default function AlarmScreen({ navigation, route }: Props) {
       }
     });
     return () => {
-      Logger.warn('AlarmScreen-DBG', 'unmount');
-      AsyncStorage.removeItem('isAlarmActive').catch(() => {});
+      // v1.8 #UnmountTrace — unmount 시점 navigation state 박아 caller 추적.
+      let routeAtUnmount = '(unknown)';
+      try {
+        const st: any = (navigation as any)?.getState?.();
+        routeAtUnmount = st?.routes?.[st.index]?.name ?? '(unknown)';
+      } catch {}
+      Logger.warn('AlarmScreen-DBG', `unmount routeAtUnmount=${routeAtUnmount}`);
+      // v2.0 C-4 — isAlarmActive AsyncStorage 측 unmount remove 폐기. Session.state 측 통합.
       appStateSub.remove();
     };
   }, []);
+
+  // v2.0 R-7 fix (C) — 외부 Stop dispatch trigger 측 자동 reset (AlarmScreen 잔존 mount 차단).
+  //   session prev=non-null → cur=null transition 측만 trigger (mount 측 초기 load null → trigger X).
+  //   사용자 "밀어서 종료" 후 잠금 잔존 + 3분 후 사용자 진입 시 mount 잔존 회귀 (R-7) 차단.
+  const { session: alarmSession } = useSession();
+  const prevSessionRef = useRef<Session | null>(null);
+  useEffect(() => {
+    if (prevSessionRef.current && !alarmSession && !dismissedRef.current) {
+      Logger.warn('AlarmScreen-R7', 'session prev=non-null → cur=null 외부 Stop trigger → 자동 reset AlarmTab');
+      dismissedRef.current = true;
+      navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }] } as any);
+    }
+    prevSessionRef.current = alarmSession;
+  }, [alarmSession, navigation]);
 
   const goHome = useCallback(async () => {
     if (dismissedRef.current) return;
@@ -434,18 +449,23 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // v1.7 hotfix #24 — 시작 위치 = 복귀 위치 규칙. alarmEntityId 있음 = AlarmTab 측 등록 알람 = AlarmTab 복귀.
     //   steps 있음 = ad-hoc routine 시작 추가 (= Phase 2-A). steps 무관 = AlarmTab reset 통일.
     //   직전 = steps 없는 단순 알람 측 fall-through → HomeTab 진입 회귀.
+    // v2.0 R-7 fix (A) — Session=null 측 = 외부 stop 처리됨 → 자동 ad-hoc routine 시작 X.
+    //   사용자 "밀어서 종료" 의도 측 Session=null + AlarmScreen 잔존 + 사용자 또 진입 시 자동 routine 시작 회귀 차단.
+    const currentSession = await getCurrentSession();
     const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
     if (alarmEntityId) {
       try {
         const alarms = await loadAlarms();
         const a = alarms.find(x => x.id === alarmEntityId);
-        if (a && a.steps && a.steps.length > 0) {
-          // v1.8 #MissionFailContinue — fail + activeRoutine 진행 중 = handleAfterAd 측 confirmAndAdvance 가 이미 schedule. 중복 차단.
-          // activeRoutine ❌ (= 알람 trigger 첫 순간 실패) → startRoutineFromAlarm 호출 → ad-hoc routine 시작 (= 다음 step 진행 흐름).
-          const arNow = await loadActiveRoutine();
-          if (!(pendingResultRef.current === 'fail' && arNow)) {
-            await startRoutineFromAlarm(a).catch(() => {});
-          }
+        if (a && a.steps && a.steps.length > 0 && currentSession) {
+          // 발견-B fix (정식 사이클 §5 정합) — fail+arNow skip 가드 제거.
+          //   옛 가정: pendingResult='fail' + arNow 있으면 handleAfterAd 측 confirmAndAdvance 가 schedule → 중복 차단.
+          //   위반-1 fix 후 (handleAfterAd 측 confirmAndAdvance 제거): schedule X → ad-hoc routine fail 시 다음 step 진행 X (멈춤 회귀).
+          //   정정: pendingResult 무관 startRoutineFromAlarm 호출. §5 "fail/success 무관 다음 단계 진행" 정합.
+          await startRoutineFromAlarm(a).catch(() => {});
+        } else if (a && a.steps && a.steps.length > 0 && !currentSession) {
+          // R-7 fix — Session=null + alarm.steps 측 자동 시작 차단. navigate AlarmTab만.
+          Logger.warn('AlarmScreen-R7', `goHome Session=null + alarm.steps=${a.steps.length} → 자동 ad-hoc routine 시작 차단 (사용자 stop 의도 정합)`);
         } else if (a) {
           // v1.8 #CalendarCategory — 일반 알람 (= step ❌) 측 dismiss 시 sessions 기록.
           await recordAlarmSession(a.label).catch(() => {});
@@ -453,6 +473,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
       } catch {
         // alarm 로드 / 시작 실패 = AlarmTab 복귀 정공 유지 (= 시작 위치 보존).
       }
+      // v1.8 #BannerTapPrematureUnmount — goHome alarmEntityId 분기 진입 추적용 (silent reset → AlarmScreen 즉시 unmount 원인 추적).
+      Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset AlarmTab alarmEntityId=${alarmEntityId} dismissMethod=${dismissMethod}`);
       navigation.reset({
         index: 0,
         routes: [{
@@ -468,23 +490,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation, route.params, dismissMethod]);
 
-  // 광고 종료 후 분기: 카메라 결과 화면 OR 홈
-  // v1.8 #MissionFailContinue — fail 시 루틴 다음 step 자동 진행 (= 사용자 부탁: 실패해도 진행, 캔슬 ❌).
-  // activeRoutine 진행 중 → confirmAndAdvance (다음 step schedule).
-  // activeRoutine ❌ + alarmEntityId 있음 → goHome 측 startRoutineFromAlarm 가 ad-hoc routine 시작 (= 첫 trigger).
-  // 마지막 step 실패 = confirmAndAdvance 내부 `nextIdx >= steps.length` 분기에서 fullCleanup → 정상 종료.
+  // 광고 종료 후 분기: 결과 화면 OR 홈
+  // 위반-1 fix (정식 사이클 정합) — fail 경로 자동 confirmAndAdvance 제거.
+  //   정식 사이클: 미션 fail/success 무관 자동 advance X. 사용자 입력(LA "다음 진행" 등)만 트리거.
+  //   옛 v1.8 #MissionFailContinue 의도 (fail 자동 진행) = 정식 사이클과 충돌 → 의도 변경.
   const handleAfterAd = useCallback(async () => {
     if (dismissedRef.current) return;
-    if (pendingResultRef.current === 'fail') {
-      try {
-        const ar = await loadActiveRoutine();
-        if (ar) {
-          await confirmAndAdvance();
-        }
-      } catch (e) {
-        Logger.warn('routine', `confirmAndAdvance fail-path err=${String(e)}`);
-      }
-    }
     if (afterAdActionRef.current === 'result' && pendingResultRef.current) {
       setResultState(pendingResultRef.current);
       if (autoResultTimeoutRef.current) clearTimeout(autoResultTimeoutRef.current);
@@ -572,31 +583,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }
   }, [stopAudioAndVibration, dismissMethod, handleAfterAd]);
 
-  const autoDismissNoResult = useCallback(async () => {
-    if (dismissedRef.current) return;
-    await stopAudioAndVibration();
-    afterAdActionRef.current = 'home';
-    // v1.7 hotfix H1 — module-level interstitialLoaded 측 검사 (= preload 영역 정합).
-    Logger.warn('Ad-DBG', `autoDismissNoResult interstitialLoaded=${interstitialLoaded} interstitial=${!!interstitial}`);
-    // v1.7 hotfix #InterstitialCooldown — AlarmScreen remount 측 광고 재호출 차단 (= module-level timestamp 가드).
-    const sinceLastShow = Date.now() - lastInterstitialShowAt;
-    if (sinceLastShow < INTERSTITIAL_COOLDOWN_MS) {
-      Logger.warn('Ad-DBG', `autoDismissNoResult SKIP cooldown (= 직전 ${sinceLastShow}ms < ${INTERSTITIAL_COOLDOWN_MS}ms) → goHome 직접`);
-      goHome();
-      return;
-    }
-    if (interstitialLoaded && interstitial) {
-      Logger.warn('Ad-DBG', 'autoDismissNoResult interstitial.show 호출');
-      lastInterstitialShowAt = Date.now();
-      interstitial.show().catch((e: any) => {
-        Logger.warn('Ad-DBG', `autoDismissNoResult show throw=${String(e)}`);
-        goHome();
-      });
-    } else {
-      Logger.warn('Ad-DBG', `autoDismissNoResult skip → goHome 직접 (= 광고 ❌)`);
-      goHome();
-    }
-  }, [stopAudioAndVibration, goHome]);
+  // 위반-5 fix (정식 사이클 §4 정합) — autoDismissNoResult 본체 폐기.
+  //   옛 동작: 3분 만료 시 onAutoTimeout('mission_3min') + stopAudioAndVibration + 광고 + goHome 자동 호출.
+  //   정식 사이클 §4 "자동 처리 금지" + §1 "일어날 때까지 안 꺼지는 알람" 위반.
+  //   정정: 본체 제거. 호출 useEffect (line 657~663) 도 같이 제거. 시간 만료 시 무동작. 사용자 미션 완료 (success) trigger 만 사이클 진행.
 
   // 전면 광고 CLOSED listener (= AlarmScreen 측 handleAfterAd 호출 영역).
   // v1.7 hotfix H1 — LOADED / ERROR listener + load() 호출 = module-level 측 영역 (= preload 정합).
@@ -632,14 +622,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // @preserve IAP — deps 원본: [navigation, isAdFree, isExpoGo]
   }, [navigation, isExpoGo]);
 
-  // 자동 종료 타이머 (결과 화면 미진입 시에만)
-  // v1.5: camera 미션은 사용자 설정 타이머 × 2회로 별도 관리하므로 제외
-  useEffect(() => {
-    if (!settingsLoaded || resultState !== 'idle') return;
-    if (dismissMethod === 'camera') return;
-    const timeout = setTimeout(autoDismissNoResult, AUTO_DISMISS_MS[dismissMethod] ?? 3 * 60 * 1000);
-    return () => clearTimeout(timeout);
-  }, [dismissMethod, settingsLoaded, autoDismissNoResult, resultState]);
+  // 위반-5 fix (정식 사이클 §4 정합) — autoDismissNoResult 호출 useEffect 제거.
+  //   옛 동작: AUTO_DISMISS_MS (camera 제외, 기본 3분) 만료 시 autoDismissNoResult 자동 호출.
+  //   정식 사이클 §4 "자동 처리 금지" 위반. 본체 (line 594~) 폐기와 짝지어 제거.
 
   // 컴포넌트 언마운트 시 30초 타이머 정리
   useEffect(() => {
@@ -1034,8 +1019,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // v1.5 카운트다운 (camera 미션 / math / typing — missionDuration 측 카운트다운 정합).
   // v1.8 — 슬롯머신 중에도 카운트다운 계속. 만료 처리 측만 isShuffling 가드 잔존.
   // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 카운트다운 ❌.
+  // 2026-05-25 사용자 요구 — math/typing/tap/shake 4개 미션 missionDuration 카운트다운 통일.
+  //   camera는 별건 (= 재시도 1회 패턴 보존).
   useEffect(() => {
-    if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing') return;
+    if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap' && dismissMethod !== 'shake') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (matched.value) return;
@@ -1047,10 +1034,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dismissMethod, resultState, isRetryBannerVisible, missionDuration]);
 
-  // v1.8 math/typing 미션 만료 처리 — missionDuration 도달 시 즉시 fail (= 재시도 ❌, camera 재시도 패턴과 분리).
-  // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 만료 처리 ❌.
+  // 위반-3 fix 정정 (정식 사이클 §4/5 본의 재해석, 2026-05-25) — math/typing missionDuration 만료 자동 fail 복원.
+  //   §4 금지 본의: "fail → cancelAlarmChain" + "fail → 사이클 종료". ≠ "자동 fail 자체 금지".
+  //   §5: "fail/success 무관 다음 단계 진행" — fail 처리 OK, 다음 단계 진행 강제.
+  //   사용자 요구: timer 0:00 → 자동 fail → 광고 → 결과 화면 → goHome → simple_alarm=AlarmTab / ad_hoc_routine=startRoutineFromAlarm (첫번째 루틴 진입).
+  //   흐름: enterResult('fail') → 광고 → handleAfterAd → 결과 화면 30초 → goHome → alarmEntityId 분기 (발견-B fix로 fail 시도 startRoutineFromAlarm 호출).
+  //   chain cancel 무해 (Face ID 시점에 §1 회수 완료).
   useEffect(() => {
-    if (dismissMethod !== 'math' && dismissMethod !== 'typing') return;
+    if (dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap' && dismissMethod !== 'shake') return;
     if (resultState !== 'idle') return;
     if (missionDuration === 0) return;
     if (remainingMs > 0) return;

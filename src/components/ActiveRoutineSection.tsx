@@ -27,8 +27,12 @@ import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
-import { Routine, ActiveRoutine, loadActiveRoutine, loadRoutines } from '../constants/routines';
+import { Routine, ActiveRoutine, loadRoutines } from '../constants/routines';
+// v2.0 C-3-2 — useSession hook 도입 (옛 ar polling + listener 5종 측 자동 갱신 대체)
+import { useActiveRoutineAr } from '../state/useSession';
 import { Logger } from '../utils/logger';
+// v2.0 P2-1 — onEndAtReached 직접 import 폐기 (handleMissionEnd 측 dispatch 충분).
+// 단 향후 simple_alarm kind 통합 측 필요 가능성 있어 import 자체 유지 옵션 검토. 본 단계 제거.
 import {
   startRoutine,
   completeCurrentMission,
@@ -74,7 +78,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   const styles = makeStyles(colors);
 
   const [routine, setRoutine] = useState<Routine | null>(null);
-  const [ar, setAr] = useState<ActiveRoutine | null>(null);
+  // v2.0 C-3-2 — useState<ActiveRoutine> 측 useActiveRoutineAr() hook 측 대체.
+  //   dispatch 측 자동 갱신 (SessionController subscribe 측) → setAr 호출 측 제거 + 옛 listener 5종 측 폐기.
+  const { ar } = useActiveRoutineAr();
   const [remainingSec, setRemainingSec] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -146,21 +152,27 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       if (res.kind === 'started' || res.kind === 'resumed') {
         const r = res as { kind: 'started' | 'resumed'; ar: ActiveRoutine; routine: Routine };
         setRoutine(r.routine);
-        setAr(r.ar);
+        // v2.0 C-3-2 — setAr 호출 폐기. useActiveRoutineAr 측 dispatch 자동 갱신.
         setIsPaused(r.ar.pausedAt !== null);
         if (r.ar.awaitingConfirm) {
           const isLastStep = r.ar.currentStepIndex + 1 >= r.routine.steps.length;
           if (isLastStep) {
-            // v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate.
-            const sig = `${r.routine.id}-${r.ar.currentStepIndex}`;
-            const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
-            if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
-              lastStepNavigatedFor = sig;
-              navigation.navigate('Alarm', {
-                fromRoutine: 'last_step',
-                routineId: r.routine.id,
-                endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
-              });
+            // 옵션 A fix 추가 (2026-05-25, 사용자 요구) — background/잠금 상태 자동 navigate 차단.
+            //   원인: background에서 routine confirm_prompt fire → ar.awaitingConfirm=true 갱신 → ActiveRoutineSection mount/effect trigger → 자동 navigate AlarmScreen → background mount + missionDuration 카운트다운 진행.
+            //   가드: AppState !== 'active' 시 무동작. 사용자 잠금 해제 시 ActionDispatcher (2.5) lastStep 분기로 navigate (A-2 fix).
+            //   active 상태 = 사용자 ActiveRoutineSection 보고 있음 → 자동 navigate OK (옛 동작 보존).
+            if (AppState.currentState === 'active') {
+              // v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate.
+              const sig = `${r.routine.id}-${r.ar.currentStepIndex}`;
+              const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
+              if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
+                lastStepNavigatedFor = sig;
+                navigation.navigate('Alarm', {
+                  fromRoutine: 'last_step',
+                  routineId: r.routine.id,
+                  endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
+                });
+              }
             }
           } else {
             // v1.6 A-1 — 모달 통일. 일반 step = 'next' 모달.
@@ -187,6 +199,14 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     if (!ar?.awaitingConfirm || modalVisible || !routine) return;
     const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
     if (isLastStep) {
+      // 옵션 A fix 추가 (2026-05-25, 사용자 요구) — background/잠금 상태 자동 navigate 차단 (log02 trigger 위치).
+      //   원인: background에서 routine 마지막 step confirm_prompt fire → transition OnAlarmFire confirm_prompt → SaveActiveRoutine effect → ar.awaitingConfirm=true 갱신 → 본 useEffect trigger → 자동 navigate AlarmScreen mount background + missionDuration 카운트다운 진행.
+      //   가드: AppState !== 'active' 시 무동작 return. 사용자 잠금 해제 시 ActionDispatcher (2.5) lastStep 분기로 navigate (A-2 fix).
+      //   active 상태 = 사용자 ActiveRoutineSection 직접 보고 있음 → 자동 navigate OK (옛 동작 보존).
+      if (AppState.currentState !== 'active') {
+        Logger.warn('ActiveRoutineSection', `lastStep useEffect skip — AppState=${AppState.currentState} (= 사용자 잠금 해제 시 ActionDispatcher 측 처리)`);
+        return;
+      }
       // v1.7 hotfix #LastStepNavigateRestore — 마지막 step alerting → AlarmScreen navigate (= 종료 스크린 표시).
       // 사용자분 의도 = 모달 ❌ + AlarmScreen 측 endMethod 분기 (= tap / shake / camera) 측 종료 흐름.
       // 직전 #LastStepAutoEnd 측 = confirmAndAdvance + onClose 자동 종료 → AlarmScreen navigate ❌ → 종료 스크린 ❌.
@@ -226,7 +246,14 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     const update = () => {
       const remainMs = ar.stepEndAt - Date.now();
       setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
-      if (remainMs <= 0) handleMissionEnd();
+      if (remainMs <= 0) {
+        // M0 진단: T8 미스터리 1 후보 — interval tick caller 식별.
+        Logger.warn('T8-DBG', `handleMissionEnd trigger caller=interval-tick stepEndAt=${ar.stepEndAt} now=${Date.now()} routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
+        // v2.0 P2-1 — 옛 onEndAtReached() 부수 호출 폐기.
+        //   handleMissionEnd → completeCurrentMission → sessionDispatch(OnEndAtReached) 측 이미 dispatch 호출.
+        //   기존 line 측 onEndAtReached() 추가 호출 = dispatch lock 2회 진입 + transition 가드 측 두 번째 effect 0 (무력).
+        handleMissionEnd();
+      }
     };
     update();
     // v1.8 #PerfTickStep — 500ms → 1000ms. setRemainingSec(Math.ceil(remainMs/1000)) 측 같은 초 측 같은 값 → React skip → re-render 측 1초 1회 측 동일. 호출 빈도 측 절반 ↓.
@@ -244,7 +271,12 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       if (state === 'active' && ar && !isPaused && !ar.awaitingConfirm) {
         const remainMs = ar.stepEndAt - Date.now();
         setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
-        if (remainMs <= 0) handleMissionEnd();
+        if (remainMs <= 0) {
+          // M0 진단: T8 미스터리 1 후보 — AppState active 진입 시 endAt 만료 caller 식별.
+          Logger.warn('T8-DBG', `handleMissionEnd trigger caller=AppState-active stepEndAt=${ar.stepEndAt} now=${Date.now()} diff=${Date.now() - ar.stepEndAt}ms routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
+          // v2.0 P2-1 — 옛 onEndAtReached() 부수 호출 폐기. handleMissionEnd 측 dispatch 충분.
+          handleMissionEnd();
+        }
       }
     });
     return () => sub.remove();
@@ -358,6 +390,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
 
   // ─── 미션 종료 처리 ──────────────────────────────────────
   const handleMissionEnd = useCallback(async () => {
+    // M0 진단: T8 미스터리 1 — handleMissionEnd 진입 컨텍스트 박기.
+    Logger.warn('T8-DBG', `handleMissionEnd 진입 routineId=${ar?.routineId ?? '(none)'} stepIdx=${ar?.currentStepIndex ?? -1} awaitingConfirm=${ar?.awaitingConfirm} pausedAt=${ar?.pausedAt} modalVisible=${modalVisibleRef.current} completing=${completingRef.current}`);
     if (completingRef.current) return;
     if (modalVisibleRef.current) return;
     if (!routine || !ar) return;
@@ -373,12 +407,12 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       }
       if (res.kind === 'advance_auto') {
         setRoutine(res.routine);
-        setAr(res.ar);
+        // v2.0 C-3-2 — setAr 폐기. useActiveRoutineAr 자동 갱신.
         return;
       }
       if (res.kind === 'advance_confirm') {
         setRoutine(res.routine);
-        setAr(res.ar);
+        // v2.0 C-3-2 — setAr 폐기.
         const isLastStep = res.ar.currentStepIndex + 1 >= res.routine.steps.length;
         if (isLastStep) {
           // v1.6 #12 — 마지막 step (모든 endMethod) = AlarmScreen navigate.
@@ -411,10 +445,12 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     if (!routine || !ar) return;
     if (isPaused) {
       const next = await resumeRoutine();
-      if (next) { setAr(next); setIsPaused(false); }
+      // v2.0 C-3-2 — setAr 폐기. useActiveRoutineAr 자동 갱신.
+      if (next) { setIsPaused(false); }
     } else {
       const next = await pauseRoutine();
-      if (next) { setAr(next); setIsPaused(true); }
+      // v2.0 C-3-2 — setAr 폐기. useActiveRoutineAr 자동 갱신.
+      if (next) { setIsPaused(true); }
     }
   }, [routine, ar, isPaused]);
 
@@ -497,16 +533,15 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       }
       if (res.kind === 'advance_auto') {
         setRoutine(res.routine);
-        setAr(res.ar);
+        // v2.0 C-3-2 — setAr 폐기. useActiveRoutineAr 자동 갱신.
         setModalVisible(false);
         setModalStage('alarm');
       }
       if (res.kind === 'advance_confirm') {
         // v1.7 hotfix #32 — 다음 step 도 confirm_prompt → ar 갱신 + 모달 close.
         // 다음 step alerting 시점 측 = 별도 useEffect (= fix #32-B) 측 모달 재표시.
-        // 직전 = 분기 ❌ → fall-through → setRoutine/setAr 갱신 ❌ → modal jam + UI 갱신 ❌ + 진동 잔존.
         setRoutine(res.routine);
-        setAr(res.ar);
+        // v2.0 C-3-2 — setAr 폐기. useActiveRoutineAr 자동 갱신.
         setModalVisible(false);
         setModalStage('alarm');
       }
@@ -559,63 +594,39 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     };
   }, [modalVisible, modalStage, routine, handleStartNext]);
 
-  // v1.6 — 위젯 / 잠금 alerting 측 외부 다음 진행 / 정지 → app modal dismiss + 사운드 stop + state sync.
+  // v2.0 C-3-2 — listener 5종 폐기. useActiveRoutineAr 측 dispatch 자동 갱신 의존.
+  //   subAdvance / subPaused / subResumed / subAwaitingConfirm → ar 측 useActiveRoutineAr 자동 갱신.
+  //   subCleared (routine 종료 시 onClose + 사운드 stop) → ar=null 측 별도 useEffect 측 처리.
+  //   stopAlarmAudio/stopAlarmVibe + setModalVisible 측 ar 변경 감지 측 처리.
   useEffect(() => {
-    const subAdvance = DeviceEventEmitter.addListener('routineAdvancedExternally', async (payload: { routineId: string }) => {
-      if (!routineId || payload?.routineId !== routineId) return;
-      stopAlarmAudio();
-      stopAlarmVibe();
-      setModalVisible(false);
-      // routine state 측 갱신 — 다음 step UI 즉시 표시.
-      const nextAr = await loadActiveRoutine();
-      if (nextAr) {
-        setAr(nextAr);
-        const routines = await loadRoutines();
-        const r = routines.find(x => x.id === nextAr.routineId);
-        if (r) setRoutine(r);
-      }
-    });
-    const subCleared = DeviceEventEmitter.addListener('routineClearedExternally', (payload: { routineId: string }) => {
-      if (!routineId || payload?.routineId !== routineId) return;
+    // ar=null (Session.state=IDLE 진입 = Stop dispatch 측 종료) 시 자동 onClose
+    if (!ar && routine) {
       stopAlarmAudio();
       stopAlarmVibe();
       setModalVisible(false);
       onClose();
-    });
-    // v1.6 #4-C Fix 3 — 위젯 측 Pause / Resume 처리 후 RN ar 동기화.
-    // routineId match 가드 제거: payload.routineId !== local routineId 라도 AsyncStorage 의 ar 신뢰
-    //   (active routine 단일 invariant 보장 → mismatch 케이스 = stale routineId 차단 무관, ar 갱신 우선).
-    const subPaused = DeviceEventEmitter.addListener('routinePausedExternally', async (_payload: { routineId: string }) => {
-      const nextAr = await loadActiveRoutine();
-      if (nextAr && nextAr.routineId === routineId) {
-        setAr(nextAr);
-        setIsPaused(nextAr.pausedAt !== null);
-      }
-    });
-    const subResumed = DeviceEventEmitter.addListener('routineResumedExternally', async (_payload: { routineId: string }) => {
-      const nextAr = await loadActiveRoutine();
-      if (nextAr && nextAr.routineId === routineId) {
-        setAr(nextAr);
-        setIsPaused(nextAr.pausedAt !== null);
-      }
-    });
-    // v1.7 hotfix #32-C — markAwaitingConfirm 측 emit listener.
-    // 다음 step alerting 시점 측 = AsyncStorage 측 ar 갱신 → 본 listener → setAr 갱신 → fix #32-B useEffect 진입 → 모달 자동 재표시.
-    const subAwaitingConfirm = DeviceEventEmitter.addListener('routineAwaitingConfirmExternally', async (payload: { routineId: string }) => {
-      if (!routineId || payload?.routineId !== routineId) return;
-      const nextAr = await loadActiveRoutine();
-      if (nextAr && nextAr.routineId === routineId) {
-        setAr(nextAr);
-      }
-    });
-    return () => {
-      subAdvance.remove();
-      subCleared.remove();
-      subPaused.remove();
-      subResumed.remove();
-      subAwaitingConfirm.remove();
-    };
-  }, [routineId, onClose, stopAlarmAudio, stopAlarmVibe]);
+    }
+    // routine lookup 측 ar.routineId 변경 시 — Advance step 측 routineId 동일 → re-lookup 불요. setRoutine 측 startRoutine applyStart 측만.
+  }, [ar, routine, onClose, stopAlarmAudio, stopAlarmVibe]);
+
+  // ar 측 isPaused 측 자동 동기
+  useEffect(() => {
+    setIsPaused(ar?.pausedAt !== null && ar?.pausedAt !== undefined);
+  }, [ar?.pausedAt]);
+
+  // v2.0 C-3-2 — 옛 subAdvance listener 측 setModalVisible(false) 등가.
+  //   step advance 시 (currentStepIndex 변경) modal 자동 close. 단 첫 mount 측 trigger 회피 (prev ref 비교).
+  const prevStepIndexRef = useRef<number | null>(null);
+  useEffect(() => {
+    const cur = ar?.currentStepIndex ?? null;
+    if (cur !== null && prevStepIndexRef.current !== null && prevStepIndexRef.current !== cur) {
+      // 실제 step advance 시점 — 옛 listener 측 stopAlarm + modal close 등가
+      stopAlarmAudio();
+      stopAlarmVibe();
+      setModalVisible(false);
+    }
+    prevStepIndexRef.current = cur;
+  }, [ar?.currentStepIndex, stopAlarmAudio, stopAlarmVibe]);
 
   // unmount cleanup
   useEffect(() => {

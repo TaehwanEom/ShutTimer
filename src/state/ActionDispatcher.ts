@@ -38,15 +38,8 @@ import {
 // 1. User UI helpers
 // ───────────────────────────────────────────────────────────
 
-export async function dispatchStart(params: {
-  kind: SessionKind;
-  steps: Step[];
-  alarmBinding?: AlarmBinding;
-  replaceExisting?: boolean;
-  deadlineAt?: number;
-}) {
-  return dispatch({ type: 'Start', ...params });
-}
+// 3번 fix (2026-05-25) — dispatchStart 함수 폐기. caller 0건. SessionAction.Start union 분리로 인해 generic params 측 narrowing 불가.
+//   호출처 = ActionDispatcher.onAlarmFire (C-1 simple_alarm) + routineController.dispatchStartRoutine (routine/ad_hoc) — 각각 dispatch() 직접 호출 (타입 narrowing 정합).
 
 export async function dispatchStop(reason: StopReason) {
   return dispatch({ type: 'Stop', reason });

@@ -25,7 +25,7 @@ import {
 // v2.0 C.4 — Session dispatch 부수 호출용. routineController → SessionController 단방향.
 import { dispatch as sessionDispatch, getCurrentSession } from '../state/SessionController';
 // v2.0 C.D — startRoutine wrapper 측 Session → ActiveRoutine 변환 (옛 createFreshAr 등가).
-import { sessionToActiveRoutine } from '../state/effectRunner';
+import { sessionToActiveRoutine, SESSION_EVENT_NAVIGATE } from '../state/effectRunner';
 import { Step as SessionStep } from '../types/session';
 // v2.0 C.D 우선순위 3 — ad_hoc kind 분기 (sessionId prefix 측 판단)
 import { isAdhocAlarmRoutine } from './alarmRoutineLink';
@@ -290,6 +290,23 @@ export async function syncRoutineFromSnapshot(routineId: string): Promise<Missio
       'routine-DBG',
       `syncRoutineFromSnapshot-stop 진입 reason=${!snapshot ? 'no-snapshot' : snapshot.routineId !== routineId ? `routineId-mismatch(snap=${snapshot.routineId}, req=${routineId})` : 'routineEnded=true'} snapshot=${JSON.stringify(snapshot)}`
     );
+    // 2번 fix (2026-05-25, 사용자 요구) — 위젯 "다음 진행" 누른 후 마지막 step 처리 = 잠금 해제 path 와 동일하게 종료방식 화면 진입.
+    //   AdvanceNextStepIntent perform (native) → snapshot.routineEnded=true → 본 분기 진입.
+    //   옛 동작: dispatch Stop 만 호출 → routine cleanup 완료. 종료방식 화면 진입 X = §3-B 7번 위반.
+    //   정정: routineEnded=true 시 SESSION_EVENT_NAVIGATE Alarm + fromRoutine='last_step' emit → 옵션 A-2 (open_app_dismiss lastStep 분기) 와 동일 흐름.
+    //   사용자가 잠금 풀고 들어오면 미션 화면 표시 (= 옵션 A 흐름과 결과 동일).
+    if (snapshot?.routineEnded === true) {
+      Logger.warn(
+        'routine-DBG',
+        `lastStep navigate emit routineId=${routineId} endMethod=${routine.endMethod ?? 'tap'}`
+      );
+      DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, {
+        target: 'Alarm',
+        fromRoutine: 'last_step',
+        routineId,
+        endMethod: routine.endMethod ?? 'tap',
+      });
+    }
     await sessionDispatch({ type: 'Stop', reason: 'override' }).catch(() => {});
     return { kind: 'end', routine };
   }

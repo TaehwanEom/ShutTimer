@@ -231,19 +231,23 @@ function transition(current: Session | null, action: SessionAction): TransitionR
 
   // ─── Start ───────────────────────────────────────────────
   if (action.type === 'Start') {
-    // 방향 B fix (2026-05-25, log02 버그 — race condition) — 같은 entityId 알람이 이미 STEP_ALERTING 시 중복 Start 거부.
-    //   원인: AlarmKit listener 측 같은 alarmId 'alerting' 이벤트 두 번 emit (cold start race) → 두번째 Start = replaceExisting=true → 기존 chain CancelAlarmChain effect 발동 → "잠깐 울리고 꺼짐" 증상.
-    //   가드: current.state === 'STEP_ALERTING' + entityId 매칭 시 next:current effects:[] 반환 (= chain 보존 + 무동작).
-    //   정상 흐름 (이전 알람 처리 완료 후 같은 entityId 재발화) = current.state !== 'STEP_ALERTING' (= IDLE/CONFIRMING) → 본 가드 통과 → 기존 override 분기 정상 처리.
+    // 방향 B fix (2026-05-25, log02 버그 — race condition) + 1번 A fix (같은 시각 알람 2개 동시 발화 처리, 사용자 요구).
+    //   STEP_ALERTING 상태에서 새 alarm fire trigger Start = 거부 (entity 같든 다르든).
+    //   - 같은 entityId: cold start race (AlarmKit listener 두 번 emit) → 중복 처리 차단.
+    //   - 다른 entityId: 같은 시각에 알람 2개 동시 fire → 첫 알람 chain 보존 (= 첫 알람 우선 + 둘째 알람 무시).
+    //   가드: current.state === 'STEP_ALERTING' + simple_alarm kind fire 시 next:current effects:[] 반환.
+    //   정상 흐름 (이전 알람 처리 완료 후 다음 알람 fire) = current.state !== 'STEP_ALERTING' (= IDLE/CONFIRMING) → 본 가드 통과 → 기존 override 분기 정상 처리.
+    //   ad_hoc_routine kind Start (= routine 시작) 는 본 가드 우회 (= 사용자 명시 입력 trigger).
     if (
       current &&
       current.state === 'STEP_ALERTING' &&
-      current.alarmBinding?.alarmEntityId &&
-      action.alarmBinding?.alarmEntityId === current.alarmBinding.alarmEntityId
+      action.kind === 'simple_alarm' &&
+      current.alarmBinding?.alarmEntityId
     ) {
+      const sameEntity = action.alarmBinding?.alarmEntityId === current.alarmBinding.alarmEntityId;
       Logger.warn(
         'SessionController',
-        `Start rejected — duplicate alarm fire (entityId=${current.alarmBinding.alarmEntityId} already STEP_ALERTING)`
+        `Start rejected — ${sameEntity ? 'duplicate alarm fire' : 'concurrent alarm fire'} (current=${current.alarmBinding.alarmEntityId}, incoming=${action.alarmBinding?.alarmEntityId ?? 'unknown'}) state=STEP_ALERTING`
       );
       return { next: current, effects: [] };
     }
@@ -294,9 +298,7 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     // v2.0 R-8 fix — simple_alarm 측 dispatch Start = alarm fire 시점 측 호출 (C-1 통합).
     //   alarm 측 이미 schedule 측 (사용자 enable 시점). fire 측 또 schedule = native 측 중복 + 무한 루프 회귀.
     //   ScheduleAlarmChain effect = enable / re-enable path 측만. simple_alarm fire path 측 push X.
-    if (action.alarmBinding && action.kind !== 'simple_alarm') {
-      effects.push({ kind: 'ScheduleAlarmChain', binding: action.alarmBinding });
-    }
+    // 3번 fix (2026-05-25, 타입 강제) — routine/ad_hoc_routine/timer = alarmBinding undefined 강제 → 본 분기 dead code 화 → 제거.
     // 위반-10 fix (정식 사이클 정합) — simple_alarm 측 ScheduleConfirmPrompt + WriteRoutineSnapshot push X.
     //   simple_alarm = 잠금화면 1번만 출력 (= chain alarm 만으로 무한 울림). confirm_prompt = routine step 진행 전용.
     //   옛 코드 = simple_alarm 도 routine처럼 confirm_prompt 자동 schedule → 잠금화면 2차 출력 ("깜박임") 회귀.
@@ -325,9 +327,8 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       effects.push({ kind: 'SetIsRoutineActive', active: true });
       effects.push({ kind: 'SaveActiveRoutine', session: newSession });
       // 옛 startRoutine: cancelRoutinePrealerts (잔존 prealert 정리)
-      // v2.0 C.A — routine kind 측은 routine.id (= sessionId) 기준, ad_hoc 은 alarm entity (= alarmBinding) 기준
-      const prealertRoutineId = action.alarmBinding?.alarmEntityId ?? newSession.sessionId;
-      effects.push({ kind: 'CancelRoutinePrealerts', routineId: prealertRoutineId });
+      // 3번 fix (2026-05-25) — ad_hoc kind alarmBinding 타입 강제로 차단됨. sessionId 직접 사용 (= ad_hoc sessionId = ADHOC_PREFIX + alarm.id = entityId 등가).
+      effects.push({ kind: 'CancelRoutinePrealerts', routineId: newSession.sessionId });
     }
     return { next: newSession, effects };
   }

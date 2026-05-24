@@ -143,21 +143,42 @@ export type AutoTimeoutReason = 'mission_3min' | 'result_30s';
 
 export type SessionAction =
   // User UI ─────────────────────────────────────────────────
+  /**
+   * 3번 fix (잠재 위반-2 차단, 2026-05-25 사용자 요구 — 타입 시스템 강제).
+   *   simple_alarm = alarmBinding 필수 (chain 50개 schedule 본체).
+   *   routine / ad_hoc_routine / timer = alarmBinding 전달 불가 (chain X = §3-B-1 정합).
+   *   = 컴파일타임 차단. routineController에서 dispatch Start kind='ad_hoc_routine' + alarmBinding 실수 호출 차단.
+   */
   | {
       type: 'Start';
-      kind: SessionKind;
+      kind: 'simple_alarm';
+      sessionId?: string;
+      steps: Step[];
+      alarmBinding: AlarmBinding;
+      replaceExisting?: boolean;
+      deadlineAt?: number;
+      routineName?: string;
+      laMeta?: {
+        routineName: string;
+        stepName: string;
+        stepIndex: number;
+        totalSteps: number;
+      };
+      autoCountdownSec?: number;
+    }
+  | {
+      type: 'Start';
+      kind: 'routine' | 'ad_hoc_routine' | 'timer';
       /**
        * v2.0 C.A — sessionId override. caller 가 결정.
        *   - routine          → routine.id
-       *   - simple_alarm     → alarm.id
        *   - ad_hoc_routine   → ADHOC_PREFIX + alarm.id ('aa_a_xxx')
        *   - timer            → 'tm_' + random
-       * 미전달 시 createSessionId() fallback.
-       * native AdvanceNextStepIntent / snapshot routineId 와 정합 (entity ID 그대로 사용).
        */
       sessionId?: string;
       steps: Step[];
-      alarmBinding?: AlarmBinding;
+      /** 3번 fix: routine/ad_hoc_routine/timer 측 alarmBinding 차단 (= chain 50개 schedule 금지) */
+      alarmBinding?: undefined;
       /** ad-hoc routine 무조건 override 정합 (alarmRoutineLink.startRoutineFromAlarm:54-57) */
       replaceExisting?: boolean;
       /** session deadline 계산용. 미전달 시 startedAt + 24h */
@@ -165,7 +186,6 @@ export type SessionAction =
       /**
        * v2.0 C.A — routine name. WriteRoutineSnapshot effect 측 routineName 인자 정합.
        *   - timer: '타이머' or 사용자 표시명
-       *   - simple_alarm: alarm.label
        *   - routine: routine.name ?? routine.category
        *   - ad_hoc_routine: routine.name ?? alarm.label
        */

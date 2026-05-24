@@ -331,6 +331,31 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       ...(trimmedSteps.length > 0 ? { steps: trimmedSteps } : {}),
     };
 
+    // 1번 B fix (2026-05-25 사용자 요구) — 같은 시각 알람 중복 등록 시 팝업 경고.
+    //   원인: 같은 시각 알람 2개 동시 발화 시 SessionController Start 가드 (1번 A) 가 둘째 거부 → 사용자가 둘 중 하나만 인식. 등록 단계에서 미리 경고.
+    //   검사: 다른 alarm.id + 같은 time + enabled=true.
+    //   사용자 "계속" 누르면 등록 진행 (= 강제 차단 X).
+    const existingAlarms = await loadAlarms();
+    const sameTimeExists = existingAlarms.some(
+      a => a.id !== alarm.id && a.time === alarm.time && a.enabled
+    );
+    if (sameTimeExists) {
+      const proceed = await new Promise<boolean>(resolve => {
+        Alert.alert(
+          t('alarm.duplicate.title', { defaultValue: '중복 알람 경고' }),
+          t('alarm.duplicate.body', {
+            defaultValue: `같은 시각(${alarm.time})에 이미 알람이 등록되어 있습니다.\n동시 발화 시 한 알람만 실행됩니다.\n계속 등록할까요?`,
+          }),
+          [
+            { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel', onPress: () => resolve(false) },
+            { text: t('common.confirm', { defaultValue: '계속' }), style: 'default', onPress: () => resolve(true) },
+          ]
+        );
+      });
+      if (!proceed) return;
+      if (!isMountedRef.current) return;
+    }
+
     // AlarmKit 권한 요청 (iOS 26+ 만)
     const authState = await requestAlarmKitAuthorizationIfNeeded();
     if (!isMountedRef.current) return;

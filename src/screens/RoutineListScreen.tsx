@@ -2,6 +2,8 @@
 // 카테고리별 섹션 그룹핑 + 카드 UI + 진행 중 배너 + PanResponder 스와이프 삭제 + 섹션별 편집 모드.
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+// v2.0 C-3-4 — useActiveRoutineAr hook
+import { useActiveRoutineAr } from '../state/useSession';
 import {
   View,
   Text,
@@ -33,7 +35,7 @@ import {
   loadRoutines,
   deleteRoutine,
   upsertRoutine,
-  loadActiveRoutine,
+  loadActiveRoutine, // v2.0 C-3-4 — caller 0 후 폐기 가능 (refreshAll 측 setActiveRoutine 폐기됨)
   getRoutineMode,
   getRoutineTotalSeconds,
   PENDING_DISABLED_ALARMS_KEY,
@@ -751,7 +753,9 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   const styles = makeStyles(colors);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
-  const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
+  // v2.0 C-3-4 — useState<ActiveRoutine> 측 useActiveRoutineAr() 측 대체. 1초 polling 폐기 + dispatch 자동 갱신.
+  //   alias `activeRoutine` 측 caller 측 변경 0.
+  const { ar: activeRoutine } = useActiveRoutineAr();
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [customCategories, setCustomCategories] = useState<CategoryDef[]>([]);
   // v1.6 hotfix — @preserve scheduled-routine. 예약 루틴 임시 비활성. 'manual' 기본 강제.
@@ -766,7 +770,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   useEffect(() => {
     const sub = DeviceEventEmitter.addListener('routineClearedExternally', () => {
       setActiveManualRoutineId(null);
-      setActiveRoutine(null);
+      // v2.0 C-3-4 — setActiveRoutine 폐기. useActiveRoutineAr 측 자동 갱신 (Stop dispatch 측 ar=null).
     });
     return () => sub.remove();
   }, []);
@@ -804,8 +808,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     setRoutines(list);
     const status = await loadScheduleStatus();
     setScheduleStatus(status);
-    const ar = await loadActiveRoutine();
-    setActiveRoutine(ar);
+    // v2.0 C-3-4 — setActiveRoutine 호출 폐기. useActiveRoutineAr 측 자동 갱신.
     const custom = await loadCustomCategories();
     setCustomCategories(custom);
   }, []);
@@ -816,32 +819,8 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     }, [refreshAll])
   );
 
-  // ActiveRoutine 폴링 — activeRoutine 또는 activeManualRoutineId 있으면 1초 주기.
-  // 참조 안정화 — UI 영향 필드 (routineId/currentStepIndex/stepEndAt/pausedAt/awaitingConfirm) 동일 시 setState 호출 X
-  // → 부모 무한 리렌더 차단 (timer tick / auto countdown useEffect cleanup race 방지)
-  useEffect(() => {
-    if (!activeRoutine && !activeManualRoutineId) return;
-    const tick = async () => {
-      const ar = await loadActiveRoutine();
-      setActiveRoutine(prev => {
-        if (!ar && !prev) return prev;
-        if (!ar || !prev) return ar;
-        if (
-          prev.routineId === ar.routineId &&
-          prev.currentStepIndex === ar.currentStepIndex &&
-          prev.stepEndAt === ar.stepEndAt &&
-          prev.pausedAt === ar.pausedAt &&
-          prev.awaitingConfirm === ar.awaitingConfirm
-        ) {
-          return prev; // 동일 — 리렌더 회피
-        }
-        return ar;
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [activeRoutine?.routineId, activeManualRoutineId]);
+  // v2.0 C-3-4 — 1초 polling useEffect 폐기. useActiveRoutineAr 측 dispatch subscribe 측 즉시 갱신.
+  //   옛 1초 polling = 효율 손해 (1초 delay + 매초 setState 비교 측 부담). 새 path = 0 delay + setState 0 (subscribe).
 
   // (nowMs 250ms tick 제거 — 부모 리렌더 빈도 감소. 카드 게이지는 RoutineCard 자체 tick 으로 계산)
 
@@ -1173,10 +1152,12 @@ export default function RoutineListScreen({ navigation, route }: Props) {
                     onPlayPress={async () => {
                       // 진행 중 카드 → pause/resume 토글. 그 외 → start.
                       if (isActiveCard && activeRoutine) {
-                        const next = activeRoutine.pausedAt
-                          ? await resumeRoutine()
-                          : await pauseRoutine();
-                        if (next) setActiveRoutine(next);
+                        // v2.0 C-3-4 — setActiveRoutine 폐기. useActiveRoutineAr 측 자동 갱신.
+                        if (activeRoutine.pausedAt) {
+                          await resumeRoutine();
+                        } else {
+                          await pauseRoutine();
+                        }
                       } else {
                         handlePlay(r);
                       }

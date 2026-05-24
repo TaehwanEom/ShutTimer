@@ -4,6 +4,8 @@
 // camera 모드: 랜덤 MISSION_POOL 1개 노출 + 탭 dismiss (v1.5 AlarmCameraMode 통합은 Phase 6.5에서 별도).
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+// v2.0 C-3-3 — useActiveRoutineAr hook 도입
+import { useActiveRoutineAr } from '../state/useSession';
 import {
   View,
   Text,
@@ -77,7 +79,8 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const styles = makeStyles(colors);
 
   const [routine, setRoutine] = useState<Routine | null>(null);
-  const [ar, setAr] = useState<ActiveRoutine | null>(null);
+  // v2.0 C-3-3 — useState<ActiveRoutine> 측 useActiveRoutineAr() 측 대체. dispatch 자동 갱신.
+  const { ar } = useActiveRoutineAr();
   const [dismissed, setDismissed] = useState(false);
   // v1.6 hotfix — dismissed 후 자동 진행 카운트다운 (autoCountdownSec → 0). 0 시 즉시 진행.
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -207,7 +210,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       }
 
       setRoutine(target);
-      setAr(existing);
+      // v2.0 C-3-3 — setAr 폐기. useActiveRoutineAr 측 자동 갱신.
 
       // camera 모드면 랜덤 미션 픽 (1회)
       if (target.endMethod === 'camera' && MISSION_POOL.length > 0) {

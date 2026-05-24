@@ -43,13 +43,29 @@ async function saveAll(list: AlarmMetaRecord[]): Promise<void> {
   await AsyncStorage.setItem(ALARM_METADATA_KEY, JSON.stringify(list));
 }
 
+// v1.8 #MappingLock — 장부 read-modify-write 직렬화 뮤텍스.
+//   직전: saveAlarmMetadata / deleteAlarmMetadata 가 lock 없이 loadAll → modify → saveAll 수행 →
+//     동시 호출 시(콜드 스타트 syncRollingSchedule ∥ syncAllAlarms·migrateSoundRename) 한쪽 항목 유실
+//     → AlarmKit 등록은 됐는데 장부엔 없는 "유령 알람" 발생 (= churn / orphan root cause).
+//   정정: 모든 장부 mutation 을 단일 promise chain 으로 직렬화 → read-modify-write 원자성 보장.
+let mappingWriteChain: Promise<unknown> = Promise.resolve();
+
+function runMappingExclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const result = mappingWriteChain.then(fn, fn);
+  // 다음 작업은 result 가 settle(성공/실패 무관)된 뒤 진행. 에러는 삼켜 chain 정지 방지.
+  mappingWriteChain = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 export async function saveAlarmMetadata(
   meta: Omit<AlarmMetaRecord, 'createdAt'>
 ): Promise<void> {
-  const all = await loadAll();
-  const next = all.filter(r => r.alarmId !== meta.alarmId);
-  next.push({ ...meta, createdAt: Date.now() });
-  await saveAll(next);
+  return runMappingExclusive(async () => {
+    const all = await loadAll();
+    const next = all.filter(r => r.alarmId !== meta.alarmId);
+    next.push({ ...meta, createdAt: Date.now() });
+    await saveAll(next);
+  });
 }
 
 export async function loadAlarmMetadata(alarmId: string): Promise<AlarmMetaRecord | null> {
@@ -58,9 +74,11 @@ export async function loadAlarmMetadata(alarmId: string): Promise<AlarmMetaRecor
 }
 
 export async function deleteAlarmMetadata(alarmId: string): Promise<void> {
-  const all = await loadAll();
-  const next = all.filter(r => r.alarmId !== alarmId);
-  await saveAll(next);
+  return runMappingExclusive(async () => {
+    const all = await loadAll();
+    const next = all.filter(r => r.alarmId !== alarmId);
+    await saveAll(next);
+  });
 }
 
 export async function listAllAlarmMetadata(): Promise<AlarmMetaRecord[]> {
@@ -68,5 +86,7 @@ export async function listAllAlarmMetadata(): Promise<AlarmMetaRecord[]> {
 }
 
 export async function clearAllAlarmMetadata(): Promise<void> {
-  await AsyncStorage.removeItem(ALARM_METADATA_KEY);
+  return runMappingExclusive(async () => {
+    await AsyncStorage.removeItem(ALARM_METADATA_KEY);
+  });
 }

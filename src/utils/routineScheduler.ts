@@ -211,6 +211,12 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
   const now = new Date();
   const stopLabel = i18n.t('routine.prealertStop', { defaultValue: '확인' });
 
+  // v1.8 #SoundRenameMigration — prealert 사운드 누락 정정.
+  //   직전: prealert scheduleAlarm 호출에 soundName 미전달 → AlarmKit 이 .default(아이폰 기본음) 발화.
+  //   정정: 사용자 설정 사운드 전달 (confirm_prompt / alarm_main 과 동일 정책).
+  const soundId = (await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND)) ?? DEFAULT_SOUND_ID;
+  const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+
   for (const prealertMin of ROUTINE_PREALERT_MINUTES_LIST) {
     const alertTime = computeAlertTime(routine.schedule.startTime, prealertMin);
     if (!alertTime) continue;
@@ -227,6 +233,7 @@ async function scheduleViaAlarmKit(routine: Routine): Promise<string[]> {
           fireAt: fireDate.getTime(),
           stopLabel,
           type: 'prealert',
+          soundName: soundItem.pushSound,
         });
         alarmIds.push(id);
         // v1.7 hotfix #3 — prealert metadata 저장. 직전: 저장 안 해서

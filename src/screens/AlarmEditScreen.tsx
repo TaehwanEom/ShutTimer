@@ -39,6 +39,7 @@ import {
 } from '../constants/routines';
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import DurationWheelPicker from '../components/DurationWheelPicker';
+import { dispatchEnableAlarm, dispatchDisableAlarm } from '../state/ActionDispatcher';
 import {
   scheduleAlarmMain,
   cancelAlarmsForEntity,
@@ -354,10 +355,13 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       );
     }
 
-    // 기존 등록 cancel + 신규 schedule
-    await cancelAlarmsForEntity(alarm.id).catch(() => {});
+    // v2.0 P3.7 — Session dispatch 흡수. effectRunner 가 cancelAlarmsForEntity + scheduleAlarmMain 호출.
+    //   편집 = 기존 chain 정리 → alarm DB 갱신 → 새 chain 등록 (enabled 일 때만).
+    await dispatchDisableAlarm(alarm.id);
     await upsertAlarm(alarm);
-    await scheduleAlarmMain(alarm).catch(() => {});
+    if (alarm.enabled) {
+      await dispatchEnableAlarm(alarm.id);
+    }
 
     if (!isMountedRef.current) return;
     navigation.goBack();
@@ -374,7 +378,8 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
           text: t('alarm.delete.confirm', { defaultValue: '삭제' }),
           style: 'destructive',
           onPress: async () => {
-            await cancelAlarmsForEntity(editingId).catch(() => {});
+            // v2.0 P3.7 — chain cancel 은 dispatch 통해 일관 처리.
+            await dispatchDisableAlarm(editingId);
             await deleteAlarm(editingId);
             if (isMountedRef.current) navigation.goBack();
           },

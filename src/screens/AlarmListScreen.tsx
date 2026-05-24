@@ -32,6 +32,7 @@ import {
   deleteAlarm,
 } from '../constants/alarms';
 import { RoutineStep, ActiveRoutine, loadActiveRoutine } from '../constants/routines';
+import { dispatchEnableAlarm, dispatchDisableAlarm } from '../state/ActionDispatcher';
 import {
   scheduleAlarmMain,
   cancelAlarmsForEntity,
@@ -585,12 +586,14 @@ export default function AlarmListScreen({ navigation }: Props) {
   };
 
   const handleToggle = async (alarm: Alarm, enabled: boolean) => {
+    // v2.0 P3.7 — Session dispatch 흡수. effectRunner 가 cancelAlarmsForEntity / scheduleAlarmMain 호출.
+    //   dispatchDisableAlarm 은 현 active session 이 같은 entity 면 session 도 stop (= 자연스러운 부수효과).
     const updated: Alarm = { ...alarm, enabled };
     await upsertAlarm(updated);
     if (enabled) {
-      await scheduleAlarmMain(updated).catch(() => {});
+      await dispatchEnableAlarm(updated.id);
     } else {
-      await cancelAlarmsForEntity(updated.id).catch(() => {});
+      await dispatchDisableAlarm(updated.id);
     }
     reload();
   };
@@ -605,7 +608,8 @@ export default function AlarmListScreen({ navigation }: Props) {
           text: t('alarm.delete.confirm', { defaultValue: '삭제' }),
           style: 'destructive',
           onPress: async () => {
-            await cancelAlarmsForEntity(alarm.id).catch(() => {});
+            // v2.0 P3.7 — chain cancel 은 dispatch 통해 일관 처리 후 alarm DB 삭제.
+            await dispatchDisableAlarm(alarm.id);
             await deleteAlarm(alarm.id);
             reload();
           },

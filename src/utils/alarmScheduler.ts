@@ -207,13 +207,52 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   const targets = all.filter(
     m => m.type === 'alarm_main' && m.entityId === alarmEntityId
   );
-  // v1.8 #AlarmChainRevive — race 안전: metadata 먼저 삭제 → native cancel 호출 순서.
-  //   직전 cancelAlarm() = native cancel → metadata 삭제 순 → .removed 이벤트 시 metadata 살아있어
-  //   listener 측 chain+1 schedule 측 race 측 가능. 본 순서 = listener meta=NULL → silent skip 정합.
+  const targetIds = new Set(targets.map(t => t.alarmId));
+
+  // v1.8 #ChainCancelVerify (버그 ⑧ FIX) — native cancel 실패 식별 + verify retry.
+  //   사용자 보고 (2026-05-23): 미션 완료 후 metas=50 → listAlarms=25 잔존 → 12분 후 잔존 chain fire.
+  //   원인 후보: .catch(() => {}) 가 native cancel 실패를 삼킴 / AlarmKit weekly cancel race.
+  //   순서 변경 정합: lazy chain (scheduleAlarmChainNext) 폐기됨 (line 222) → .removed 이벤트가
+  //     listener 측 chain+1 schedule 안 함 → cancel → verify → deleteMetadata 순서 안전.
+
+  // F1: cancel 시도 (catch 풀어 native 실패 식별 + 카운트)
+  let nativeFailCount = 0;
+  for (const meta of targets) {
+    try {
+      await AlarmkitBridge.cancelAlarm(meta.alarmId);
+    } catch (e) {
+      nativeFailCount++;
+      Logger.warn('cancelEntity-DBG', `attempt-1 cancelAlarm fail alarmId=${meta.alarmId} err=${String(e)}`);
+    }
+  }
+
+  // F2: verify — native 측 targetIds 잔존 확인 + 최대 3회 retry (100ms delay).
+  let stale: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const nativeAlarms = await AlarmkitBridge.listAlarms();
+    stale = nativeAlarms.filter(a => targetIds.has(a.id)).map(a => a.id);
+    if (stale.length === 0) break;
+    Logger.warn('cancelEntity-DBG', `verify attempt=${attempt} stale=${stale.length} ids=[${stale.join(',')}]`);
+    for (const id of stale) {
+      try {
+        await AlarmkitBridge.cancelAlarm(id);
+      } catch (e) {
+        Logger.warn('cancelEntity-DBG', `retry cancel fail alarmId=${id} err=${String(e)}`);
+      }
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  if (stale.length > 0) {
+    Logger.warn('cancelEntity-DBG', `FINAL stale alarms remain count=${stale.length} ids=[${stale.join(',')}] entityId=${alarmEntityId}`);
+  }
+
+  // verify 후 mapping table cleanup (deleteMetadata 마지막).
   for (const meta of targets) {
     await deleteAlarmMetadata(meta.alarmId).catch(() => {});
-    await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
   }
+
+  Logger.warn('cancelEntity-DBG', `done entityId=${alarmEntityId} targets=${targets.length} nativeFail=${nativeFailCount} finalStale=${stale.length}`);
   await disableOnceAlarmIfNeeded(alarmEntityId).catch(() => {});
 }
 
@@ -286,10 +325,13 @@ export async function syncAllAlarms(): Promise<void> {
       .filter(m => m.type === 'alarm_main')
       .map(m => m.entityId)
   );
-  for (const alarm of freshAlarms) {
-    if (alarm.enabled && !entitiesWithChain.has(alarm.id)) {
-      await scheduleAlarmMain(alarm).catch(() => {});
-    }
+  // M0 진단: K14 미스터리 1 후보 — 분기 C 진입 시 schedule 대상 entityId 박기 (cold-start duplicate schedule 추적).
+  const scheduleTargets = freshAlarms.filter(a => a.enabled && !entitiesWithChain.has(a.id));
+  if (scheduleTargets.length > 0) {
+    Logger.warn('alarmScheduler-DBG', `syncAllAlarms 분기C 진입 targets=${scheduleTargets.length} ids=[${scheduleTargets.map(a => a.id).join(',')}] entitiesWithChain.size=${entitiesWithChain.size}`);
+  }
+  for (const alarm of scheduleTargets) {
+    await scheduleAlarmMain(alarm).catch(() => {});
   }
 }
 
@@ -321,6 +363,52 @@ export async function cleanupGhostAlarms(): Promise<number> {
   } catch (e) {
     Logger.warn('GhostCleanup', `error=${String(e)}`);
     return 0;
+  }
+}
+
+// ─── v1.8 #SoundRenameMigration — 사운드 파일 리네임 회귀 1회성 정정 ──────────────
+
+/**
+ * 사운드 파일 리네임(커밋 4fa2e2a, 2026-05-21) 회귀 정정 — 콜드 스타트 1회 실행.
+ *   문제: 리네임 이전 빌드에서 켠 alarm_main 체인은 옛 파일명(notification_alarm.wav 등)을
+ *     .named(...)로 OS에 박아둠. 리네임 후 빌드 번들엔 그 파일이 없음 →
+ *     AlarmKit이 발화 시 못 찾고 OS default(= 아이폰 기본 알람음)로 폴백.
+ *   정정: 켜진 알람 전체를 옛 체인 cancel + scheduleAlarmMain 재등록.
+ *     재등록 시 resolveSoundName()이 현재 파일명을 박음 → 번들 존재 → 정상 발화.
+ *   안전: AsyncStorage 플래그 1회 가드 → 반복 실행(churn) 구조 아님.
+ *     prealert/confirm_prompt 는 syncRollingSchedule 이 매 콜드 스타트 재생성 → 별도 처리 불필요.
+ *   cancelAlarmsForEntity 미사용 — 그 함수는 disableOnceAlarmIfNeeded 부수효과로
+ *     미발화 'once' 알람을 꺼버림. 여기선 alarm_main meta 만 직접 cancel.
+ */
+const SOUND_RENAME_MIGRATION_KEY = '@shuttimer/sound_rename_migration_v1';
+
+export async function migrateSoundRename(): Promise<void> {
+  if (!isAlarmKitAvailableSync()) return;
+  try {
+    if (await AsyncStorage.getItem(SOUND_RENAME_MIGRATION_KEY)) {
+      Logger.warn('alarmScheduler', 'migrateSoundRename skip — 이미 실행됨 (flag set)');
+      return;
+    }
+    Logger.warn('alarmScheduler', 'migrateSoundRename 시작 — 사운드 리네임 회귀 정정');
+
+    const alarms = await loadAlarms();
+    const allMeta = await listAllAlarmMetadata();
+    let count = 0;
+    for (const alarm of alarms) {
+      if (!alarm.enabled) continue;
+      // 옛 체인 직접 cancel — disable 부수효과 없는 cancelAlarm 사용.
+      const chainMetas = allMeta.filter(
+        m => m.type === 'alarm_main' && m.entityId === alarm.id
+      );
+      for (const meta of chainMetas) await cancelAlarm(meta.alarmId);
+      // 현재 사운드명으로 재등록.
+      await scheduleAlarmMain(alarm);
+      count += 1;
+    }
+    await AsyncStorage.setItem(SOUND_RENAME_MIGRATION_KEY, String(Date.now()));
+    Logger.warn('alarmScheduler', `migrateSoundRename 완료 — ${count}개 알람 재등록`);
+  } catch (e) {
+    Logger.warn('alarmScheduler', `migrateSoundRename error=${String(e)}`);
   }
 }
 

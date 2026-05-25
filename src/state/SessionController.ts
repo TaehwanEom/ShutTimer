@@ -33,6 +33,21 @@ import {
 
 export type SideEffect =
   | { kind: 'ScheduleAlarmChain'; binding: AlarmBinding }
+  /**
+   * Sub A-2 fix (2026-05-25, Timer 통합) — 단발성 알람 schedule (= chain X).
+   *   Timer 전용. AlarmkitBridge.scheduleAlarm({type: 'timer_main'}) 1회 호출 + saveAlarmMetadata.
+   *   simple_alarm chain 50개 (ScheduleAlarmChain) 와 분리. 정식 사이클 §0 Timer 별도 도구 정합.
+   */
+  | {
+      kind: 'ScheduleAlarmOnce';
+      entityId: string;
+      fireAt: number;
+      title: string;
+      stopLabel?: string;
+      soundName?: string;
+      laStepName?: string;
+      laRoutineName?: string;
+    }
   | { kind: 'CancelAlarmChain'; alarmEntityId: string }
   | {
       kind: 'ScheduleConfirmPrompt';
@@ -303,7 +318,8 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     //   simple_alarm = 잠금화면 1번만 출력 (= chain alarm 만으로 무한 울림). confirm_prompt = routine step 진행 전용.
     //   옛 코드 = simple_alarm 도 routine처럼 confirm_prompt 자동 schedule → 잠금화면 2차 출력 ("깜박임") 회귀.
     //   routine / ad_hoc_routine 측은 confirm_prompt 정상 (= step 사이 전환에 필요).
-    if (action.kind !== 'simple_alarm' && action.steps.length > 0) {
+    // Sub A-1 fix (2026-05-25) — kind='timer' 도 simple_alarm처럼 confirm_prompt 미사용 (= Timer 1회 알람만).
+    if ((action.kind === 'routine' || action.kind === 'ad_hoc_routine') && action.steps.length > 0) {
       const nextStep = action.steps[1];
       effects.push({
         kind: 'ScheduleConfirmPrompt',
@@ -329,6 +345,19 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       // 옛 startRoutine: cancelRoutinePrealerts (잔존 prealert 정리)
       // 3번 fix (2026-05-25) — ad_hoc kind alarmBinding 타입 강제로 차단됨. sessionId 직접 사용 (= ad_hoc sessionId = ADHOC_PREFIX + alarm.id = entityId 등가).
       effects.push({ kind: 'CancelRoutinePrealerts', routineId: newSession.sessionId });
+    }
+    // Sub A-2 fix (2026-05-25, Timer 통합) — kind='timer' 측 단발성 알람 schedule.
+    //   alarmBinding 필수 (Sub A-1 타입 강제). entityId = 'main_timer_xxx'. fireAt = newSession.stepEndAt (= now + duration).
+    //   title / laRoutineName = action.routineName 또는 action.laMeta 측 사용. 사운드 = effectRunner 측 settings cache read.
+    if (action.kind === 'timer') {
+      effects.push({
+        kind: 'ScheduleAlarmOnce',
+        entityId: action.alarmBinding.alarmEntityId,
+        fireAt: newSession.stepEndAt,
+        title: action.routineName ?? action.laMeta?.routineName ?? '타이머',
+        laStepName: action.laMeta?.stepName,
+        laRoutineName: action.laMeta?.routineName ?? action.routineName,
+      });
     }
     return { next: newSession, effects };
   }

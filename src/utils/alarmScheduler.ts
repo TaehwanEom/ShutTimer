@@ -204,8 +204,10 @@ export async function cancelAlarm(alarmKitId: string): Promise<void> {
  */
 export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void> {
   const all = await listAllAlarmMetadata();
+  // Sub A-4 fix (2026-05-25, Timer 통합) — filter 확장. timer_main 도 cancel 대상.
+  //   Timer dismiss → dispatch Dismiss → CancelAlarmChain effect → 본 함수 호출 → entityId 매칭 alarm_main + timer_main 모두 cancel.
   const targets = all.filter(
-    m => m.type === 'alarm_main' && m.entityId === alarmEntityId
+    m => (m.type === 'alarm_main' || m.type === 'timer_main') && m.entityId === alarmEntityId
   );
   const targetIds = new Set(targets.map(t => t.alarmId));
 

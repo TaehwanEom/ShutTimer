@@ -38,7 +38,11 @@ import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { Logger } from '../utils/logger';
-import { saveAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
+import { saveAlarmMetadata, deleteAlarmMetadata, listAllAlarmMetadata } from '../utils/alarmkitMappingTable';
+// Sub A-2 fix (2026-05-25, Timer 통합) — Timer 시작 → dispatch Start kind='timer' 경유.
+//   transition Start 측 ScheduleAlarmOnce effect 발동 → effectRunner 측 AlarmkitBridge.scheduleAlarm + saveAlarmMetadata 호출.
+//   옛 HomeScreen 직접 호출 폐기.
+import { dispatch as sessionDispatch } from '../state/SessionController';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 import { stopRoutine } from '../utils/routineController';
@@ -478,40 +482,51 @@ export default function HomeScreen({ navigation, route }: Props) {
                   ? t('home.alarmTitleRandom', { defaultValue: '타이머 완료' })
                   : t('home.alarmTitleCamera', { defaultValue: '타이머 완료\n사물 스캔 종료' });
       try {
-        const id = await AlarmkitBridge.scheduleAlarm({
-          entityId: routineId,
-          title: alarmTitle,
-          fireAt,
-          stopLabel: t('home.timerStop', { defaultValue: '확인' }),
-          type: 'timer_main',
-          soundName: soundItem.pushSound, // v1.6 hotfix — 사용자 설정 사운드 풀스크린 발화
-          // v1.7 hotfix #LAUnify Phase 5 — AlarmKit framework LA Activity metadata 측 step 데이터.
-          //   단일 타이머 = totalSteps=1, stepIndex=0, stepName="타이머".
-          laStepName: t('home.timerName', { defaultValue: '타이머' }),
-          laStepIndex: 0,
-          laTotalSteps: 1,
-          laStage: 'step',
-          laRoutineId: routineId,
-          laRoutineName: t('home.timerName', { defaultValue: '타이머' }),
+        // Sub A-2 fix (2026-05-25, Timer 통합) — AlarmkitBridge.scheduleAlarm 직접 호출 폐기 → dispatch Start kind='timer' 경유.
+        //   transition Start kind='timer' → ScheduleAlarmOnce effect → effectRunner 측 AlarmkitBridge.scheduleAlarm + saveAlarmMetadata 호출.
+        //   alarmkitIdRef 갱신 = dispatch 후 mapping table 측 entityId 매칭 lookup (= 옛 Sub A-5 보류로 Pause/Resume/cancel 코드 잔존 정합).
+        const timerName = t('home.timerName', { defaultValue: '타이머' });
+        await sessionDispatch({
+          type: 'Start',
+          kind: 'timer',
+          sessionId: routineId,
+          steps: [{
+            index: 0,
+            name: timerName,
+            durationSeconds: seconds,
+            endMethod: 'tap',
+            soundName: soundItem.pushSound,
+          }],
+          alarmBinding: {
+            alarmEntityId: routineId,
+            alarmType: 'main',
+            alarmRepeat: 'once',
+            currentAlarmId: null,
+            chainAlarmIds: [],
+            chainCount: 0,
+          },
+          replaceExisting: true,
+          routineName: alarmTitle,
+          laMeta: {
+            routineName: timerName,
+            stepName: timerName,
+            stepIndex: 0,
+            totalSteps: 1,
+          },
         });
-        Logger.warn('timer', `scheduled id: ${id}`);
-        // Phase E 진단 — 등록 직후 system 측 alarm 상태
-        try {
-          const after = await AlarmkitBridge.listAlarms();
-          Logger.warn('timer', `alarms after: ${after.length} ${JSON.stringify(after)}`);
-        } catch (e) {
-          Logger.warn('timer', `listAlarms after fail: ${String(e)}`);
-        }
-        if (id) {
-          await saveAlarmMetadata({ alarmId: id, type: 'timer_main', entityId: routineId });
-          alarmkitIdRef.current = id;
+        // mapping table 측 dispatch 결과 alarmId lookup → alarmkitIdRef 갱신.
+        const metas = await listAllAlarmMetadata();
+        const meta = metas.find(m => m.entityId === routineId && m.type === 'timer_main');
+        if (meta) {
+          alarmkitIdRef.current = meta.alarmId;
           // v1.6 Phase 10-A — LA Intent 가 read 해 AlarmKit pause/resume/cancel 호출
-          writeChainAlarms(routineId, [id]);
+          writeChainAlarms(routineId, [meta.alarmId]);
+          Logger.warn('timer', `scheduled via dispatch id: ${meta.alarmId}`);
           return;
         }
+        Logger.warn('timer', `dispatch Start completed but mapping lookup failed entityId=${routineId}`);
       } catch (e) {
-        // Phase E 진단 — catch 빈 블록 → throw 표면화
-        Logger.warn('timer', `schedule throw: ${String(e)}`);
+        Logger.warn('timer', `dispatch Start throw: ${String(e)}`);
       }
     }
 

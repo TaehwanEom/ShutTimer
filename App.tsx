@@ -356,20 +356,24 @@ function AppNavigator() {
       // v2.0 영역 B — Session dispatch 흡수. alarm_main 측 navigate + ⑨ guard 모두 dispatch 가 처리.
       //   confirm_prompt / prealert 는 옛 흐름 유지 (영역 D 미흡수).
       //   ghost=true 시 옛 흐름 즉시 종료 (silent native cleanup 완료).
-      if (meta.type === 'alarm_main' || meta.type === 'confirm_prompt' || meta.type === 'prealert') {
+      // Sub A-3 fix (2026-05-25, Timer 통합) — timer_main 포함 (= alarm_main과 동일 path 통합).
+      //   Timer Session 생성됨 (Sub A-2 dispatch Start kind='timer') → transition OnAlarmFire 측 entityId 매칭 → STEP_ALERTING 전이.
+      if (meta.type === 'alarm_main' || meta.type === 'timer_main' || meta.type === 'confirm_prompt' || meta.type === 'prealert') {
+        const alarmType: 'main' | 'confirm_prompt' | 'prealert' =
+          meta.type === 'alarm_main' || meta.type === 'timer_main' ? 'main' : meta.type;
         const fireResult = await onAlarmFire({
           alarmId: event.alarmId,
           entityId: meta.entityId,
-          alarmType: meta.type === 'alarm_main' ? 'main' : meta.type,
+          alarmType,
         }).catch(() => ({ ghost: false }));
         if (fireResult.ghost) return;
       }
-      // 옵션 4 fix (2026-05-25, log02 버그 — 포그라운드 알람 무반응) — alarm_main + AppState='active' 시 SESSION_EVENT_NAVIGATE Alarm emit.
+      // 옵션 4 fix + Sub A-3 (2026-05-25) — alarm_main + timer_main 둘 다 포그라운드 + AppState='active' 시 SESSION_EVENT_NAVIGATE Alarm emit.
       //   원인: suppressFlag 가드 (line 332-337) 가 포그라운드 알람 즉시 cancel → native UI X. 위반-11 fix 후 NavigateAlarmScreen effect 제거 → in-app mount path X.
       //   옵션 2 fix (transition OnAppActive)는 background→active transition만 trigger. 이미 active 상태에서 fire = transition 없음 → 무작동.
       //   정정: 포그라운드 알람 fire 시 직접 SESSION_EVENT_NAVIGATE Alarm emit → AlarmScreen mount.
-      if (meta.type === 'alarm_main' && AppState.currentState === 'active') {
-        Logger.warn('onAlarmStateChange-DBG', `포그라운드 알람 → SESSION_EVENT_NAVIGATE Alarm entityId=${meta.entityId}`);
+      if ((meta.type === 'alarm_main' || meta.type === 'timer_main') && AppState.currentState === 'active') {
+        Logger.warn('onAlarmStateChange-DBG', `포그라운드 알람 (${meta.type}) → SESSION_EVENT_NAVIGATE Alarm entityId=${meta.entityId}`);
         DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, {
           target: 'Alarm',
           alarmEntityId: meta.entityId,
@@ -384,16 +388,10 @@ function AppNavigator() {
         return;
       }
 
-      if (meta.type === 'timer_main') {
-        // v1.6 Phase 9: 일반 타이머 AlarmKit fire → AlarmScreen navigate
-        // v1.6 hotfix — deleteAlarmMetadata 호출 제거. AlarmScreen.stopAudioAndVibration 의
-        // listAllAlarmMetadata loop 가 cancel + delete 통합 처리 (race 방지: listener 가
-        // 먼저 metadata 삭제하면 AlarmScreen cleanup 이 A 를 못 찾아 system 측 ghost 잔존).
-        if (currentRoute === 'Alarm') return;
-        Logger.warn('NAV-DBG-COLD', `onAlarmState-timer_main navigate Alarm currentRoute=${currentRoute} alarmId=${event.alarmId}`);
-        navigationRef.current?.navigate('Alarm');
-        return;
-      }
+      // Sub A-3 fix (2026-05-25, Timer 통합) — timer_main listener 분기 폐기.
+      //   옛 동작: navigationRef.navigate('Alarm') 직접 호출 (= Session 외부 path).
+      //   정정: Timer Session 생성됨 (Sub A-2) → onAlarmFire (alarmType='main') 위에서 처리됨 → transition OnAlarmFire 측 entityId 매칭 → STEP_ALERTING 전이 → 옵션 4 fix 측 SESSION_EVENT_NAVIGATE Alarm emit (단 timer_main도 emit 대상 포함).
+      //   = 옛 navigate 직접 호출 폐기. 통합 path 사용.
 
       // v1.6+ 알람 entity 측 발화 분기 (= type='alarm_main').
       // v2.0 영역 B — ⑨ guard + navigate 는 dispatch 가 처리 (위 onAlarmFire). 본 분기는 부수 작업만.
@@ -478,11 +476,9 @@ function AppNavigator() {
         await deleteAlarmMetadata(alerting.id);
         return;
       }
-      if (meta.type === 'timer_main') {
-        Logger.warn('NAV-DBG-COLD', `alertingCheck-timer_main navigate Alarm alarmId=${alerting.id}`);
-        navigationRef.current?.navigate('Alarm');
-        return;
-      }
+      // Sub A-3 fix (2026-05-25, Timer 통합) — timer_main 분기 폐기.
+      //   Timer Session 통합됨 → cold start / active 진입 시 OnAppActive dispatch → 옵션 2 fix (transition OnAppActive STEP_ALERTING + alarmBinding) → NavigateAlarmScreen effect → AlarmScreen mount.
+      //   = 옛 직접 navigate 폐기. 통합 path 사용.
       if (meta.type === 'alarm_main') {
         await recordAlarmSession().catch(() => {});
         await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});

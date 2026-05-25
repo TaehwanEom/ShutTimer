@@ -293,18 +293,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
       clearInterval(vibrationIntervalRef.current);
       vibrationIntervalRef.current = null;
     }
-    // v1.6 hotfix — AlarmKit timer_main alarm cancel (시스템 alerting UI 사운드 중단).
-    // 미적용 시 stopAsync 가 expo-av 만 정리해 system alerting 사운드 잔존 → 지속 울림.
-    // type='timer_main' 만 filter — 루틴 진행 중 일반 타이머 dismiss 시 routine 알람 보존.
+    // Sub A-4 fix (2026-05-25, Timer 통합) — timer_main filter 직접 cancel 폐기.
+    //   옛 동작: timer_main alarm만 직접 cancel (alarm_main chain은 별도 cancelAlarmsForEntity 호출).
+    //   정정: Timer Session 통합 후 = dispatchDismiss('success') (line 286) → transition Dismiss → CancelAlarmChain effect → cancelAlarmsForEntity (filter 확장으로 timer_main 포함) → 통합 cancel.
+    //   = 옛 timer_main filter loop 폐기.
     try {
       const metas = await listAllAlarmMetadata();
       Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration metas.count=${metas.length}`);
-      for (const m of metas) {
-        if (m.type === 'timer_main') {
-          await AlarmkitBridge.cancelAlarm(m.alarmId).catch(() => {});
-          await deleteAlarmMetadata(m.alarmId).catch(() => {});
-        }
-      }
       // v1.8 #AlarmRepeat — 알람 entity 측 dismiss 시 = chain 형제 일괄 cancel.
       // 직전 = alerting 1개만 stop → scheduled 측 chain 49개 잔존 → 2분 뒤 또 울림 회귀.
       // 정정 = route.params.alarmEntityId 측 = mapping table entityId 매칭 chain 전체 cancel.

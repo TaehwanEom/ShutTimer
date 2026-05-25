@@ -32,6 +32,7 @@ import {
 import {
   listAllAlarmMetadata,
   deleteAlarmMetadata,
+  saveAlarmMetadata,
 } from '../utils/alarmkitMappingTable';
 import {
   PENDING_DISABLED_ALARMS_KEY,
@@ -131,6 +132,39 @@ async function runEffect(effect: SideEffect): Promise<void> {
       await cancelAlarmsForEntity(effect.alarmEntityId).catch((e) => {
         Logger.warn('effectRunner', `CancelAlarmChain error=${String(e)}`);
       });
+      return;
+    }
+
+    // Sub A-2 fix (2026-05-25, Timer 통합) — 단발성 알람 schedule.
+    //   AlarmkitBridge.scheduleAlarm({type: 'timer_main'}) 1회 호출 + saveAlarmMetadata.
+    //   사운드 = settings cache read (= HomeScreen 측 옛 코드 정합).
+    case 'ScheduleAlarmOnce': {
+      try {
+        const soundId = (await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND)) ?? DEFAULT_SOUND_ID;
+        const soundItem = ALARM_SOUNDS.find((s) => s.id === soundId) ?? ALARM_SOUNDS[0];
+        const id = await AlarmkitBridge.scheduleAlarm({
+          entityId: effect.entityId,
+          title: effect.title,
+          fireAt: effect.fireAt,
+          stopLabel: effect.stopLabel ?? '확인',
+          type: 'timer_main',
+          soundName: soundItem.pushSound,
+          laStepName: effect.laStepName ?? '타이머',
+          laStepIndex: 0,
+          laTotalSteps: 1,
+          laStage: 'step',
+          laRoutineId: effect.entityId,
+          laRoutineName: effect.laRoutineName ?? '타이머',
+        });
+        if (id) {
+          await saveAlarmMetadata({ alarmId: id, type: 'timer_main', entityId: effect.entityId });
+          Logger.warn('effectRunner', `ScheduleAlarmOnce id=${id} entityId=${effect.entityId} fireAt=${effect.fireAt}`);
+        } else {
+          Logger.warn('effectRunner', `ScheduleAlarmOnce returned null id entityId=${effect.entityId}`);
+        }
+      } catch (e) {
+        Logger.warn('effectRunner', `ScheduleAlarmOnce error=${String(e)}`);
+      }
       return;
     }
 

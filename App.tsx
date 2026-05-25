@@ -555,6 +555,10 @@ function AppNavigator() {
       if (state === 'active') {
         onAppActive().catch(() => {});
         runAlertingAlarmCheck();
+        // v1.9 #StepEndCatchUp — AppState=active 진입 시 = restoreRoutineState 호출 → stepEndAt 만료 시 OnEndAtReached dispatch.
+        //   직전 = native AlarmKit .timer(duration:) 측 = background throttle/deferral 시 = countdown 측 정시 fire 안 됨 (log02 측 step 02 5분 지연 보고).
+        //   정정 = active 진입 시 = JS 측 stepEndAt 검사 + 만료 시 즉시 advance → native fire 측 지연 측 = JS 측 fallback 보장.
+        restoreRoutineState().catch(() => {});
         // v1.9 #OrphanCleanupOnActive — AppState=active 진입 시 orphan alarm cleanup 호출.
         //   직전 = cleanupGhostAlarms 측 = AppNavigator cold start 측만 호출. 사용자 측 앱 측 = 이미 띄워둔 상태 측
         //   = cold start 측 X → orphan 측 잔존 → 옛 잘못된 alarm 매일 fire.

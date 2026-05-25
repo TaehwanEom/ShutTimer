@@ -75,7 +75,7 @@ export async function dispatchDisableAlarm(alarmEntityId: string) {
 // ───────────────────────────────────────────────────────────
 
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
-import { deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
+import { deleteAlarmMetadata, saveAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { isGhostAlarmFire } from './effectRunner';
 // v2.0 C-1 — simple_alarm kind 자동 Session 생성용 (loadAlarms 측 이미 line 22 import 잔존)
 import { getCachedDismissMethod } from '../utils/settingsCache';
@@ -226,6 +226,24 @@ export async function onLAControlSignal(params: {
       return;
     case 'advance_done':
       // v2.0 C.7 — syncRoutineFromSnapshot 본체가 dispatch(OnSnapshotChange) 호출 → 중복 회피 위해 본 case 측 dispatch 제거.
+      // v1.9 #AdvanceMappingSave — native AdvanceNextStepIntent 측 mapping save 누락 root cause 차단.
+      //   native 측 = scheduleNextStepAlarm 측 = AlarmKit framework 측 schedule + snapshot 갱신만.
+      //   JS mapping table 측 save 측 native 측 호출 X → 다음 step alerting 시 meta=NULL silent skip 회귀 영역
+      //   + 사용자 cancel 시 mapping 측 추적 X → orphan alarm 누적 (= log02 측 22:14, 22:16 잔존 root cause).
+      //   정정 = advance_done signal 받는 시점 = snapshot 읽음 → currentAlarmId + routineId 측 mapping save.
+      try {
+        const snap = readRoutineSnapshot();
+        if (snap && snap.currentAlarmId && snap.routineId === routineId) {
+          await saveAlarmMetadata({
+            alarmId: snap.currentAlarmId,
+            type: 'confirm_prompt',
+            entityId: snap.routineId,
+          });
+          Logger.warn('LAControl-DBG', `advance_done mapping save alarmId=${snap.currentAlarmId} routineId=${snap.routineId}`);
+        }
+      } catch (e) {
+        Logger.warn('LAControl-DBG', `advance_done mapping save fail err=${String(e)}`);
+      }
       await syncRoutineFromSnapshot(routineId);
       DeviceEventEmitter.emit('routineAdvancedExternally', { routineId });
       return;

@@ -170,8 +170,9 @@ async function scheduleAlarmAt(
     laRoutineId: alarm.id,
     laRoutineName: '다음 알람\n남은 시간',
   } as const;
+  let nativeId: string | null = null;
   try {
-    const id = await AlarmkitBridge.scheduleAlarm({
+    nativeId = await AlarmkitBridge.scheduleAlarm({
       entityId: alarm.id,
       title,
       countdownTitle,
@@ -181,17 +182,22 @@ async function scheduleAlarmAt(
       recurrence,
       ...laMeta,
     });
-    if (!id) return null;
+    if (!nativeId) return null;
     await saveAlarmMetadata({
-      alarmId: id,
+      alarmId: nativeId,
       type: 'alarm_main',
       entityId: alarm.id,
       chainIndex,
       chainBaseFireAt,
     });
-    return id;
+    return nativeId;
   } catch (e) {
-    Logger.warn('alarmScheduler', `scheduleAlarm error=${String(e)}`);
+    // v1.9 #ScheduleAtomicity — saveAlarmMetadata 실패 시 = native id 측 orphan 회피 위해 cancel rollback.
+    //   직전 = catch → return null → native 측 잔존 (= mapping 측 X) → orphan.
+    Logger.warn('alarmScheduler', `scheduleAlarm error=${String(e)} (rollback nativeId=${nativeId ?? '(none)'})`);
+    if (nativeId) {
+      await AlarmkitBridge.cancelAlarm(nativeId).catch(() => {});
+    }
     return null;
   }
 }

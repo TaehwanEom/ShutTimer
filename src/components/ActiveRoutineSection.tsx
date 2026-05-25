@@ -234,20 +234,20 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   }, [ar?.awaitingConfirm, ar?.currentStepIndex]);
 
   // ─── 카운트다운 tick ──────────────────────────────────────
+  // 2026-05-25 사용자 요구 — V1 timer-tick 디버그 로그 spam 제거 (= 매초 3개 로그 폭주, AsyncStorage 공간 + 신호 대 잡음 영향).
+  //   T8-DBG (handleMissionEnd trigger) 만 유지. effect run / EARLY CLEANUP / START interval / EFFECT CLEANUP 4곳 제거.
   useEffect(() => {
-    Logger.warn('V1 timer-tick', `effect run routine=${!!routine} ar=${!!ar} isPaused=${isPaused} pausedAt=${ar?.pausedAt} awaitingConfirm=${ar?.awaitingConfirm} modalVisible=${modalVisible}`);
     // v1.6 #4-C Fix 1 — ar.pausedAt 가드 추가. 위젯 pause 신호 폴링 처리 후 ar.pausedAt 가 갱신됐지만
     // setIsPaused(true) emit 가 race 로 늦으면 tick 진행 → 시간 mismatch. ar.pausedAt 검사로 확실 차단.
     if (!routine || !ar || isPaused || ar.pausedAt !== null || ar.awaitingConfirm || modalVisible) {
-      if (tickRef.current) { Logger.warn('V1 timer-tick', 'EARLY CLEANUP'); clearInterval(tickRef.current); tickRef.current = null; }
+      if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
       return;
     }
-    Logger.warn('V1 timer-tick', 'START interval');
     const update = () => {
       const remainMs = ar.stepEndAt - Date.now();
       setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
       if (remainMs <= 0) {
-        // M0 진단: T8 미스터리 1 후보 — interval tick caller 식별.
+        // M0 진단: T8 미스터리 1 후보 — interval tick caller 식별. (유지)
         Logger.warn('T8-DBG', `handleMissionEnd trigger caller=interval-tick stepEndAt=${ar.stepEndAt} now=${Date.now()} routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
         // v2.0 P2-1 — 옛 onEndAtReached() 부수 호출 폐기.
         //   handleMissionEnd → completeCurrentMission → sessionDispatch(OnEndAtReached) 측 이미 dispatch 호출.
@@ -259,7 +259,6 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // v1.8 #PerfTickStep — 500ms → 1000ms. setRemainingSec(Math.ceil(remainMs/1000)) 측 같은 초 측 같은 값 → React skip → re-render 측 1초 1회 측 동일. 호출 빈도 측 절반 ↓.
     tickRef.current = setInterval(update, 1000);
     return () => {
-      Logger.warn('V1 timer-tick', 'EFFECT CLEANUP');
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

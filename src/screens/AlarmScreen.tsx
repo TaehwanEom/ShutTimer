@@ -350,8 +350,12 @@ export default function AlarmScreen({ navigation, route }: Props) {
     if (alarmEntityId) return;
     // v1.9 #DualSoTFix — AsyncStorage isRoutineActive 측 read → race 시 false positive.
     //   정정 = getCurrentSession() 측 Session state 단독 SoT 사용 (= dispatch 측 직렬화 보장).
+    // v1.9 #MountRaceFix — getCurrentSession await ~ navigation.reset 사이 200ms race 회피.
+    //   await 중 = 다른 dispatch 측 = session 변경 → reset 시점 측 state stale. mountedRef + dismissedRef guard 측 추가.
+    let mounted = true;
     (async () => {
       const session = await getCurrentSession();
+      if (!mounted || dismissedRef.current) return;
       if (!session) return;
       if (session.kind !== 'routine' && session.kind !== 'ad_hoc_routine') return;
       if (session.state === 'IDLE') return;
@@ -362,6 +366,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
         navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
       }
     })().catch(() => {});
+    return () => { mounted = false; };
   }, [navigation, route.params]);
 
   // v2.0 C-4 — isAlarmActive AsyncStorage 측 mount/unmount write 폐기.

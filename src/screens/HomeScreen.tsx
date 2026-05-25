@@ -977,9 +977,15 @@ export default function HomeScreen({ navigation, route }: Props) {
         const newRemainingSecs = Math.max(1, Math.ceil((endAtRef.current - now) / 1000));
         // v1.9 #AlarmConflictPauseResume — pause + dial 변경 측 reschedule 전 갭 체크 + dialog.
         //   직전 = 무조건 reschedule → 갭 dialog 누락.
-        //   정정 = checkAlarmConflictAndConfirm 측 호출 → "취소" 시 paused 상태 유지 (= resume 측 진행 X, 사용자 다시 다이얼 조정 또는 취소 가능).
+        //   정정 = checkAlarmConflictAndConfirm 측 호출 → "취소" 시 paused 상태 복원 (= resume 측 진행 X, 사용자 다시 다이얼 조정 또는 취소 가능).
         const proceed = await checkAlarmConflictAndConfirm(newRemainingSecs);
-        if (!proceed) return;
+        if (!proceed) {
+          // v1.9 #PauseStateRevert — handlePauseResume 진입 시 line 953-954 측 isPaused=false 즉시 toggle.
+          //   "취소" 시 = isPaused 복원 안 하면 → UI 측 카운트다운 진행 + native 측 변경 X = 불일치.
+          isPausedRef.current = true;
+          setIsPaused(true);
+          return;
+        }
         totalSecondsRef.current = newRemainingSecs;
         // scheduleAlarm 내부 = 기존 alarmkitIdRef cancel + 새 alarm schedule + alarmkitIdRef swap 자동.
         await scheduleAlarm(newRemainingSecs);

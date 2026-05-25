@@ -36,7 +36,7 @@ export type SideEffect =
   /**
    * Sub A-2 fix (2026-05-25, Timer 통합) — 단발성 알람 schedule (= chain X).
    *   Timer 전용. AlarmkitBridge.scheduleAlarm({type: 'timer_main'}) 1회 호출 + saveAlarmMetadata.
-   *   simple_alarm chain 50개 (ScheduleAlarmChain) 와 분리. 정식 사이클 §0 Timer 별도 도구 정합.
+   *   simple_alarm chain 30개 (ScheduleAlarmChain) 와 분리. 정식 사이클 §0 Timer 별도 도구 정합.
    */
   | {
       kind: 'ScheduleAlarmOnce';
@@ -688,7 +688,7 @@ function transition(current: Session | null, action: SessionAction): TransitionR
   //   사용자 의도: "음향버튼/밀어서종료 후 앱 진입 → chain 회수 + 미션 화면 진입".
   //   버그 (log01): 음향버튼 silent dismiss → 1분 뒤 자발 앱 진입 → suppressFlag 가드로 alerting alarm cancel → AlarmScreen mount path 없음 → 미션 화면 X.
   //   정정: Session.state === 'STEP_ALERTING' + alarmBinding 있으면 → NavigateAlarmScreen effect.
-  //     → AlarmScreen mount → stopAudioAndVibration → cancelAlarmsForEntity → chain 50개 회수.
+  //     → AlarmScreen mount → stopAudioAndVibration → cancelAlarmsForEntity → chain 30개 회수.
   //   중복 mount 차단: App.tsx SESSION_EVENT_NAVIGATE listener 측 currentRoute === 'Alarm' 가드.
   //   정상 흐름 무영향: STEP_ALERTING 아닌 상태 (IDLE/CONFIRMING) = effects [].
   if (action.type === 'OnAppActive') {

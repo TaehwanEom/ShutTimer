@@ -145,7 +145,7 @@ export type SessionAction =
   // User UI ─────────────────────────────────────────────────
   /**
    * Sub A-1 fix (2026-05-25, Timer 통합) + 3번 fix (잠재 위반-2 차단) — 타입 시스템 강제.
-   *   simple_alarm = alarmBinding 필수 (chain 50개 schedule 본체).
+   *   simple_alarm = alarmBinding 필수 (chain 30개 schedule 본체).
    *   timer = alarmBinding 필수 (1회 schedule. chain X = ScheduleAlarmOnce effect — Sub A-2 신설).
    *   routine / ad_hoc_routine = alarmBinding 전달 불가 (chain X = §3-B-1 정합).
    *   = 컴파일타임 차단.
@@ -177,7 +177,7 @@ export type SessionAction =
        */
       sessionId?: string;
       steps: Step[];
-      /** 3번 fix: routine/ad_hoc_routine 측 alarmBinding 차단 (= chain 50개 schedule 금지) */
+      /** 3번 fix: routine/ad_hoc_routine 측 alarmBinding 차단 (= chain 30개 schedule 금지) */
       alarmBinding?: undefined;
       /** ad-hoc routine 무조건 override 정합 (alarmRoutineLink.startRoutineFromAlarm:54-57) */
       replaceExisting?: boolean;

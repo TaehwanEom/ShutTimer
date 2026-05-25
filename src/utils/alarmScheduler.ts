@@ -61,7 +61,7 @@ async function resolveSoundName(): Promise<string | undefined> {
  * v1.8 #AlarmChainEager — 알람 entity 측 AlarmKit 등록 + 2분 간격 chain 전체 미리 예약.
  * 정책 (= 사용자분 측 명시):
  *   - native 측 .alarm(schedule:) factory 측 사용 = AlarmPresentation 측 alert-only = LA 측 생성 ❌
- *   - chain = 알람 등록 시점에 전체 미리 예약 (= 활성 알람 갯수 분배, 최대 50개) → 잠금/앱 종료 상태에서도 OS가 전부 발화.
+ *   - chain = 알람 등록 시점에 전체 미리 예약 (= 활성 알람 갯수 분배, 최대 30개) → 잠금/앱 종료 상태에서도 OS가 전부 발화.
  *   - v1.8 #AlarmChainRecurring — chainIndex 0/1+ 모두 .relative OS 반복 (daily/weekly) → 재예약 없이 매주/매일 자동 갱신. 'once' 만 .fixed 단발.
  *   - 직전 lazy chain (= 발화 listener 측 다음 1개 등록) 폐기 — 잠금 상태 앱 suspend 시 listener 미발화 → chain 끊김 회귀 root cause.
  *   - 발화 (alerting) 시 → 'once' 측 자동 disable (= disableOnceAlarmIfNeeded 측 listener 분기 정합).
@@ -78,7 +78,7 @@ function mapAlarmRepeatToRecurrence(alarm: Alarm): { mode: 'never' | 'daily' | '
 }
 
 // v1.8 #AlarmChainRecurring — 체인 멤버가 기준 알람 대비 며칠 뒤 날짜에 발화하는지.
-// 체인 길이 최대 100분 (50회 × 2분) → 자정은 1회만 넘을 수 있어 결과는 0 또는 1.
+// 체인 길이 최대 60분 (30회 × 2분) → 자정은 1회만 넘을 수 있어 결과는 0 또는 1.
 // weekly 알람의 자정-크로스 멤버 요일 보정용. 로컬 시각 기준 (= nextAlarmOccurrenceTime 정합).
 function chainMemberDayOffset(baseFireAt: number, memberFireAt: number): number {
   const startOfDay = (ms: number): number => {
@@ -120,10 +120,10 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
   if (baseFireAt === null) return null;
 
   // v1.8 #AlarmChainEager — 활성 알람 갯수만큼 chain 예산 분배 (= AlarmKit 총 알람 수 제한 대응).
-  //   1개 활성 → 50개, 2개 → 25개, 10개 → 5개. 최소 1개 보장.
+  //   1개 활성 → 30개, 2개 → 15개, 10개 → 3개. 최소 1개 보장.
   const all = await loadAlarms();
   const activeCount = Math.max(1, all.filter(a => a.enabled).length);
-  const chainTotal = ALARM_CHAIN_MAX_INDEX + 1; // 50
+  const chainTotal = ALARM_CHAIN_MAX_INDEX + 1; // 30
   const chainCount = Math.max(1, Math.min(chainTotal, Math.floor(chainTotal / activeCount)));
 
   // v1.8 #AlarmChainEager — chain 전체를 등록 시점에 미리 예약 (= 잠금/앱 종료 상태 OS 자동 발화).
@@ -263,10 +263,11 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
 }
 
 // v1.8 #AlarmChainEager — 2분 간격 chain. 알람 등록 시점 scheduleAlarmMain 측에서 chain 전체 미리 예약.
-//   chainIndex 0..49 = 총 50회 = 100분. 활성 알람 갯수만큼 분배.
+//   chainIndex 0..29 = 총 30회 = 60분. 활성 알람 갯수만큼 분배.
 //   직전 lazy chain (scheduleAlarmChainNext = 발화 listener 측 다음 1개 등록) 폐기 — 잠금 suspend 시 미발화 회귀.
+//   v1.9 — chain 50 → 30 축소 (= 100분 → 60분 ringing 보장). 사용자 100분까지 도달하지 않을 영역.
 export const ALARM_CHAIN_INTERVAL_MS = 120000; // 2분
-export const ALARM_CHAIN_MAX_INDEX = 49; // chainIndex 0..49 = 총 50회 = 100분
+export const ALARM_CHAIN_MAX_INDEX = 29; // chainIndex 0..29 = 총 30회 = 60분
 
 /**
  * 앱 기동 / 루틴 복원 시 호출. alarm_main 체인 정합성 동기화.
@@ -282,7 +283,7 @@ export async function syncAllAlarms(): Promise<void> {
   if (!isAlarmKitAvailableSync()) return;
 
   const now = Date.now();
-  // 'once' 체인 수명 = 50회 × 2분 = 100분. 기준시각 + 수명 < now → 전 멤버 발화 완료 = 죽은 체인.
+  // 'once' 체인 수명 = 30회 × 2분 = 60분. 기준시각 + 수명 < now → 전 멤버 발화 완료 = 죽은 체인.
   const chainLifespanMs = (ALARM_CHAIN_MAX_INDEX + 1) * ALARM_CHAIN_INTERVAL_MS;
 
   // alarm_main mapping을 entityId 기준 그룹화.

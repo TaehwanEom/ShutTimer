@@ -579,14 +579,45 @@ export default function HomeScreen({ navigation, route }: Props) {
       const alarms = await loadAlarms();
       const enabledAlarms = alarms.filter(a => a.enabled);
       const limitMs = nowMs + (total + 300) * 1000;
-      let conflict: { time: number; label: string; alarmId: string } | null = null;
+      let conflict: { time: number; label: string; alarmId: string; isUserAlarm: boolean } | null = null;
       for (const a of enabledAlarms) {
         const next = nextAlarmOccurrenceTime(a, new Date(nowMs));
         if (next !== null && next >= nowMs && next <= limitMs) {
           if (!conflict || next < conflict.time) {
-            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id };
+            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id, isUserAlarm: true };
           }
         }
+      }
+      // v1.9 #AlarmTimerConflictRoutine — native alarm 측 추가 검사 (= routine confirm_prompt + 사용자 알람 chain).
+      //   직전 = enabledAlarms 측 (= AsyncStorage 사용자 알람) 측만 검사 → routine 진행 중 alarm (= confirm_prompt countdown) 누락 → dialog 미노출.
+      //   정정 = AlarmkitBridge.listAlarms() 측 native alarm + mapping table 측 type 측 추가 검사.
+      //   isUserAlarm=false 측 (= routine alarm) "그래도 시작" 측 = cancel ❌ + 동시 진행 (= routine 종료 X).
+      try {
+        const nativeAlarms = await AlarmkitBridge.listAlarms();
+        const allMeta = await listAllAlarmMetadata();
+        const userAlarmIds = new Set(enabledAlarms.map(a => a.id));
+        for (const native of nativeAlarms) {
+          let nextFire: number | null = null;
+          if (native.state === 'countdown' && native.preAlertSeconds != null) {
+            nextFire = nowMs + native.preAlertSeconds * 1000;
+          } else if (native.state === 'scheduled' && native.fixedFireMs != null) {
+            nextFire = native.fixedFireMs;
+          }
+          if (nextFire === null || nextFire < nowMs || nextFire > limitMs) continue;
+          const meta = allMeta.find(m => m.alarmId === native.id);
+          if (!meta) continue;
+          if (meta.type !== 'confirm_prompt' && meta.type !== 'alarm_main') continue;
+          // 사용자 알람 측 = 직전 검사 중복 → skip.
+          if (meta.type === 'alarm_main' && userAlarmIds.has(meta.entityId)) continue;
+          const label = meta.type === 'confirm_prompt'
+            ? t('routine.routineAlarmLabel', { defaultValue: '루틴 진행 중 알람' })
+            : t('history.alarmDefaultLabel', { defaultValue: '알람' });
+          if (!conflict || nextFire < conflict.time) {
+            conflict = { time: nextFire, label, alarmId: meta.entityId, isUserAlarm: false };
+          }
+        }
+      } catch (e) {
+        Logger.warn('timer', `alarmConflict native check fail err=${String(e)}`);
       }
       if (conflict) {
         const d = new Date(conflict.time);
@@ -605,18 +636,22 @@ export default function HomeScreen({ navigation, route }: Props) {
               {
                 text: t('routine.alarmConflictProceed'),
                 onPress: async () => {
-                  try {
-                    const target = enabledAlarms.find(x => x.id === c.alarmId);
-                    if (target) {
-                      await upsertAlarm({ ...target, enabled: false });
-                      await cancelAlarmsForEntity(c.alarmId);
-                      const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
-                      const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
-                      if (!prev.includes(c.alarmId)) prev.push(c.alarmId);
-                      await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
+                  // v1.9 #AlarmTimerConflictRoutine — isUserAlarm=true 측만 임시 disable + cancel (= 직전 흐름).
+                  //   isUserAlarm=false 측 (= routine confirm_prompt) = cancel ❌ + 동시 진행 (= routine 종료 X).
+                  if (c.isUserAlarm) {
+                    try {
+                      const target = enabledAlarms.find(x => x.id === c.alarmId);
+                      if (target) {
+                        await upsertAlarm({ ...target, enabled: false });
+                        await cancelAlarmsForEntity(c.alarmId);
+                        const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+                        const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
+                        if (!prev.includes(c.alarmId)) prev.push(c.alarmId);
+                        await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
+                      }
+                    } catch (e) {
+                      Logger.warn('timer', `alarmConflict disable fail err=${String(e)}`);
                     }
-                  } catch (e) {
-                    Logger.warn('timer', `alarmConflict disable fail err=${String(e)}`);
                   }
                   await proceedTimerStart();
                   resolve();

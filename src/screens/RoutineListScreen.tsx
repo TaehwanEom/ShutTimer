@@ -49,6 +49,8 @@ import {
 import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
 import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
+import AlarmkitBridge from '../../modules/alarmkit-bridge';
+import { listAllAlarmMetadata } from '../utils/alarmkitMappingTable';
 import { Logger } from '../utils/logger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -926,14 +928,44 @@ export default function RoutineListScreen({ navigation, route }: Props) {
       const now = Date.now();
       const totalSec = getRoutineTotalSeconds(routine);
       const limitMs = now + (totalSec + 300) * 1000; // 5분 버퍼
-      let conflict: { time: number; label: string; alarmId: string } | null = null;
+      let conflict: { time: number; label: string; alarmId: string; isUserAlarm: boolean } | null = null;
       for (const a of alarmRoutines) {
         const next = nextAlarmOccurrenceTime(a, new Date(now));
         if (next !== null && next >= now && next <= limitMs) {
           if (!conflict || next < conflict.time) {
-            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id };
+            conflict = { time: next, label: a.label || t('history.alarmDefaultLabel', { defaultValue: '알람' }), alarmId: a.id, isUserAlarm: true };
           }
         }
+      }
+      // v1.9 #AlarmTimerConflictRoutine — native alarm 측 추가 검사 (= 다른 routine 진행 중 confirm_prompt + 사용자 알람 chain).
+      //   직전 = alarmRoutines 측 (= AsyncStorage 알람 루틴) 측만 검사 → 진행 중 routine alarm 측 누락 → dialog 미노출.
+      //   정정 = AlarmkitBridge.listAlarms() + mapping table 측 type 측 추가 검사.
+      //   isUserAlarm=false 측 (= 다른 routine alarm) "그래도 시작" 측 = cancel ❌ + 동시 진행 (= 다른 routine 종료 X).
+      try {
+        const nativeAlarms = await AlarmkitBridge.listAlarms();
+        const allMeta = await listAllAlarmMetadata();
+        const userAlarmIds = new Set(alarmRoutines.map(a => a.id));
+        for (const native of nativeAlarms) {
+          let nextFire: number | null = null;
+          if (native.state === 'countdown' && native.preAlertSeconds != null) {
+            nextFire = now + native.preAlertSeconds * 1000;
+          } else if (native.state === 'scheduled' && native.fixedFireMs != null) {
+            nextFire = native.fixedFireMs;
+          }
+          if (nextFire === null || nextFire < now || nextFire > limitMs) continue;
+          const meta = allMeta.find(m => m.alarmId === native.id);
+          if (!meta) continue;
+          if (meta.type !== 'confirm_prompt' && meta.type !== 'alarm_main') continue;
+          if (meta.type === 'alarm_main' && userAlarmIds.has(meta.entityId)) continue;
+          const label = meta.type === 'confirm_prompt'
+            ? t('routine.routineAlarmLabel', { defaultValue: '루틴 진행 중 알람' })
+            : t('history.alarmDefaultLabel', { defaultValue: '알람' });
+          if (!conflict || nextFire < conflict.time) {
+            conflict = { time: nextFire, label, alarmId: meta.entityId, isUserAlarm: false };
+          }
+        }
+      } catch (e) {
+        Logger.warn('routine', `alarmConflict native check fail err=${String(e)}`);
       }
       if (conflict) {
         const timeText = formatConflictTime(conflict.time);
@@ -943,7 +975,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
           t('routine.alarmConflictBody', { time: timeText, alarmLabel: c.label }),
           [
             { text: t('routine.alarmConflictCancel'), style: 'cancel' },
-            { text: t('routine.alarmConflictProceed'), onPress: () => proceedPlay(routine, c.alarmId) },
+            { text: t('routine.alarmConflictProceed'), onPress: () => proceedPlay(routine, c.isUserAlarm ? c.alarmId : undefined) },
           ],
           { cancelable: true }
         );

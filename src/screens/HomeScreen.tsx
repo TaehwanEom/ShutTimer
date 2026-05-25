@@ -42,7 +42,7 @@ import { saveAlarmMetadata, deleteAlarmMetadata, listAllAlarmMetadata } from '..
 // Sub A-2 fix (2026-05-25, Timer 통합) — Timer 시작 → dispatch Start kind='timer' 경유.
 //   transition Start 측 ScheduleAlarmOnce effect 발동 → effectRunner 측 AlarmkitBridge.scheduleAlarm + saveAlarmMetadata 호출.
 //   옛 HomeScreen 직접 호출 폐기.
-import { dispatch as sessionDispatch } from '../state/SessionController';
+import { dispatch as sessionDispatch, getCurrentSession } from '../state/SessionController';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 import { stopRoutine } from '../utils/routineController';
@@ -856,13 +856,14 @@ export default function HomeScreen({ navigation, route }: Props) {
   // ★ 루틴 진행 중이면 단일 타이머 stale state 자동 정리 + 복원 skip
   //   (이전 세션에서 두 시스템 storage 가 동시에 남아있는 경우 양쪽 동시 부활 방지)
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem(ACTIVE_TIMER_KEY),
-      AsyncStorage.getItem('isRoutineActive'),
-    ]).then(async ([raw, isRoutineActive]) => {
-      if (isRoutineActive === 'true') {
+    (async () => {
+      // v1.9 #DualSoTFix2 — isRoutineActive AsyncStorage read → race 회피.
+      //   정정 = getCurrentSession() 측 Session state 단독 SoT 사용. dispatch 직렬화 보장.
+      const session = await getCurrentSession();
+      const raw = await AsyncStorage.getItem(ACTIVE_TIMER_KEY);
+      const isRoutineActive = session !== null && (session.kind === 'routine' || session.kind === 'ad_hoc_routine') && session.state !== 'IDLE';
+      if (isRoutineActive) {
         // 루틴 active — 단일 타이머 stale storage 정리 후 복원 skip.
-        // LA cleanup = routine 측 restoreRoutineState 가 자동 처리 (HomeScreen 영역 외).
         if (raw) AsyncStorage.removeItem(ACTIVE_TIMER_KEY).catch(() => {});
         AsyncStorage.removeItem('isTimerActive').catch(() => {});
         return;
@@ -929,7 +930,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           missionIcon: t.missionIcon ?? undefined,
         });
       }
-    }).catch(() => {});
+    })().catch(() => {});
   }, []);
 
   // --- AppState (v1.5 — endAt 기반이라 수동 차감 불필요) ---
@@ -1034,15 +1035,16 @@ export default function HomeScreen({ navigation, route }: Props) {
 
   // v1.8 #PausedDialEdit — paused 측 dial/키패드 변경 시 AsyncStorage 측 endAt 동기.
   // cold start 복원 시 = 변경 endAt 측 정합 (= 미동기 시 회귀: 강제 종료 후 복원 = 옛 endAt 측 잃어버림).
-  const persistPausedEndAt = () => {
-    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
+  // v1.9 #PersistAwait — dial 회전 후 즉시 resume 클릭 시 = AsyncStorage write 미완료 → reschedule 측 옛 endAtRef 회귀.
+  //   정정 = async + await sequential. 호출 측 = await 필요 (= onSeekEnd 측).
+  const persistPausedEndAt = async (): Promise<void> => {
+    try {
+      const raw = await AsyncStorage.getItem(ACTIVE_TIMER_KEY);
       if (!raw) return;
-      try {
-        const tt: ActiveTimer = JSON.parse(raw);
-        const updated: ActiveTimer = { ...tt, endAt: endAtRef.current };
-        AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated)).catch(() => {});
-      } catch {}
-    }).catch(() => {});
+      const tt: ActiveTimer = JSON.parse(raw);
+      const updated: ActiveTimer = { ...tt, endAt: endAtRef.current };
+      await AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated));
+    } catch {}
   };
 
   // --- 취소 ---
@@ -1166,7 +1168,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   : (m) => { setSelectedMinutes(m); setSelectedSeconds(0); setSelectedIndex(-1); }
             }
             onSeekStart={() => {}}
-            onSeekEnd={() => { if (isPaused) persistPausedEndAt(); }}
+            onSeekEnd={() => { if (isPaused) persistPausedEndAt().catch(() => {}); }}
             isWarning={isRunning && remainingSeconds <= 60}
           />
         )}
@@ -1188,12 +1190,12 @@ export default function HomeScreen({ navigation, route }: Props) {
                       endAtRef.current = nowMs + newRemainingSecs * 1000;
                       remainingSecondsRef.current = newRemainingSecs;
                       setRemainingSeconds(newRemainingSecs);
-                      persistPausedEndAt();
+                      persistPausedEndAt().catch(() => {});
                     }
                   : (m: number, s?: number) => { setSelectedMinutes(m); setSelectedSeconds(s ?? 0); setSelectedIndex(-1); }
             }
             onSeekStart={() => {}}
-            onSeekEnd={() => { if (isPaused) persistPausedEndAt(); }}
+            onSeekEnd={() => { if (isPaused) persistPausedEndAt().catch(() => {}); }}
             isWarning={isRunning && remainingSeconds <= 60}
             isRunning={isRunning}
             isPaused={isPaused}

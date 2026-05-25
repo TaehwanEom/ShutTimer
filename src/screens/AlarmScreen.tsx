@@ -372,33 +372,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const stack = new Error().stack;
     const stackTop = stack?.split('\n').slice(1, 6).join(' | ') ?? '(no stack)';
     Logger.warn('AlarmScreen-DBG', `mount AppState=${AppState.currentState} routeParams=${JSON.stringify(route.params ?? {})} stack=${stackTop}`);
-    // v1.7 hotfix Phase 13 G4-B — expo banner dismiss 폐기 (= AlarmKit only).
-    // v1.7 hotfix #BannerDismissOnActive — AppState=active 진입 시점 측만 stopAlarm 호출 (= 사용자분 측 banner 누름 + 앱 진입 시점만 dismiss).
-    //   직전 (= #BannerDismissOnMount = 모든 mount 시점 호출) = 백그라운드 측 App.tsx onAlarmStateChange 측 자동 navigate 시점 측도 호출 → 알람 즉시 종료 회귀.
-    //   본 정정 = AppState change listener 측 = active 진입 시점만 호출 → background mount 시점 호출 ❌ + active 진입 (= banner 누름) 시점만 dismiss.
-    //   stopAudioAndVibration 측 = 잔존 cleanup 영역 보존 ✅ (= mapping table + dismissMethod 별 정리 영역).
-    const dismissAlertingBanner = async () => {
-      // v1.8 #AndroidNativeSound — 안드로이드는 포그라운드 진입 시 네이티브 알람을 멈추지 않음
-      //   (= 네이티브가 사운드 단일 소스로 끝까지 재생). 실제 해제는 미션 완료 시 stopAudioAndVibration.
-      if (Platform.OS === 'android') return;
-      try {
-        const alarms = await AlarmkitBridge.listAlarms();
-        for (const a of alarms) {
-          if (a.state === 'alerting') {
-            Logger.warn('AlarmScreen-DBG', `BannerDismissOnActive stopAlarm id=${a.id}`);
-            await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
-          }
-        }
-      } catch {}
-    };
-    if (AppState.currentState === 'active') {
-      dismissAlertingBanner();
-    }
-    const appStateSub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') {
-        dismissAlertingBanner();
-      }
-    });
+    // v1.9 #AudioFirstThenStop — BannerDismissOnActive 측 stopAlarm 호출 폐기.
+    //   직전 = AppState=active 진입 시점 측 즉시 stopAlarm → in-app 사운드 시작 race → 1초 무음 갭 회귀.
+    //   본 정정 = startAlarmAudio useEffect 측 통합 (= player.play() 호출 직후 stopAlarm).
+    //   = in-app 사운드 시작 보장 후 native banner stop → 무음 갭 X.
     return () => {
       // v1.8 #UnmountTrace — unmount 시점 navigation state 박아 caller 추적.
       let routeAtUnmount = '(unknown)';
@@ -408,7 +385,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
       } catch {}
       Logger.warn('AlarmScreen-DBG', `unmount routeAtUnmount=${routeAtUnmount}`);
       // v2.0 C-4 — isAlarmActive AsyncStorage 측 unmount remove 폐기. Session.state 측 통합.
-      appStateSub.remove();
     };
   }, []);
 
@@ -725,16 +701,37 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
         // v1.7 hotfix #ExpoAudio Phase 4-C — expo-av → expo-audio swap.
         // v1.7 hotfix #ExpoAudio-LoadGate — playbackStatusUpdate listener 측 = isLoaded event 후 play.
+        // v1.9 #AudioFirstThenStop — in-app 사운드 play() 호출 직후 native banner stop.
+        //   직전 = 별도 useEffect 측 AppState=active 진입 시점 즉시 stop → in-app 사운드 시작 race → 1초 무음 갭.
+        //   본 정정 = play() 직후 호출 → 무음 갭 X (= 사운드 끊김 없이 native banner만 사라짐).
+        //   Platform.OS === 'android' 측 = 진입 자체 차단 (= 함수 상단 return) → iOS만 동작.
+        const dismissAlertingBanner = async () => {
+          try {
+            const alarms = await AlarmkitBridge.listAlarms();
+            for (const a of alarms) {
+              if (a.state === 'alerting') {
+                Logger.warn('AlarmScreen-DBG', `AudioFirstThenStop stopAlarm id=${a.id}`);
+                await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+              }
+            }
+          } catch {}
+        };
         const playWhenLoaded = (player: AudioPlayer, tag: string) => {
           if (player.isLoaded) {
-            try { player.play(); } catch (e: any) { appendAlarmAudioLog(`${tag} play fail: ${e?.message || e}`); }
+            try {
+              player.play();
+              dismissAlertingBanner();
+            } catch (e: any) { appendAlarmAudioLog(`${tag} play fail: ${e?.message || e}`); }
             return;
           }
           const sub = player.addListener('playbackStatusUpdate', (status) => {
             if (status?.isLoaded) {
               sub.remove();
               if (resultEnteredRef.current || dismissedRef.current) return;
-              try { player.play(); } catch (e: any) { appendAlarmAudioLog(`${tag} play(after-load) fail: ${e?.message || e}`); }
+              try {
+                player.play();
+                dismissAlertingBanner();
+              } catch (e: any) { appendAlarmAudioLog(`${tag} play(after-load) fail: ${e?.message || e}`); }
             }
           });
         };

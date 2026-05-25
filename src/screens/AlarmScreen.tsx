@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   AppState,
+  type AppStateStatus,
   Platform,
   ScrollView,
   useWindowDimensions,
@@ -199,6 +200,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
   const [remainingMs, setRemainingMs] = useState<number>(DEFAULT_SETTINGS.missionDuration * 1000);
   const [isRetryBannerVisible, setIsRetryBannerVisible] = useState(false);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 2026-05-25 사용자 요구 — background mount 시 카운트다운 진행 차단용 reactive AppState.
+  //   타이머 (timer_main) / 알람 background mount 후 잠금 안 풀면 missionDuration 카운트다운 진행 → 자동 fail 회귀 → 사용자 잠금 풀기 전 사이클 종료.
+  //   정정: 카운트다운 useEffect 측 appState === 'active' 가드 + change listener로 reactive 갱신.
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => setAppState(next));
+    return () => sub.remove();
+  }, []);
 
   // v1.5 Worklet SharedValue
   const matched = useSharedValue(false);
@@ -1021,18 +1030,22 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // v1.8 — missionDuration === 0 (= 제한 없음) 측 = 카운트다운 ❌.
   // 2026-05-25 사용자 요구 — math/typing/tap/shake 4개 미션 missionDuration 카운트다운 통일.
   //   camera는 별건 (= 재시도 1회 패턴 보존).
+  // 2026-05-25 추가 — background mount (= 타이머/알람 잠금 상태 mount) 시 카운트다운 차단.
+  //   appState 가드 추가. background에서 setInterval 작동 X → 사용자 잠금 풀고 active 진입 시점부터 카운트다운.
+  //   잔여시간 (remainingMs) 그대로 유지 (= 사용자 잠금 풀기 전 = missionDuration 100%).
   useEffect(() => {
     if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap' && dismissMethod !== 'shake') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (matched.value) return;
     if (missionDuration === 0) return;
+    if (appState !== 'active') return;
     const id = setInterval(() => {
       setRemainingMs((prev) => Math.max(0, prev - 1000));
     }, 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dismissMethod, resultState, isRetryBannerVisible, missionDuration]);
+  }, [dismissMethod, resultState, isRetryBannerVisible, missionDuration, appState]);
 
   // 위반-3 fix 정정 (정식 사이클 §4/5 본의 재해석, 2026-05-25) — math/typing missionDuration 만료 자동 fail 복원.
   //   §4 금지 본의: "fail → cancelAlarmChain" + "fail → 사이클 종료". ≠ "자동 fail 자체 금지".

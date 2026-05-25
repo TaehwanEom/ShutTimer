@@ -282,11 +282,23 @@ async function runEffect(effect: SideEffect): Promise<void> {
     case 'PauseAlarmNative': {
       // Apple AlarmKit framework pause → LA paused state 자동 진입.
       // v2.0 C.B — effectRunner 측 currentRunningAlarmId 사용 (kind 무관, binding 미사용).
-      if (!currentRunningAlarmId) {
-        Logger.warn('effectRunner', 'PauseAlarmNative skip — currentRunningAlarmId null');
+      // v1.9 #PauseResumeFallback — currentRunningAlarmId null 시 = native listAlarms 측 countdown alarm 측 lookup.
+      //   race 시점 (= confirm_prompt cancel + 새 schedule 사이) 측 widget pause 클릭 → null skip → LA pause 미발동 회귀.
+      //   정정 = fallback = countdown alarm 측 = pause 호출 (= active alarm 측 단일 가정).
+      let targetId = currentRunningAlarmId;
+      if (!targetId) {
+        try {
+          const nativeAlarms = await AlarmkitBridge.listAlarms();
+          const countdown = nativeAlarms.find(a => a.state === 'countdown');
+          targetId = countdown?.id ?? null;
+          if (targetId) Logger.warn('effectRunner', `PauseAlarmNative fallback native lookup id=${targetId}`);
+        } catch {}
+      }
+      if (!targetId) {
+        Logger.warn('effectRunner', 'PauseAlarmNative skip — currentRunningAlarmId null + native lookup miss');
         return;
       }
-      await AlarmkitBridge.pauseAlarm(currentRunningAlarmId).catch((e: any) => {
+      await AlarmkitBridge.pauseAlarm(targetId).catch((e: any) => {
         Logger.warn('effectRunner', `PauseAlarmNative error=${String(e)}`);
       });
       return;
@@ -295,11 +307,21 @@ async function runEffect(effect: SideEffect): Promise<void> {
     case 'ResumeAlarmNative': {
       // Apple AlarmKit framework resume → LA countdown 복귀.
       // v2.0 C.B — effectRunner 측 currentRunningAlarmId 사용.
-      if (!currentRunningAlarmId) {
-        Logger.warn('effectRunner', 'ResumeAlarmNative skip — currentRunningAlarmId null');
+      // v1.9 #PauseResumeFallback — null 시 = native paused alarm 측 lookup.
+      let targetId = currentRunningAlarmId;
+      if (!targetId) {
+        try {
+          const nativeAlarms = await AlarmkitBridge.listAlarms();
+          const paused = nativeAlarms.find(a => a.state === 'paused');
+          targetId = paused?.id ?? null;
+          if (targetId) Logger.warn('effectRunner', `ResumeAlarmNative fallback native lookup id=${targetId}`);
+        } catch {}
+      }
+      if (!targetId) {
+        Logger.warn('effectRunner', 'ResumeAlarmNative skip — currentRunningAlarmId null + native lookup miss');
         return;
       }
-      await AlarmkitBridge.resumeAlarm(currentRunningAlarmId).catch((e: any) => {
+      await AlarmkitBridge.resumeAlarm(targetId).catch((e: any) => {
         Logger.warn('effectRunner', `ResumeAlarmNative error=${String(e)}`);
       });
       return;

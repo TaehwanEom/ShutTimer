@@ -348,20 +348,20 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // 직전 = isRoutineActive=true + non-adhoc routine 측 영역 시 = 알람 entity 측 AlarmScreen mount → 약 0.3초 후 강제 unmount → 사용자 dismiss method 진입 ❌ 회귀.
     const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
     if (alarmEntityId) return;
-    AsyncStorage.getItem('isRoutineActive').then(async v => {
-      if (v !== 'true') return;
-      const arRaw = await AsyncStorage.getItem('shuttimer_active_routine').catch(() => null);
-      if (!arRaw) return;
-      try {
-        const ar = JSON.parse(arRaw);
-        // v1.7 hotfix — adhoc 루틴 (= 알람 entity 측 영역) 시 = RoutineList 강제 이동 ❌ → AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
-        if (ar?.routineId && !isAdhocAlarmRoutine(ar.routineId)) {
-          Logger.warn('NAV-DBG-COLD', `AlarmScreen-guard reset RoutineTab isRoutineActive=true ar.routineId=${ar.routineId}`);
-          // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측으로 reset.
-          navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
-        }
-      } catch {}
-    }).catch(() => {});
+    // v1.9 #DualSoTFix — AsyncStorage isRoutineActive 측 read → race 시 false positive.
+    //   정정 = getCurrentSession() 측 Session state 단독 SoT 사용 (= dispatch 측 직렬화 보장).
+    (async () => {
+      const session = await getCurrentSession();
+      if (!session) return;
+      if (session.kind !== 'routine' && session.kind !== 'ad_hoc_routine') return;
+      if (session.state === 'IDLE') return;
+      const routineId = session.sessionId;
+      // adhoc 루틴 (= 알람 entity 측 영역) 시 = AlarmScreen 그대로 영역 (= 진동 / 사운드 dismiss 가능 영역).
+      if (!isAdhocAlarmRoutine(routineId)) {
+        Logger.warn('NAV-DBG-COLD', `AlarmScreen-guard reset RoutineTab session.kind=${session.kind} routineId=${routineId}`);
+        navigation.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
+      }
+    })().catch(() => {});
   }, [navigation, route.params]);
 
   // v2.0 C-4 — isAlarmActive AsyncStorage 측 mount/unmount write 폐기.
@@ -515,13 +515,20 @@ export default function AlarmScreen({ navigation, route }: Props) {
     // v1.8 #StoreReview — 알람 미션 성공 시 카운터 증가 + 트리거 조건 만족 시 별점 요청 (= fire-and-forget, 핵심 흐름 영향 ❌)
     // v1.8 #RecommendModal — 평가 모달 호출 후 = 추천 모달 표시 가능 측 검사 + pending flag set → HomeScreen mount 시 표시.
     if (result === 'success') {
-      incrementAlarmSuccessCount()
-        .then(() => maybeRequestReview())
-        .then(() => shouldShowRecommend())
-        .then((show) => {
-          if (show) AsyncStorage.setItem('recommend_pending', 'true').catch(() => {});
-        })
-        .catch((e) => Logger.warn('StoreReview', `enterResult flow failed: ${String(e)}`));
+      // v1.9 #StoreReviewIndependentSteps — Promise chain 측 중간 실패 시 = 다음 step skip 회귀 (= maybeRequestReview throw 시 = shouldShowRecommend X).
+      //   정정 = 각 step 측 독립 try/catch + await 측 sequential. recommend_pending 측 = setItem 측 await 보장 (= HomeScreen mount 측 race 회피).
+      (async () => {
+        try { await incrementAlarmSuccessCount(); } catch (e) { Logger.warn('StoreReview', `increment fail: ${String(e)}`); }
+        try { await maybeRequestReview(); } catch (e) { Logger.warn('StoreReview', `requestReview fail: ${String(e)}`); }
+        try {
+          const show = await shouldShowRecommend();
+          if (show) {
+            await AsyncStorage.setItem('recommend_pending', 'true');
+          }
+        } catch (e) {
+          Logger.warn('StoreReview', `shouldShowRecommend/setItem fail: ${String(e)}`);
+        }
+      })();
     }
     // cancel/dismiss/sound stop 완료 후 광고/네비게이션 진행 (race 방지)
     await stopAudioAndVibration();

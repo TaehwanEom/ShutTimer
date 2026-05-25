@@ -303,9 +303,11 @@ export default function HomeScreen({ navigation, route }: Props) {
     checkRecommendPending();
   }, []);
 
-  const handleRecommendClose = useCallback(() => {
+  const handleRecommendClose = useCallback(async () => {
     setRecommendVisible(false);
-    markRecommendShown().catch(() => {});
+    // v1.9 #MarkRecommendAwait — markRecommendShown 측 await 보장 (= AsyncStorage write 미완료 race 회피).
+    //   직전 = fire-and-forget → 3초 내 강제 종료 시 KEY_RECOMMEND_LAST_SHOWN_AT 미저장 → 15일 체크 pass → 재표시 회귀.
+    try { await markRecommendShown(); } catch (e) { Logger.warn('StoreReview', `markRecommendShown fail: ${String(e)}`); }
   }, []);
 
   useFocusEffect(
@@ -1015,18 +1017,19 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
     }
     // AsyncStorage 업데이트 (cold start 복원용)
-    AsyncStorage.getItem(ACTIVE_TIMER_KEY).then((raw) => {
-      if (!raw) return;
-      try {
+    // v1.9 #TimerPersistAwait — pause/resume 측 ACTIVE_TIMER_KEY write await 보장 (= 사용자 강제 종료 시 endAt 잔존 보장).
+    try {
+      const raw = await AsyncStorage.getItem(ACTIVE_TIMER_KEY);
+      if (raw) {
         const t: ActiveTimer = JSON.parse(raw);
         const updated: ActiveTimer = {
           ...t,
           endAt: endAtRef.current,
           pausedAt: pausedAtRef.current,
         };
-        AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated)).catch(() => {});
-      } catch {}
-    }).catch(() => {});
+        await AsyncStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(updated));
+      }
+    } catch {}
   };
 
   // v1.8 #PausedDialEdit — paused 측 dial/키패드 변경 시 AsyncStorage 측 endAt 동기.

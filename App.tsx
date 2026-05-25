@@ -538,6 +538,13 @@ function AppNavigator() {
       if (state === 'active') {
         onAppActive().catch(() => {});
         runAlertingAlarmCheck();
+        // v1.9 #OrphanCleanupOnActive — AppState=active 진입 시 orphan alarm cleanup 호출.
+        //   직전 = cleanupGhostAlarms 측 = AppNavigator cold start 측만 호출. 사용자 측 앱 측 = 이미 띄워둔 상태 측
+        //   = cold start 측 X → orphan 측 잔존 → 옛 잘못된 alarm 매일 fire (= log02 측 22:14, 22:16 사용자 보고).
+        //   정정 = active 진입 시 2초 지연 후 cleanup → scheduleAlarm + saveAlarmMetadata 측 race 회피.
+        setTimeout(() => {
+          cleanupGhostAlarms().catch(() => {});
+        }, 2000);
       }
     });
     return () => sub.remove();

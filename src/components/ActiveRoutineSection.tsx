@@ -316,12 +316,20 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
       Logger.warn('SOUND-DBG', 'startAlarmEffects SKIP — inProgress');
       return;
     }
+    // v1.9 #SoundDoubleStopFix — AppState=background 시점 = JS in-app 사운드 시작 skip.
+    //   직전 의도 = "background 측 JS thread 정지 → 호출 자체 ❌". 실제 = AlarmKit listener trigger
+    //   + setInterval tick 측 = JS thread 측 background 측 동작 → startAlarmEffects 호출됨
+    //   → expo-audio 측 sound 시작 + AppState=background 측 native banner 사운드 동시 = 2중 중첩.
+    //   정정 = active 측만 in-app 사운드 시작. native banner 측만 단독 재생 (= log02 측 13:20:04, 13:22:20 사용자 보고).
+    if (AppState.currentState !== 'active') {
+      Logger.warn('SOUND-DBG', `startAlarmEffects SKIP — AppState=${AppState.currentState} (native banner 단독 재생)`);
+      return;
+    }
     inProgressRef.current = true;
     try {
       // v1.7 hotfix #13 — AlarmKit native 사운드 ↔ expo-av 사운드 중첩 회피.
       // active 시점 측: AlarmKit fire → JS listener cancelAlarm → AlarmKit stop. 단 Apple 측 fade-out (= ms ~ 수백ms) 후도 사운드 잔존.
       // 200ms 지연 후 expo-av 시작 → AlarmKit fade-out 완료 후 단독 출력 → 중첩 ❌.
-      // background 시점 측: JS thread 정지 → 본 호출 자체 ❌. AlarmKit 사운드 단독 정합.
       Logger.warn('SOUND-DBG', `startAlarmEffects ENTER soundRef=${soundRef.current ? 'EXISTS' : 'null'} time=${Date.now()}`);
       await new Promise(resolve => setTimeout(resolve, 200));
 

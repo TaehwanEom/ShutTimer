@@ -338,7 +338,15 @@ function AppNavigator() {
       const metaRaw = await loadAlarmMetadata(event.alarmId);
       // v1.7 hotfix #26 — debug log: meta lookup 결과 (= 베너 미노출 추적용).
       // meta=null = mapping table 측 잔존 ❌ → silent skip 진입 = 사용자 측 모름.
-      Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${metaRaw ? `${metaRaw.type}/${metaRaw.entityId}` : 'NULL'}`);
+      Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${metaRaw ? `${metaRaw.type}/${metaRaw.entityId}${metaRaw.deleted ? '/DELETED' : ''}` : 'NULL'}`);
+      // v1.9 #SoftDelete — meta.deleted=true 측 = cancelAlarmsForEntity F2 verify 후 stale 잔존 (= native cancel 실패).
+      //   직전 fire 시 = 사용자 화면 진입 + native banner+사운드 = 회귀. 정정 = silent native cancel + metadata 정식 delete + return.
+      if (metaRaw && metaRaw.deleted === true) {
+        Logger.warn('onAlarmStateChange-DBG', `deleted alarm fire → silent native cancel + metadata delete alarmId=${event.alarmId}`);
+        await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
+        await deleteAlarmMetadata(event.alarmId).catch(() => {});
+        return;
+      }
       // v1.7 hotfix #34 — meta=NULL 시 = routine_snapshot 측 fallback (= confirm_prompt 분기 정합).
       // root cause = AdvanceNextStepIntent native 측 = 다음 step alarm schedule 시 mapping table saveAlarmMetadata ❌ →
       //   다음 step alerting 시 listener 측 meta lookup NULL → silent skip → ar.awaitingConfirm 갱신 ❌ →

@@ -16,6 +16,7 @@ import {
 import {
   saveAlarmMetadata,
   deleteAlarmMetadata,
+  markAlarmDeleted,
   listAllAlarmMetadata,
 } from './alarmkitMappingTable';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
@@ -219,11 +220,12 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   //   정정: F0 metadata 먼저 삭제 (옛 안전망 복원) + F1 cancel + F2 verify retry (신 기능 유지).
   //     = 다층 방어. cancel 모두 실패해도 metadata 없음 → fire 시 silent skip (사용자 화면 영향 X).
 
-  // F0: metadata 먼저 삭제 (옛 #AlarmChainRevive 안전망 복원).
-  //   효과: native cancel 실패 + OS race로 fire되어도 meta lookup NULL → listener silent skip → 사용자 화면 진입 X.
-  //   lazy chain (scheduleAlarmChainNext) 폐기됨 (line 222 주변) → .removed 이벤트 측 chain+1 schedule 안 함 → 본 순서 안전.
+  // F0: v1.9 #SoftDelete — metadata 측 deleted=true flag set (= 정식 delete 측 F3로 이동).
+  //   직전 = F0 정식 delete → cancel 실패 + OS race → native banner+사운드 잔존 fire (= orphan 동일 회귀).
+  //   정정 = soft delete (deleted=true) → listener 측 = deleted=true 감지 시 silent native cancel + return
+  //   → 사용자 화면 진입 X. F2 verify=0 보장 시점 = F3 정식 delete (= 안전한 시점, 다음 fire 위험 X).
   for (const meta of targets) {
-    await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+    await markAlarmDeleted(meta.alarmId).catch(() => {});
   }
 
   // F1: cancel 시도 (catch 풀어 native 실패 식별 + 카운트)
@@ -254,8 +256,14 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
     await new Promise(r => setTimeout(r, 100));
   }
 
-  if (stale.length > 0) {
-    Logger.warn('cancelEntity-DBG', `FINAL stale alarms remain count=${stale.length} ids=[${stale.join(',')}] entityId=${alarmEntityId}`);
+  // F3: v1.9 #SoftDelete — stale=0 시 정식 deleteAlarmMetadata. stale>0 시 = metadata 잔존 (= deleted=true).
+  //   listener 측 deleted=true 감지 시 silent native cancel + return. cleanupGhostAlarms 측도 추가 정리.
+  if (stale.length === 0) {
+    for (const meta of targets) {
+      await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+    }
+  } else {
+    Logger.warn('cancelEntity-DBG', `FINAL stale alarms remain count=${stale.length} ids=[${stale.join(',')}] entityId=${alarmEntityId} (metadata deleted=true 잔존, listener 측 silent skip)`);
   }
 
   Logger.warn('cancelEntity-DBG', `done entityId=${alarmEntityId} targets=${targets.length} nativeFail=${nativeFailCount} finalStale=${stale.length}`);

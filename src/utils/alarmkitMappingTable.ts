@@ -26,6 +26,13 @@ export type AlarmMetaRecord = {
    * 다음 chain fireAt = chainBaseFireAt + chainIndex * 120000.
    */
   chainBaseFireAt?: number;
+  /**
+   * v1.9 #SoftDelete — cancelAlarmsForEntity 측 F0 시점 = deleted=true set (= 정식 delete X).
+   *   F2 verify retry 후 = stale=0 시점 = 정식 delete. stale>0 시 = metadata 잔존 → 다음 fire 시
+   *   App.tsx listener 측 = deleted===true 시 silent native cancel + return (= 사용자 화면 진입 X).
+   *   직전 = F0 정식 delete → cancel 실패 시 = native banner+사운드 잔존 fire = orphan 동일 회귀.
+   */
+  deleted?: boolean;
 };
 
 async function loadAll(): Promise<AlarmMetaRecord[]> {
@@ -77,6 +84,19 @@ export async function deleteAlarmMetadata(alarmId: string): Promise<void> {
   return runMappingExclusive(async () => {
     const all = await loadAll();
     const next = all.filter(r => r.alarmId !== alarmId);
+    await saveAll(next);
+  });
+}
+
+/**
+ * v1.9 #SoftDelete — alarmId 측 deleted=true flag set (= 정식 delete X).
+ *   cancelAlarmsForEntity 측 F0 시점 호출. F2 verify 후 stale=0 시점 = 정식 deleteAlarmMetadata 호출.
+ *   listener (App.tsx onAlarmStateChange) 측 = meta.deleted===true 감지 시 = silent native cancel + return.
+ */
+export async function markAlarmDeleted(alarmId: string): Promise<void> {
+  return runMappingExclusive(async () => {
+    const all = await loadAll();
+    const next = all.map(r => (r.alarmId === alarmId ? { ...r, deleted: true } : r));
     await saveAll(next);
   });
 }

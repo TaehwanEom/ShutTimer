@@ -330,6 +330,8 @@ async function runEffect(effect: SideEffect): Promise<void> {
     case 'CleanupAlertingAlarms': {
       // 옛 confirmAndAdvance (routineController:481-500) 측 alerting alarm 일괄 stop loop.
       //   confirm_prompt / prealert / metadata 없는 alerting 정리.
+      // v1.9 #CleanupAlertingFull — stopAlarm만 호출 시 = 측 = alarm 측 alerting → scheduled 복귀 측 = 다음 시점 측 다시 alerting 가능.
+      //   정정 = stopAlarm + cancelAlarm 둘 다 호출 (= idempotent + 완전 정리). meta=null orphan 측 도 동일.
       try {
         const alarms = await AlarmkitBridge.listAlarms();
         const metas = await listAllAlarmMetadata();
@@ -338,10 +340,12 @@ async function runEffect(effect: SideEffect): Promise<void> {
           const meta = metas.find((m) => m.alarmId === a.id);
           if (meta && (meta.type === 'confirm_prompt' || meta.type === 'prealert')) {
             await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+            await AlarmkitBridge.cancelAlarm(a.id).catch(() => {});
             await deleteAlarmMetadata(a.id).catch(() => {});
           } else if (!meta) {
-            // metadata 없는 alerting = 안전망 stop
+            // metadata 없는 alerting = orphan = 안전망 stop + cancel (= 완전 정리).
             await AlarmkitBridge.stopAlarm(a.id).catch(() => {});
+            await AlarmkitBridge.cancelAlarm(a.id).catch(() => {});
           }
         }
       } catch (e) {

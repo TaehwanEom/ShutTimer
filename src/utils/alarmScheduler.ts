@@ -318,9 +318,29 @@ export async function syncAllAlarms(): Promise<void> {
     }
 
     // 분기 B-once — 체인이 죽었으면(전 멤버 발화 완료) 정리 + 알람 disable. 살아있으면 skip.
+    // v1.9 #ChainBaseFireAtFallback — base=null 측 (= v1.7 이전 migration metadata) 시 = 측 native listAlarms
+    //   verify 후 결정 (= chain member 실제 존재 시 = 살아있음 처리, 없으면 = cleanup).
+    //   직전 = base=null → chainDead=true → 활성 once 알람 무조건 disable 회귀 영역.
     if (alarm.repeat === 'once') {
       const base = metas.find(m => m.chainBaseFireAt != null)?.chainBaseFireAt;
-      const chainDead = base == null || base + chainLifespanMs < now;
+      let chainDead: boolean;
+      if (base == null) {
+        // fallback = native verify
+        try {
+          const nativeAlarms = await AlarmkitBridge.listAlarms();
+          const nativeIds = new Set(nativeAlarms.map(a => a.id));
+          const aliveCount = metas.filter(m => nativeIds.has(m.alarmId)).length;
+          chainDead = aliveCount === 0;
+          if (chainDead) {
+            Logger.warn('alarmScheduler-DBG', `once chain base=null + native verify=0 → cleanup entityId=${entityId}`);
+          }
+        } catch {
+          // verify 실패 시 = 안전한 쪽 (= 살아있음 처리, 활성 알람 보존)
+          chainDead = false;
+        }
+      } else {
+        chainDead = base + chainLifespanMs < now;
+      }
       if (chainDead) {
         for (const meta of metas) await cancelAlarm(meta.alarmId);
         await disableOnceAlarmIfNeeded(entityId).catch(() => {});

@@ -955,11 +955,13 @@ export default function RoutineListScreen({ navigation, route }: Props) {
           if (nextFire === null || nextFire < now || nextFire > limitMs) continue;
           const meta = allMeta.find(m => m.alarmId === native.id);
           if (!meta) continue;
-          if (meta.type !== 'confirm_prompt' && meta.type !== 'alarm_main') continue;
+          if (meta.type !== 'confirm_prompt' && meta.type !== 'alarm_main' && meta.type !== 'timer_main') continue;
           if (meta.type === 'alarm_main' && userAlarmIds.has(meta.entityId)) continue;
           const label = meta.type === 'confirm_prompt'
             ? t('routine.routineAlarmLabel', { defaultValue: '루틴 진행 중 알람' })
-            : t('history.alarmDefaultLabel', { defaultValue: '알람' });
+            : meta.type === 'timer_main'
+              ? t('routine.timerAlarmLabel', { defaultValue: '진행 중인 타이머' })
+              : t('history.alarmDefaultLabel', { defaultValue: '알람' });
           if (!conflict || nextFire < conflict.time) {
             conflict = { time: nextFire, label, alarmId: meta.entityId, isUserAlarm: false };
           }

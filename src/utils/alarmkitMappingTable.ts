@@ -76,8 +76,12 @@ export async function saveAlarmMetadata(
 }
 
 export async function loadAlarmMetadata(alarmId: string): Promise<AlarmMetaRecord | null> {
-  const all = await loadAll();
-  return all.find(r => r.alarmId === alarmId) ?? null;
+  // v1.9 #ReadLockRace — runMappingExclusive 측 wrap → markAlarmDeleted 측 write chain 완료 후 read 보장.
+  //   직전 = 직접 loadAll().find() → markAlarmDeleted 측 write 측 진행 중 시 = read 측 deleted=false 읽음 → listener silent skip 실패.
+  return runMappingExclusive(async () => {
+    const all = await loadAll();
+    return all.find(r => r.alarmId === alarmId) ?? null;
+  });
 }
 
 export async function deleteAlarmMetadata(alarmId: string): Promise<void> {
@@ -102,7 +106,8 @@ export async function markAlarmDeleted(alarmId: string): Promise<void> {
 }
 
 export async function listAllAlarmMetadata(): Promise<AlarmMetaRecord[]> {
-  return loadAll();
+  // v1.9 #ReadLockRace — runMappingExclusive 측 wrap → write chain 완료 후 read 보장.
+  return runMappingExclusive(async () => loadAll());
 }
 
 export async function clearAllAlarmMetadata(): Promise<void> {

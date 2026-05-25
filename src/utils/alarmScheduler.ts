@@ -129,10 +129,17 @@ export async function scheduleAlarmMain(alarm: Alarm): Promise<string | null> {
 
   // v1.8 #AlarmChainEager — chain 전체를 등록 시점에 미리 예약 (= 잠금/앱 종료 상태 OS 자동 발화).
   let firstId: string | null = null;
+  let scheduledIds: string[] = [];
   for (let i = 0; i < chainCount; i++) {
     const fireAt = baseFireAt + i * ALARM_CHAIN_INTERVAL_MS;
     const id = await scheduleAlarmAt(alarm, fireAt, i, baseFireAt);
     if (firstId === null) firstId = id;
+    if (id) scheduledIds.push(id);
+  }
+  // v1.9 #ChainBaseFireAtVerify — 일관성 검증. chain 측 saveAlarmMetadata 실패 시 = chainBaseFireAt 측 missing → syncAllAlarms 측 base=null 오인.
+  //   verify = chainCount = 실제 schedule 성공 count 측 비교. mismatch 시 warn (= retry 측 future).
+  if (scheduledIds.length !== chainCount) {
+    Logger.warn('alarmScheduler-DBG', `scheduleAlarmMain chain mismatch entityId=${alarm.id} expected=${chainCount} actual=${scheduledIds.length}`);
   }
   return firstId;
 }
@@ -381,7 +388,10 @@ export async function cleanupGhostAlarms(): Promise<number> {
   try {
     const frameworkAlarms = await AlarmkitBridge.listAlarms();
     const allMeta = await listAllAlarmMetadata();
-    const knownIds = new Set(allMeta.map(m => m.alarmId));
+    // v1.9 #SoftDeleteGhostFix — deleted=true metadata 측 = ghost 인정 (= cancel 대상).
+    //   직전 = knownIds = all meta (deleted 무관) → deleted=true 측 = ghost 측 X → cleanup 측 누락 → 잔존.
+    //   정정 = deleted=true 측 knownIds 제외 → ghost 인정 + cancel + 정식 deleteAlarmMetadata.
+    const knownIds = new Set(allMeta.filter(m => !m.deleted).map(m => m.alarmId));
     const ghostIds: string[] = frameworkAlarms
       .map(a => a.id)
       .filter(id => !knownIds.has(id));
@@ -393,6 +403,8 @@ export async function cleanupGhostAlarms(): Promise<number> {
 
     for (const ghostId of ghostIds) {
       await AlarmkitBridge.cancelAlarm(ghostId).catch(() => {});
+      // v1.9 #SoftDeleteGhostFix — deleted=true metadata 측 = native cancel 후 정식 deleteAlarmMetadata.
+      await deleteAlarmMetadata(ghostId).catch(() => {});
     }
     return ghostIds.length;
   } catch (e) {

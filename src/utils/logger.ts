@@ -25,19 +25,33 @@ const pushToMemory = (entry: LogEntry) => {
 //   정정 = 1초 측 1회만 setItem (= debounce). 측 = 메모리 측 = primary 측 항상 최신.
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 const PERSIST_DEBOUNCE_MS = 1000;
+const persistImmediate = () => {
+  try {
+    const snapshot = JSON.stringify(memoryBuffer);
+    AsyncStorage.setItem(MEMORY_BUFFER_KEY, snapshot).catch((e) => {
+      console.warn('Logger persist failed:', e);
+    });
+  } catch (e) {
+    console.warn('Logger persist error:', e);
+  }
+};
 const persistAll = () => {
   if (persistTimer) return;
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    try {
-      const snapshot = JSON.stringify(memoryBuffer);
-      AsyncStorage.setItem(MEMORY_BUFFER_KEY, snapshot).catch((e) => {
-        console.warn('Logger persist failed:', e);
-      });
-    } catch (e) {
-      console.warn('Logger persist error:', e);
-    }
+    persistImmediate();
   }, PERSIST_DEBOUNCE_MS);
+};
+/**
+ * v1.9 #BackgroundFlush — AppState=background 진입 시 호출 측 = pending log 측 즉시 flush.
+ *   debounce 측 = 1초 timer pending 시 = cold start kill 측 = log lost. 정정 = background 측 = 즉시 setItem.
+ */
+export const flushLogs = (): void => {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  persistImmediate();
 };
 
 const record = (level: 'info' | 'warn' | 'error', tag: string, message: string) => {

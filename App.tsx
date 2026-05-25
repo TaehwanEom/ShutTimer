@@ -17,7 +17,7 @@ import { SETTINGS_KEY } from './src/constants/settings';
 import { MISSIONS_STORAGE_KEY } from './src/constants/missions';
 import { preloadDismissMethod, getCachedDismissMethod } from './src/utils/settingsCache';
 import { DEFAULT_SETTINGS } from './src/constants/settings';
-import { Logger } from './src/utils/logger';
+import { Logger, flushLogs } from './src/utils/logger';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
 // v1.7 hotfix Phase 13 G4-F — Notifications.setNotificationHandler 통째 폐기 (= AlarmKit only).
@@ -548,6 +548,10 @@ function AppNavigator() {
   //   기존엔 cold start 시 restoreRoutineState → dispatch OnAppActive만 호출 → background → active transition 시 호출 X → 옵션 2 fix 무작동 회귀.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
+      // v1.9 #BackgroundLogFlush — background 진입 시 = 즉시 log flush (debounce 측 pending log 측 kill 전 보존).
+      if (state === 'background' || state === 'inactive') {
+        flushLogs();
+      }
       if (state === 'active') {
         onAppActive().catch(() => {});
         runAlertingAlarmCheck();

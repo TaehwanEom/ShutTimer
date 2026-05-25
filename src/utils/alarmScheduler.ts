@@ -209,11 +209,20 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   );
   const targetIds = new Set(targets.map(t => t.alarmId));
 
-  // v1.8 #ChainCancelVerify (버그 ⑧ FIX) — native cancel 실패 식별 + verify retry.
-  //   사용자 보고 (2026-05-23): 미션 완료 후 metas=50 → listAlarms=25 잔존 → 12분 후 잔존 chain fire.
-  //   원인 후보: .catch(() => {}) 가 native cancel 실패를 삼킴 / AlarmKit weekly cancel race.
-  //   순서 변경 정합: lazy chain (scheduleAlarmChainNext) 폐기됨 (line 222) → .removed 이벤트가
-  //     listener 측 chain+1 schedule 안 함 → cancel → verify → deleteMetadata 순서 안전.
+  // v1.8 #ChainCancelVerify + 2026-05-25 사용자 보고 회귀 fix — 옛 안전망 (#AlarmChainRevive) 복원 + verify retry 통합.
+  //   사용자 보고 #1 (2026-05-23): 미션 완료 후 metas=50 → listAlarms=25 잔존 → 12분 후 잔존 chain fire.
+  //   사용자 보고 #2 (2026-05-25): 9:36 dismiss 후 28분 뒤 (10:04) 잔존 chain fire → 앱 화면 진입까지.
+  //   원인 #2: 옛 코드 (metadata 먼저 삭제) → fix #1 (cancel → verify → metadata 마지막) 변경으로 안전망 소실.
+  //     OS race로 verify 통과 후에도 native 잔존 → metadata 정상 → fire 시 meta lookup 성공 → 화면 진입.
+  //   정정: F0 metadata 먼저 삭제 (옛 안전망 복원) + F1 cancel + F2 verify retry (신 기능 유지).
+  //     = 다층 방어. cancel 모두 실패해도 metadata 없음 → fire 시 silent skip (사용자 화면 영향 X).
+
+  // F0: metadata 먼저 삭제 (옛 #AlarmChainRevive 안전망 복원).
+  //   효과: native cancel 실패 + OS race로 fire되어도 meta lookup NULL → listener silent skip → 사용자 화면 진입 X.
+  //   lazy chain (scheduleAlarmChainNext) 폐기됨 (line 222 주변) → .removed 이벤트 측 chain+1 schedule 안 함 → 본 순서 안전.
+  for (const meta of targets) {
+    await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+  }
 
   // F1: cancel 시도 (catch 풀어 native 실패 식별 + 카운트)
   let nativeFailCount = 0;
@@ -245,11 +254,6 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
 
   if (stale.length > 0) {
     Logger.warn('cancelEntity-DBG', `FINAL stale alarms remain count=${stale.length} ids=[${stale.join(',')}] entityId=${alarmEntityId}`);
-  }
-
-  // verify 후 mapping table cleanup (deleteMetadata 마지막).
-  for (const meta of targets) {
-    await deleteAlarmMetadata(meta.alarmId).catch(() => {});
   }
 
   Logger.warn('cancelEntity-DBG', `done entityId=${alarmEntityId} targets=${targets.length} nativeFail=${nativeFailCount} finalStale=${stale.length}`);

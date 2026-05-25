@@ -87,8 +87,7 @@ export function generateTypingProblems(locale: string, count: number = 3): Typin
   return problems;
 }
 
-/** 입력 정답 체크. 대소문자만 무시. 띄어쓰기 포함 정확 일치 (2026-05-25 사용자 요구). */
+/** 입력 정답 체크. 띄어쓰기 + 대소문자 포함 완전 정확 일치 (2026-05-25 사용자 요구). */
 export function checkTypingAnswer(input: string, problem: TypingProblem): boolean {
-  const normalize = (s: string) => s.toLowerCase();
-  return normalize(input) === normalize(problem.text);
+  return input === problem.text;
 }

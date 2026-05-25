@@ -595,7 +595,7 @@
     "timerConflictBody": "Un timer singolo è attivo. Annullare e avviare la routine?",
     "timerConflictProceed": "Avvia routine",
     "alarmConflictTitle": "Conflitto sveglia programmata",
-    "alarmConflictBody": "C'è una sveglia '{{alarmLabel}}' programmata alle {{time}}.\nLa sveglia potrebbe suonare prima della fine della routine.",
+    "alarmConflictBody": "'{{alarmLabel}}' è programmato.\nAvviare comunque?",
     "alarmConflictProceed": "Avvia",
     "alarmConflictCancel": "Annulla",
     "timerConflictTitle": "Timer attivo",

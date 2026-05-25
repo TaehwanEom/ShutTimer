@@ -595,7 +595,7 @@
     "timerConflictBody": "Un temporizador está en curso. ¿Cancelar e iniciar la rutina?",
     "timerConflictProceed": "Iniciar rutina",
     "alarmConflictTitle": "Conflicto de alarma programada",
-    "alarmConflictBody": "Hay una alarma '{{alarmLabel}}' programada a las {{time}}.\nLa alarma puede sonar antes de que termine la rutina.",
+    "alarmConflictBody": "'{{alarmLabel}}' está programado.\n¿Iniciar de todos modos?",
     "alarmConflictProceed": "Iniciar",
     "alarmConflictCancel": "Cancelar",
     "timerConflictTitle": "Temporizador en curso",

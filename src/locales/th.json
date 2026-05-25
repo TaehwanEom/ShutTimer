@@ -595,7 +595,7 @@
     "timerConflictBody": "จับเวลาเดี่ยวกำลังทำงาน ยกเลิกแล้วเริ่มกิจวัตร?",
     "timerConflictProceed": "เริ่มกิจวัตร",
     "alarmConflictTitle": "ความขัดแย้งของนาฬิกาปลุกที่กำหนดไว้",
-    "alarmConflictBody": "มีนาฬิกาปลุก \"{{alarmLabel}}\" กำหนดไว้ที่ {{time}}\nนาฬิกาปลุกอาจดังก่อนกิจวัตรจบ",
+    "alarmConflictBody": "\"{{alarmLabel}}\" ถูกกำหนดไว้\nเริ่มต่อหรือไม่?",
     "alarmConflictProceed": "เริ่ม",
     "alarmConflictCancel": "ยกเลิก",
     "timerConflictTitle": "จับเวลากำลังทำงาน",

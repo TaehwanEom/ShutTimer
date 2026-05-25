@@ -595,7 +595,7 @@
     "timerConflictBody": "Tekli zamanlayıcı çalışıyor. İptal edip rutini başlat?",
     "timerConflictProceed": "Rutini başlat",
     "alarmConflictTitle": "Planlanmış alarm çakışması",
-    "alarmConflictBody": "{{time}} saatinde '{{alarmLabel}}' alarmı planlı.\nRutin bitmeden alarm çalabilir.",
+    "alarmConflictBody": "'{{alarmLabel}}' planlı.\nYine de başlat?",
     "alarmConflictProceed": "Başlat",
     "alarmConflictCancel": "İptal",
     "timerConflictTitle": "Zamanlayıcı çalışıyor",

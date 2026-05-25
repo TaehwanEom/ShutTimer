@@ -595,7 +595,7 @@
     "timerConflictBody": "Timer tunggal sedang berjalan. Batalkan dan mulai rutinitas?",
     "timerConflictProceed": "Mulai rutinitas",
     "alarmConflictTitle": "Konflik alarm terjadwal",
-    "alarmConflictBody": "Alarm '{{alarmLabel}}' terjadwal pada {{time}}.\nAlarm mungkin berbunyi sebelum rutinitas selesai.",
+    "alarmConflictBody": "'{{alarmLabel}}' terjadwal.\nTetap mulai?",
     "alarmConflictProceed": "Mulai",
     "alarmConflictCancel": "Batal",
     "timerConflictTitle": "Timer berjalan",

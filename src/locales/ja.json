@@ -602,7 +602,7 @@
     "timerConflictBody": "シングルタイマーが実行中です。キャンセルしてルーティンを開始しますか?",
     "timerConflictProceed": "ルーティン開始",
     "alarmConflictTitle": "予定されたアラーム競合",
-    "alarmConflictBody": "{{time}}に「{{alarmLabel}}」アラームが予定されています。\nルーティン終了前にアラームが鳴る可能性があります。",
+    "alarmConflictBody": "「{{alarmLabel}}」が予定されています。\nそれでも開始しますか？",
     "alarmConflictProceed": "開始",
     "alarmConflictCancel": "キャンセル",
     "timerConflictTitle": "タイマー実行中",

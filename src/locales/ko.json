@@ -494,7 +494,7 @@
     "timerConflictBody": "진행 중인 단일 타이머가 있습니다. 취소하고 루틴을 시작하시겠어요?",
     "timerConflictProceed": "루틴 시작",
     "alarmConflictTitle": "예정된 알람 충돌",
-    "alarmConflictBody": "{{time}}에 '{{alarmLabel}}' 알람이 예정되어 있습니다.\n루틴이 끝나기 전에 알람이 울릴 수 있습니다.",
+    "alarmConflictBody": "'{{alarmLabel}}'이(가) 예정되어 있습니다.\n그래도 시작하시겠어요?",
     "alarmConflictProceed": "시작",
     "alarmConflictCancel": "취소",
     "exactAlarmTitle": "정확한 알림 권한",

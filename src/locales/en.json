@@ -488,7 +488,7 @@
     "timerConflictBody": "A single timer is running. Cancel it and start the routine?",
     "timerConflictProceed": "Start routine",
     "alarmConflictTitle": "Scheduled alarm conflict",
-    "alarmConflictBody": "An alarm '{{alarmLabel}}' is scheduled at {{time}}.\nThe alarm may fire before the routine ends.",
+    "alarmConflictBody": "'{{alarmLabel}}' is scheduled.\nStart anyway?",
     "alarmConflictProceed": "Start",
     "alarmConflictCancel": "Cancel",
     "exactAlarmTitle": "Exact alarm permission",

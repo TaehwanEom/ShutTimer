@@ -602,7 +602,7 @@
     "timerConflictBody": "單一計時器正在執行。取消並開始例程?",
     "timerConflictProceed": "開始例程",
     "alarmConflictTitle": "預定的鬧鐘衝突",
-    "alarmConflictBody": "{{time}} 已預定「{{alarmLabel}}」鬧鐘。\n例程結束前鬧鐘可能響起。",
+    "alarmConflictBody": "已預定「{{alarmLabel}}」。\n仍要開始嗎？",
     "alarmConflictProceed": "開始",
     "alarmConflictCancel": "取消",
     "timerConflictTitle": "計時器執行中",

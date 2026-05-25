@@ -595,7 +595,7 @@
     "timerConflictBody": "مؤقت واحد قيد التشغيل. إلغاؤه وبدء الروتين؟",
     "timerConflictProceed": "ابدأ الروتين",
     "alarmConflictTitle": "تعارض المنبه المجدول",
-    "alarmConflictBody": "هناك منبه «{{alarmLabel}}» مجدول في {{time}}.\nقد يرن المنبه قبل انتهاء الروتين.",
+    "alarmConflictBody": "«{{alarmLabel}}» مجدول.\nهل تريد البدء على أي حال؟",
     "alarmConflictProceed": "ابدأ",
     "alarmConflictCancel": "إلغاء",
     "timerConflictTitle": "المؤقت قيد التشغيل",

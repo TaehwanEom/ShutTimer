@@ -595,7 +595,7 @@
     "timerConflictBody": "Un minuteur est en cours. L'annuler et démarrer la routine ?",
     "timerConflictProceed": "Démarrer la routine",
     "alarmConflictTitle": "Conflit d'alarme programmée",
-    "alarmConflictBody": "Une alarme « {{alarmLabel}} » est prévue à {{time}}.\nL'alarme peut sonner avant la fin de la routine.",
+    "alarmConflictBody": "« {{alarmLabel}} » est prévu.\nDémarrer quand même ?",
     "alarmConflictProceed": "Démarrer",
     "alarmConflictCancel": "Annuler",
     "timerConflictTitle": "Minuteur en cours",

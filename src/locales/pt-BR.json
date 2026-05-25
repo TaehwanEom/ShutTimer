@@ -595,7 +595,7 @@
     "timerConflictBody": "Um cronômetro está em execução. Cancelar e iniciar a rotina?",
     "timerConflictProceed": "Iniciar rotina",
     "alarmConflictTitle": "Conflito de alarme agendado",
-    "alarmConflictBody": "Há um alarme '{{alarmLabel}}' agendado às {{time}}.\nO alarme pode tocar antes do fim da rotina.",
+    "alarmConflictBody": "'{{alarmLabel}}' está agendado.\nIniciar mesmo assim?",
     "alarmConflictProceed": "Iniciar",
     "alarmConflictCancel": "Cancelar",
     "timerConflictTitle": "Cronômetro em execução",

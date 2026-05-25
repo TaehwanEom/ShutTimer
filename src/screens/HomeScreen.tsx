@@ -622,17 +622,13 @@ export default function HomeScreen({ navigation, route }: Props) {
         Logger.warn('timer', `alarmConflict native check fail err=${String(e)}`);
       }
       if (conflict) {
-        const d = new Date(conflict.time);
-        const h = d.getHours();
-        const m = d.getMinutes();
-        const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
-        const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-        const timeText = `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
+        // v1.9 #AlarmConflictDialogSimplify — 시각 표시 제거 (= 잔존 native alarm 측 오류 가능성 회피).
+        //   라벨만 유지 → 사용자 측 충돌 종류 인지 + 정확한 시각 측 false positive 방지.
         const c = conflict;
         await new Promise<void>((resolve) => {
           Alert.alert(
             t('routine.alarmConflictTitle'),
-            t('routine.alarmConflictBody', { time: timeText, alarmLabel: c.label }),
+            t('routine.alarmConflictBody', { alarmLabel: c.label }),
             [
               { text: t('routine.alarmConflictCancel'), style: 'cancel', onPress: () => resolve() },
               {

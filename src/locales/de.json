@@ -595,7 +595,7 @@
     "timerConflictBody": "Ein einzelner Timer läuft. Abbrechen und Routine starten?",
     "timerConflictProceed": "Routine starten",
     "alarmConflictTitle": "Geplanter Wecker-Konflikt",
-    "alarmConflictBody": "Um {{time}} ist der Wecker „{{alarmLabel}}\" geplant.\nDer Wecker könnte vor Ende der Routine klingeln.",
+    "alarmConflictBody": "„{{alarmLabel}}\" ist geplant.\nTrotzdem starten?",
     "alarmConflictProceed": "Starten",
     "alarmConflictCancel": "Abbrechen",
     "timerConflictTitle": "Timer läuft",

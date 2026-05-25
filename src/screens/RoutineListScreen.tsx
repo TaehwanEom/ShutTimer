@@ -909,15 +909,6 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     setCollapseSignal(Date.now());
   }, []);
 
-  const formatConflictTime = useCallback((ms: number) => {
-    const d = new Date(ms);
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
-    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
-  }, [t]);
-
   const handlePlay = useCallback(async (routine: Routine) => {
     // v1.8 #TimerRoutineCoexist — 루틴 시작 시 진행 중 타이머 측 dialog 폐기 (= 본 cycle B-2 측 정정 측 되돌림).
     //   AlarmKit framework 측 = scheduled (= 알람) + countdown (= 타이머/루틴 step) 측 = 동시 활성 가능 측 추정.
@@ -970,11 +961,12 @@ export default function RoutineListScreen({ navigation, route }: Props) {
         Logger.warn('routine', `alarmConflict native check fail err=${String(e)}`);
       }
       if (conflict) {
-        const timeText = formatConflictTime(conflict.time);
+        // v1.9 #AlarmConflictDialogSimplify — 시각 표시 제거 (= 잔존 native alarm 측 오류 가능성 회피).
+        //   라벨만 유지 → 사용자 측 충돌 종류 인지 + 정확한 시각 측 false positive 방지.
         const c = conflict;
         Alert.alert(
           t('routine.alarmConflictTitle'),
-          t('routine.alarmConflictBody', { time: timeText, alarmLabel: c.label }),
+          t('routine.alarmConflictBody', { alarmLabel: c.label }),
           [
             { text: t('routine.alarmConflictCancel'), style: 'cancel' },
             { text: t('routine.alarmConflictProceed'), onPress: () => proceedPlay(routine, c.isUserAlarm ? c.alarmId : undefined) },
@@ -987,7 +979,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
       Logger.warn('routine', `alarmConflict check fail err=${String(e)}`);
     }
     proceedPlay(routine);
-  }, [t, formatConflictTime, proceedPlay]);
+  }, [t, proceedPlay]);
 
   // ActiveRoutineSection onClose — useCallback 으로 stable. 매 부모 리렌더마다 새 inline arrow 가
   // 자식 useCallback (handleAutoNow 등) dep cascade 트리거하던 문제 차단 → auto countdown setTimeout 정상 fire.

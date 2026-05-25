@@ -329,15 +329,10 @@ function AppNavigator() {
       // v1.8 #ChainMarker — bundle 적용 검증용 마커. 본 로그 안 보이면 = 디바이스 측 옛 bundle.
       Logger.warn('CHAIN-MARKER-V18', `listener entered state=${event.state} alarmId=${event.alarmId}`);
       if (event.state !== 'alerting') return;
-      // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
-      // v1.8 #AndroidNativeSound — 안드로이드 제외 (네이티브 AlarmService가 포그라운드에서도 계속 재생).
-      if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active' && Platform.OS !== 'android') {
-        Logger.warn('onAlarmStateChange-DBG', `suppressFlag 진입 → cancelAlarm ${event.alarmId}`);
-        await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
-      }
+      // v1.9 #ListenerCancelOrder — cancelAlarm 호출 측 = meta lookup 후로 이동.
+      //   직전 = state==='alerting' 즉시 cancelAlarm → AlarmScreen 측 startAlarmAudio 측 race 가능 + meta type 측 무관 cancel.
+      //   정정 = meta lookup 후 = (a) deleted=true → silent cancel + return / (b) 의도된 type 만 SUPPRESS cancel / (c) 그 외 NULL/unknown 측 = cancel skip.
       const metaRaw = await loadAlarmMetadata(event.alarmId);
-      // v1.7 hotfix #26 — debug log: meta lookup 결과 (= 베너 미노출 추적용).
-      // meta=null = mapping table 측 잔존 ❌ → silent skip 진입 = 사용자 측 모름.
       Logger.warn('onAlarmStateChange-DBG', `meta lookup alarmId=${event.alarmId} meta=${metaRaw ? `${metaRaw.type}/${metaRaw.entityId}${metaRaw.deleted ? '/DELETED' : ''}` : 'NULL'}`);
       // v1.9 #SoftDelete — meta.deleted=true 측 = cancelAlarmsForEntity F2 verify 후 stale 잔존 (= native cancel 실패).
       //   직전 fire 시 = 사용자 화면 진입 + native banner+사운드 = 회귀. 정정 = silent native cancel + metadata 정식 delete + return.
@@ -346,6 +341,12 @@ function AppNavigator() {
         await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
         await deleteAlarmMetadata(event.alarmId).catch(() => {});
         return;
+      }
+      // v1.6 — 앱 active 시 AlarmKit 시스템 banner 차단. in-app modal + expo-av 사운드 정공.
+      // v1.8 #AndroidNativeSound — 안드로이드 제외 (네이티브 AlarmService가 포그라운드에서도 계속 재생).
+      if (SUPPRESS_ALARMKIT_BANNER_IN_FG && AppState.currentState === 'active' && Platform.OS !== 'android') {
+        Logger.warn('onAlarmStateChange-DBG', `suppressFlag 진입 → cancelAlarm ${event.alarmId}`);
+        await AlarmkitBridge.cancelAlarm(event.alarmId).catch(() => {});
       }
       // v1.7 hotfix #34 — meta=NULL 시 = routine_snapshot 측 fallback (= confirm_prompt 분기 정합).
       // root cause = AdvanceNextStepIntent native 측 = 다음 step alarm schedule 시 mapping table saveAlarmMetadata ❌ →

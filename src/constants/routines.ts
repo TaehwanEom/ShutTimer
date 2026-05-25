@@ -279,8 +279,20 @@ export async function recordStepSession(r: Routine, stepIdx: number, executionId
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
     // v1.8 — step record 중복 방지. 같은 executionId + 같은 stepIdx + 같은 routineId 측 이미 저장된 record 있으면 skip.
     // 원인 = LA "다음 진행" 흐름 측 = native AdvanceNextStepIntent (advance_done signal) + secondaryIntent (NextStepIntent) 두 경로 record 호출 가능.
+    // v1.9 #ExecutionIdFallback — executionId 측 = caller 측 누락 시 = 동일 routineId + stepName + 30초 내 record 측 dedup (= 측 = 측 = 측 = 직접 dispatch path 측 = 측 = LA Intent 두 경로 측 = 측 = 측 = 안전망).
     if (executionId) {
       const dup = list.some(s => s.executionId === executionId && s.routineId === r.id && s.stepName === step.name);
+      if (dup) return;
+    } else {
+      const nowMs = Date.now();
+      const dup = list.some(s => {
+        if (s.routineId !== r.id || s.stepName !== step.name) return false;
+        const sId = s.id; // = 's_${ms}_${rand}' 측 = 측 = ms 추출.
+        const m = sId.match(/^s_(\d+)_/);
+        if (!m) return false;
+        const sMs = parseInt(m[1], 10);
+        return Math.abs(nowMs - sMs) < 30000;
+      });
       if (dup) return;
     }
     const d = new Date();

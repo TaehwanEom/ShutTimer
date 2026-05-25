@@ -189,7 +189,11 @@ function AppNavigator() {
     // v1.6: 루틴 활성 플래그도 stale 방지 (kill 후 재시작 시 단일 타이머 알림 suppress 차단 방지)
     AsyncStorage.removeItem('isRoutineActive').catch(() => {});
     // dismissMethod 사전 로드 → AlarmScreen 마운트 시 즉시 사용 (흔들기 애니메이션 지연 제거)
-    preloadDismissMethod();
+    // v1.9 #PreloadDismissAwait — 측 fire-and-forget → AsyncStorage read 완료 전 AlarmScreen mount 시 = null 반환 → 기본값 fallback 회귀.
+    //   정정 = .catch() 측 logging 측만 (= 측 = await 측 useEffect 측 안 됨 → IIFE 측 internal await 측 보장).
+    (async () => {
+      try { await preloadDismissMethod(); } catch (e) { Logger.warn('App', `preloadDismissMethod fail: ${String(e)}`); }
+    })();
   }, []);
 
   // v1.6: 화면 켜짐 유지 — 설정 ON이면 앱 foreground 동안 화면 자동 잠금 차단.

@@ -490,16 +490,29 @@ export async function recordAlarmSession(label?: string): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(SESSIONS_STORAGE_KEY);
     const list: SessionRecord[] = raw ? JSON.parse(raw) : [];
+    // v1.9 #AlarmRecordDedup — 동일 label 측 = 30초 내 record 측 dedup.
+    //   직전 = 사용자 측 같은 알람 측 = 재시도 (= dismiss fail + 재시도) 시 = 매번 push → 히스토리 중복 회귀.
+    //   정정 = 30초 내 동일 label 측 type='alarm' record 측 = skip.
+    const nowMs = Date.now();
+    const normLabel = label && label.trim().length > 0 ? label.trim() : undefined;
+    const dup = list.some(s => {
+      if (s.type !== 'alarm' || s.label !== normLabel) return false;
+      const m = s.id.match(/^s_(\d+)_/);
+      if (!m) return false;
+      const sMs = parseInt(m[1], 10);
+      return Math.abs(nowMs - sMs) < 30000;
+    });
+    if (dup) return;
     const d = new Date();
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     list.push({
-      id: `s_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id: `s_${nowMs}_${Math.random().toString(36).slice(2, 6)}`,
       date,
       icon: 'alarm',
       minutes: 0,
       type: 'alarm',
       totalSeconds: 0,
-      label: label && label.trim().length > 0 ? label.trim() : undefined,
+      label: normLabel,
     });
     await AsyncStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(list));
   } catch {

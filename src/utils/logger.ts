@@ -21,15 +21,23 @@ const pushToMemory = (entry: LogEntry) => {
 };
 
 // 백그라운드로 스토리지 반영 (실패해도 메모리엔 이미 있음)
+// v1.9 #PersistThrottle — 매 record 측 setItem 호출 → 빈번 write 측 race + 성능 ↓.
+//   정정 = 1초 측 1회만 setItem (= debounce). 측 = 메모리 측 = primary 측 항상 최신.
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const PERSIST_DEBOUNCE_MS = 1000;
 const persistAll = () => {
-  try {
-    const snapshot = JSON.stringify(memoryBuffer);
-    AsyncStorage.setItem(MEMORY_BUFFER_KEY, snapshot).catch((e) => {
-      console.warn('Logger persist failed:', e);
-    });
-  } catch (e) {
-    console.warn('Logger persist error:', e);
-  }
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      const snapshot = JSON.stringify(memoryBuffer);
+      AsyncStorage.setItem(MEMORY_BUFFER_KEY, snapshot).catch((e) => {
+        console.warn('Logger persist failed:', e);
+      });
+    } catch (e) {
+      console.warn('Logger persist error:', e);
+    }
+  }, PERSIST_DEBOUNCE_MS);
 };
 
 const record = (level: 'info' | 'warn' | 'error', tag: string, message: string) => {

@@ -563,23 +563,16 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   };
 
-  // --- 타이머 시작 ---
-  const handleStart = async () => {
-    const total = selectedMinutes * 60 + selectedSeconds;
-    if (total <= 0) return;
-    // v1.8 #TimerRoutineCoexist — 루틴 진행 중 + 메인 타이머 시작 시 dialog 측 제거.
-    //   직전 = isRoutineActive dialog 측 = "루틴 종료 후 시작" 측만 → 동시 진행 ❌ 회귀 root cause.
-    //   정정 = dialog 측 폐기 + 그대로 진행. AlarmKit framework 측 = scheduled (= 루틴 step) + countdown (= 타이머)
-    //     측 = 동시 활성 가능 측 추정 → 동시 진행 ✅. 64개 측 한계 도달 시 = 다음 cycle 측 별도 처리.
+  // v1.9 #AlarmConflictExtract — handleStart + togglePause(dial 변경) 양쪽 측 공통 갭 체크 + dialog 함수.
+  //   직전 = handleStart 측만 갭 체크 → pause + dial 회전 측 reschedule 시 갭 dialog 누락.
+  //   정정 = 함수 추출 → 양쪽 호출. true 반환 시 caller 측 진행, false 시 사용자 취소.
+  const checkAlarmConflictAndConfirm = async (durationSec: number): Promise<boolean> => {
     const nowMs = Date.now();
-    // v1.8 #AlarmTimerConflict — 단일 타이머 시작 시 알람 다음 트리거 시각 검사.
-    // 타이머 종료 + 5분 버퍼 안에 알람 트리거 있으면 경고 dialog → 사용자 선택 후 시작.
-    // "시작" 누름 시 = 충돌 알람 임시 disable + AlarmKit cancel + AsyncStorage 측 ID 저장 → AlarmScreen goHome 측 측 복원.
+    const limitMs = nowMs + (durationSec + 300) * 1000;
+    let conflict: { time: number; label: string; alarmId: string; isUserAlarm: boolean } | null = null;
     try {
       const alarms = await loadAlarms();
       const enabledAlarms = alarms.filter(a => a.enabled);
-      const limitMs = nowMs + (total + 300) * 1000;
-      let conflict: { time: number; label: string; alarmId: string; isUserAlarm: boolean } | null = null;
       for (const a of enabledAlarms) {
         const next = nextAlarmOccurrenceTime(a, new Date(nowMs));
         if (next !== null && next >= nowMs && next <= limitMs) {
@@ -588,10 +581,6 @@ export default function HomeScreen({ navigation, route }: Props) {
           }
         }
       }
-      // v1.9 #AlarmTimerConflictRoutine — native alarm 측 추가 검사 (= routine confirm_prompt + 사용자 알람 chain).
-      //   직전 = enabledAlarms 측 (= AsyncStorage 사용자 알람) 측만 검사 → routine 진행 중 alarm (= confirm_prompt countdown) 누락 → dialog 미노출.
-      //   정정 = AlarmkitBridge.listAlarms() 측 native alarm + mapping table 측 type 측 추가 검사.
-      //   isUserAlarm=false 측 (= routine alarm) "그래도 시작" 측 = cancel ❌ + 동시 진행 (= routine 종료 X).
       try {
         const nativeAlarms = await AlarmkitBridge.listAlarms();
         const allMeta = await listAllAlarmMetadata();
@@ -607,7 +596,6 @@ export default function HomeScreen({ navigation, route }: Props) {
           const meta = allMeta.find(m => m.alarmId === native.id);
           if (!meta) continue;
           if (meta.type !== 'confirm_prompt' && meta.type !== 'alarm_main' && meta.type !== 'timer_main') continue;
-          // 사용자 알람 측 = 직전 검사 중복 → skip.
           if (meta.type === 'alarm_main' && userAlarmIds.has(meta.entityId)) continue;
           const label = meta.type === 'confirm_prompt'
             ? t('routine.routineAlarmLabel', { defaultValue: '루틴 진행 중 알람' })
@@ -621,49 +609,53 @@ export default function HomeScreen({ navigation, route }: Props) {
       } catch (e) {
         Logger.warn('timer', `alarmConflict native check fail err=${String(e)}`);
       }
-      if (conflict) {
-        // v1.9 #AlarmConflictDialogSimplify — 시각 표시 제거 (= 잔존 native alarm 측 오류 가능성 회피).
-        //   라벨만 유지 → 사용자 측 충돌 종류 인지 + 정확한 시각 측 false positive 방지.
-        const c = conflict;
-        await new Promise<void>((resolve) => {
-          Alert.alert(
-            t('routine.alarmConflictTitle'),
-            t('routine.alarmConflictBody', { alarmLabel: c.label }),
-            [
-              { text: t('routine.alarmConflictCancel'), style: 'cancel', onPress: () => resolve() },
-              {
-                text: t('routine.alarmConflictProceed'),
-                onPress: async () => {
-                  // v1.9 #AlarmTimerConflictRoutine — isUserAlarm=true 측만 임시 disable + cancel (= 직전 흐름).
-                  //   isUserAlarm=false 측 (= routine confirm_prompt) = cancel ❌ + 동시 진행 (= routine 종료 X).
-                  if (c.isUserAlarm) {
-                    try {
-                      const target = enabledAlarms.find(x => x.id === c.alarmId);
-                      if (target) {
-                        await upsertAlarm({ ...target, enabled: false });
-                        await cancelAlarmsForEntity(c.alarmId);
-                        const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
-                        const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
-                        if (!prev.includes(c.alarmId)) prev.push(c.alarmId);
-                        await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
-                      }
-                    } catch (e) {
-                      Logger.warn('timer', `alarmConflict disable fail err=${String(e)}`);
+      if (!conflict) return true;
+      const c = conflict;
+      return await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          t('routine.alarmConflictTitle'),
+          t('routine.alarmConflictBody', { alarmLabel: c.label }),
+          [
+            { text: t('routine.alarmConflictCancel'), style: 'cancel', onPress: () => resolve(false) },
+            {
+              text: t('routine.alarmConflictProceed'),
+              onPress: async () => {
+                if (c.isUserAlarm) {
+                  try {
+                    const target = enabledAlarms.find(x => x.id === c.alarmId);
+                    if (target) {
+                      await upsertAlarm({ ...target, enabled: false });
+                      await cancelAlarmsForEntity(c.alarmId);
+                      const prevRaw = await AsyncStorage.getItem(PENDING_DISABLED_ALARMS_KEY);
+                      const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
+                      if (!prev.includes(c.alarmId)) prev.push(c.alarmId);
+                      await AsyncStorage.setItem(PENDING_DISABLED_ALARMS_KEY, JSON.stringify(prev));
                     }
+                  } catch (e) {
+                    Logger.warn('timer', `alarmConflict disable fail err=${String(e)}`);
                   }
-                  await proceedTimerStart();
-                  resolve();
-                },
+                }
+                resolve(true);
               },
-            ],
-            { cancelable: true, onDismiss: () => resolve() }
-          );
-        });
-        return;
-      }
+            },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) }
+        );
+      });
     } catch (e) {
       Logger.warn('timer', `alarmConflict check fail err=${String(e)}`);
+      return true;
     }
+  };
+
+  // --- 타이머 시작 ---
+  const handleStart = async () => {
+    const total = selectedMinutes * 60 + selectedSeconds;
+    if (total <= 0) return;
+    // v1.8 #TimerRoutineCoexist — 루틴 진행 중 dialog 측 폐기 + 동시 진행 ✅.
+    // v1.8 #AlarmTimerConflict — 단일 타이머 시작 시 알람 다음 트리거 시각 검사 (= 5분 버퍼).
+    const proceed = await checkAlarmConflictAndConfirm(total);
+    if (!proceed) return;
     await proceedTimerStart();
 
     async function proceedTimerStart() {
@@ -983,6 +975,11 @@ export default function HomeScreen({ navigation, route }: Props) {
       const changed = original !== null && endAtRef.current !== original;
       if (changed) {
         const newRemainingSecs = Math.max(1, Math.ceil((endAtRef.current - now) / 1000));
+        // v1.9 #AlarmConflictPauseResume — pause + dial 변경 측 reschedule 전 갭 체크 + dialog.
+        //   직전 = 무조건 reschedule → 갭 dialog 누락.
+        //   정정 = checkAlarmConflictAndConfirm 측 호출 → "취소" 시 paused 상태 유지 (= resume 측 진행 X, 사용자 다시 다이얼 조정 또는 취소 가능).
+        const proceed = await checkAlarmConflictAndConfirm(newRemainingSecs);
+        if (!proceed) return;
         totalSecondsRef.current = newRemainingSecs;
         // scheduleAlarm 내부 = 기존 alarmkitIdRef cancel + 새 alarm schedule + alarmkitIdRef swap 자동.
         await scheduleAlarm(newRemainingSecs);

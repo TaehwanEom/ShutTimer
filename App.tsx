@@ -67,6 +67,7 @@ import {
   SESSION_EVENT_NAVIGATE,
 } from './src/state/effectRunner';
 import { onAlarmFire, onLAControlSignal, onAppActive } from './src/state/ActionDispatcher';
+import { dispatch as sessionDispatch } from './src/state/SessionController';
 import { migrateLegacyToSession } from './src/state/SessionStore';
 /*
   ═══════════════════════════════════════════════════════════
@@ -346,6 +347,18 @@ function AppNavigator() {
       Logger.warn('onAlarmStateChange-DBG', `alarmId=${event.alarmId} state=${event.state} AppState=${AppState.currentState} suppressFlag=${SUPPRESS_ALARMKIT_BANNER_IN_FG}`);
       // v1.8 #ChainMarker — bundle 적용 검증용 마커. 본 로그 안 보이면 = 디바이스 측 옛 bundle.
       Logger.warn('CHAIN-MARKER-V18', `listener entered state=${event.state} alarmId=${event.alarmId}`);
+      // Phase 3-3 (2026-05-26, Android): native FSI 측 secondary action button (= "다음 진행") 측 = AlarmActionReceiver 측 emit.
+      //   confirm_prompt 측 alarm 측 = routine 측 step 진행. JS 측 dispatch Advance 정합 (= iOS AdvanceNextStepIntent 등가).
+      //   alarm cancel + service stop 측 = native 측 이미 처리. 본 분기 측 = JS 측 dispatch만.
+      if (event.state === 'secondary_action') {
+        const sMeta = await loadAlarmMetadata(event.alarmId).catch(() => null);
+        Logger.warn('onAlarmStateChange-DBG', `secondary_action alarmId=${event.alarmId} meta=${sMeta ? `${sMeta.type}/${sMeta.entityId}` : 'NULL'}`);
+        if (sMeta?.type === 'confirm_prompt') {
+          await sessionDispatch({ type: 'Advance' }).catch(() => {});
+        }
+        await deleteAlarmMetadata(event.alarmId).catch(() => {});
+        return;
+      }
       if (event.state !== 'alerting') return;
       // v1.9 #ListenerCancelOrder — cancelAlarm 호출 측 = meta lookup 후로 이동.
       //   직전 = state==='alerting' 즉시 cancelAlarm → AlarmScreen 측 startAlarmAudio 측 race 가능 + meta type 측 무관 cancel.

@@ -186,9 +186,11 @@ type AlarmRowProps = {
   activeRunNode?: React.ReactNode;
   /** v1.7 Phase 2-B — 본 알람 측 진행 중 = swipe 차단 + 자동 펼침 */
   isActive?: boolean;
+  /** 2026-05-27 fix — 루틴/ad-hoc routine 진행 중 측 = 모든 알람 토글 disable (= 진행 중 routine 측 영향 차단). */
+  toggleDisabled?: boolean;
 };
 
-function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive }: AlarmRowProps) {
+function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive, toggleDisabled }: AlarmRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
   const [expanded, setExpanded] = useState(false);
@@ -459,7 +461,9 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
               <Switch
                 value={item.enabled}
                 onValueChange={onToggle}
+                disabled={!!toggleDisabled}
                 trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+                style={toggleDisabled ? { opacity: 0.4 } : undefined}
               />
             </View>
           </View>
@@ -643,6 +647,9 @@ export default function AlarmListScreen({ navigation }: Props) {
 
   // ─── 정상 진입 ─────────────────────────────────
 
+  // 2026-05-27 fix — 루틴 / ad-hoc routine 진행 중 측 = 모든 알람 토글 disabled (= 진행 중 routine 영향 차단).
+  //   activeRoutine 측 = SessionController kind=routine 또는 ad_hoc_routine 측 active 상태 측 mirror.
+  const anyRoutineRunning = !!activeRoutine;
   const renderItem = ({ item }: { item: Alarm }) => {
     // v1.7 Phase 2-B — 본 알람 측 ad-hoc routine 진행 중 = ActiveRoutineSection 마운트.
     const isActive = !!activeRoutine && activeRoutine.routineId === createAlarmAdhocRoutineId(item.id);
@@ -657,6 +664,7 @@ export default function AlarmListScreen({ navigation }: Props) {
         onToggle={(v) => handleToggle(item, v)}
         onDelete={() => handleDelete(item)}
         isActive={isActive}
+        toggleDisabled={anyRoutineRunning}
         activeRunNode={
           isActive ? (
             <ActiveRoutineSection

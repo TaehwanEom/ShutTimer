@@ -42,7 +42,6 @@ import {
   isAdhocAlarmRoutine,
 } from '../utils/alarmRoutineLink';
 import ActiveRoutineSection from '../components/ActiveRoutineSection';
-import AdBanner from '../components/AdBanner';
 
 // v1.8 — AlarmList Stack.Screen 제거. MainTabsNavigator AlarmTab Tab.Screen만 사용.
 type Props = {
@@ -636,7 +635,7 @@ export default function AlarmListScreen({ navigation }: Props) {
             })}
           </Text>
         </View>
-        <AdBanner />
+        {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. */}
       </SafeAreaView>
     );
   }
@@ -704,7 +703,7 @@ export default function AlarmListScreen({ navigation }: Props) {
         contentContainerStyle={alarms.length === 0 ? styles.emptyContent : styles.content}
       />
 
-      <AdBanner />
+      {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. */}
     </SafeAreaView>
   );
 }

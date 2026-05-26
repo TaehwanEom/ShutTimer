@@ -9,7 +9,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom-tabs';
+import AdBanner from './src/components/AdBanner';
 import { MaterialIcons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -147,7 +148,16 @@ function MainTabsNavigator() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   return (
-    <Tab.Navigator screenOptions={{
+    <Tab.Navigator
+      // v1.9 #AdBannerConsolidate — Tab 화면 5개 측 각자 AdBanner mount → 5개+ 동시 BannerAd 요청 측 = 메모리/광고비용 비효율.
+      // 정정 = tabBar prop 측 = AdBanner 단일 mount + BottomTabBar 통합 → 모든 Tab 화면 측 공유 = 1개 instance.
+      tabBar={(props) => (
+        <View>
+          <AdBanner />
+          <BottomTabBar {...props} />
+        </View>
+      )}
+      screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.secondary,

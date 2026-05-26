@@ -26,7 +26,6 @@ import { useTheme } from '../context/ThemeContext';
 import { MISSIONS, MISSIONS_STORAGE_KEY, Mission } from '../constants/missions';
 import TimerDial from '../components/TimerDial';
 import TimerDigital from '../components/TimerDigital';
-import AdBanner from '../components/AdBanner';
 import BugReportModal from '../components/BugReportModal';
 import RecommendModal from '../components/RecommendModal';
 import { markRecommendShown } from '../utils/storeReview';
@@ -1285,9 +1284,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* v1.6 후속 — 즐겨찾기 영역 제거 후 AdBanner 위치 정정. flex spacer 으로 화면 하단 push. */}
-      <View style={{ flex: 1 }} />
-      <AdBanner />
+      {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. 측 = 다중 instance 회피. */}
       </ScrollView>
       {/* v1.7 — 버그 제보 모달 */}
       <BugReportModal

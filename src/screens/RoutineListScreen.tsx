@@ -62,7 +62,6 @@ import {
   CategoryDef,
   loadCustomCategories,
 } from '../constants/categories';
-import AdBanner from '../components/AdBanner';
 
 // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측만 사용.
 type Props = {
@@ -1212,7 +1211,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
         <View style={{ height: 24 }} />
       </ScrollView>
       </View>
-      <AdBanner />
+      {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. */}
     </SafeAreaView>
   );
 }

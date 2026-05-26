@@ -25,7 +25,6 @@ import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useTranslation } from 'react-i18next';
-import AdBanner from '../components/AdBanner';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 import { getLocales } from 'expo-localization';
@@ -993,7 +992,7 @@ export default function SettingsScreen({ navigation }: Props) {
         </View>
       </Modal>
 
-      <AdBanner />
+      {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. */}
     </SafeAreaView>
   );
 }

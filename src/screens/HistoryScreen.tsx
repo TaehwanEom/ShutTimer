@@ -16,7 +16,6 @@ import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
-import AdBanner from '../components/AdBanner';
 
 // v1.8 — History Stack.Screen 제거. MainTabsNavigator CalendarTab Tab.Screen만 사용.
 type Props = {
@@ -548,7 +547,7 @@ export default function HistoryScreen({ navigation }: Props) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-      <AdBanner />
+      {/* v1.9 #AdBannerConsolidate — AdBanner 측 = MainTabsNavigator tabBar prop 통합 측 이동. */}
     </SafeAreaView>
   );
 }

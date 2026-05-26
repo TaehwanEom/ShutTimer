@@ -47,7 +47,7 @@ import { readControlSignal, clearControlSignal, readRoutineSnapshot } from './sr
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
-import { loadAlarmMetadata, deleteAlarmMetadata } from './src/utils/alarmkitMappingTable';
+import { loadAlarmMetadata, deleteAlarmMetadata, listAllAlarmMetadata } from './src/utils/alarmkitMappingTable';
 import { loadAlarms } from './src/constants/alarms';
 import {
   syncAllAlarms,
@@ -55,7 +55,9 @@ import {
   recordAlarmSession,
   cleanupGhostAlarms,
   migrateSoundRename,
+  migrateChainFixedSafety,
   ALARM_CHAIN_MAX_INDEX,
+  rearmSafetyChain,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
 import { recordInstallDateIfNeeded } from './src/utils/storeReview';
@@ -443,6 +445,36 @@ function AppNavigator() {
         if (curIdx >= ALARM_CHAIN_MAX_INDEX) {
           await disableOnceAlarmIfNeeded(meta.entityId).catch(() => {});
         }
+        // v2.0 #ChainFixedSafety (2026-05-28) — iOS 전용. Android 측 = chainIndex 1+ daily/weekly 유지 → 본 분기 X.
+        //   iOS 측 = chainIndex 1+ .fixed → 발화 후 소비 → 매일 chainIndex 0 발화 시점 측 listener 측 그날 safety chain 재예약.
+        //   listener 미발화 시 (= 앱 완전 종료) = 그날 safety chain X (= chainIndex 0 만 발화). 다음 syncAllAlarms 측 복구.
+        //   중복 방지 = Day 1 (= 초기 schedule 직후 chainIndex 0 첫 발화) 측 chainIndex 1+ 측 이미 존재 → 측 = skip rearm.
+        if (Platform.OS === 'ios') {
+          if (curIdx === 0) {
+            const allAlarms = await loadAlarms().catch(() => []);
+            const alarm = allAlarms.find(a => a.id === meta.entityId);
+            if (alarm && (alarm.repeat === 'daily' || alarm.repeat === 'weekly')) {
+              const allMetaSnap = await listAllAlarmMetadata().catch(() => []);
+              const hasExistingSafety = allMetaSnap.some(m =>
+                m.type === 'alarm_main' &&
+                m.entityId === meta.entityId &&
+                (m.chainIndex ?? 0) >= 1 &&
+                m.deleted !== true
+              );
+              if (!hasExistingSafety) {
+                const baseFireAt = Date.now();
+                Logger.warn('onAlarmStateChange-DBG', `chainIndex 0 alerting → rearmSafetyChain entityId=${meta.entityId} baseFireAt=${baseFireAt}`);
+                await rearmSafetyChain(alarm, baseFireAt).catch(() => {});
+              } else {
+                Logger.warn('onAlarmStateChange-DBG', `chainIndex 0 alerting skip rearm (existing safety chain) entityId=${meta.entityId}`);
+              }
+            }
+          } else {
+            // chainIndex >= 1 (iOS safety chain 멤버) .fixed 측 = 발화 후 framework 자동 제거 → JS metadata orphan cleanup.
+            //   Android 측 = 동일 alarmId 측 daily 재예약 (= 메타 삭제 ❌, alarmId 재사용).
+            await deleteAlarmMetadata(event.alarmId).catch(() => {});
+          }
+        }
         return;
       }
 
@@ -774,6 +806,10 @@ function AppNavigator() {
         // v1.8 #SoundRenameMigration — 사운드 리네임 회귀 1회성 정정. syncAllAlarms 앞에서 실행
         //   → 옛 체인 재등록 후 syncAllAlarms 가 fresh 체인을 live 로 인식해 skip.
         await migrateSoundRename();
+        // v2.0 #ChainFixedSafetyMigration (2026-05-28) — 옛 .relative(daily) 체인 → .fixed 체인 1회성 정정. iOS 전용.
+        //   업데이트 후 첫 부팅 시 = 옛 체인 wipe + 새 chainMemberRecurrence 측 재등록.
+        //   baseFireAt = next future occurrence → 유령 발화 ❌ + listener metadata cleanup 정합.
+        await migrateChainFixedSafety();
         await syncAllAlarms();
         await cleanupGhostAlarms();
         // v2.0 P3.6 ⑨ guard — disabled alarm entity 의 chain 잔존 정리 (cleanupGhostAlarms 가 못 잡는 영역).

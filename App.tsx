@@ -160,7 +160,7 @@ function MainTabsNavigator() {
   const { t } = useTranslation();
   return (
     <Tab.Navigator
-      tabBar={TabBarWithAd}
+      tabBar={(props) => <TabBarWithAd {...props} />}
       screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: colors.primary,

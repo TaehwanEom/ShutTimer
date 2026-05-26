@@ -31,9 +31,10 @@
   5. Dismiss: `cancelEntity done targets=1 nativeFail=0 finalStale=0` + SharedPreferences 완전 정리.
 
   상세: `docs/work-2026-05-26-android-phase2-1-and-phase3-2.md` §"Android 에뮬레이터 실기 검증". 잔여: 실기기 측 FSI 잠금화면 점유 + 무음모드 우회 + 볼륨 버튼 차단 + 재부팅 복원 = 별도 실기기 세션.
-- ⬜ Phase 2-2 — 진행 중 카운트다운 알림 (ongoing notification, MED)
-- ⬜ Phase 3-0/3-1/3-3/3-4/3-5 — 알람 탭 + 루틴 활성화 (= JS 가드 해제 + secondaryLabel UI + OEM 안내)
-- ✅ **2026-05-26 Phase 3-0b + 2-2 + 3-3 마무리** — 루틴 path 활성화 + ongoing chronometer notification + secondaryLabel native action button + AlarmActionReceiver. Kotlin BUILD SUCCESSFUL + dex deployment 검증 PASS. 상세: `docs/work-2026-05-26-android-phase2-2-and-3-3.md`. 잔여: Phase 3-5 (OEM 안내) + E2E onboarding 통과 측 UI 검증 (= 에뮬레이터 UI swipe 측 신뢰성 한계).
+- ✅ **2026-05-26 Phase 2-2 마무리** — 진행 중 카운트다운 알림 (ongoing chronometer notification, setUsesChronometer + setChronometerCountDown + setWhen). 상세: `docs/work-2026-05-26-android-phase2-2-and-3-3.md`.
+- ✅ **2026-05-26 Phase 3-0/3-1/3-3/3-4 마무리** — 알람 탭 + 루틴 활성화 (= JS 가드 해제 + secondaryLabel UI + AlarmActionReceiver).
+- ✅ **2026-05-26 Phase 3-0b + 2-2 + 3-3 마무리** — 루틴 path 활성화 + ongoing chronometer notification + secondaryLabel native action button + AlarmActionReceiver. Kotlin BUILD SUCCESSFUL + dex deployment 검증 PASS. 상세: `docs/work-2026-05-26-android-phase2-2-and-3-3.md`.
+- ✅ **2026-05-26 Phase 3-5 마무리** — Samsung 측 배터리 최적화 deep-link + Onboarding 안내 슬라이드 + Settings 행. `src/utils/oemBatteryHelper.ts` (NEW: isSamsung() + requestIgnoreBatteryOptimization + openSamsungDeviceCare candidates chain) + `OnboardingScreen.tsx` (samsung-battery permission slide, isSamsung() 가드) + `SettingsScreen.tsx` ("배터리 최적화 설정" 행, Platform.OS==='android' 가드). 검증: Pixel 에뮬레이터 (= manufacturer='Google', 비-삼성) 측 = Settings 행 노출 + tap → `act=android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS / cmp=com.android.settings/.fuelgauge.RequestIgnoreBatteryOptimizations` 정확 fire (logcat). iOS 영향 = 0 (= 모든 분기 Platform/isSamsung 가드 격리). 커밋 = 4af701a.
 
 ## 만들어진 것 (`modules/alarmkit-bridge/android/`)
 

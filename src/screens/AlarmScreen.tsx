@@ -462,8 +462,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
       //   원인: transition Dismiss = STEP_ALERTING → CONFIRMING 전이만. timer/simple_alarm 측 = 다음 dispatch (Advance/Stop) 없으면 session 영구 잔존.
       //   잔존 시 = 다음 routine ▶ tap 측 = dispatch(Start) currentState=CONFIRMING → "Start rejected — existing session" → 화면 변화 0 = 먹통.
       //   정정 = goHome 측 = timer/simple_alarm session 측 = 명시 Stop dispatch (= session 정리 + alarmBinding 정리).
-      //   routine kind 측 = 분기 위쪽 (= fromRoutine='last_step' / startRoutineFromAlarm) 측 이미 처리됨 = 본 분기 진입 X.
-      if (currentSession && (currentSession.kind === 'timer' || currentSession.kind === 'simple_alarm')) {
+      // Fix A.2 (2026-05-27) — startRoutineFromAlarm 측 새 ad_hoc_routine session 측 storage 측 덮어쓴 후 측 = 옛 currentSession 변수 측 = stale.
+      //   재읽기 필수. 새 session 측 kind != timer/simple_alarm 시 (= ad_hoc_routine 측 take over) = Stop skip (= 막 시작한 ad-hoc routine 측 죽임 방지).
+      //   사용자 시나리오: 알람 (a.steps 보유) fire → dismiss → startRoutineFromAlarm 측 ad-hoc routine 시작 → Fix A 측 옛 simple_alarm 변수 측 = 측 Stop → ad-hoc routine 죽음 → "알람 내 루틴 실행 안 됨".
+      const sessNow = await getCurrentSession();
+      if (sessNow && (sessNow.kind === 'timer' || sessNow.kind === 'simple_alarm')) {
         await sessionDispatch({ type: 'Stop', reason: 'user_button' }).catch(() => {});
       }
       // v1.8 #BannerTapPrematureUnmount — goHome alarmEntityId 분기 진입 추적용 (silent reset → AlarmScreen 즉시 unmount 원인 추적).

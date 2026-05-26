@@ -17,6 +17,23 @@ const HIDE_ADS = __DEV__ || process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
 // iOS: ca-app-pub-3043284478228309/4187716112
 // Android: ca-app-pub-3043284478228309/6158631734
 
+// v1.9 #RequireOnce — 직전 = render마다 require() 호출 → 모듈 캐시 측 = 매번 lookup + try/catch 측 = 성능 부담.
+// 정정 = 모듈 로드 시점 측 1회성 require + module-scope 변수 측 cache → render 측 = lookup X.
+let BannerAdModule: any = null;
+let bannerRequireError: string | null = null;
+if (!isExpoGo && !HIDE_ADS) {
+  try {
+    BannerAdModule = require('react-native-google-mobile-ads');
+  } catch (e: any) {
+    bannerRequireError = e?.message || String(e);
+  }
+}
+
+const BANNER_UNIT_ID = Platform.select({
+  ios: 'ca-app-pub-3043284478228309/4187716112',
+  android: 'ca-app-pub-3043284478228309/6158631734',
+}) as string;
+
 export default function AdBanner() {
   // @preserve IAP — usePurchase 훅 호출. Phase 2+ 복원용. 삭제 금지.
   // const { isAdFree, loading } = usePurchase();
@@ -41,31 +58,25 @@ export default function AdBanner() {
    * ═══════════════════════════════════════════════════════════
    */
   if (isExpoGo || HIDE_ADS) return null;
-
-  try {
-    const { BannerAd, BannerAdSize } = require('react-native-google-mobile-ads');
-    const BANNER_UNIT_ID = Platform.select({
-      ios: 'ca-app-pub-3043284478228309/4187716112',
-      android: 'ca-app-pub-3043284478228309/6158631734',
-    }) as string;
-
-    return (
-      <View style={{ width: '100%', alignItems: 'center' }}>
-        <BannerAd
-          unitId={BANNER_UNIT_ID}
-          size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-          requestOptions={{ requestNonPersonalizedAdsOnly: npa }}
-          onAdFailedToLoad={(error: any) => {
-            Logger.warn('AdMob', `Banner failed: code=${error?.code} domain=${error?.domain} msg=${error?.message}`);
-          }}
-          onAdLoaded={() => {
-            Logger.info('AdMob', 'Banner loaded');
-          }}
-        />
-      </View>
-    );
-  } catch (e: any) {
-    Logger.warn('AdMob', `BannerAd require failed: ${e?.message || e}`);
+  if (!BannerAdModule) {
+    if (bannerRequireError) Logger.warn('AdMob', `BannerAd require failed: ${bannerRequireError}`);
     return null;
   }
+
+  const { BannerAd, BannerAdSize } = BannerAdModule;
+  return (
+    <View style={{ width: '100%', alignItems: 'center' }}>
+      <BannerAd
+        unitId={BANNER_UNIT_ID}
+        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        requestOptions={{ requestNonPersonalizedAdsOnly: npa }}
+        onAdFailedToLoad={(error: any) => {
+          Logger.warn('AdMob', `Banner failed: code=${error?.code} domain=${error?.domain} msg=${error?.message}`);
+        }}
+        onAdLoaded={() => {
+          Logger.info('AdMob', 'Banner loaded');
+        }}
+      />
+    </View>
+  );
 }

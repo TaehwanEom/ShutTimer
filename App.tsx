@@ -142,6 +142,17 @@ function CalendarPlaceholder() {
   );
 }
 
+// v1.9 #AdBannerConsolidate — Tab 화면 5개 측 각자 AdBanner mount → 5개+ 동시 BannerAd 요청 측 = 메모리/광고비용 비효율.
+// 정정 = tabBar prop 측 = AdBanner 단일 mount + BottomTabBar 통합 → 모든 Tab 화면 측 공유 = 1개 instance.
+// v1.9 #AdBannerStableRef — tabBar 측 inline JSX 시 = MainTabsNavigator re-render 측 (= theme 변경 / i18n 변경) → 새 함수 reference 측 = AdBanner unmount/remount 반복 = BannerAd 측 = 매번 새 광고 요청 = 비용 ↑.
+// 정정 = 모듈 외부 측 TabBarWithAd 측 = stable component reference → React.memo 측 = props 동일 시 = re-render skip → AdBanner instance 측 = mount 후 stable alive.
+const TabBarWithAd = React.memo((props: any) => (
+  <View>
+    <AdBanner />
+    <BottomTabBar {...props} />
+  </View>
+));
+
 // v1.6 후속 — 하단 탭 (타이머 / 루틴 / 캘린더 / 설정).
 // v1.8 #TabBarI18n — tabBarLabel = i18n 분기 (ko / en / ja / zh-CN / zh-TW = 본인 언어 / 나머지 9개 언어 = en fallback)
 function MainTabsNavigator() {
@@ -149,14 +160,7 @@ function MainTabsNavigator() {
   const { t } = useTranslation();
   return (
     <Tab.Navigator
-      // v1.9 #AdBannerConsolidate — Tab 화면 5개 측 각자 AdBanner mount → 5개+ 동시 BannerAd 요청 측 = 메모리/광고비용 비효율.
-      // 정정 = tabBar prop 측 = AdBanner 단일 mount + BottomTabBar 통합 → 모든 Tab 화면 측 공유 = 1개 instance.
-      tabBar={(props) => (
-        <View>
-          <AdBanner />
-          <BottomTabBar {...props} />
-        </View>
-      )}
+      tabBar={TabBarWithAd}
       screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: colors.primary,

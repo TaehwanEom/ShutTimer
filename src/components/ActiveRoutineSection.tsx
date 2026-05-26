@@ -245,7 +245,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     }
     const update = () => {
       const remainMs = ar.stepEndAt - Date.now();
-      setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
+      // 2026-05-27 fix — 화면 카운트다운 측 = ceil → floor. ceil 측 = 0.001~0.999초 남은 시점 측 = "00:01" 표시 → 0초 도달 즉시 알람 → "00:00" 표시 못 봄.
+      //   floor 측 = 1초 미만 남으면 "00:00" 표시 → 사용자 측 = 0초 약 1초간 명시 표시 후 알람.
+      setRemainingSec(Math.max(0, Math.floor(remainMs / 1000)));
       if (remainMs <= 0) {
         // M0 진단: T8 미스터리 1 후보 — interval tick caller 식별. (유지)
         Logger.warn('T8-DBG', `handleMissionEnd trigger caller=interval-tick stepEndAt=${ar.stepEndAt} now=${Date.now()} routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
@@ -269,7 +271,8 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && ar && !isPaused && !ar.awaitingConfirm) {
         const remainMs = ar.stepEndAt - Date.now();
-        setRemainingSec(Math.max(0, Math.ceil(remainMs / 1000)));
+        // 2026-05-27 fix — ceil → floor (위 update 측 동일 정합).
+        setRemainingSec(Math.max(0, Math.floor(remainMs / 1000)));
         if (remainMs <= 0) {
           // M0 진단: T8 미스터리 1 후보 — AppState active 진입 시 endAt 만료 caller 식별.
           Logger.warn('T8-DBG', `handleMissionEnd trigger caller=AppState-active stepEndAt=${ar.stepEndAt} now=${Date.now()} diff=${Date.now() - ar.stepEndAt}ms routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);

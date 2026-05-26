@@ -36,7 +36,7 @@ import { Logger } from '../utils/logger';
 import { dispatchDismiss } from '../state/ActionDispatcher';
 // v2.0 R-7 fix — Session.state 측 외부 Stop trigger 측 자동 reset
 import { useSession } from '../state/useSession';
-import { getCurrentSession } from '../state/SessionController';
+import { getCurrentSession, dispatch as sessionDispatch } from '../state/SessionController';
 import { Session } from '../types/session';
 import { loadAlarms } from '../constants/alarms';
 import { loadActiveRoutine } from '../constants/routines';
@@ -458,6 +458,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
       } catch {
         // alarm 로드 / 시작 실패 = AlarmTab 복귀 정공 유지 (= 시작 위치 보존).
       }
+      // Fix A (2026-05-26) — timer / simple_alarm kind session 측 = Dismiss 후 CONFIRMING 잔존 정리.
+      //   원인: transition Dismiss = STEP_ALERTING → CONFIRMING 전이만. timer/simple_alarm 측 = 다음 dispatch (Advance/Stop) 없으면 session 영구 잔존.
+      //   잔존 시 = 다음 routine ▶ tap 측 = dispatch(Start) currentState=CONFIRMING → "Start rejected — existing session" → 화면 변화 0 = 먹통.
+      //   정정 = goHome 측 = timer/simple_alarm session 측 = 명시 Stop dispatch (= session 정리 + alarmBinding 정리).
+      //   routine kind 측 = 분기 위쪽 (= fromRoutine='last_step' / startRoutineFromAlarm) 측 이미 처리됨 = 본 분기 진입 X.
+      if (currentSession && (currentSession.kind === 'timer' || currentSession.kind === 'simple_alarm')) {
+        await sessionDispatch({ type: 'Stop', reason: 'user_button' }).catch(() => {});
+      }
       // v1.8 #BannerTapPrematureUnmount — goHome alarmEntityId 분기 진입 추적용 (silent reset → AlarmScreen 즉시 unmount 원인 추적).
       Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset AlarmTab alarmEntityId=${alarmEntityId} dismissMethod=${dismissMethod}`);
       navigation.reset({
@@ -471,6 +479,13 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }
     // v1.8 #AlarmTimerConflict — 단일 타이머 종료 시 임시 disable 한 알람 복원 (= 루틴 컨텍스트 아닌 일반 타이머 경로).
     await restorePendingDisabledAlarms();
+    // Fix A — alarmEntityId 미보유 path 측 = 안전망 (= 위 분기 측 동일 정합).
+    {
+      const sess = await getCurrentSession();
+      if (sess && (sess.kind === 'timer' || sess.kind === 'simple_alarm')) {
+        await sessionDispatch({ type: 'Stop', reason: 'user_button' }).catch(() => {});
+      }
+    }
     Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset Home dismissMethod=${dismissMethod}`);
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }, [navigation, route.params, dismissMethod]);

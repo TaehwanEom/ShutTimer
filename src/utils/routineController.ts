@@ -155,6 +155,22 @@ export async function startRoutine(
     DeviceEventEmitter.emit('timerCancelledExternally');
   }
 
+  // Fix B (2026-05-26) — stale non-routine session (= timer / simple_alarm) 측 = 잔존 시 강제 Stop.
+  //   원인: timer / simple_alarm 측 Dismiss → CONFIRMING 전이만. Advance/Stop 미dispatch 시 session 영구 잔존.
+  //   증상: 사용자 측 timer 발화 → 미션 풀고 dismiss → 루틴 ▶ → dispatch(Start) currentState=CONFIRMING → "Start rejected — existing session" → 화면 변화 0 = 먹통.
+  //   정정: routine ▶ 진입 시 = 잔존 timer/simple_alarm session 측 = 명시 Stop dispatch (= ActiveRoutine 비관여 영역).
+  //   Fix A (AlarmScreen goHome) 측 = root cause 정리. 본 안전망 = AlarmScreen 미경유 path (= 외부 stop / 강종 등) 측 보강.
+  {
+    const preSession = await getCurrentSession();
+    if (preSession && (preSession.kind === 'timer' || preSession.kind === 'simple_alarm')) {
+      Logger.warn(
+        'routine',
+        `startRoutine stale non-routine session detected kind=${preSession.kind} state=${preSession.state} → dispatch Stop`
+      );
+      await sessionDispatch({ type: 'Stop', reason: 'override' }).catch(() => {});
+    }
+  }
+
   const existing = await loadActiveRoutine();
 
   if (existing && existing.routineId === routineId) {

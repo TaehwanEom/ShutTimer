@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, PanResponder, Animated, Easing } from 'react-native';
 import Svg, { Circle, Path, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { ThemeColors } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
 
@@ -206,6 +207,8 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
       minutes = Math.max(0, Math.min(60, minutes));
       prevMinutesRef.current = minutes;
       onSeek(minutes);
+      // 2026-05-27 — iPhone Clock 다이얼 정합. tap 시점 측 = haptic + 시스템 click sound.
+      Haptics.selectionAsync().catch(() => {});
     },
     onPanResponderMove: (evt) => {
       if (!onSeek) return;
@@ -216,6 +219,10 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
       if (normalized >= 354) minutes = 60;
       minutes = Math.max(0, Math.min(60, minutes));
       if (prevMinutesRef.current !== null && Math.abs(minutes - prevMinutesRef.current) > 30) return;
+      // 2026-05-27 — iPhone Clock 다이얼 정합. 분 변경 시점 측만 haptic + 시스템 click sound (= 같은 분 측 매 frame 호출 차단).
+      if (prevMinutesRef.current !== minutes) {
+        Haptics.selectionAsync().catch(() => {});
+      }
       prevMinutesRef.current = minutes;
       onSeek(minutes);
     },

@@ -2,6 +2,7 @@
 // ScrollView snapToInterval 패턴. 의존성 0.
 
 import React, { useEffect, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   Modal,
   View,
@@ -106,7 +107,12 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
     if (isJumpingRef.current) return;
     const y = e.nativeEvent.contentOffset.y;
     const rawIdx = Math.round(y / ITEM_HEIGHT);
-    if (rawIdx !== centerIdx) setCenterIdx(rawIdx);
+    if (rawIdx !== centerIdx) {
+      setCenterIdx(rawIdx);
+      // 2026-05-27 — iOS native UIPickerView 정합. row 변경 시점마다 haptic + 시스템 click sound.
+      //   TimeWheelPicker (시:분 선택) + DurationWheelPicker (시:분:초 duration) 둘 다 본 Wheel 재사용.
+      Haptics.selectionAsync().catch(() => {});
+    }
   };
 
   const scrollStyle = width != null ? { ...wheelStyles.scroll, width } : wheelStyles.scroll;

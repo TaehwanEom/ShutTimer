@@ -26,9 +26,11 @@ import { SETTINGS_KEY } from '../constants/settings';
 
 // ─── AlarmKit 가용성 ──────────────────────────────────────
 
-// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능.
+// Phase 3-0a (2026-05-26): Android 도 알람 엔진 활성화 (= alarmkit-bridge Android Module 측 setAlarmClock 정합).
+//   Phase 3-1 (Module UUID 항상 발급) + Phase 3-2 (AlarmReceiver 반복 재예약) 완료 정합 후 가드 해제.
 function isAlarmKitAvailableSync(): boolean {
-  return Platform.OS === 'ios';
+  return Platform.OS === 'ios' || Platform.OS === 'android';
 }
 
 async function isAlarmKitReady(): Promise<boolean> {

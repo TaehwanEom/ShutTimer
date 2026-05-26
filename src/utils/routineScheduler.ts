@@ -3,7 +3,7 @@
 // (2) F4 confirm_prompt — 미션 종료 시점 DATE trigger 1개. AlarmKit only.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, AppState } from 'react-native';
+import { Platform, AppState, PermissionsAndroid } from 'react-native';
 import i18n from '../i18n';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
@@ -30,10 +30,13 @@ import { Logger } from './logger';
 let _alarmKitAvailable: boolean | null = null;
 let _alarmKitAuthorized: boolean | null = null;
 
-// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능.
+// Phase 3-0b (2026-05-26): Android 도 알람 엔진 활성화 (= 루틴 prealert + confirm_prompt path 측 활성).
+//   Phase 3-3 (2026-05-26): secondaryLabel ("다음 진행") 측 native FSI notification 측 secondary action button 측 정합.
+//     AlarmActionReceiver 측 broadcast → JS App.tsx 측 'secondary_action' listener → dispatch Advance.
 function isAlarmKitAvailableSync(): boolean {
   if (_alarmKitAvailable !== null) return _alarmKitAvailable;
-  _alarmKitAvailable = Platform.OS === 'ios';
+  _alarmKitAvailable = Platform.OS === 'ios' || Platform.OS === 'android';
   return _alarmKitAvailable;
 }
 
@@ -58,8 +61,15 @@ async function shouldUseAlarmKit(): Promise<boolean> {
   }
 }
 
-/** 사용자 액션 (첫 루틴 저장) 시점에 명시적으로 권한 요청. */
+/** 사용자 액션 (첫 루틴 저장 / 첫 타이머 / 온보딩) 시점에 명시적으로 권한 요청.
+ *  iOS = AlarmKit framework 권한 (= AlarmManager.shared.requestAuthorization).
+ *  Android = POST_NOTIFICATIONS 런타임 권한 (Android 13+ — 거부 시 FSI 알람 미표시).
+ *    USE_EXACT_ALARM / USE_FULL_SCREEN_INTENT 측 = manifest 자동 부여 (사용자 prompt X).
+ */
 export async function requestAlarmKitAuthorizationIfNeeded(): Promise<'authorized' | 'denied' | 'unavailable'> {
+  if (Platform.OS === 'android') {
+    return requestAndroidNotificationPermission();
+  }
   if (!isAlarmKitAvailableSync()) return 'unavailable';
   try {
     const current = await AlarmkitBridge.getAuthorizationState();
@@ -79,10 +89,35 @@ export async function requestAlarmKitAuthorizationIfNeeded(): Promise<'authorize
   }
 }
 
+// Android POST_NOTIFICATIONS 런타임 요청. Android 12 이하 = 자동 허용 → 'authorized'.
+async function requestAndroidNotificationPermission(): Promise<'authorized' | 'denied' | 'unavailable'> {
+  try {
+    const perm = (PermissionsAndroid.PERMISSIONS as any).POST_NOTIFICATIONS;
+    // Android 12 이하 (API < 33) — 본 키 미정의 → 권한 자동 부여 상태로 처리.
+    if (!perm) {
+      _alarmKitAuthorized = true;
+      return 'authorized';
+    }
+    const already = await PermissionsAndroid.check(perm);
+    if (already) {
+      _alarmKitAuthorized = true;
+      return 'authorized';
+    }
+    const result = await PermissionsAndroid.request(perm);
+    const granted = result === PermissionsAndroid.RESULTS.GRANTED;
+    _alarmKitAuthorized = granted;
+    return granted ? 'authorized' : 'denied';
+  } catch (e) {
+    Logger.warn('routineScheduler', `requestAndroidNotificationPermission error=${String(e)}`);
+    return 'unavailable';
+  }
+}
+
 // AppState 'active' 사이클당 Alert 1회 노출 허용. 시스템 설정 복귀 후 권한 캐시 invalidate.
 let _alertShownThisCycle = false;
 
-if (Platform.OS === 'ios') {
+// iOS = AlarmKit, Android = POST_NOTIFICATIONS. 둘 다 시스템 설정 복귀 시 권한 캐시 invalidate 필요.
+if (Platform.OS === 'ios' || Platform.OS === 'android') {
   AppState.addEventListener('change', (state) => {
     if (state === 'active') {
       _alarmKitAuthorized = null;

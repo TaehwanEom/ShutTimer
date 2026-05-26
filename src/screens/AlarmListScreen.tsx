@@ -50,9 +50,10 @@ type Props = {
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능. Android 측만 분기 잔존.
+// v1.7 hotfix #G7 Phase 2-B — main app target 26.0 강제 정합 → iOS 측 = AlarmKit 항상 사용 가능.
+// Phase 3-4 (2026-05-26): Android 도 알람 엔진 활성화 (= alarmkit-bridge Android Module 측 setAlarmClock 정합).
 function isAlarmKitSupported(): boolean {
-  return Platform.OS === 'ios';
+  return Platform.OS === 'ios' || Platform.OS === 'android';
 }
 
 /** "HH:MM" → "오전/오후 H:MM" */

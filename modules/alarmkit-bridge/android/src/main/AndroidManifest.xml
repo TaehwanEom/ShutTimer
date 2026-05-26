@@ -15,6 +15,11 @@
         <receiver
             android:name="expo.modules.alarmkitbridge.AlarmReceiver"
             android:exported="false"/>
+        <!-- Phase 3-3: FSI notification 측 secondary action button (= "다음 진행") 측 broadcast 수신.
+             내부 알림 측 PendingIntent 측만 발송 → exported=false. -->
+        <receiver
+            android:name="expo.modules.alarmkitbridge.AlarmActionReceiver"
+            android:exported="false"/>
         <!-- 알람 발화 서비스 — foreground service. 소리·진동·전체화면 알림. -->
         <service
             android:name="expo.modules.alarmkitbridge.AlarmService"

@@ -46,6 +46,11 @@ class AlarmService : Service() {
     val record = alarmId?.let { AlarmScheduler.get(this, it) }
     Log.w(TAG, "AlarmService start — alarmId=$alarmId title=${record?.title}")
 
+    // Phase 2-2: 발화 시점 측 = ongoing chronometer notification 측 제거 (= 알람 측 활성 상태 측 = countdown 측 표시 X).
+    if (alarmId != null) {
+      AlarmScheduler.stopOngoingTimerNotification(this, alarmId)
+    }
+
     val notif = buildNotification(record)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
@@ -106,7 +111,7 @@ class AlarmService : Service() {
     } else {
       Notification.Builder(this)
     }
-    return builder
+    builder
       .setContentTitle(record?.title?.replace("\n", " ") ?: "알람")
       .setSmallIcon(applicationInfo.icon)
       .setCategory(Notification.CATEGORY_ALARM)
@@ -114,7 +119,23 @@ class AlarmService : Service() {
       .setAutoCancel(false)
       .setFullScreenIntent(pending, true)
       .setContentIntent(pending)
-      .build()
+    // Phase 3-3: secondaryLabel 측 = FSI notification 측 secondary action button.
+    //   탭 시 = AlarmActionReceiver 측 broadcast → JS 측 "secondary_action" event emit + native cleanup.
+    val secondaryLabel = record?.secondaryLabel
+    if (!secondaryLabel.isNullOrBlank() && record != null) {
+      val secondaryIntent = Intent(this, AlarmActionReceiver::class.java).apply {
+        action = AlarmActionReceiver.ACTION_SECONDARY
+        putExtra(AlarmScheduler.EXTRA_ALARM_ID, record.id)
+        // 동일 entityId + chainIndex 측 = 다른 alarm 측 같은 request code 측 회피 → record.id (UUID) 측 + 1 (= primary 측과 구분).
+      }
+      val secondaryPending = PendingIntent.getBroadcast(
+        this, record.id.hashCode() xor 0x1,
+        secondaryIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+      )
+      builder.addAction(0, secondaryLabel, secondaryPending)
+    }
+    return builder.build()
   }
 
   // ── 사운드 (알람 스트림 — 무음모드 우회). soundName → res/raw 우리 wav, 없으면 시스템 기본음 ──

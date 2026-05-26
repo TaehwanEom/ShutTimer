@@ -80,7 +80,8 @@ export type ScheduleAlarmParams = {
  */
 export type AlarmStateChangeEvent = {
   alarmId: string;
-  state: AlarmKitAlarmState | 'removed';
+  // Phase 3-3 (2026-05-26, Android): 'secondary_action' 추가 — FSI notification 측 secondary button (= "다음 진행") 측 사용자 탭 → AlarmActionReceiver 측 emit.
+  state: AlarmKitAlarmState | 'removed' | 'secondary_action';
   preAlertSeconds?: number;
   fixedFireMs?: number;
   relativeHour?: number;

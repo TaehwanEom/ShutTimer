@@ -12,6 +12,9 @@ import expo.modules.kotlin.records.Record
 import java.util.UUID
 
 // JS scheduleAlarm 파라미터 — Android는 알람 발화 필드만 사용 (la* 필드는 iOS Live Activity 전용 → 무시).
+// Phase 3-3 (2026-05-26): secondaryLabel 측 추가. AlarmService 측 = FSI notification 측 secondary action button.
+//   사용자 측 = 잠금화면 측 = secondary 버튼 탭 → AlarmActionReceiver → JS 측 "secondary_action" event.
+//   routine confirm_prompt 측 "다음 진행" 측 = 본 path 측 = JS dispatch Advance 정합 (App.tsx 측 listener).
 class ScheduleAlarmParams(
   @Field val entityId: String = "",
   @Field val title: String = "",
@@ -20,6 +23,7 @@ class ScheduleAlarmParams(
   @Field val type: String? = null,
   @Field val countdownTitle: String? = null,
   @Field val stopLabel: String? = null,
+  @Field val secondaryLabel: String? = null,
   @Field val recurrence: Map<String, Any?>? = null
 ) : Record
 
@@ -50,8 +54,14 @@ class AlarmkitBridgeModule : Module() {
     AsyncFunction("requestAuthorization") { authorizationState() }
 
     // ── 알람 예약 / 취소 / 조회 ──
+    // Phase 3-1: 항상 UUID 발급 (= iOS AlarmKit 패턴 정합).
+    //   직전 = `entityId.ifBlank { UUID }` 측 = entityId 측 직접 alarmId 측 사용 →
+    //     chain (= 같은 entityId 측 30개 schedule) 측 = firePendingIntent 측 `alarmId.hashCode()` 측 같음 →
+    //     PendingIntent.FLAG_UPDATE_CURRENT 측 = 직전 측 덮어쓰기 → chain 측 1개만 잔존 회귀.
+    //   정정 = 매 schedule 측 새 UUID 발급 → request code (hashCode) 측 unique 보장 → chain 측 30개 측 독립.
+    //   호환 = JS 측 = `scheduleAlarm` 반환 id 측 받아 mapping table 측 alarmId 저장. entityId 측 별도 추적.
     AsyncFunction("scheduleAlarm") { params: ScheduleAlarmParams ->
-      val id = params.entityId.ifBlank { UUID.randomUUID().toString() }
+      val id = UUID.randomUUID().toString()
       val recMode = params.recurrence?.get("mode") as? String ?: "never"
       val recDays = (params.recurrence?.get("days") as? List<*>)
         ?.mapNotNull { (it as? Number)?.toInt() } ?: emptyList()
@@ -67,7 +77,8 @@ class AlarmkitBridgeModule : Module() {
           recurrenceMode = recMode,
           recurrenceDays = recDays,
           countdownTitle = params.countdownTitle,
-          stopLabel = params.stopLabel
+          stopLabel = params.stopLabel,
+          secondaryLabel = params.secondaryLabel
         )
       )
       id
@@ -88,18 +99,40 @@ class AlarmkitBridgeModule : Module() {
 
     AsyncFunction("listAlarms") {
       val alertingId = AlarmScheduler.getAlertingId(context)
-      AlarmScheduler.list(context).map { r ->
+      val active = AlarmScheduler.list(context).map { r ->
         mapOf(
           "id" to r.id,
           "state" to if (r.id == alertingId) "alerting" else "scheduled",
           "fixedFireMs" to r.fireAt.toDouble()
         )
       }
+      // Phase 2-1: paused 알람 측 = state="paused" + 현 fireAt = now + remainingMs (= JS 측 표시 정합).
+      val now = System.currentTimeMillis()
+      val paused = AlarmScheduler.listPaused(context).map { p ->
+        mapOf(
+          "id" to p.record.id,
+          "state" to "paused",
+          "fixedFireMs" to (now + p.remainingMs).toDouble()
+        )
+      }
+      active + paused
     }
 
-    // ── Phase 2 예정 (타이머 일시정지/재개) — 현재 no-op ──
-    AsyncFunction("pauseAlarm") { _: String -> 0.0 }
-    AsyncFunction("resumeAlarm") { _: String -> 0.0 }
+    // ── Phase 2-1: 타이머 일시정지/재개 ──
+    //   AlarmScheduler.pauseAlarm — native 측 예약 cancel + 잔여 시간 paused map 영속 + event emit("paused").
+    //   AlarmScheduler.resumeAlarm — paused map 측 record + remainingMs 측 = now + remainingMs 측 새 fireAt 측 schedule.
+    //   반환 = ms timestamp (= iOS 시그니처 정합). 실패 시 = 0.
+    AsyncFunction("pauseAlarm") { alarmId: String ->
+      val ts = AlarmScheduler.pauseAlarm(context, alarmId)
+      if (ts > 0L) AlarmEventBus.emit(alarmId, "paused")
+      ts.toDouble()
+    }
+
+    AsyncFunction("resumeAlarm") { alarmId: String ->
+      val ts = AlarmScheduler.resumeAlarm(context, alarmId)
+      if (ts > 0L) AlarmEventBus.emit(alarmId, "scheduled")
+      ts.toDouble()
+    }
 
     // ── iOS App Group 전용 — Android no-op ──
     Function("writeAppGroupString") { _: String, _: String? -> false }

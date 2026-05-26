@@ -9,9 +9,31 @@
 - ✅ Step 1 — 모듈 기반 (스텁 제거, manifest 권한 8개)
 - ✅ Step 2 — 엔진 코어 (setAlarmClock 예약/취소)
 - ✅ Step 3 — 발화 체인 (Receiver→Service, 소리/진동/볼륨)
-- ⏭️ **Step 4 — 전체화면 + RN 연결 ← 다음 시작점**
-- ⬜ Step 5 — 타이머 연결 (HomeScreen 게이트 개방) — 여기서 첫 end-to-end 기능 테스트
-- ⬜ Step 6 — 재부팅 복원 / Step 7 — 해제·정리 / Step 8 — 전체 검증
+- ✅ Step 4 — 전체화면 + RN 연결 (AlarmEventBus emit + manifest MainActivity merge + cold-start listAlarms polling)
+- ✅ Step 5 — 타이머 연결 (HomeScreen `shouldUseAlarmKitInTimer` Android 허용 + dispatch Start kind='timer' 경로 정합)
+- ✅ Step 6 — 재부팅 복원 (`BootReceiver` + `AlarmScheduler.rescheduleAllFromBoot`)
+- ✅ Step 7 — 해제·정리 (`AlarmService.onDestroy` 사운드/진동/볼륨/alerting 일괄)
+- ✅ **2026-05-26 추가** — POST_NOTIFICATIONS 런타임 권한 흐름 (`routineScheduler.requestAlarmKitAuthorizationIfNeeded` Android 분기 + AppState invalidate Android 포함). 상세: `docs/work-2026-05-26-android-phase1-complete.md`
+- ✅ **2026-05-26 추가 (동일 세션 후속)** — 알람 시스템 사이클 점검 (4종 알람 × iOS/Android 정합). 상세: `docs/audit-2026-05-26-alarm-cycle.md`
+- ✅ **2026-05-26 Phase 2-1 마무리** — pauseAlarm/resumeAlarm Kotlin 구현 + paused map 영속 + listAlarms paused state + event emit. 상세: `docs/work-2026-05-26-android-phase2-1-and-phase3-2.md`
+- ✅ **2026-05-26 Phase 3-2 마무리** — AlarmReceiver 측 반복 알람 다음 occurrence 재예약 (daily/weekly) + computeNextOccurrence. Phase 3 진입 시 자동 정합.
+- ✅ **2026-05-26 Phase 3 부분 마무리 (3-1 + 3-0a + 3-4)** — 알람 탭 측 Android 활성화:
+  - Phase 3-1 (Module UUID per schedule, chain 충돌 차단) — 에뮬레이터 측 chain 30개 모두 unique UUID 등록 검증 PASS
+  - Phase 3-0a (alarmScheduler.ts Android 허용) — alarm 등록 path 활성화 검증 PASS
+  - Phase 3-4 (AlarmListScreen Android 허용) — unsupported 화면 제거 검증 PASS
+  - Phase 3-2 deployed 검증 — dex symbols (computeNextOccurrence + nextDayInWeek) 확인. daily/weekly 실 fire = 24h 대기 측 미실행.
+  - 상세: `docs/work-2026-05-26-android-phase3-alarm-tab.md`
+- ✅ **2026-05-26 Step 8 부분 PASS (에뮬레이터)** — 전체 시나리오 5단계 PASS:
+  1. Timer schedule: `dispatch Start → ScheduleAlarmOnce → AlarmkitBridge.scheduleAlarm → setAlarmClock` 측 정확 등록 (`exactAllowReason=policy_permission`).
+  2. Phase 2-1 Pause: `pauseAlarm → cancel + paused_alarms 영속` (remainingMs=223,132ms 정확 산출).
+  3. Phase 2-1 Resume: `resumeAlarm → 새 fireAt = now + remainingMs + schedule 재등록` (정확).
+  4. **Phase 1 Fire**: `AlarmReceiver fired → AlarmService start → AlarmEventBus.emit("alerting") → JS SESSION_EVENT_NAVIGATE → AlarmScreen mount` (정확 시점, 48ms drift).
+  5. Dismiss: `cancelEntity done targets=1 nativeFail=0 finalStale=0` + SharedPreferences 완전 정리.
+
+  상세: `docs/work-2026-05-26-android-phase2-1-and-phase3-2.md` §"Android 에뮬레이터 실기 검증". 잔여: 실기기 측 FSI 잠금화면 점유 + 무음모드 우회 + 볼륨 버튼 차단 + 재부팅 복원 = 별도 실기기 세션.
+- ⬜ Phase 2-2 — 진행 중 카운트다운 알림 (ongoing notification, MED)
+- ⬜ Phase 3-0/3-1/3-3/3-4/3-5 — 알람 탭 + 루틴 활성화 (= JS 가드 해제 + secondaryLabel UI + OEM 안내)
+- ✅ **2026-05-26 Phase 3-0b + 2-2 + 3-3 마무리** — 루틴 path 활성화 + ongoing chronometer notification + secondaryLabel native action button + AlarmActionReceiver. Kotlin BUILD SUCCESSFUL + dex deployment 검증 PASS. 상세: `docs/work-2026-05-26-android-phase2-2-and-3-3.md`. 잔여: Phase 3-5 (OEM 안내) + E2E onboarding 통과 측 UI 검증 (= 에뮬레이터 UI swipe 측 신뢰성 한계).
 
 ## 만들어진 것 (`modules/alarmkit-bridge/android/`)
 

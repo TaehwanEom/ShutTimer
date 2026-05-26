@@ -228,7 +228,8 @@
     "random": "Acak",
     "randomDesc": "Acak dari ketuk/goyang/kamera/matematika",
     "typing": "Mengetik",
-    "typingDesc": "Ketik 3 kata/angka dengan benar untuk mematikan"
+    "typingDesc": "Ketik 3 kata/angka dengan benar untuk mematikan",
+    "batteryOptimization": "Pengoptimalan baterai"
   },
   "missions": {
     "boy": "Orang",
@@ -380,7 +381,10 @@
     "start": "Mulai",
     "tooltipPlay": "Tekan lama tombol play untuk menghentikan timer",
     "tooltipFav": "Tekan lama favorit untuk mengedit",
-    "confirm": "Konfirmasi"
+    "confirm": "Konfirmasi",
+    "permissionSamsungBatteryTitle": "Pengaturan Samsung Device Care",
+    "permissionSamsungBatteryBody": "Fitur \"Aplikasi tidur\" Samsung\ndapat memblokir alarm.\nMohon tambahkan aplikasi ini ke\ndaftar pengecualian di Device Care.",
+    "permissionSamsungBatteryButton": "Buka pengaturan"
   },
   "common": {
     "save": "Simpan",
@@ -611,7 +615,9 @@
       "thu": "Kam",
       "tue": "Sel",
       "wed": "Rab"
-    }
+    },
+    "routineAlarmLabel": "Alarm rutinitas berjalan",
+    "timerAlarmLabel": "Timer berjalan"
   },
   "favorites": {
     "empty": "Tidak ada favorit",

@@ -228,7 +228,8 @@
     "random": "Casuale",
     "randomDesc": "Casuale tra tocco/scuoti/fotocamera/matematica",
     "typing": "Digitazione",
-    "typingDesc": "Digita 3 parole/numeri correttamente per spegnere"
+    "typingDesc": "Digita 3 parole/numeri correttamente per spegnere",
+    "batteryOptimization": "Ottimizzazione batteria"
   },
   "missions": {
     "boy": "Persona",
@@ -380,7 +381,10 @@
     "start": "Inizia",
     "tooltipPlay": "Premi a lungo il pulsante play per fermare il timer",
     "tooltipFav": "Premi a lungo un preferito per modificarlo",
-    "confirm": "Conferma"
+    "confirm": "Conferma",
+    "permissionSamsungBatteryTitle": "Configurazione Samsung Device Care",
+    "permissionSamsungBatteryBody": "La funzione \"App in sospensione\" di Samsung\npuò bloccare le sveglie.\nAggiungi questa app all'elenco\ndi esclusione in Device Care.",
+    "permissionSamsungBatteryButton": "Apri impostazioni"
   },
   "common": {
     "save": "Salva",
@@ -611,7 +615,9 @@
       "thu": "Gio",
       "tue": "Mar",
       "wed": "Mer"
-    }
+    },
+    "routineAlarmLabel": "Allarme di routine in corso",
+    "timerAlarmLabel": "Timer in corso"
   },
   "favorites": {
     "empty": "Nessun preferito",

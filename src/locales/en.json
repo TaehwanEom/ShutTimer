@@ -235,7 +235,8 @@
     "random": "Random",
     "randomDesc": "Random pick from tap/shake/camera/math",
     "typing": "Typing",
-    "typingDesc": "Type 3 words/numbers correctly to dismiss"
+    "typingDesc": "Type 3 words/numbers correctly to dismiss",
+    "batteryOptimization": "Battery optimization"
   },
   "missions": {
     "boy": "Person",
@@ -387,7 +388,10 @@
     "start": "Get started",
     "tooltipPlay": "Long-press the play button to stop the timer",
     "tooltipFav": "Long-press a favorite to edit",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "permissionSamsungBatteryTitle": "Samsung Device Care setup",
+    "permissionSamsungBatteryBody": "Samsung's \"Sleeping apps\" feature\nmay block alarms.\nPlease exclude this app in\nDevice Care.",
+    "permissionSamsungBatteryButton": "Open settings"
   },
   "common": {
     "cancel": "Cancel",
@@ -619,7 +623,9 @@
     "prealertBody30m": "Your routine will start in 30 minutes",
     "prealertBody5m": "Your routine is about to start",
     "prealertTitle30m": "Routine starts in 30 minutes",
-    "prealertTitle5m": "Routine starts soon"
+    "prealertTitle5m": "Routine starts soon",
+    "routineAlarmLabel": "Routine alarm in progress",
+    "timerAlarmLabel": "Timer in progress"
   },
   "favorites": {
     "empty": "No favorites",

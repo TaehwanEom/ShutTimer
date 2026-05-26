@@ -228,7 +228,8 @@
     "random": "Aleatorio",
     "randomDesc": "Aleatorio entre toque/sacudir/cámara/matemáticas",
     "typing": "Escribir",
-    "typingDesc": "Escribe 3 palabras/números correctamente para apagar"
+    "typingDesc": "Escribe 3 palabras/números correctamente para apagar",
+    "batteryOptimization": "Optimización de batería"
   },
   "missions": {
     "boy": "Persona",
@@ -380,7 +381,10 @@
     "start": "Empezar",
     "tooltipPlay": "Mantén pulsado el botón de reproducción para detener",
     "tooltipFav": "Mantén pulsado un favorito para editarlo",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "permissionSamsungBatteryTitle": "Configuración de Samsung Device Care",
+    "permissionSamsungBatteryBody": "La función \"Apps en suspensión\" de Samsung\npuede bloquear las alarmas.\nPor favor añade esta app a la lista\nde excluidos en Device Care.",
+    "permissionSamsungBatteryButton": "Abrir ajustes"
   },
   "common": {
     "save": "Guardar",
@@ -611,7 +615,9 @@
       "thu": "Jue",
       "tue": "Mar",
       "wed": "Mié"
-    }
+    },
+    "routineAlarmLabel": "Alarma de rutina en curso",
+    "timerAlarmLabel": "Temporizador en curso"
   },
   "favorites": {
     "empty": "Sin favoritos",

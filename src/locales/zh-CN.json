@@ -235,7 +235,8 @@
     "random": "随机",
     "randomDesc": "从点击/摇动/相机/算术中随机选择",
     "typing": "打字",
-    "typingDesc": "正确输入3个单词/数字以关闭"
+    "typingDesc": "正确输入3个单词/数字以关闭",
+    "batteryOptimization": "电池优化"
   },
   "missions": {
     "boy": "人",
@@ -387,7 +388,10 @@
     "start": "开始使用",
     "tooltipPlay": "长按播放按钮可以停止计时器",
     "tooltipFav": "长按收藏可以编辑",
-    "confirm": "确定"
+    "confirm": "确定",
+    "permissionSamsungBatteryTitle": "三星设备维护设置",
+    "permissionSamsungBatteryBody": "三星手机的\"休眠应用\"功能\n可能会阻止闹钟。\n请在设备维护中\n将此应用添加到\"排除\"列表。",
+    "permissionSamsungBatteryButton": "打开设置"
   },
   "common": {
     "save": "保存",
@@ -618,7 +622,9 @@
       "thu": "四",
       "tue": "二",
       "wed": "三"
-    }
+    },
+    "routineAlarmLabel": "进行中的例程闹钟",
+    "timerAlarmLabel": "进行中的计时器"
   },
   "favorites": {
     "empty": "没有收藏",

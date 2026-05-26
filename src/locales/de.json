@@ -228,7 +228,8 @@
     "random": "Zufall",
     "randomDesc": "Zufällig aus Tippen/Schütteln/Kamera/Rechnen",
     "typing": "Tippen",
-    "typingDesc": "3 Wörter/Zahlen korrekt eingeben zum Beenden"
+    "typingDesc": "3 Wörter/Zahlen korrekt eingeben zum Beenden",
+    "batteryOptimization": "Akku-Optimierung"
   },
   "missions": {
     "boy": "Person",
@@ -380,7 +381,10 @@
     "start": "Loslegen",
     "tooltipPlay": "Play-Taste lange drücken, um Timer zu stoppen",
     "tooltipFav": "Favoriten lange drücken zum Bearbeiten",
-    "confirm": "Bestätigen"
+    "confirm": "Bestätigen",
+    "permissionSamsungBatteryTitle": "Samsung Device Care Einrichtung",
+    "permissionSamsungBatteryBody": "Die Samsung-Funktion „Schlafende Apps\"\nkann Alarme blockieren.\nBitte fügen Sie diese App in Device Care\nzur Ausschlussliste hinzu.",
+    "permissionSamsungBatteryButton": "Einstellungen öffnen"
   },
   "common": {
     "save": "Speichern",
@@ -611,7 +615,9 @@
       "thu": "Do",
       "tue": "Di",
       "wed": "Mi"
-    }
+    },
+    "routineAlarmLabel": "Routine-Alarm läuft",
+    "timerAlarmLabel": "Timer läuft"
   },
   "favorites": {
     "empty": "Keine Favoriten",

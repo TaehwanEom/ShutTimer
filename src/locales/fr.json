@@ -228,7 +228,8 @@
     "random": "Aléatoire",
     "randomDesc": "Aléatoire parmi toucher/secouer/caméra/calcul",
     "typing": "Saisie",
-    "typingDesc": "Tapez 3 mots/chiffres correctement pour arrêter"
+    "typingDesc": "Tapez 3 mots/chiffres correctement pour arrêter",
+    "batteryOptimization": "Optimisation de batterie"
   },
   "missions": {
     "boy": "Personne",
@@ -380,7 +381,10 @@
     "start": "Commencer",
     "tooltipPlay": "Appui long sur le bouton pour arrêter le minuteur",
     "tooltipFav": "Appui long sur un favori pour le modifier",
-    "confirm": "Confirmer"
+    "confirm": "Confirmer",
+    "permissionSamsungBatteryTitle": "Configuration Samsung Device Care",
+    "permissionSamsungBatteryBody": "La fonction « Apps en veille » de Samsung\npeut bloquer les alarmes.\nVeuillez ajouter cette app à la liste\ndes exclusions dans Device Care.",
+    "permissionSamsungBatteryButton": "Ouvrir les paramètres"
   },
   "common": {
     "save": "Enregistrer",
@@ -611,7 +615,9 @@
       "thu": "Jeu",
       "tue": "Mar",
       "wed": "Mer"
-    }
+    },
+    "routineAlarmLabel": "Alarme de routine en cours",
+    "timerAlarmLabel": "Minuteur en cours"
   },
   "favorites": {
     "empty": "Aucun favori",

@@ -228,7 +228,8 @@
     "random": "عشوائي",
     "randomDesc": "اختيار عشوائي من نقر/هز/كاميرا/حساب",
     "typing": "كتابة",
-    "typingDesc": "اكتب 3 كلمات/أرقام بشكل صحيح للإيقاف"
+    "typingDesc": "اكتب 3 كلمات/أرقام بشكل صحيح للإيقاف",
+    "batteryOptimization": "تحسين البطارية"
   },
   "missions": {
     "boy": "شخص",
@@ -380,7 +381,10 @@
     "start": "ابدأ",
     "tooltipPlay": "اضغط مطولا على زر التشغيل لإيقاف المؤقت",
     "tooltipFav": "اضغط مطولا على المفضلة للتعديل",
-    "confirm": "تأكيد"
+    "confirm": "تأكيد",
+    "permissionSamsungBatteryTitle": "إعداد Samsung Device Care",
+    "permissionSamsungBatteryBody": "قد تحظر ميزة \"التطبيقات النائمة\" من Samsung\nالمنبهات.\nيرجى استبعاد هذا التطبيق في\nDevice Care.",
+    "permissionSamsungBatteryButton": "فتح الإعدادات"
   },
   "common": {
     "save": "حفظ",
@@ -611,7 +615,9 @@
       "thu": "خميس",
       "tue": "ثلاثاء",
       "wed": "أربعاء"
-    }
+    },
+    "routineAlarmLabel": "منبه الروتين قيد التشغيل",
+    "timerAlarmLabel": "المؤقت قيد التشغيل"
   },
   "favorites": {
     "empty": "لا توجد مفضلات",

@@ -228,7 +228,8 @@
     "random": "สุ่ม",
     "randomDesc": "สุ่มจาก แตะ/เขย่า/กล้อง/คณิตศาสตร์",
     "typing": "พิมพ์",
-    "typingDesc": "พิมพ์ 3 คำ/ตัวเลขอย่างถูกต้องเพื่อปิด"
+    "typingDesc": "พิมพ์ 3 คำ/ตัวเลขอย่างถูกต้องเพื่อปิด",
+    "batteryOptimization": "การเพิ่มประสิทธิภาพแบตเตอรี่"
   },
   "missions": {
     "boy": "คน",
@@ -380,7 +381,10 @@
     "start": "เริ่ม",
     "tooltipPlay": "กดปุ่มเล่นค้างไว้เพื่อหยุดตัวจับเวลา",
     "tooltipFav": "กดรายการโปรดค้างไว้เพื่อแก้ไข",
-    "confirm": "ยืนยัน"
+    "confirm": "ยืนยัน",
+    "permissionSamsungBatteryTitle": "ตั้งค่า Samsung Device Care",
+    "permissionSamsungBatteryBody": "ฟีเจอร์ \"แอปที่หลับ\" ของ Samsung\nอาจขัดขวางการแจ้งเตือนนาฬิกาปลุก\nโปรดเพิ่มแอปนี้ในรายการ\nยกเว้นใน Device Care",
+    "permissionSamsungBatteryButton": "เปิดการตั้งค่า"
   },
   "common": {
     "save": "บันทึก",
@@ -611,7 +615,9 @@
       "thu": "พฤ",
       "tue": "อ",
       "wed": "พ"
-    }
+    },
+    "routineAlarmLabel": "นาฬิกาปลุกกิจวัตรกำลังทำงาน",
+    "timerAlarmLabel": "ตัวจับเวลากำลังทำงาน"
   },
   "favorites": {
     "empty": "ไม่มีรายการโปรด",

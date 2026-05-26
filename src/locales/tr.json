@@ -228,7 +228,8 @@
     "random": "Rastgele",
     "randomDesc": "Dokun/salla/kamera/matematik arasından rastgele",
     "typing": "Yazma",
-    "typingDesc": "Kapatmak için 3 kelime/sayıyı doğru yazın"
+    "typingDesc": "Kapatmak için 3 kelime/sayıyı doğru yazın",
+    "batteryOptimization": "Pil optimizasyonu"
   },
   "missions": {
     "boy": "Kişi",
@@ -380,7 +381,10 @@
     "start": "Başla",
     "tooltipPlay": "Oynat düğmesini uzun basarak zamanlayıcıyı durdur",
     "tooltipFav": "Bir favoriyi uzun basarak düzenle",
-    "confirm": "Onayla"
+    "confirm": "Onayla",
+    "permissionSamsungBatteryTitle": "Samsung Device Care ayarı",
+    "permissionSamsungBatteryBody": "Samsung'un \"Uyuyan uygulamalar\" özelliği\nalarmları engelleyebilir.\nLütfen bu uygulamayı Device Care'de\nhariç tutulanlar listesine ekleyin.",
+    "permissionSamsungBatteryButton": "Ayarları aç"
   },
   "common": {
     "save": "Kaydet",
@@ -611,7 +615,9 @@
       "thu": "Per",
       "tue": "Sal",
       "wed": "Çar"
-    }
+    },
+    "routineAlarmLabel": "Devam eden rutin alarmı",
+    "timerAlarmLabel": "Devam eden zamanlayıcı"
   },
   "favorites": {
     "empty": "Favori yok",

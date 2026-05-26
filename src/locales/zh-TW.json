@@ -235,7 +235,8 @@
     "random": "隨機",
     "randomDesc": "從點擊/搖動/相機/算術中隨機選擇",
     "typing": "打字",
-    "typingDesc": "正確輸入3個單詞/數字以關閉"
+    "typingDesc": "正確輸入3個單詞/數字以關閉",
+    "batteryOptimization": "電池最佳化"
   },
   "missions": {
     "boy": "人",
@@ -387,7 +388,10 @@
     "start": "開始",
     "tooltipPlay": "長按播放按鈕可以停止計時器",
     "tooltipFav": "長按收藏可以編輯",
-    "confirm": "確認"
+    "confirm": "確認",
+    "permissionSamsungBatteryTitle": "Samsung 裝置維護設定",
+    "permissionSamsungBatteryBody": "Samsung 手機的「睡眠中應用程式」功能\n可能會阻擋鬧鐘。\n請在裝置維護中\n將本應用程式加入「排除」清單。",
+    "permissionSamsungBatteryButton": "開啟設定"
   },
   "common": {
     "save": "儲存",
@@ -618,7 +622,9 @@
       "thu": "四",
       "tue": "二",
       "wed": "三"
-    }
+    },
+    "routineAlarmLabel": "進行中的例程鬧鐘",
+    "timerAlarmLabel": "進行中的計時器"
   },
   "favorites": {
     "empty": "沒有收藏",

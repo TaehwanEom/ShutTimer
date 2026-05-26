@@ -235,7 +235,8 @@
     "random": "ランダム",
     "randomDesc": "タップ/振る/カメラ/算数からランダムに1つ",
     "typing": "タイピング",
-    "typingDesc": "単語と数字3つを正確に入力すると終了"
+    "typingDesc": "単語と数字3つを正確に入力すると終了",
+    "batteryOptimization": "バッテリー最適化"
   },
   "missions": {
     "boy": "人",
@@ -387,7 +388,10 @@
     "start": "始める",
     "tooltipPlay": "再生ボタンを長押しするとタイマーを停止できます",
     "tooltipFav": "お気に入りを長押しすると編集できます",
-    "confirm": "確認"
+    "confirm": "確認",
+    "permissionSamsungBatteryTitle": "Samsung デバイスケア設定",
+    "permissionSamsungBatteryBody": "Samsung スマートフォンの「スリープ中アプリ」機能が\nアラームを遮断する可能性があります。\nデバイスケアでこのアプリを\n「除外」リストに追加してください。",
+    "permissionSamsungBatteryButton": "設定を開く"
   },
   "common": {
     "save": "保存",
@@ -618,7 +622,9 @@
       "thu": "木",
       "tue": "火",
       "wed": "水"
-    }
+    },
+    "routineAlarmLabel": "進行中のルーチンアラーム",
+    "timerAlarmLabel": "進行中のタイマー"
   },
   "favorites": {
     "empty": "お気に入りがありません",

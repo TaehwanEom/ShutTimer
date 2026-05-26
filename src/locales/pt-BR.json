@@ -228,7 +228,8 @@
     "random": "Aleatório",
     "randomDesc": "Aleatório entre toque/sacudir/câmera/matemática",
     "typing": "Digitação",
-    "typingDesc": "Digite 3 palavras/números corretamente para desligar"
+    "typingDesc": "Digite 3 palavras/números corretamente para desligar",
+    "batteryOptimization": "Otimização de bateria"
   },
   "missions": {
     "boy": "Pessoa",
@@ -380,7 +381,10 @@
     "start": "Começar",
     "tooltipPlay": "Mantenha pressionado o botão para parar o cronômetro",
     "tooltipFav": "Mantenha pressionado um favorito para editar",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "permissionSamsungBatteryTitle": "Configuração do Samsung Device Care",
+    "permissionSamsungBatteryBody": "A função \"Apps em suspensão\" da Samsung\npode bloquear alarmes.\nAdicione este app à lista\nde exclusão no Device Care.",
+    "permissionSamsungBatteryButton": "Abrir configurações"
   },
   "common": {
     "save": "Salvar",
@@ -611,7 +615,9 @@
       "thu": "Qui",
       "tue": "Ter",
       "wed": "Qua"
-    }
+    },
+    "routineAlarmLabel": "Alarme de rotina em curso",
+    "timerAlarmLabel": "Cronômetro em curso"
   },
   "favorites": {
     "empty": "Sem favoritos",

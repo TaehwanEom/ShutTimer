@@ -21,6 +21,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
+import { isSamsung, openSamsungDeviceCare } from '../utils/oemBatteryHelper';
 import { useTranslation } from 'react-i18next';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 import { RootStackParamList } from '../../App';
@@ -32,7 +33,7 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
 };
 
-type PermissionType = 'att' | 'notification' | 'camera';
+type PermissionType = 'att' | 'notification' | 'camera' | 'samsung-battery';
 
 type Card = { icon: string; label: string; description: string };
 
@@ -134,6 +135,27 @@ export default function OnboardingScreen({ navigation }: Props) {
       body: t('onboarding.permissionNotifBody', { defaultValue: '잠금 화면에서 타이머 종료를\n받으려면 알림 권한이 필요합니다.\n루틴 진행에 필수입니다.' }),
       buttonLabel: t('onboarding.permissionNotifButton', { defaultValue: '계속' }),
     },
+    // Phase 3-5 (Android, Samsung) — Device Care "잠자는 앱" 측 = 알람 fire 차단 방지 안내.
+    //   iOS 측 = isSamsung() 측 false 측 = 슬라이드 미추가 → 인덱스 / 길이 / 흐름 측 = iOS 측 불변.
+    ...(isSamsung()
+      ? [
+          {
+            kind: 'permission' as const,
+            permission: 'samsung-battery' as const,
+            icon: 'battery-saver',
+            title: t('onboarding.permissionSamsungBatteryTitle', {
+              defaultValue: '삼성 디바이스 케어 설정',
+            }),
+            body: t('onboarding.permissionSamsungBatteryBody', {
+              defaultValue:
+                '삼성 폰의 "잠자는 앱" 기능이\n알람을 차단할 수 있습니다.\n디바이스 케어에서 본 앱을\n"제외" 목록에 추가해주세요.',
+            }),
+            buttonLabel: t('onboarding.permissionSamsungBatteryButton', {
+              defaultValue: '설정 열기',
+            }),
+          },
+        ]
+      : []),
   ];
 
   const totalPages = slides.length + 2; // +2: 준비 완료 슬라이드 + home-preview 슬라이드
@@ -363,6 +385,10 @@ export default function OnboardingScreen({ navigation }: Props) {
         const result = await Camera.requestCameraPermission();
         await AsyncStorage.setItem('cameraStatus', result);
         await AsyncStorage.setItem('cameraAsked', 'true');
+      } else if (permission === 'samsung-battery') {
+        if (Platform.OS !== 'android') return;
+        await openSamsungDeviceCare();
+        await AsyncStorage.setItem('samsungBatteryAsked', 'true');
       }
     } catch (e) {
       // 환경 미지원 무시 (e.g., Expo Go)

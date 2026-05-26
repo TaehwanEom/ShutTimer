@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   Share,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Logger } from '../utils/logger';
@@ -32,6 +33,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
 import { setCachedDismissMethod } from '../utils/settingsCache';
 import { clearPreloadedSound } from '../utils/alarmSoundPreload';
+import { isSamsung, openSamsungDeviceCare, requestIgnoreBatteryOptimization } from '../utils/oemBatteryHelper';
 
 // v1.7 hotfix #DebugUIGate — EAS profile env 측 디버그 UI 분기 (production = false / dev + preview = true).
 const SHOW_DEBUG_UI = process.env.EXPO_PUBLIC_SHOW_DEBUG_UI === 'true';
@@ -497,6 +499,28 @@ export default function SettingsScreen({ navigation }: Props) {
               style={{ transform: [{ scale: 0.85 }] }}
             />
           </View>
+          {/* Phase 3-5 (Android) — 배터리 최적화 설정 (= setAlarmClock 측 fire 신뢰성 보장).
+              iOS 측 = Platform 분기 측 비렌더 → 기존 알람 섹션 측 = iOS 측 불변. */}
+          {Platform.OS === 'android' && (
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={async () => {
+                if (isSamsung()) {
+                  await openSamsungDeviceCare();
+                } else {
+                  await requestIgnoreBatteryOptimization();
+                }
+              }}
+            >
+              <View style={styles.toggleLeft}>
+                <MaterialIcons name="battery-saver" size={22} color={colors.onBackground} />
+                <Text style={styles.toggleLabel}>
+                  {t('settings.batteryOptimization', { defaultValue: '배터리 최적화 설정' })}
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.secondary} style={{ opacity: 0.5 }} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 알람 사운드 */}

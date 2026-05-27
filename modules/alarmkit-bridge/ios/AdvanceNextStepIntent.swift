@@ -269,6 +269,25 @@ private func scheduleNextStepAlarm(snapshot: RoutineSnapshot, nextStepIdx: Int) 
 
 // MARK: - Intent
 
+// v2.0 #AdvanceDebounce (2026-05-28) — 동일 routineId 측 1.5초 내 중복 perform 차단.
+//   직전 = confirm_prompt 중복 / 다중 alerting / 다중 press 시 = AdvanceNextStepIntent 다중 발화 →
+//   각 호출이 snapshot.currentStepIndex 증가 → 마지막 step 도달 시 routineEnded=true 강제 → step skip + 조기 종료.
+//   정정 = static dictionary 측 [entityId: lastPerformAt] 측 lookup → 1.5초 이내 = skip + return (= 멱등 처리).
+fileprivate let ADVANCE_DEBOUNCE_MS: Double = 1500.0
+fileprivate let advanceDebounceLock = NSLock()
+fileprivate var lastAdvancePerformAt: [String: Double] = [:]
+
+fileprivate func shouldDebounceAdvance(entityId: String) -> Bool {
+    let nowMs = Date().timeIntervalSince1970 * 1000.0
+    advanceDebounceLock.lock()
+    defer { advanceDebounceLock.unlock() }
+    if let last = lastAdvancePerformAt[entityId], nowMs - last < ADVANCE_DEBOUNCE_MS {
+        return true
+    }
+    lastAdvancePerformAt[entityId] = nowMs
+    return false
+}
+
 @available(iOS 26.0, *)
 struct AdvanceNextStepIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "다음 진행"
@@ -283,6 +302,13 @@ struct AdvanceNextStepIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         // v1.7 hotfix #DBG — Advance Intent perform 진입 (= alarmkit module = AlarmKit secondary button 측).
         appendNativeDbg("Intent-DBG-AlarmKit", "AdvanceNextStepIntent.perform entityId=\(entityId)")
+        // v2.0 #AdvanceDebounce (2026-05-28) — 1.5초 내 중복 perform 차단.
+        //   debounce key = entityId. 빈 entityId 측 = snapshot.routineId 측 fallback 전이라 임시 키 사용 (= 너무 보수적이지 X).
+        let debounceKey = entityId.isEmpty ? "__empty__" : entityId
+        if shouldDebounceAdvance(entityId: debounceKey) {
+            appendNativeDbg("Intent-DBG-AlarmKit", "AdvanceNextStepIntent debounce SKIP entityId=\(entityId)")
+            return .result()
+        }
         // 1. snapshot 로드.
         // v1.7 hotfix #11 — entityId 측 snapshot 측 fallback (= AppIntent @Parameter setting 측 race / fail 회피).
         // Apple AppIntents 측 = perform() 시 시스템 측 새 instance 생성 → init() 호출 → @Parameter setting.

@@ -191,6 +191,28 @@ async function runEffect(effect: SideEffect): Promise<void> {
         await cancelRoutineConfirmPrompt(currentRunningAlarmId).catch(() => {});
         currentRunningAlarmId = null;
       }
+      // v2.0 #ConfirmPromptDedup (2026-05-28) — entityId 매칭 모든 잔존 confirm_prompt 강제 cancel.
+      //   직전 = currentRunningAlarmId 측 단일만 cancel → JS bridge reset / Resync race / Start+Advance 다른 path 측 race 시
+      //   다른 alarmId 잔존 가능 → 같은 routine 측 confirm_prompt 2개 동시 alerting → user 1회 press 측 = 양쪽 처리 +
+      //   추가 press 유발 → AdvanceNextStepIntent 다중 발화 → step skip + 조기 종료 회귀 (log01.md 2026-05-27 06:35).
+      //   정정 = mapping table 측 type=confirm_prompt + entityId=routineId 측 모든 alarmId cancel + metadata 정식 delete.
+      try {
+        const allMeta = await listAllAlarmMetadata();
+        const staleConfirms = allMeta.filter(m =>
+          m.type === 'confirm_prompt' &&
+          m.entityId === effect.routineId &&
+          m.deleted !== true
+        );
+        if (staleConfirms.length > 0) {
+          Logger.warn('effectRunner', `ScheduleConfirmPrompt stale dedup count=${staleConfirms.length} routineId=${effect.routineId} ids=[${staleConfirms.map(m => m.alarmId).join(',')}]`);
+          for (const meta of staleConfirms) {
+            await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
+            await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+          }
+        }
+      } catch (e) {
+        Logger.warn('effectRunner', `ScheduleConfirmPrompt stale dedup error=${String(e)}`);
+      }
       try {
         const id = await scheduleRoutineConfirmPrompt(
           effect.routineId,

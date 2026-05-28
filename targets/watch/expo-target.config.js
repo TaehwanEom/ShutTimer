@@ -1,6 +1,8 @@
 /** @type {import('@bacons/apple-targets/app.plugin').ConfigFunction} */
 module.exports = config => ({
   type: 'watch',
+  // Apple Developer Portal 등록 ID 정합 (= com.shuttimer.app.watch 외부 점유).
+  bundleIdentifier: 'com.shuttimer.watch',
   // ShutTimer 측 메인 icon 측 정합 (= 단일 App Store binary).
   icon: '../../assets/icon.png',
   colors: {

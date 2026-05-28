@@ -159,7 +159,16 @@ struct TimerRootView: View {
     var body: some View {
         switch store.state {
         case .idle:
-            TimerSetupView(store: store)
+            // 2026-05-28 — 사용자 요구: 앱(iOS) 측 다이얼 측 = 워치에도 동일 구조 + picker 보존.
+            //   TabView 측 = swipe 측 = page 1 (= 다이얼) ↔ page 2 (= picker).
+            //   기본 첫 화면 = 다이얼 (= 앱 측 classic 측과 동일).
+            TabView {
+                DialSetupView(store: store)
+                    .tag(0)
+                PickerSetupView(store: store)
+                    .tag(1)
+            }
+            .tabViewStyle(.page)
         case .running, .paused:
             CountdownView(store: store)
         case .finished:
@@ -168,7 +177,30 @@ struct TimerRootView: View {
     }
 }
 
-struct TimerSetupView: View {
+// MARK: - Setup Views (= 두 가지 디자인: 다이얼 + picker)
+
+// 다이얼 디자인 (= 앱 iOS 측 TimerDial 동일 구조).
+struct DialSetupView: View {
+    @ObservedObject var store: TimerStore
+
+    var body: some View {
+        VStack(spacing: 6) {
+            DialView(store: store)
+            Button(action: { store.start() }) {
+                Text("시작")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
+            .disabled(store.minutes == 0 && store.seconds == 0)
+        }
+        .padding(.horizontal, 8)
+    }
+}
+
+// Picker 디자인 (= 기존 보존, 표준 워치 패턴).
+struct PickerSetupView: View {
     @ObservedObject var store: TimerStore
 
     var body: some View {

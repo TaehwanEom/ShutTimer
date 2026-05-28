@@ -192,7 +192,7 @@ struct DialSetupView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
+            .tint(Color(red: 1.0, green: 0.141, blue: 0.141))
             .disabled(store.minutes == 0 && store.seconds == 0)
         }
         .padding(.horizontal, 8)
@@ -207,7 +207,7 @@ struct PickerSetupView: View {
         VStack(spacing: 8) {
             Text("ShutTimer")
                 .font(.headline)
-                .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.21))
+                .foregroundColor(Color(red: 1.0, green: 0.141, blue: 0.141))
 
             HStack {
                 VStack {
@@ -236,7 +236,7 @@ struct PickerSetupView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
+            .tint(Color(red: 1.0, green: 0.141, blue: 0.141))
             .disabled(store.minutes == 0 && store.seconds == 0)
         }
         .padding()
@@ -285,7 +285,7 @@ struct AlertView: View {
         VStack(spacing: 12) {
             Image(systemName: "bell.fill")
                 .font(.largeTitle)
-                .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.21))
+                .foregroundColor(Color(red: 1.0, green: 0.141, blue: 0.141))
 
             Text("완료")
                 .font(.title2)
@@ -296,7 +296,7 @@ struct AlertView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color(red: 1.0, green: 0.42, blue: 0.21))
+            .tint(Color(red: 1.0, green: 0.141, blue: 0.141))
         }
         .padding()
     }

@@ -602,10 +602,14 @@ export async function syncAllAlarms(): Promise<void> {
 
   // ── 분기 C — enabled인데 alarm_main 체인이 하나도 없는 알람 신규 예약 ──
   //   분기 B가 once 알람을 disable 했을 수 있어 알람·mapping 상태 재로드.
+  //   v2.2 #DailyDismissPreserve (2026-05-28) — deleted!==true filter 추가.
+  //     직전 = deleted 무관 filter → cancelAlarmsForEntity F2 실패 시 = deleted=true 잔존 → entitiesWithChain 측 포함 →
+  //       scheduleAlarmMain 미호출 → cold start 측 알람 측 없음 회귀 (= 옛 한계).
+  //     정정 = deleted!==true filter → 실제 active chain 측만 인지 → F2 실패 시 cold start 측 신규 schedule 보장.
   const freshAlarms = await loadAlarms();
   const entitiesWithChain = new Set(
     (await listAllAlarmMetadata())
-      .filter(m => m.type === 'alarm_main')
+      .filter(m => m.type === 'alarm_main' && m.deleted !== true)
       .map(m => m.entityId)
   );
   // M0 진단: K14 미스터리 1 후보 — 분기 C 진입 시 schedule 대상 entityId 박기 (cold-start duplicate schedule 추적).

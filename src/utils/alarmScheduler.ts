@@ -259,6 +259,19 @@ export async function rebalanceAllChains(): Promise<void> {
       const currentChainCount = currentChain.length;
       // chainCount 일치 시 = skip (idempotent 보장)
       if (currentChainCount === targetChainCount) continue;
+      // v2.2 #DailyDismissPreserve (2026-05-28) — daily/weekly 알람 측 chain[0] 1개만 = preserve 상태 → skip rebalance.
+      //   cancelSafetyChainPreservingDaily 호출 후 = chain[0] 1개 + chain[1..N] 0개 = preserve.
+      //   rebalance 측 chain[0] cancel + 재schedule 회피 (= UUID 안정성 + native call 효율).
+      //   syncAllAlarms 분기 B-skip 측 = cold start 시 rearmSafetyChain 측 = chain[1..N] 자동 복구.
+      const isRecurring = alarm.repeat === 'daily' || alarm.repeat === 'weekly';
+      const isPreserveState = currentChain.length === 1 && (currentChain[0]?.chainIndex ?? -1) === 0;
+      if (isRecurring && isPreserveState) {
+        Logger.warn(
+          'alarmScheduler-DBG',
+          `rebalanceAllChains skip preserve state entityId=${alarm.id} (= dismiss 후 chain[0] 보존)`
+        );
+        continue;
+      }
       Logger.warn(
         'alarmScheduler-DBG',
         `rebalanceAllChains entityId=${alarm.id} current=${currentChainCount} target=${targetChainCount}`

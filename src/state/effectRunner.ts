@@ -17,6 +17,7 @@ import { registerEffectRunner, SideEffect } from './SessionController';
 import {
   scheduleAlarmMain,
   cancelAlarmsForEntity,
+  rebalanceAllChains,
 } from '../utils/alarmScheduler';
 import {
   scheduleRoutineConfirmPrompt,
@@ -124,6 +125,11 @@ async function runEffect(effect: SideEffect): Promise<void> {
       await scheduleAlarmMain(target).catch((e) => {
         Logger.warn('effectRunner', `ScheduleAlarmChain error=${String(e)}`);
       });
+      // v2.1 #ChainRebalance (2026-05-28) — 활성 알람 갯수 변경 시 기존 알람 chain 재계산.
+      //   새 알람 enable 시 = 옛 알람 chainCount > 새 target → 옛 알람 측 cancel + 재schedule.
+      await rebalanceAllChains().catch((e) => {
+        Logger.warn('effectRunner', `rebalanceAllChains after Schedule error=${String(e)}`);
+      });
       return;
     }
 
@@ -131,6 +137,11 @@ async function runEffect(effect: SideEffect): Promise<void> {
       // F1+F2 transactional cancel 이 이미 cancelAlarmsForEntity 내부에 적용됨
       await cancelAlarmsForEntity(effect.alarmEntityId).catch((e) => {
         Logger.warn('effectRunner', `CancelAlarmChain error=${String(e)}`);
+      });
+      // v2.1 #ChainRebalance (2026-05-28) — 알람 비활성 시 = 남은 알람 chainCount 증가 가능 → 재계산.
+      //   예: 5개 활성 (= 각 6) → 1개 disable → 남은 4개 측 target=7 → rebalance.
+      await rebalanceAllChains().catch((e) => {
+        Logger.warn('effectRunner', `rebalanceAllChains after Cancel error=${String(e)}`);
       });
       return;
     }

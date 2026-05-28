@@ -236,6 +236,46 @@ export async function rearmSafetyChain(alarm: Alarm, baseFireAt: number): Promis
   }
 }
 
+// v2.1 #ChainRebalance (2026-05-28) — 활성 알람 갯수 변경 시 기존 알람 chain 재계산.
+//   문제: chainCount = floor(30 / activeCount) 측 = scheduleAlarmMain 호출 시점 계산만 함 → 새 알람 추가/삭제 시 기존 알람의 chain 갯수 변경 X.
+//     누적 = activeCount=5 알람 enable 시 = 30+15+10+7+6 = 68개 → AlarmKit framework limit (~64) 초과 위험.
+//   정정: EnableAlarm + DisableAlarm effect 측 후속 호출 → 모든 활성 알람 chainCount 재계산 + 다르면 cancel + 재schedule.
+//   idempotent: current=target 시 skip → 무한 루프 X. Platform 공통 (= iOS + Android 양쪽 적용).
+export async function rebalanceAllChains(): Promise<void> {
+  if (!isAlarmKitAvailableSync()) return;
+  try {
+    const alarms = await loadAlarms();
+    const activeAlarms = alarms.filter(a => a.enabled);
+    if (activeAlarms.length === 0) return;
+    const chainTotal = ALARM_CHAIN_MAX_INDEX + 1;
+    const targetChainCount = Math.max(1, Math.min(chainTotal, Math.floor(chainTotal / activeAlarms.length)));
+
+    const allMeta = await listAllAlarmMetadata();
+    let rebalancedCount = 0;
+    for (const alarm of activeAlarms) {
+      const currentChain = allMeta.filter(
+        m => m.type === 'alarm_main' && m.entityId === alarm.id && m.deleted !== true
+      );
+      const currentChainCount = currentChain.length;
+      // chainCount 일치 시 = skip (idempotent 보장)
+      if (currentChainCount === targetChainCount) continue;
+      Logger.warn(
+        'alarmScheduler-DBG',
+        `rebalanceAllChains entityId=${alarm.id} current=${currentChainCount} target=${targetChainCount}`
+      );
+      // 옛 chain 전체 cancel + scheduleAlarmMain 재호출
+      for (const meta of currentChain) await cancelAlarm(meta.alarmId);
+      await scheduleAlarmMain(alarm).catch(() => {});
+      rebalancedCount += 1;
+    }
+    if (rebalancedCount > 0) {
+      Logger.warn('alarmScheduler-DBG', `rebalanceAllChains 완료 rebalanced=${rebalancedCount} target=${targetChainCount} activeAlarms=${activeAlarms.length}`);
+    }
+  } catch (e) {
+    Logger.warn('alarmScheduler-DBG', `rebalanceAllChains error=${String(e)}`);
+  }
+}
+
 // v2.0 #ChainFixedSafety (2026-05-28) — 소비된 safety chain (chainIndex 1+ .fixed 발화 완료) metadata cleanup.
 //   iOS 전용. Android 측 = chainIndex 1+ daily/weekly 측 alarmId 재사용 (소비 X) → 본 함수 호출 시 정상 알람 metadata 삭제 회귀.
 //   .fixed 알람 측 발화 시 = AlarmKit framework 측 자동 제거 but JS metadata 측 잔존 → orphan.

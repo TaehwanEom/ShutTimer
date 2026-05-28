@@ -384,6 +384,105 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
   await disableOnceAlarmIfNeeded(alarmEntityId).catch(() => {});
 }
 
+// v2.2 #DailyDismissPreserve (2026-05-28) — Dismiss / Advance lastStep 측 = chain[0] (.relative daily/weekly) 보존 + chain[1..29] (safety chain) 만 cancel.
+//   문제: 사용자 dismiss → cancelAlarmsForEntity → chain[0..29] 전부 cancel → iOS .relative(daily) OS 자동 반복 사라짐 → 다음날 알람 X (= 사용자 cold start까지).
+//   정정: daily/weekly 알람 측 = chain[0] 보존 (= OS 자동 반복) + chain[1..29] 만 F0~F3 cancel. 다음날 chain[0] fire → listener 측 rearmSafetyChain → 정상.
+//   once 알람 / lookup 실패 / Android Platform = cancelAlarmsForEntity 위임 (= 기존 동작 보존, 회귀 0).
+//   chain[0] alerting 중 = AlarmkitBridge.stopAlarm 호출 (= alerting 종료 + .relative daily 보존).
+export async function cancelSafetyChainPreservingDaily(alarmEntityId: string): Promise<void> {
+  // iOS 외 = 기존 cancelAlarmsForEntity 위임 (= Android 회귀 0). production Android 빌드 사이클 시 별도 fix.
+  if (Platform.OS !== 'ios') {
+    return cancelAlarmsForEntity(alarmEntityId);
+  }
+  const alarms = await loadAlarms();
+  const alarm = alarms.find(a => a.id === alarmEntityId);
+  // 알람 lookup 실패 또는 once = 기존 동작 (= 전체 cancel + disableOnce).
+  if (!alarm || alarm.repeat === 'once') {
+    return cancelAlarmsForEntity(alarmEntityId);
+  }
+  // daily / weekly: chain[0] 보존 + chain[1..29] cancel.
+  const allMeta = await listAllAlarmMetadata();
+  const safetyTargets = allMeta.filter(
+    m => m.type === 'alarm_main' && m.entityId === alarmEntityId && (m.chainIndex ?? 0) >= 1
+  );
+  const chain0Meta = allMeta.find(
+    m => m.type === 'alarm_main' && m.entityId === alarmEntityId && (m.chainIndex ?? 0) === 0
+  );
+  Logger.warn('cancelSafetyChain-DBG', `start entityId=${alarmEntityId} repeat=${alarm.repeat} safety=${safetyTargets.length} chain0=${chain0Meta?.alarmId ?? 'NULL'}`);
+
+  const safetyIds = new Set(safetyTargets.map(t => t.alarmId));
+
+  // F0: soft delete (= cancelAlarmsForEntity 측 안전망 패턴 동일).
+  for (const meta of safetyTargets) {
+    await markAlarmDeleted(meta.alarmId).catch(() => {});
+  }
+
+  // F1: cancel.
+  let nativeFailCount = 0;
+  for (const meta of safetyTargets) {
+    try {
+      await AlarmkitBridge.cancelAlarm(meta.alarmId);
+    } catch (e) {
+      nativeFailCount++;
+      Logger.warn('cancelSafetyChain-DBG', `attempt-1 cancelAlarm fail alarmId=${meta.alarmId} err=${String(e)}`);
+    }
+  }
+
+  // F2: verify retry (= cancelAlarmsForEntity 패턴 동일).
+  let stale: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const nativeAlarms = await AlarmkitBridge.listAlarms();
+    stale = nativeAlarms.filter(a => safetyIds.has(a.id)).map(a => a.id);
+    if (stale.length === 0) break;
+    Logger.warn('cancelSafetyChain-DBG', `verify attempt=${attempt} stale=${stale.length}`);
+    for (const id of stale) {
+      try {
+        await AlarmkitBridge.cancelAlarm(id);
+      } catch (e) {
+        Logger.warn('cancelSafetyChain-DBG', `retry cancel fail alarmId=${id} err=${String(e)}`);
+      }
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  // F3: stale=0 시 정식 deleteAlarmMetadata.
+  if (stale.length === 0) {
+    for (const meta of safetyTargets) {
+      await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+    }
+  } else {
+    Logger.warn('cancelSafetyChain-DBG', `FINAL stale=${stale.length} ids=[${stale.join(',')}] (metadata deleted=true 잔존)`);
+  }
+
+  // chain[0] alerting 중 = stopAlarm (= alerting 종료 + .relative daily/weekly OS 자동 반복 보존).
+  //   AlarmkitBridge.stopAlarm 측 = framework 측 alerting 측 stop intent perform → .relative recurrence 측 다음 발화 보존.
+  //   cancelAlarm 측 = 전체 cancel (= recurrence 사라짐) → 사용 ❌.
+  //   chain[0] 측 alerting 아닐 때 = stopAlarm 호출 X (= iOS AlarmKit 측 = .alerting 전용 API. scheduled 측 호출 시 동작 불확실).
+  //   → listAlarms 측 state 확인 후 분기.
+  if (chain0Meta) {
+    let chain0IsAlerting = false;
+    try {
+      const nativeAlarms = await AlarmkitBridge.listAlarms();
+      const chain0Native = nativeAlarms.find(a => a.id === chain0Meta.alarmId);
+      chain0IsAlerting = chain0Native?.state === 'alerting';
+    } catch (e) {
+      Logger.warn('cancelSafetyChain-DBG', `chain[0] state lookup fail alarmId=${chain0Meta.alarmId} err=${String(e)}`);
+    }
+    if (chain0IsAlerting) {
+      try {
+        await AlarmkitBridge.stopAlarm(chain0Meta.alarmId);
+        Logger.warn('cancelSafetyChain-DBG', `chain[0] alerting → stopAlarm 호출 alarmId=${chain0Meta.alarmId} (.relative 보존)`);
+      } catch (e) {
+        Logger.warn('cancelSafetyChain-DBG', `chain[0] stopAlarm fail alarmId=${chain0Meta.alarmId} err=${String(e)}`);
+      }
+    } else {
+      Logger.warn('cancelSafetyChain-DBG', `chain[0] alerting X → stopAlarm 측 skip alarmId=${chain0Meta.alarmId} (.relative 보존)`);
+    }
+  }
+
+  Logger.warn('cancelSafetyChain-DBG', `done entityId=${alarmEntityId} safety=${safetyTargets.length} nativeFail=${nativeFailCount} finalStale=${stale.length} chain0Preserved=${chain0Meta != null}`);
+}
+
 // v1.8 #AlarmChainEager — 2분 간격 chain. 알람 등록 시점 scheduleAlarmMain 측에서 chain 전체 미리 예약.
 //   chainIndex 0..29 = 총 30회 = 60분. 활성 알람 갯수만큼 분배.
 //   직전 lazy chain (scheduleAlarmChainNext = 발화 listener 측 다음 1개 등록) 폐기 — 잠금 suspend 시 미발화 회귀.

@@ -49,6 +49,10 @@ export type SideEffect =
       laRoutineName?: string;
     }
   | { kind: 'CancelAlarmChain'; alarmEntityId: string }
+  // v2.2 #DailyDismissPreserve (2026-05-28) — Dismiss / Advance lastStep 측 = daily/weekly 알람 측 chain[0] 보존 + chain[1..29] 만 cancel.
+  //   once 알람 / lookup 실패 / Android = cancelAlarmsForEntity 위임 (= 회귀 0).
+  //   호출 위치: Dismiss + Advance lastStep. Stop / Start override / DisableAlarm = 기존 CancelAlarmChain (= 전체 cancel) 유지.
+  | { kind: 'CancelSafetyChainOnly'; alarmEntityId: string }
   | {
       kind: 'ScheduleConfirmPrompt';
       routineId: string;
@@ -519,10 +523,13 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     const pendingResult = action.missionResult;
     const dismissed: Session = { ...current, pendingResult, awaitingConfirm: true };
     // chain cancel — 미션 완료 시 같은 entity chain 정리
+    // v2.2 #DailyDismissPreserve (2026-05-28) — Dismiss = "오늘 미션 완료" 의미. daily/weekly 알람 측 = 다음날 다시 fire 의도.
+    //   → CancelSafetyChainOnly 측 = chain[0] 보존 + chain[1..29] 만 cancel.
+    //   once 알람 / Android Platform = effectRunner 측 cancelSafetyChainPreservingDaily 측 = cancelAlarmsForEntity 위임 (= 기존 동작 보존).
     const effects: SideEffect[] = [];
     if (current.alarmBinding) {
       effects.push({
-        kind: 'CancelAlarmChain',
+        kind: 'CancelSafetyChainOnly',
         alarmEntityId: current.alarmBinding.alarmEntityId,
       });
     }
@@ -554,9 +561,11 @@ function transition(current: Session | null, action: SessionAction): TransitionR
 
     if (nextIdx >= current.steps.length) {
       // 마지막 step → COMPLETED → IDLE (cleanup)
+      // v2.2 #DailyDismissPreserve (2026-05-28) — 루틴 마지막 step 완료 = "오늘 루틴 완료" 의미. daily/weekly 알람 측 = 다음날 다시 fire 의도.
+      //   → CancelSafetyChainOnly 측 = chain[0] 보존 + chain[1..29] 만 cancel.
       if (current.alarmBinding) {
         effects.push({
-          kind: 'CancelAlarmChain',
+          kind: 'CancelSafetyChainOnly',
           alarmEntityId: current.alarmBinding.alarmEntityId,
         });
       }

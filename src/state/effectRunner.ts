@@ -18,6 +18,7 @@ import {
   scheduleAlarmMain,
   cancelAlarmsForEntity,
   rebalanceAllChains,
+  cancelSafetyChainPreservingDaily,
 } from '../utils/alarmScheduler';
 import {
   scheduleRoutineConfirmPrompt,
@@ -142,6 +143,22 @@ async function runEffect(effect: SideEffect): Promise<void> {
       //   예: 5개 활성 (= 각 6) → 1개 disable → 남은 4개 측 target=7 → rebalance.
       await rebalanceAllChains().catch((e) => {
         Logger.warn('effectRunner', `rebalanceAllChains after Cancel error=${String(e)}`);
+      });
+      return;
+    }
+
+    case 'CancelSafetyChainOnly': {
+      // v2.2 #DailyDismissPreserve (2026-05-28) — Dismiss / Advance lastStep 측 = daily/weekly 알람 측 chain[0] 보존 + chain[1..29] 만 cancel.
+      //   사용자 cold start 미발생 시에도 = chain[0] = .relative(daily/weekly) OS 자동 반복 → 다음날 정상 fire.
+      //   once 알람 / Android Platform = cancelSafetyChainPreservingDaily 내부 측 = cancelAlarmsForEntity 위임 (= 회귀 0).
+      await cancelSafetyChainPreservingDaily(effect.alarmEntityId).catch((e) => {
+        Logger.warn('effectRunner', `CancelSafetyChainOnly error=${String(e)}`);
+      });
+      // 일일/주간 알람 측 = chain[0] 보존 = activeCount 변경 X → rebalance 호출 불필요.
+      // once 알람 측 = cancelAlarmsForEntity 위임 후 별도 rebalance 필요할 수 있음 (= 사용자 dismiss 후 자동 disable).
+      // → 안전상 rebalance 호출 (= idempotent 가드 측 = current=target 시 skip).
+      await rebalanceAllChains().catch((e) => {
+        Logger.warn('effectRunner', `rebalanceAllChains after CancelSafetyChainOnly error=${String(e)}`);
       });
       return;
     }

@@ -109,10 +109,13 @@ final class TimerStore: ObservableObject {
     private func finish() {
         ticker?.invalidate()
         ticker = nil
+        // 앱 활성 상태 측 finish 시 = scheduled notification 측 cancel (= 중복 진동 차단).
+        //   notification 측 = 백그라운드 측 = 앱 suspended 측 fire 보장 의도.
+        //   앱 활성 측 = play(.notification) 측 = 즉시 진동 + AlertView 진입. notification 측 불필요.
+        cancelFinishNotification()
         state = .finished
-        // 워치 본체 측 = 진동 (= local notification 측도 진동 + 사운드 출력. 양쪽 다 OK).
         WKInterfaceDevice.current().play(.notification)
-        // session = finish 후도 = 측 = AlertView 측 사용자 측 dismiss 까지 = 측 = 측 유지.
+        // session = finish 후도 = AlertView 측 사용자 측 dismiss 까지 유지.
     }
 
     private func startExtendedRuntimeSession() {

@@ -30,7 +30,7 @@ import Constants from 'expo-constants';
 import { consumeAlarmSound } from '../utils/alarmSoundPreload';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { listAllAlarmMetadata, deleteAlarmMetadata } from '../utils/alarmkitMappingTable';
-import { cancelAlarmsForEntity, recordAlarmSession } from '../utils/alarmScheduler';
+import { cancelSafetyChainPreservingDaily, recordAlarmSession } from '../utils/alarmScheduler';
 import { stopRoutine, restorePendingDisabledAlarms } from '../utils/routineController';
 import { Logger } from '../utils/logger';
 import { dispatchDismiss } from '../state/ActionDispatcher';
@@ -303,10 +303,15 @@ export default function AlarmScreen({ navigation, route }: Props) {
       // v1.8 #AlarmRepeat — 알람 entity 측 dismiss 시 = chain 형제 일괄 cancel.
       // 직전 = alerting 1개만 stop → scheduled 측 chain 49개 잔존 → 2분 뒤 또 울림 회귀.
       // 정정 = route.params.alarmEntityId 측 = mapping table entityId 매칭 chain 전체 cancel.
+      // v2.2 #DailyDismissPreserve (2026-05-28) — cancelAlarmsForEntity → cancelSafetyChainPreservingDaily 교체.
+      //   문제: dispatchDismiss → CancelSafetyChainOnly effect 측 = chain[0] 보존. 그런데 본 line 측 직접 cancelAlarmsForEntity 호출 →
+      //     F2 verify retry 측 chain[0] 측 = stop() 후 state=scheduled → 추가 cancelAlarm 측 = cancel() → .relative 사라짐 → 한계 5 root cause.
+      //   정정: cancelSafetyChainPreservingDaily 호출 = effectRunner 측 처리와 동일 패턴 = daily/weekly 측 chain[0] 보존.
+      //     once 알람 / Android / lookup 실패 = cancelAlarmsForEntity 위임 (= 본 함수 내부 분기).
       const alarmEntityIdParam = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
       if (alarmEntityIdParam) {
         Logger.warn('AlarmScreen-DBG', `stopAudioAndVibration chain cancel entityId=${alarmEntityIdParam}`);
-        await cancelAlarmsForEntity(alarmEntityIdParam).catch(() => {});
+        await cancelSafetyChainPreservingDaily(alarmEntityIdParam).catch(() => {});
       }
       // v1.6 후속 hotfix — 시스템 측 잔존 alerting 알람 cleanup (= mapping table 측 ❌ 영역).
       // dismiss 시점 = 모든 alerting 영역 정리 정공 (= 활성 영역 ❌, alerting 상태만).

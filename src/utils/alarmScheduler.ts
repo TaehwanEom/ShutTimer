@@ -584,8 +584,13 @@ export async function syncAllAlarms(): Promise<void> {
     //     발화 = next chainIndex 0 occurrence 측 = 다음 day 측 = safety chain 측 누락 → 재예약 필요.
     //     검사: chainIndex 0 metadata 존재 + chainIndex 1+ metadata 누락 → rearmSafetyChain.
     //     baseFireAt = nextAlarmOccurrenceTime (= 미래) → AlarmKit 측 .fixed 측 = 날짜+시각 보존 → 유령 발화 차단.
-    const hasChain0 = metas.some(m => (m.chainIndex ?? 0) === 0);
-    const hasChainSafety = metas.some(m => (m.chainIndex ?? 0) >= 1);
+    //   v2.2 #DailyDismissPreserve (2026-05-28) — deleted=true filter 추가.
+    //     직전 = deleted 무관 filter → cancelAlarmsForEntity / cancelSafetyChainPreservingDaily 측 F2 verify 실패 시 =
+    //       deleted=true 잔존 metadata → hasChainSafety=true false negative → rearm 측 누락 → 다음날 안전망 0 회귀.
+    //     정정 = deleted!==true filter → 실제 active safety chain 측만 count → F2 실패 시도 정확한 rearm trigger.
+    //     hasChain0 측 동일 fix (= deleted=true 잔존 chain[0] 측 false positive 회피).
+    const hasChain0 = metas.some(m => (m.chainIndex ?? 0) === 0 && m.deleted !== true);
+    const hasChainSafety = metas.some(m => (m.chainIndex ?? 0) >= 1 && m.deleted !== true);
     if (hasChain0 && !hasChainSafety) {
       const nextBase = nextAlarmOccurrenceTime(alarm);
       if (nextBase != null) {

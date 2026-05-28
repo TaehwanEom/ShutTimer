@@ -10,7 +10,7 @@ import UserNotifications
 @main
 struct ShutTimerWatchApp: App {
     init() {
-        // 알람 권한 측 = launch 시 1회 요청. 사용자 측 = 거부 시 = 진동만 (= 워치 기본).
+        // 알람 권한 = launch 시 1회 요청. 사용자 거부 시 = 진동만 (= 워치 기본).
         UNUserNotificationCenter.current().requestAuthorization(
             options: [.alert, .sound]
         ) { _, _ in }

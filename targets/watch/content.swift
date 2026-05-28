@@ -9,6 +9,9 @@ import SwiftUI
 import WatchKit
 import UserNotifications
 
+// 2026-05-29 — 반응형 다이얼 사이즈 (= dial.swift 정합 = 화면 가로 폭 * 0.95).
+private let WATCH_DIAL_SIZE: CGFloat = WKInterfaceDevice.current().screenBounds.width * 0.95
+
 // MARK: - Timer 상태
 
 enum TimerState {
@@ -21,8 +24,13 @@ enum TimerState {
 @MainActor
 final class TimerStore: ObservableObject {
     @Published var state: TimerState = .idle
-    @Published var minutes: Int = 5
-    @Published var seconds: Int = 0
+    // 2026-05-28 — paused 시 minutes/seconds 변경 시 = remainingMs 자동 동기 (= iOS 정합 = 다이얼 회전 재설정).
+    @Published var minutes: Int = 5 {
+        didSet { syncRemainingIfPaused() }
+    }
+    @Published var seconds: Int = 0 {
+        didSet { syncRemainingIfPaused() }
+    }
     @Published var remainingMs: Int = 0
 
     private var ticker: Timer?
@@ -33,8 +41,25 @@ final class TimerStore: ObservableObject {
         (minutes * 60 + seconds) * 1000
     }
 
+    private func syncRemainingIfPaused() {
+        guard state == .paused else { return }
+        let newMs = (minutes * 60 + seconds) * 1000
+        remainingMs = newMs
+        // endAt 갱신은 resume 시점에서 새로 계산. notification은 미리 cancel.
+        cancelFinishNotification()
+    }
+
     var displayText: String {
-        let totalSec = max(0, remainingMs / 1000)
+        // 2026-05-29 — iOS HomeScreen 정합 (HomeScreen.tsx:1118-1119).
+        //   idle = 설정값 (= minutes * 60 + seconds)
+        //   running/paused/finished = 남은 시간 (= remainingMs / 1000)
+        let totalSec: Int
+        switch state {
+        case .idle:
+            totalSec = minutes * 60 + seconds
+        case .running, .paused, .finished:
+            totalSec = max(0, remainingMs / 1000)
+        }
         let m = totalSec / 60
         let s = totalSec % 60
         return String(format: "%02d:%02d", m, s)
@@ -158,19 +183,9 @@ struct TimerRootView: View {
 
     var body: some View {
         switch store.state {
-        case .idle:
-            // 2026-05-28 — 사용자 요구: 앱(iOS) 측 다이얼 측 = 워치에도 동일 구조 + picker 보존.
-            //   TabView 측 = swipe 측 = page 1 (= 다이얼) ↔ page 2 (= picker).
-            //   기본 첫 화면 = 다이얼 (= 앱 측 classic 측과 동일).
-            TabView {
-                DialSetupView(store: store)
-                    .tag(0)
-                PickerSetupView(store: store)
-                    .tag(1)
-            }
-            .tabViewStyle(.page)
-        case .running, .paused:
-            CountdownView(store: store)
+        case .idle, .running, .paused:
+            // 2026-05-28 — 사용자 분노 fix: idle/running/paused 측 = 동일 View 사용 (= 버튼 위치/크기 일관 보장).
+            DialWithButtonView(store: store)
         case .finished:
             AlertView(store: store)
         }
@@ -179,104 +194,134 @@ struct TimerRootView: View {
 
 // MARK: - Setup Views (= 두 가지 디자인: 다이얼 + picker)
 
-// 다이얼 디자인 (= 앱 iOS 측 TimerDial 동일 구조).
-struct DialSetupView: View {
+// 2026-05-28 — 사용자 분노 fix: idle/running/paused 측 = 단일 View = 버튼 위치/크기 100% 일관 보장.
+//   iOS 앱 정합:
+//     - 단일 토글 버튼 (= state 측 action 분기)
+//     - 짧게 탭 = idle→start / running→pause / paused→resume
+//     - 길게 누름 (= 1.3초) = cancel (= running/paused 시만)
+//     - 게이지 = running/paused 시만 표시
+//     - 버튼 크기 = 항상 34x34 고정 (= 외곽 43x43)
+//     - 위치 = ZStack(alignment: .bottomTrailing) = 모든 state 동일
+struct DialWithButtonView: View {
     @ObservedObject var store: TimerStore
 
+    @State private var pressProgress: Double = 0
+    @State private var pressDelayTimer: Timer?
+    @State private var pressCancelTimer: Timer?
+    // iOS HomeScreen.tsx:1071 정합. 길게 누름 cancel 후 release 시 = button.action 측 차단.
+    @State private var longPressFired = false
+
+    private func startLongPress() {
+        guard store.state == .running || store.state == .paused else { return }
+        pressDelayTimer?.invalidate()
+        pressCancelTimer?.invalidate()
+        pressDelayTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { _ in
+            DispatchQueue.main.async {
+                withAnimation(.linear(duration: 1.0)) {
+                    pressProgress = 1.0
+                }
+                pressCancelTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { _ in
+                    DispatchQueue.main.async {
+                        longPressFired = true  // ← release 시 button.action 차단
+                        store.cancel()
+                        pressProgress = 0
+                    }
+                }
+            }
+        }
+    }
+
+    private func cancelLongPress() {
+        pressDelayTimer?.invalidate()
+        pressCancelTimer?.invalidate()
+        pressDelayTimer = nil
+        pressCancelTimer = nil
+        withAnimation(.linear(duration: 0.15)) {
+            pressProgress = 0
+        }
+        // longPressFired reset X (= handleTap 측 release 후 1회 차단 후 reset)
+    }
+
+    private var iconName: String {
+        switch store.state {
+        case .idle, .paused, .finished: return "play.fill"
+        case .running: return "pause.fill"
+        }
+    }
+
+    private func handleTap() {
+        // iOS HomeScreen.tsx:1261 정합. 길게 누름 cancel 후 release 시 = 1회 차단 + reset.
+        if longPressFired {
+            longPressFired = false
+            return
+        }
+        switch store.state {
+        case .idle: store.start()
+        case .running: store.pause()
+        case .paused: store.resume()
+        case .finished: break
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 6) {
+        // 2026-05-28 — 사용자 fix: ZStack 크기 = 다이얼 크기 강제 고정 (= 시간 capsule 측 .frame(maxWidth: .infinity)
+        // 측 = ZStack 측 무한대 확장 → bottomTrailing 위치 변동 → 버튼 움직임). 측 = 측 = 측 = 측 = 측 (측 X)
+        // 외곽 frame = 195x195 (= DialView size 정합) → 모든 state 측 = 동일 영역 → 버튼 위치 고정.
+        ZStack(alignment: .bottomTrailing) {
             DialView(store: store)
-            Button(action: { store.start() }) {
-                Text("시작")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(red: 1.0, green: 0.141, blue: 0.141))
-            .disabled(store.minutes == 0 && store.seconds == 0)
-        }
-        .padding(.horizontal, 8)
-    }
-}
 
-// Picker 디자인 (= 기존 보존, 표준 워치 패턴).
-struct PickerSetupView: View {
-    @ObservedObject var store: TimerStore
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text("ShutTimer")
-                .font(.headline)
-                .foregroundColor(Color(red: 1.0, green: 0.141, blue: 0.141))
-
-            HStack {
-                VStack {
-                    Text("분")
-                        .font(.caption2)
-                    Picker("min", selection: $store.minutes) {
-                        ForEach(0..<60) { Text("\($0)").tag($0) }
-                    }
-                    .labelsHidden()
-                    .frame(width: 60)
-                }
-                VStack {
-                    Text("초")
-                        .font(.caption2)
-                    Picker("sec", selection: $store.seconds) {
-                        ForEach(0..<60) { Text("\($0)").tag($0) }
-                    }
-                    .labelsHidden()
-                    .frame(width: 60)
-                }
-            }
-
-            Button(action: { store.start() }) {
-                Text("시작")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color(red: 1.0, green: 0.141, blue: 0.141))
-            .disabled(store.minutes == 0 && store.seconds == 0)
-        }
-        .padding()
-    }
-}
-
-struct CountdownView: View {
-    @ObservedObject var store: TimerStore
-
-    var body: some View {
-        VStack(spacing: 12) {
+            // 2026-05-29 — iOS HomeScreen 정합 = 모든 state(idle 포함) 시간 텍스트 상시 표시.
+            //   idle 시 = displayText 측 setup 값 (= minutes*60+seconds) 반환.
+            //   .position 측 = ZStack center 기준 = 가운데 점 아래.
             Text(store.displayText)
-                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.black.opacity(0.75)))
+                .position(x: WATCH_DIAL_SIZE / 2, y: WATCH_DIAL_SIZE / 2 + WATCH_DIAL_SIZE * (32.0 / 195.0))
 
-            HStack(spacing: 12) {
-                Button(action: {
-                    if store.state == .running {
-                        store.pause()
-                    } else {
-                        store.resume()
-                    }
-                }) {
-                    Image(systemName: store.state == .running ? "pause.fill" : "play.fill")
-                        .font(.title2)
-                }
-                .buttonStyle(.bordered)
+            // 우하단 = 토글 버튼 + 게이지 (= 모든 state 동일 위치/크기)
+            ZStack {
+                Color.clear.frame(width: 43, height: 43)
 
-                Button(action: { store.cancel() }) {
-                    Image(systemName: "stop.fill")
-                        .font(.title2)
-                        .foregroundColor(.red)
+                if store.state == .running || store.state == .paused {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 2)
+                        .frame(width: 43, height: 43)
+                    Circle()
+                        .trim(from: 0, to: pressProgress)
+                        .stroke(
+                            Color(red: 1.0, green: 0.141, blue: 0.141),
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 43, height: 43)
                 }
-                .buttonStyle(.bordered)
+
+                Button(action: handleTap) {
+                    Image(systemName: iconName)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(Color(red: 1.0, green: 0.141, blue: 0.141)))
+                }
+                .buttonStyle(.plain)
+                .disabled(store.state == .idle && store.minutes == 0 && store.seconds == 0)
+                .onLongPressGesture(minimumDuration: 1.3, maximumDistance: 50) {
+                    store.cancel()
+                    pressProgress = 0
+                } onPressingChanged: { pressing in
+                    if pressing { startLongPress() } else { cancelLongPress() }
+                }
             }
         }
-        .padding()
+        .frame(width: WATCH_DIAL_SIZE, height: WATCH_DIAL_SIZE)  // ← 반응형 다이얼 크기 = 화면 비율
     }
 }
+
+// 2026-05-28 — CountdownView 측 = DialWithButtonView 측 통합 = 제거.
 
 struct AlertView: View {
     @ObservedObject var store: TimerStore

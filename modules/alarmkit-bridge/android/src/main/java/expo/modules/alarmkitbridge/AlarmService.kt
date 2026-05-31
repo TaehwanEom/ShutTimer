@@ -186,7 +186,10 @@ class AlarmService : Service() {
     mediaPlayer = null
   }
 
-  // ── 볼륨 강제 (최대 + 볼륨 버튼으로 내려도 즉시 재확인 → 음소거 불가) ──
+  // ── 볼륨 초기 설정 (시작 시 max로 설정, 사용자 음량 버튼 조절 허용) ──
+  //   2026-05-31 — iOS 정합. 직전 = ContentObserver로 음량 변경 즉시 max 강제 복원
+  //   → 사용자가 음량 버튼으로 줄여도 1초 안에 max로 돌아감 → 인앱 음량 조절 불가 버그.
+  //   정정 = 시작 시 max만 설정 (= 못 듣는 사고 방지), 그 후 사용자 자유 조절 허용 (= Android 표준).
   private fun audioManager() = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
   private fun forceAlarmVolume() {
@@ -195,17 +198,7 @@ class AlarmService : Service() {
     am.setStreamVolume(
       AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0
     )
-    val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-      override fun onChange(selfChange: Boolean) {
-        val a = audioManager()
-        val max = a.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-        if (a.getStreamVolume(AudioManager.STREAM_ALARM) < max) {
-          a.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
-        }
-      }
-    }
-    volumeObserver = observer
-    contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
+    // ContentObserver 등록 X — 사용자가 음량 버튼으로 조절 시 변경 즉시 반영 (= iOS 동일).
   }
 
   private fun unregisterVolumeObserver() {

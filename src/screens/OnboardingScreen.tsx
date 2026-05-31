@@ -9,13 +9,22 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   useWindowDimensions,
   AppState,
   Platform,
   Animated,
+  Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// 2026-05-31 — TimerDial 측 SIZE 정합 (= TimerDial.tsx 측 Platform 분기 동일 계산).
+//   HomePreview spacer 측 = dialSize 동기화 필수 (= 다이얼 위치 정합 보장).
+//   iOS = Math.min(330, SCREEN_W - 60), Android = Math.min(290, SCREEN_W - 80) (= 즐겨찾기 잘림 방지).
+const SCREEN_W = Dimensions.get('window').width;
+const DIAL_SIZE = Platform.OS === 'android'
+  ? Math.min(290, SCREEN_W - 80)
+  : Math.min(330, SCREEN_W - 60);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -1216,7 +1225,7 @@ function HomePreviewSlide({
 
         {/* 13:00 pill + Pause button + 게이지바 링 (long-press 취소 indicator 배경) */}
         {/* Android — 재생 버튼 링이 Favorites 구분선과 겹쳐 섹션 간격 확대. iOS는 6 유지. */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 36 : 6, gap: 8 }}>
+        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 12 : 6, gap: 8 }}>
           <View style={{ borderWidth: 2, borderColor: colors.outlineVariant, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
             <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onBackground, letterSpacing: 1 }}>
               13 : 00
@@ -1313,11 +1322,12 @@ function HomePreviewSlide({
               <Text style={[hp.headerTitle, { color: colors.onBackground }]}>ShutTimer</Text>
             </View>
           </View>
-          {/* Dial 공간 spacer — TimerDial 330 고정 + 스위처 행 spacer.
+          {/* Dial 공간 spacer — TimerDial 반응형 (= Platform 분기 정합).
+              iOS = Math.min(330, screenW - 60), Android = Math.min(290, screenW - 80).
               Android — includeFontPadding으로 실제 스위처 행이 하드코딩 32보다 ~20px 높음 → 실제 행 미러로 자동 정합.
               iOS — ~32로 맞아 기존 하드코딩 유지 (iOS 무변경 보장, Android 작업이 iOS 회귀 일으키지 않도록 분기). */}
           <View style={[hp.dialSection, { opacity: 0 }]}>
-            <View style={{ width: 330, height: 330 }} />
+            <View style={{ width: DIAL_SIZE, height: DIAL_SIZE }} />
             {Platform.OS === 'android' ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
                 <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
@@ -1333,7 +1343,7 @@ function HomePreviewSlide({
           </View>
           {/* Play button 섹션 (링 + tooltip) */}
           {/* Android — preview 측과 동일 간격 확대 (레이어 정렬 유지). iOS는 6 유지. */}
-          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 36 : 6, gap: 8 }}>
+          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 12 : 6, gap: 8 }}>
             <View style={{ opacity: 0, borderWidth: 2, borderColor: 'transparent', borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '800', letterSpacing: 1 }}>13 : 00</Text>
             </View>
@@ -1383,35 +1393,26 @@ function HomePreviewSlide({
               </View>
             </View>
           </View>
-          {/* Android — 확인 버튼: 미러 flow 안 즐겨찾기 다음에 배치. 위 spacer들이 위치 결정 → 화면 높이 무관 */}
-          {Platform.OS === 'android' && (
-            <Animated.View style={{ opacity: confirmOp, alignItems: 'center', marginTop: 24 }}>
-              <TouchableOpacity style={styles.startButton} onPress={onStart}>
-                <Text style={styles.startButtonText}>{confirmLabel}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
         </View>
-        {/* iOS — 확인 버튼: 화면 정중앙 (absolute, center both axes). iOS 현행 유지 */}
-        {Platform.OS === 'ios' && (
-          <Animated.View
-            pointerEvents="box-none"
-            style={{
-              opacity: confirmOp,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <TouchableOpacity style={styles.startButton} onPress={onStart}>
-              <Text style={styles.startButtonText}>{confirmLabel}</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+        {/* 2026-05-31 — 확인 버튼: 화면 정중앙 absolute (iOS + Android 통일).
+            기존 Android 미러 flow 측 = S23 화면 길이 초과로 화면 밖 → absolute center로 통일. */}
+        <Animated.View
+          pointerEvents="box-none"
+          style={{
+            opacity: confirmOp,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <TouchableOpacity style={styles.startButton} onPress={onStart}>
+            <Text style={styles.startButtonText}>{confirmLabel}</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </View>
   );

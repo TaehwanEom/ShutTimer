@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, PanResponder, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, PanResponder, Animated, Easing, Dimensions, Platform } from 'react-native';
 import Svg, { Circle, Path, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { ThemeColors } from '../constants/theme';
@@ -21,16 +21,23 @@ type Props = {
   isWarning?: boolean;
 };
 
-const SIZE = 330;
-const cx = 165;
-const cy = 165;
-const LABEL_RADIUS = 176;
-const SECTOR_RADIUS = 161; // 155 × 1.04
-const CENTER_RADIUS = 15;
-const TICK_OUTER_MAJOR = 161; // SECTOR_RADIUS와 일치
-const TICK_INNER_MAJOR = 137; // 길이 30 → 24 (= 추가 20% 축소)
-const TICK_OUTER_MINOR = 161; // SECTOR_RADIUS와 일치
-const TICK_INNER_MINOR = 144; // 길이 21 → 17 (= 추가 20% 축소)
+// 2026-05-31 — 반응형 사이즈 (= Galaxy S23 360pt 등 작은 화면 정합).
+//   iOS (iPhone 15+ 375pt) = Math.min(330, 315) = 315 ~ 330 (= 큰 화면 = 330 상한 유지, iOS 회귀 X)
+//   Android (Galaxy S23 360pt) = Math.min(290, 280) = 280 (= 더 작게 = 즐겨찾기/광고 자리 확보)
+//   모든 상수 = SIZE 기준 비율로 동적 계산 (= 디자인 비율 100% 유지).
+const SCREEN_W = Dimensions.get('window').width;
+const SIZE = Platform.OS === 'android'
+  ? Math.min(290, SCREEN_W - 80)
+  : Math.min(330, SCREEN_W - 60);
+const cx = SIZE / 2;
+const cy = SIZE / 2;
+const LABEL_RADIUS = SIZE * (176 / 330);
+const SECTOR_RADIUS = SIZE * (161 / 330); // 155 × 1.04
+const CENTER_RADIUS = SIZE * (15 / 330);
+const TICK_OUTER_MAJOR = SIZE * (161 / 330); // SECTOR_RADIUS와 일치
+const TICK_INNER_MAJOR = SIZE * (137 / 330); // 길이 30 → 24 (= 추가 20% 축소)
+const TICK_OUTER_MINOR = SIZE * (161 / 330); // SECTOR_RADIUS와 일치
+const TICK_INNER_MINOR = SIZE * (144 / 330); // 길이 21 → 17 (= 추가 20% 축소)
 
 const LABELS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 

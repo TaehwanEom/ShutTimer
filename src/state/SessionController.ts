@@ -64,6 +64,11 @@ export type SideEffect =
       currentStepName?: string;
       stepIndex?: number;
       totalSteps?: number;
+      /** 2026-05-31 — Android 미션 알람 잠금 해제 강제 (iOS 정합).
+       *    'tap' / undefined = 일반 알람 = 잠금 위 표시.
+       *    'shake' | 'camera' | 'math' | 'typing' | 'random' = 미션 알람 = KeyguardManager 호출.
+       */
+      endMethod?: string;
     }
   | { kind: 'CancelConfirmPrompt'; alarmId: string }
   | { kind: 'StopAlarmNative'; alarmId: string }
@@ -231,8 +236,16 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       });
     }
     if (current.alarmBinding) {
+      // 2026-06-02 fix #DailyAlarmRoutineRevive (2차) — Stop 시에도 데일리 chain[0] 보존.
+      //   log02(1.8.6 디버그)에서 확인: Dismiss override가 chain[0]을 보존해도, 직후 startRoutine이
+      //     "stale simple_alarm 세션(CONFIRMING) 감지 → dispatch Stop"을 날리고, 이 Stop의 CancelAlarmChain(전체취소)이
+      //     chain[0](.relative daily)을 다시 제거함. (rebalance가 재생성해 살아남긴 했으나 취소→재생성 불안정.)
+      //   정정: Stop도 CancelSafetyChainOnly → cancelSafetyChainPreservingDaily.
+      //     - daily/weekly: chain[0] 보존(취소 자체가 안 일어남) → rebalance churn 없음.
+      //     - once / 알람 아닌 entity: 함수 내부 전체취소 폴백(회귀 0).
+      //     - 알람 비활성/삭제는 DisableAlarm 전환(별도, 전체취소 유지)이 담당하므로 Stop 보존이 의도와 맞음.
       effects.push({
-        kind: 'CancelAlarmChain',
+        kind: 'CancelSafetyChainOnly',
         alarmEntityId: current.alarmBinding.alarmEntityId,
       });
     }
@@ -275,8 +288,16 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     // 기존 session 있으면 override (replaceExisting 또는 ad_hoc 무조건)
     if (current && (action.replaceExisting || action.kind === 'ad_hoc_routine')) {
       if (current.alarmBinding) {
+        // 2026-06-02 fix #DailyAlarmRoutineRevive — Start override(루틴 시작/replaceExisting) 시 전체취소 금지.
+        //   버그: 데일리 알람+루틴에서 루틴 시작 → 직전 simple_alarm 세션(binding = 원본 데일리 alarm.id)에
+        //     CancelAlarmChain(전체취소) → chain[0](.relative daily OS 반복)까지 삭제 → 다음날부터 미발화.
+        //     복구(syncAllAlarms)는 cold start 한정이라, 앱을 며칠 안 켜면 토글 ON인데 영영 안 울림(= 사용자 확인:
+        //     OFF→ON 재예약 시 부활). 원인 = 전체취소가 데일리 반복 심장(chain[0])을 같이 죽임.
+        //   정정: CancelSafetyChainOnly → cancelSafetyChainPreservingDaily.
+        //     - daily/weekly: chain[0] 보존 + 안전체인(1+)만 취소 → 데일리 반복 유지.
+        //     - once / 알람 아닌 entity: 함수 내부에서 전체취소로 자동 폴백 → 기존 동작 동일(회귀 0).
         effects.push({
-          kind: 'CancelAlarmChain',
+          kind: 'CancelSafetyChainOnly',
           alarmEntityId: current.alarmBinding.alarmEntityId,
         });
       }
@@ -334,6 +355,7 @@ function transition(current: Session | null, action: SessionAction): TransitionR
         currentStepName: firstStep?.name,
         stepIndex: 0,
         totalSteps: action.steps.length,
+        endMethod: firstStep?.endMethod,  // 2026-05-31 — Android 미션 알람 잠금 해제 강제
       });
       effects.push({
         kind: 'WriteRoutineSnapshot',
@@ -602,6 +624,7 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       currentStepName: nextStep?.name,
       stepIndex: nextIdx,
       totalSteps: current.steps.length,
+      endMethod: nextStep?.endMethod,  // 2026-05-31 — Android 미션 알람 잠금 해제 강제
     });
     effects.push({
       kind: 'WriteRoutineSnapshot',
@@ -640,6 +663,7 @@ function transition(current: Session | null, action: SessionAction): TransitionR
           currentStepName: curStep?.name,
           stepIndex: current.currentStepIndex,
           totalSteps: current.steps.length,
+          endMethod: curStep?.endMethod,  // 2026-05-31 — Android 미션 알람 잠금 해제 강제
         },
         {
           kind: 'WriteRoutineSnapshot',

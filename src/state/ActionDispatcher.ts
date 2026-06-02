@@ -10,7 +10,7 @@
 // 본 P2 단계: helper 함수 정의만. 실제 구독은 P3 단계에서 App.tsx 부착 (subscribe pattern).
 // 본 P2 단계: dispatch 직접 호출 helper + LAControlSignal → action 변환 router.
 
-import { DeviceEventEmitter } from 'react-native';
+import { DeviceEventEmitter, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Logger } from '../utils/logger';
 import { dispatch } from './SessionController';
@@ -211,15 +211,41 @@ export async function onLAControlSignal(params: {
     case 'resume':
       await dispatch({ type: 'Resume', timestamp, source: 'la' });
       return;
-    case 'stop':
-      // v1.6 Phase 12 — 위젯 ✕ stop 시 RoutineListScreen activeManualRoutineId 정리 트리거.
-      try {
-        await stopRoutine();
-      } finally {
-        DeviceEventEmitter.emit('routineClearedExternally', { routineId });
-      }
-      await dispatch({ type: 'Stop', reason: 'la_widget' });
+    case 'stop': {
+      // 2026-06-02 사용자 항의 fix — 위젯 "정지" 즉시 누름 = 실수 클릭 측 routine 종료 회귀.
+      //   JS dead (= cold start) 측 signal 처리 측도 동일하게 Alert.alert 표시 → 사용자 선택 후 종료.
+      // 2026-06-02 fix(#StopPauseDuringConfirm) — iOS 정합 (Android stop_action 핸들러와 동일 동작).
+      //   iOS 위젯 정지 = la_control_signal 'stop' 경로(이 case). Android stop_action 핸들러의 Pause 수정이
+      //   이 경로엔 적용 안 돼 있어, iOS도 "팝업 떠 있는 동안 루틴 계속 진행 + 취소해도 진행" 버그가 남아있었음.
+      //   정정: 즉시 Pause(source 미지정 → PauseAlarmNative = 네이티브 알람 취소로 실제 정지) → 진행 차단.
+      //     취소/팝업 닫힘 = Resume(재개). 종료 = stopRoutine + Stop.
+      //     Pause는 IDLE/COMPLETED/PAUSED 외에서만, Resume은 PAUSED에서만 동작 → 중복/양쪽 호출 안전(no-op).
+      await dispatch({ type: 'Pause', timestamp: Date.now() }).catch(() => {});
+      const resumeRoutine = () => {
+        dispatch({ type: 'Resume', timestamp: Date.now() }).catch(() => {});
+      };
+      Alert.alert(
+        '루틴 종료',
+        '진행 중인 루틴을 종료하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel', onPress: () => { resumeRoutine(); } },
+          {
+            text: '종료',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await stopRoutine();
+              } finally {
+                DeviceEventEmitter.emit('routineClearedExternally', { routineId });
+              }
+              await dispatch({ type: 'Stop', reason: 'la_widget' });
+            },
+          },
+        ],
+        { cancelable: true, onDismiss: () => { resumeRoutine(); } }
+      );
       return;
+    }
     case 'advance':
       // FIX-⑤ silent ignore. native advance_done 정공.
       Logger.info('ActionDispatcher', `LA 'advance' silent ignore (FIX-⑤)`);

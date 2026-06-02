@@ -213,6 +213,17 @@ struct ResumeRoutineIntent: LiveActivityIntent {
 struct StopRoutineIntent: LiveActivityIntent {
     static var title: LocalizedStringResource = "정지"
     static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+    // 요구사항(Android 정합): 정지 누르면 즉시 종료 X + 앱 진입 + confirm modal → 사용자 선택 시 종료.
+    //
+    // 2026-06-02 근본 원인 확정 — perform 미발화(버튼 먹통) 원인 = 타깃 멤버십.
+    //   "앱을 여는" intent(supportedModes foreground)는 앱 + 위젯 양쪽 타깃에 컴파일돼 있어야 함(Apple).
+    //   이전엔 StopRoutineIntent 가 위젯 타깃 전용 → 앱 본체에 없음 → 시스템이 앱에서 실행 불가 → perform 0회.
+    //   근거: log02 (StopRoutineIntent.perform 0회) + Apple 문서.
+    //   정정: 동일한 StopRoutineIntent 사본을 앱 타깃(modules/alarmkit-bridge/ios/StopRoutineIntent.swift)에도 둠.
+    //     OpenAppDismissIntent(검증된 앱-여는 intent)가 같은 위치라 앱이 본 intent 를 인식 → foreground 진입 가능.
+    //     두 사본은 type name + @Parameter 동일 → 시스템이 동일 intent 로 매칭(= 파일을 양쪽 타깃에 넣은 것과 등가).
+    //   ⚠️ 앱 사본(alarmkit-bridge/StopRoutineIntent.swift)과 항상 동일하게 유지할 것.
+    static var supportedModes: IntentModes = [.foreground(.immediate)]
 
     @Parameter(title: "Routine ID")
     var routineId: String
@@ -221,31 +232,9 @@ struct StopRoutineIntent: LiveActivityIntent {
     init(routineId: String) { self.routineId = routineId }
 
     func perform() async throws -> some IntentResult {
-        // v1.7 hotfix #DBG — Stop Intent perform 진입.
-        appendNativeDbg("Intent-DBG-Widget", "StopRoutineIntent.perform routineId=\(routineId)")
-        // v1.6 #4-A — chain_alarms 영역 + snapshot.currentAlarmId 둘 다 cancel.
-        // (chain_alarms 미사용 케이스 = snapshot 만 cancel → 다음 step alerting fire 차단)
-        let alarmIds = readAlarmIds(routineId: routineId)
-        for idStr in alarmIds {
-            if let id = UUID(uuidString: idStr) {
-                try? AlarmManager.shared.cancel(id: id)
-            }
-        }
-        if let snapshot = readRoutineSnapshot(),
-           snapshot.routineId == routineId,
-           let currentUuid = UUID(uuidString: snapshot.currentAlarmId) {
-            try? AlarmManager.shared.cancel(id: currentUuid)
-        }
-
-        // v1.7 hotfix #LAUnify Phase 10-G1 — Activity<ShutTimerActivityAttributes> manual end 제거.
-        // AlarmKit framework `.cancel(id:)` API가 자동으로 LA Activity 종료.
-
-        if let defaults = UserDefaults(suiteName: APP_GROUP) {
-            defaults.removeObject(forKey: "\(KEY_ALARM_IDS_PREFIX)\(routineId)")
-        }
-        // v1.6 #4-A — snapshot 정리 (RN polling 대기 없이 위젯 측 즉시 cleanup).
-        clearRoutineSnapshot()
-
+        appendNativeDbg("Intent-DBG-Widget", "StopRoutineIntent.perform routineId=\(routineId) — signal write + 앱 진입 (즉시 종료 X)")
+        // signal write 만 — alarm/snapshot/LA 는 그대로 유지. 앱 active 진입 시 기존 la_control_signal polling →
+        //   ActionDispatcher 'stop' → "루틴 종료" Alert confirm → "종료" 선택 시에만 cleanup.
         writeControlSignal(action: "stop", routineId: routineId)
         return .result()
     }

@@ -6,12 +6,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 
 class AlarmReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val alarmId = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: return
-    Log.w("AlarmkitBridge", "AlarmReceiver fired — alarmId=$alarmId → AlarmService")
+    NativeDebugLog.log(context, "AlarmkitBridge", "AlarmReceiver fired — alarmId=$alarmId → AlarmService")
     val svc = Intent(context, AlarmService::class.java).apply {
       putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
     }
@@ -27,7 +26,7 @@ class AlarmReceiver : BroadcastReceiver() {
     try {
       AlarmScheduler.scheduleNextOccurrenceIfNeeded(context, alarmId)
     } catch (e: Exception) {
-      Log.w("AlarmkitBridge", "scheduleNextOccurrenceIfNeeded fail alarmId=$alarmId err=$e")
+      NativeDebugLog.log(context, "AlarmkitBridge", "scheduleNextOccurrenceIfNeeded fail alarmId=$alarmId err=$e")
     }
   }
 }

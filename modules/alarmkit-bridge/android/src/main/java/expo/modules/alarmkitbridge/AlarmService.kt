@@ -1,4 +1,5 @@
-// 알람 발화 서비스 — foreground service(mediaPlayback). 알람 사운드(STREAM_ALARM)·진동·볼륨 강제 + 전체화면 알림.
+// 알람 발화 서비스 — foreground service(mediaPlayback). 알람 사운드(STREAM_ALARM)·진동 + 전체화면 알림.
+//   2026-05-31: 음량 강제 제거 (= 사용자 STREAM_ALARM 셋팅 그대로).
 package expo.modules.alarmkitbridge
 
 import android.app.Notification
@@ -9,27 +10,19 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.database.ContentObserver
 import android.media.AudioAttributes
-import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.provider.Settings
-import android.util.Log
 
 class AlarmService : Service() {
   private var mediaPlayer: MediaPlayer? = null
   private var vibrator: Vibrator? = null
-  private var priorAlarmVolume: Int = -1
-  private var volumeObserver: ContentObserver? = null
   private var currentAlarmId: String? = null
 
   companion object {
@@ -44,7 +37,7 @@ class AlarmService : Service() {
     val alarmId = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID)
     currentAlarmId = alarmId
     val record = alarmId?.let { AlarmScheduler.get(this, it) }
-    Log.w(TAG, "AlarmService start — alarmId=$alarmId title=${record?.title}")
+    NativeDebugLog.log(this, TAG, "AlarmService start — alarmId=$alarmId title=${record?.title}")
 
     // Phase 2-2: 발화 시점 측 = ongoing chronometer notification 측 제거 (= 알람 측 활성 상태 측 = countdown 측 표시 X).
     if (alarmId != null) {
@@ -58,7 +51,9 @@ class AlarmService : Service() {
       startForeground(NOTIF_ID, notif)
     }
 
-    forceAlarmVolume()
+    // 2026-05-31 — 사용자 STREAM_ALARM 셋팅 그대로 사용 (= max 강제 금지).
+    //   직전: forceAlarmVolume()으로 max 강제 → 사용자 음량 설정 무시.
+    //   정정: 호출 제거. 사용자 셋팅 0이면 못 듣는 것도 사용자 책임 (= Android 표준 + iOS 정합).
     startSound(record?.soundName)
     startVibration()
 
@@ -73,8 +68,7 @@ class AlarmService : Service() {
   override fun onDestroy() {
     stopSound()
     stopVibration()
-    unregisterVolumeObserver()
-    restoreAlarmVolume()
+    // 2026-05-31 — forceAlarmVolume 제거에 따라 volumeObserver/restore도 제거 (= 우리가 음량 변경 안 함).
     currentAlarmId?.let {
       AlarmScheduler.clearAlerting(this)
       AlarmEventBus.emit(it, "removed")
@@ -97,9 +91,16 @@ class AlarmService : Service() {
       nm.createNotificationChannel(channel)
     }
 
-    val launch = (packageManager.getLaunchIntentForPackage(packageName) ?: Intent()).apply {
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-      putExtra("alerting_alarm_id", record?.id)
+    // 2026-05-31 — full-screen-intent 대상 변경: MainActivity → AlarmAlertActivity.
+    //   직전: MainActivity 자동 진입 = RN 앱 전체 로드 = 인앱 진입 (= iPhone 정합 X).
+    //   본 정정: 가벼운 AlarmAlertActivity만 띄움 → 사용자 "끄기" 액션 후 일반 알람=종료, 미션 알람=MainActivity 진입.
+    //   alarmId + endMethod = AlarmAlertActivity에서 사용 (= 라벨 조회 + 미션/일반 분기).
+    val launch = Intent(this, AlarmAlertActivity::class.java).apply {
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+      putExtra(AlarmScheduler.EXTRA_ALARM_ID, record?.id)
+      if (record?.endMethod != null) putExtra("alerting_end_method", record.endMethod)
+      // type 전달 = AlarmAlertActivity 측 routine 'confirm_prompt' 분기 (= endMethod='tap'이어도 MainActivity 진입 필수).
+      if (record?.type != null) putExtra("alerting_type", record.type)
     }
     val pending = PendingIntent.getActivity(
       this, 0, launch,
@@ -140,6 +141,10 @@ class AlarmService : Service() {
 
   // ── 사운드 (알람 스트림 — 무음모드 우회). soundName → res/raw 우리 wav, 없으면 시스템 기본음 ──
   private fun startSound(soundName: String?) {
+    // 2026-06-01 — 2중 재생 회피 = 기존 mediaPlayer release 후 새 instance 시작.
+    //   직전 = stopSound() 호출 없이 mediaPlayer 측 덮어쓰기 → 기존 instance 계속 재생 + 새 instance 추가 = 2중 사운드.
+    //   동시 alarm fire (= 같은 AlarmService onStartCommand 재호출) 측 회귀 차단.
+    stopSound()
     try {
       val uri = resolveSoundUri(soundName)
       mediaPlayer = MediaPlayer().apply {
@@ -155,7 +160,7 @@ class AlarmService : Service() {
         start()
       }
     } catch (e: Exception) {
-      Log.w(TAG, "startSound fail: $e")
+      NativeDebugLog.log(this, TAG, "startSound fail: $e")
     }
   }
 
@@ -165,10 +170,10 @@ class AlarmService : Service() {
       val stem = soundName.substringBeforeLast('.')
       val resId = resources.getIdentifier(stem, "raw", packageName)
       if (resId != 0) {
-        Log.w(TAG, "startSound — res/raw 사용 name=$soundName resId=$resId")
+        NativeDebugLog.log(this, TAG, "startSound — res/raw 사용 name=$soundName resId=$resId")
         return Uri.parse("android.resource://$packageName/$resId")
       }
-      Log.w(TAG, "startSound — res/raw 미발견 name=$soundName → 시스템 기본음 폴백")
+      NativeDebugLog.log(this, TAG, "startSound — res/raw 미발견 name=$soundName → 시스템 기본음 폴백")
     }
     return RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM)
       ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -179,46 +184,20 @@ class AlarmService : Service() {
       try {
         if (it.isPlaying) it.stop()
       } catch (e: Exception) {
-        Log.w(TAG, "stopSound fail: $e")
+        NativeDebugLog.log(this, TAG, "stopSound fail: $e")
       }
       it.release()
     }
     mediaPlayer = null
   }
 
-  // ── 볼륨 초기 설정 (시작 시 max로 설정, 사용자 음량 버튼 조절 허용) ──
-  //   2026-05-31 — iOS 정합. 직전 = ContentObserver로 음량 변경 즉시 max 강제 복원
-  //   → 사용자가 음량 버튼으로 줄여도 1초 안에 max로 돌아감 → 인앱 음량 조절 불가 버그.
-  //   정정 = 시작 시 max만 설정 (= 못 듣는 사고 방지), 그 후 사용자 자유 조절 허용 (= Android 표준).
-  private fun audioManager() = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-  private fun forceAlarmVolume() {
-    val am = audioManager()
-    if (priorAlarmVolume < 0) priorAlarmVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
-    am.setStreamVolume(
-      AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0
-    )
-    // ContentObserver 등록 X — 사용자가 음량 버튼으로 조절 시 변경 즉시 반영 (= iOS 동일).
-  }
-
-  private fun unregisterVolumeObserver() {
-    volumeObserver?.let {
-      try { contentResolver.unregisterContentObserver(it) } catch (e: Exception) {}
-    }
-    volumeObserver = null
-  }
-
-  private fun restoreAlarmVolume() {
-    if (priorAlarmVolume >= 0) {
-      try {
-        audioManager().setStreamVolume(AudioManager.STREAM_ALARM, priorAlarmVolume, 0)
-      } catch (e: Exception) {}
-      priorAlarmVolume = -1
-    }
-  }
+  // ── 볼륨: 우리 앱은 STREAM_ALARM 음량을 변경하지 않음. 사용자 셋팅 그대로 사용 (= Android 표준 + iOS 정합). ──
+  //   2026-05-31 사용자 보고: max 강제 = 사용자 음량 셋팅 무시 회귀. forceAlarmVolume/restoreAlarmVolume/ContentObserver 전부 제거.
 
   // ── 진동 (반복 패턴) ──
   private fun startVibration() {
+    // 2026-06-01 — 2중 진동 회피 = 기존 vibrator cancel 후 새 시작.
+    stopVibration()
     val v = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
       (getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
     } else {
@@ -235,7 +214,7 @@ class AlarmService : Service() {
         v.vibrate(pattern, 0)
       }
     } catch (e: Exception) {
-      Log.w(TAG, "vibrate fail: $e")
+      NativeDebugLog.log(this, TAG, "vibrate fail: $e")
     }
   }
 

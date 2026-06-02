@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 잠금화면 routine 위젯 = iOS Live Activity 컨셉 정합 (= 큰 글자 chronometer + 액션 버튼 단일 카드).
+     Custom RemoteViews = OS notification 카드 측 자체 layout = 글자 크기/배치 자유 설계.
+     bigContentView = expanded 측 (= 잠금화면 + 사용자 알림 펼침 시).
+     색상 = ?android:attr/textColorPrimary 측 = Samsung OneUI + Pixel 양쪽 다크/라이트 모드 자동 정합. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <!-- 제목 (= step 이름 / routine 이름) -->
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:paddingBottom="8dp"
+        tools:text="다음 루틴 02"/>
+
+    <!-- 큰 카운트다운 chronometer (= iOS Live Activity 정중앙 큰 글자 정합).
+         일시정지 시 = visibility=GONE. paused_text 측 정적 잔여 시간 표시. -->
+    <Chronometer
+        android:id="@+id/widget_chronometer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:textSize="56sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp"
+        tools:text="00:42"/>
+
+    <!-- 일시정지 측 정적 잔여 시간 표시 (= chronometer 측 setBase 측 paused 상태 표현 한계 회피).
+         isPaused=false 측 = visibility=GONE. isPaused=true 측 = chronometer GONE + 본 TextView VISIBLE. -->
+    <TextView
+        android:id="@+id/widget_paused_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:textSize="56sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp"
+        android:visibility="gone"
+        tools:text="00:42"
+        tools:visibility="visible"/>
+
+    <!-- 액션 버튼 영역 (= 다음 진행 + 정지) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="4dp">
+
+        <Button
+            android:id="@+id/widget_btn_pause_resume"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            android:fontFamily="sans-serif-medium"
+            tools:text="일시정지"/>
+
+        <Button
+            android:id="@+id/widget_btn_stop"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            android:fontFamily="sans-serif-medium"
+            tools:text="정지"/>
+    </LinearLayout>
+</LinearLayout>

@@ -24,7 +24,12 @@ class ScheduleAlarmParams(
   @Field val countdownTitle: String? = null,
   @Field val stopLabel: String? = null,
   @Field val secondaryLabel: String? = null,
-  @Field val recurrence: Map<String, Any?>? = null
+  @Field val recurrence: Map<String, Any?>? = null,
+  // 2026-05-31 — endMethod 전달 (= iOS 정합 = 미션 알람 잠금 해제 강제).
+  //   'tap' = 일반 알람 (= 잠금 위 표시 가능)
+  //   'shake' | 'camera' | 'math' | 'typing' | 'random' = 미션 알람 (= 잠금 해제 강제)
+  //   null = 기본 'tap' 동작.
+  @Field val endMethod: String? = null
 ) : Record
 
 class AlarmkitBridgeModule : Module() {
@@ -39,6 +44,43 @@ class AlarmkitBridgeModule : Module() {
     OnCreate {
       AlarmEventBus.listener = { alarmId, state ->
         sendEvent("onAlarmStateChange", mapOf("alarmId" to alarmId, "state" to state))
+      }
+      // 2026-05-31 — cold start 정합 (= AlarmAlertActivity 도입 후 필수).
+      //   흐름: AlarmAlertActivity "끄기 → 미션" → SharedPreferences pending_mission_alarm_id 저장 + stopAlarmService + MainActivity launch
+      //         → JS RN 앱 시작 → 본 OnCreate → pending 키 확인 → emit "alerting" → JS 알람 화면 mount.
+      //   주의: stopAlarmService → AlarmService.onDestroy → clearAlerting → getAlertingId null이므로 별도 키 사용.
+      try {
+        val prefs = context.getSharedPreferences(
+          AlarmAlertActivity.PREFS_PENDING,
+          Context.MODE_PRIVATE
+        )
+        val pendingSecondaryId = prefs.getString(AlarmAlertActivity.KEY_PENDING_SECONDARY_ACTION_ID, null)
+        val pendingMissionId = prefs.getString(AlarmAlertActivity.KEY_PENDING_MISSION_ALARM_ID, null)
+        val pendingWidgetStopId = prefs.getString(AlarmAlertActivity.KEY_PENDING_WIDGET_STOP_ALARM_ID, null)
+        if (pendingWidgetStopId != null) {
+          // 2026-06-02 방안 B — 위젯 "정지" → MainActivity 직접 진입 cold start = emit "stop_action" → JS confirm modal.
+          sendEvent("onAlarmStateChange", mapOf("alarmId" to pendingWidgetStopId, "state" to "stop_action"))
+          prefs.edit().remove(AlarmAlertActivity.KEY_PENDING_WIDGET_STOP_ALARM_ID).apply()
+        } else if (pendingSecondaryId != null) {
+          // confirm_prompt "다음 진행" 우선 처리 (= JS dispatch Advance, routine 다음 step).
+          sendEvent("onAlarmStateChange", mapOf("alarmId" to pendingSecondaryId, "state" to "secondary_action"))
+          prefs.edit().remove(AlarmAlertActivity.KEY_PENDING_SECONDARY_ACTION_ID).apply()
+        } else if (pendingMissionId != null) {
+          // 미션 알람 = emit "alerting" → JS AlarmScreen mount.
+          sendEvent("onAlarmStateChange", mapOf("alarmId" to pendingMissionId, "state" to "alerting"))
+          prefs.edit()
+            .remove(AlarmAlertActivity.KEY_PENDING_MISSION_ALARM_ID)
+            .remove(AlarmAlertActivity.KEY_PENDING_END_METHOD)
+            .apply()
+        } else {
+          // 폴백: AlarmAlertActivity 우회 경로(= 외부 trigger 등) 대비 = getAlertingId도 확인.
+          val alertingId = AlarmScheduler.getAlertingId(context)
+          if (alertingId != null) {
+            sendEvent("onAlarmStateChange", mapOf("alarmId" to alertingId, "state" to "alerting"))
+          }
+        }
+      } catch (e: Exception) {
+        // context 미확보 등 silent skip
       }
     }
     OnDestroy {
@@ -78,7 +120,8 @@ class AlarmkitBridgeModule : Module() {
           recurrenceDays = recDays,
           countdownTitle = params.countdownTitle,
           stopLabel = params.stopLabel,
-          secondaryLabel = params.secondaryLabel
+          secondaryLabel = params.secondaryLabel,
+          endMethod = params.endMethod
         )
       )
       id
@@ -134,10 +177,28 @@ class AlarmkitBridgeModule : Module() {
       ts.toDouble()
     }
 
-    // ── iOS App Group 전용 — Android no-op ──
-    Function("writeAppGroupString") { _: String, _: String? -> false }
-    Function("readAppGroupString") { _: String -> null as String? }
-    Function("removeAppGroupKey") { _: String -> false }
+    // 2026-06-01 — iOS App Group UserDefaults 1:1 정합 = Android SharedPreferences 기반 구현.
+    //   JS 측 = native_debug_log_v1 / routine_snapshot / la_control_signal 등 = iOS와 같은 키로 read/write.
+    //   직전 = stub (= 항상 false/null) → JS 측 native 데이터 접근 X.
+    Function("writeAppGroupString") { key: String, value: String? ->
+      val prefs = context.getSharedPreferences(APP_GROUP_PREFS, Context.MODE_PRIVATE)
+      val editor = prefs.edit()
+      if (value != null) editor.putString(key, value) else editor.remove(key)
+      editor.apply()
+      true
+    }
+    Function("readAppGroupString") { key: String ->
+      context.getSharedPreferences(APP_GROUP_PREFS, Context.MODE_PRIVATE).getString(key, null)
+    }
+    Function("removeAppGroupKey") { key: String ->
+      context.getSharedPreferences(APP_GROUP_PREFS, Context.MODE_PRIVATE).edit().remove(key).apply()
+      true
+    }
+  }
+
+  companion object {
+    // iOS App Group 'group.com.shuttimer.app' 정합 = Android SharedPreferences 파일명.
+    private const val APP_GROUP_PREFS = "shuttimer_app_group"
   }
 
   // 권한 상태 — 알림 권한 기준 (정확 알람은 USE_EXACT_ALARM으로 자동 부여).

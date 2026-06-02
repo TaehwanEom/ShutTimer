@@ -12,12 +12,19 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
+import android.widget.RemoteViews
 import java.util.Calendar
 import org.json.JSONArray
 import org.json.JSONObject
 
 object AlarmScheduler {
   const val EXTRA_ALARM_ID = "alarmkit_alarm_id"
+  // 2026-06-02 — 위젯 "정지" → 앱 진입 방식 토글.
+  //   "A" = AlarmAlertActivity launchMainOnly (보이는 창 확보 후 MainActivity launch).
+  //   "B" = MainActivity 직접 launch (= 알림 PendingIntent 1차 hop만 사용 → 2차 startActivity BAL 차단 회피).
+  const val WIDGET_STOP_MODE = "B"
+  const val EXTRA_WIDGET_STOP_ALARM_ID = "widget_stop_alarm_id"
   private const val PREFS_NAME = "alarmkit_bridge_alarms"
   private const val KEY_ALARMS = "alarms"
   private const val KEY_ALERTING = "alerting_id"
@@ -41,7 +48,10 @@ object AlarmScheduler {
     val stopLabel: String?,
     // Phase 3-3: AlarmService 측 FSI notification 측 secondary action button label.
     //   null = secondary 측 표시 X. 비어있지 않은 값 측 = "다음 진행" 측 routine 측 사용.
-    val secondaryLabel: String? = null
+    val secondaryLabel: String? = null,
+    // 2026-05-31 — endMethod (= iOS 정합 = 미션 알람 잠금 해제 강제).
+    //   'tap' / null = 일반 알람. 그 외 = 미션 알람 = MainActivity 측 KeyguardManager 호출.
+    val endMethod: String? = null
   )
 
   // Phase 2-1: 일시정지 상태 알람 — 잔여 시간 + 원본 record 보존. resume 시 = now + remainingMs 측 재예약.
@@ -58,8 +68,10 @@ object AlarmScheduler {
     val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val info = AlarmManager.AlarmClockInfo(record.fireAt, showIntent(context))
     am.setAlarmClock(info, firePendingIntent(context, record.id))
-    // Phase 2-2: timer_main 측 = 잠금화면 측 ongoing chronometer notification 표시.
-    if (record.type == "timer_main") {
+    // 잠금화면 측 ongoing chronometer notification 표시 (= iOS Live Activity 대응).
+    //   timer_main = 단일 타이머. confirm_prompt = routine step 진행 중 잔여 시간 위젯.
+    //   2026-06-01: confirm_prompt 측 추가 (= routine 측 잠금화면 잔여 타이머 위젯 차단 결함 해소).
+    if (record.type == "timer_main" || record.type == "confirm_prompt") {
       startOngoingTimerNotification(context, record)
     }
   }
@@ -94,8 +106,14 @@ object AlarmScheduler {
     am.cancel(firePendingIntent(context, alarmId))
     persistRemove(context, alarmId)
     pausedUpsert(context, PausedAlarm(record, remainingMs, now))
-    // Phase 2-2: pause 시 ongoing chronometer 측 제거 (= resume 시 새 fireAt 측 schedule → ongoing 재시작).
-    stopOngoingTimerNotification(context, alarmId)
+    // 2026-06-02 — iOS LA 정합 = pause 시 위젯 유지 + paused 상태 재렌더링.
+    //   직전 = stopOngoingTimerNotification 호출 → 위젯 사라짐 → 사용자 시각 "일시정지 안 됨" 항의.
+    //   정정 = paused map 등록 후 startOngoingTimerNotification 재호출 = isPaused=true 분기 → chronometer GONE + paused TextView VISIBLE + 버튼 "▶ 플레이" 토글.
+    if (record.type == "timer_main" || record.type == "confirm_prompt") {
+      startOngoingTimerNotification(context, record)
+    } else {
+      stopOngoingTimerNotification(context, alarmId)
+    }
     return now
   }
 
@@ -255,6 +273,7 @@ object AlarmScheduler {
     if (r.countdownTitle != null) put("countdownTitle", r.countdownTitle)
     if (r.stopLabel != null) put("stopLabel", r.stopLabel)
     if (r.secondaryLabel != null) put("secondaryLabel", r.secondaryLabel)
+    if (r.endMethod != null) put("endMethod", r.endMethod)
   }
 
   private fun fromJson(o: JSONObject): AlarmRecord {
@@ -270,7 +289,8 @@ object AlarmScheduler {
       recurrenceDays = (0 until daysArr.length()).map { daysArr.getInt(it) },
       countdownTitle = if (o.has("countdownTitle") && !o.isNull("countdownTitle")) o.getString("countdownTitle") else null,
       stopLabel = if (o.has("stopLabel") && !o.isNull("stopLabel")) o.getString("stopLabel") else null,
-      secondaryLabel = if (o.has("secondaryLabel") && !o.isNull("secondaryLabel")) o.getString("secondaryLabel") else null
+      secondaryLabel = if (o.has("secondaryLabel") && !o.isNull("secondaryLabel")) o.getString("secondaryLabel") else null,
+      endMethod = if (o.has("endMethod") && !o.isNull("endMethod")) o.getString("endMethod") else null
     )
   }
 
@@ -320,11 +340,14 @@ object AlarmScheduler {
    * 사용자 측 = 알림 측 long press 측 = "Hide" 측 = 채널 측 권한 측 = 시스템 측 제어.
    */
   fun startOngoingTimerNotification(context: Context, record: AlarmRecord) {
-    if (record.type != "timer_main") return
+    // 2026-06-01: confirm_prompt (= routine step) 측도 허용 = routine 진행 중 잠금화면 잔여 타이머 위젯 표시.
+    if (record.type != "timer_main" && record.type != "confirm_prompt") return
     val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      // IMPORTANCE_DEFAULT = 잠금화면 측 카드 형태로 표시 강도 높임. 사운드/진동은 setSound(null,null) + enableVibration(false)로 무력화.
+      // (직전 LOW = 잠금화면 측 collapsed 작게만 표시되는 한계 회피 시도)
       val channel = NotificationChannel(
-        ONGOING_CHANNEL_ID, "Timer countdown", NotificationManager.IMPORTANCE_LOW
+        ONGOING_CHANNEL_ID, "Timer countdown", NotificationManager.IMPORTANCE_DEFAULT
       ).apply {
         setSound(null, null)
         enableVibration(false)
@@ -350,18 +373,153 @@ object AlarmScheduler {
     builder
       .setContentTitle(record.title.replace("\n", " "))
       .setSmallIcon(context.applicationInfo.icon)
-      .setCategory(Notification.CATEGORY_STOPWATCH)
+      .setCategory(Notification.CATEGORY_ALARM)
       .setOngoing(true)
       .setAutoCancel(false)
-      .setUsesChronometer(true)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
-      .setShowWhen(true)
-      .setWhen(record.fireAt)
       .setContentIntent(pending)
-    // setChronometerCountDown = API 24+ 측 지원 (= chronometer 측 fireAt 측 향해 카운트다운).
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-      builder.setChronometerCountDown(true)
+    // 잠금화면 측 expanded 형태 우선 표시 강도 높임. 사운드/진동은 채널에서 무력화됨.
+    @Suppress("DEPRECATION")
+    builder.setPriority(Notification.PRIORITY_HIGH)
+
+    // 2026-06-01 — iOS Live Activity 컨셉 정합 = Custom RemoteViews 측 큰 글자 위젯 + 액션 버튼 단일 카드.
+    //   잠금화면 + 알림창 측 = 자체 layout = chronometer 글자 크기 56sp + 액션 버튼 동일 카드.
+    //   ProgressStyle / setRequestPromotedOngoing / setShortCriticalText 측 = customContentView 측과 호환 X → 제거.
+    //   confirm_prompt = "다음 진행" + "정지" 버튼. timer_main = "정지"만.
+    val advanceLabel = record.secondaryLabel
+    // 모달 측 stopLabel = "확인" (= step 완료 confirm 의미, AlarmAlertActivity 측). 잠금화면 위젯 측 = iOS LA StopRoutineIntent 정합 = "정지".
+    //   record.stopLabel 값이 "확인"인 경우 = ko 측 routine.confirmPromptStop / routine.prealertStop = 위젯 측만 "정지" 변환.
+    //   그 외 locale (en="OK" / ja="OK" / zh="确定") = stopLabel 값 그대로 (= 다국어 회귀 X).
+    val modalStopLabel = record.stopLabel?.takeIf { it.isNotBlank() } ?: "정지"
+    val widgetStopLabel = if (modalStopLabel == "확인") "정지" else modalStopLabel
+    val titleText = record.title.replace("\n", " ")
+    // Chronometer.setBase 측 = SystemClock.elapsedRealtime() 기준 시각 (= System.currentTimeMillis() 측 아님).
+    //   잔여 ms = fireAt - now → elapsedRealtime + 잔여 ms = chronometer base.
+    val nowMs = System.currentTimeMillis()
+    val remainingMs = (record.fireAt - nowMs).coerceAtLeast(0L)
+    val chronoBase = SystemClock.elapsedRealtime() + remainingMs
+
+    val advancePending = if (!advanceLabel.isNullOrBlank()) {
+      val advanceIntent = Intent(context, AlarmActionReceiver::class.java).apply {
+        action = AlarmActionReceiver.ACTION_SECONDARY
+        putExtra(EXTRA_ALARM_ID, record.id)
+      }
+      PendingIntent.getBroadcast(
+        context, record.id.hashCode() xor 0x100,
+        advanceIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+      )
+    } else null
+
+    // 2026-06-02 — Android 12+ background activity launch 제한 우회.
+    //   직전 = PendingIntent.getBroadcast → AlarmActionReceiver.handleStop → startActivity → OS 차단 (앱 진입 X + 모달 X).
+    //   정정 = PendingIntent.getActivity → AlarmAlertActivity launchMainOnly mode 직접 launch (= 사용자 탭 trigger 측 정합 = OS 허용).
+    //   AlarmAlertActivity.onCreate launchMainOnly 분기 측 = AlarmEventBus.emit("stop_action") + Keyguard dismiss + MainActivity launch + finish.
+    val stopPending = if (WIDGET_STOP_MODE == "B") {
+      // 방안 B — MainActivity 직접 launch. 알림 PendingIntent 1차 hop만 사용 = 2차 startActivity BAL 차단 회피.
+      //   MainActivity 측 = widget_stop extra 감지 → KeyguardManager dismiss + (JS alive emit / JS dead pending-key write).
+      val mainIntent = Intent().apply {
+        setClassName(context, "com.shuttimer.app.MainActivity")
+        action = "expo.modules.alarmkitbridge.WIDGET_STOP_LAUNCH"  // unique action = PendingIntent 캐시 충돌 회피
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        putExtra(EXTRA_WIDGET_STOP_ALARM_ID, record.id)
+      }
+      PendingIntent.getActivity(
+        context, record.id.hashCode() xor 0x200,
+        mainIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+      )
+    } else {
+      // 방안 A — AlarmAlertActivity launchMainOnly mode (보이는 창 확보 후 MainActivity launch).
+      val stopIntent = Intent(context, AlarmAlertActivity::class.java).apply {
+        action = "expo.modules.alarmkitbridge.WIDGET_STOP_LAUNCH"  // unique action = PendingIntent 캐시 충돌 회피
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        putExtra(EXTRA_ALARM_ID, record.id)
+        putExtra(AlarmAlertActivity.EXTRA_LAUNCH_MAIN_ONLY, true)
+      }
+      PendingIntent.getActivity(
+        context, record.id.hashCode() xor 0x200,
+        stopIntent,
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+      )
     }
+
+    // iOS LA PauseRoutineIntent / ResumeRoutineIntent 정합 = isPaused 토글.
+    val pausedEntry = pausedGet(context, record.id)
+    val isPaused = pausedEntry != null
+    val pauseResumeAction = if (isPaused) AlarmActionReceiver.ACTION_RESUME else AlarmActionReceiver.ACTION_PAUSE
+    val pauseResumeLabel = if (isPaused) "▶ 플레이" else "❚❚ 일시정지"
+    // paused 측 정적 잔여 시간 텍스트 (= chronometer 측 setBase 측 paused 상태 표현 한계 회피).
+    //   pausedEntry.remainingMs 측 = pauseAlarm 측 계산된 잔여 ms (= alarm cancel 시점 기준).
+    val pausedRemainingText = if (isPaused) {
+      val totalSec = ((pausedEntry?.remainingMs ?: 0L) / 1000L).coerceAtLeast(0L)
+      val mm = totalSec / 60L
+      val ss = totalSec % 60L
+      String.format("%02d:%02d", mm, ss)
+    } else ""
+    val pauseResumeIntent = Intent(context, AlarmActionReceiver::class.java).apply {
+      action = pauseResumeAction
+      putExtra(EXTRA_ALARM_ID, record.id)
+    }
+    val pauseResumePending = PendingIntent.getBroadcast(
+      context, record.id.hashCode() xor 0x300,
+      pauseResumeIntent,
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    )
+
+    fun buildExpandedRemoteViews(): RemoteViews {
+      // iOS Live Activity 정합 = routine step 카운트다운 중 위젯 = "정지" + "일시정지/플레이" toggle (= 2개 버튼).
+      // "다음 진행"은 step 알람 fire 시점 AlarmAlertActivity 측에서만 가능 (= 위젯 측 노출 X).
+      val rv = RemoteViews(context.packageName, R.layout.notification_routine_widget)
+      rv.setTextViewText(R.id.widget_title, titleText)
+      if (isPaused) {
+        // paused 측 = chronometer 측 setBase 측 elapsedRealtime 기준 측 = 멈춤 불가 → GONE 후 정적 TextView 표시.
+        rv.setViewVisibility(R.id.widget_chronometer, android.view.View.GONE)
+        rv.setViewVisibility(R.id.widget_paused_text, android.view.View.VISIBLE)
+        rv.setTextViewText(R.id.widget_paused_text, pausedRemainingText)
+      } else {
+        rv.setViewVisibility(R.id.widget_chronometer, android.view.View.VISIBLE)
+        rv.setViewVisibility(R.id.widget_paused_text, android.view.View.GONE)
+        rv.setChronometer(R.id.widget_chronometer, chronoBase, null, true)
+        rv.setChronometerCountDown(R.id.widget_chronometer, true)
+      }
+      // 일시정지/플레이 toggle (= iOS LA AlarmKitPauseResumeButton 정합)
+      rv.setTextViewText(R.id.widget_btn_pause_resume, pauseResumeLabel)
+      rv.setOnClickPendingIntent(R.id.widget_btn_pause_resume, pauseResumePending)
+      rv.setViewVisibility(R.id.widget_btn_pause_resume, android.view.View.VISIBLE)
+      // 정지 (= iOS LA StopRoutineIntent 정합 = widgetStopLabel 측 "정지" 변환).
+      rv.setTextViewText(R.id.widget_btn_stop, widgetStopLabel)
+      rv.setOnClickPendingIntent(R.id.widget_btn_stop, stopPending)
+      return rv
+    }
+
+    fun buildCollapsedRemoteViews(): RemoteViews {
+      // 잠금화면 기본 표시 (= OS 높이 제한 ~48dp). 제목 + 카운트다운만 가로 배치.
+      val rv = RemoteViews(context.packageName, R.layout.notification_routine_widget_collapsed)
+      rv.setTextViewText(R.id.widget_title, titleText)
+      if (isPaused) {
+        rv.setViewVisibility(R.id.widget_chronometer, android.view.View.GONE)
+        rv.setViewVisibility(R.id.widget_paused_text, android.view.View.VISIBLE)
+        rv.setTextViewText(R.id.widget_paused_text, pausedRemainingText)
+      } else {
+        rv.setViewVisibility(R.id.widget_chronometer, android.view.View.VISIBLE)
+        rv.setViewVisibility(R.id.widget_paused_text, android.view.View.GONE)
+        rv.setChronometer(R.id.widget_chronometer, chronoBase, null, true)
+        rv.setChronometerCountDown(R.id.widget_chronometer, true)
+      }
+      return rv
+    }
+
+    builder.setCustomContentView(buildCollapsedRemoteViews())
+    builder.setCustomBigContentView(buildExpandedRemoteViews())
+    // heads-up popup 측에도 expanded view 적용 (= priority HIGH 시 OneUI 측 펼친 상태가 heads-up view로 처리되는 경로 차단).
+    builder.setCustomHeadsUpContentView(buildExpandedRemoteViews())
+    builder.style = Notification.DecoratedCustomViewStyle()
+
+    // 2026-06-02 — addAction fallback 제거 (= iOS LA 정합 = 위젯 카드 안 버튼 1개만).
+    //   직전 = customView 측 "정지" + addAction 측 "확인" 라벨 = 카드 안 + 카드 아래 = 확인/정지 버튼 2개 노출 = 사용자 항의.
+    //   정정 = customView 측 widgetStopLabel "정지" 1개만 노출. customView 미지원 디바이스 = OS 측 자동 폴백 표시.
+
     nm.notify(ongoingNotifId(record.id), builder.build())
   }
 

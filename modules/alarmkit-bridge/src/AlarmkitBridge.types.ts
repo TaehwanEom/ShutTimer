@@ -81,7 +81,9 @@ export type ScheduleAlarmParams = {
 export type AlarmStateChangeEvent = {
   alarmId: string;
   // Phase 3-3 (2026-05-26, Android): 'secondary_action' 추가 — FSI notification 측 secondary button (= "다음 진행") 측 사용자 탭 → AlarmActionReceiver 측 emit.
-  state: AlarmKitAlarmState | 'removed' | 'secondary_action';
+  // 2026-06-01 (Android): 'stop_action' 추가 — 잠금화면 ongoing chronometer notification 측 "정지" 버튼 사용자 탭 → AlarmActionReceiver ACTION_STOP broadcast → emit. routine 종료 정합.
+  // 2026-06-02 (Android): 'pause_action' / 'resume_action' 추가 — iOS LA PauseRoutineIntent / ResumeRoutineIntent 정합. 잠금화면 위젯 일시정지/플레이 toggle 측 사용자 탭 → AlarmActionReceiver ACTION_PAUSE / ACTION_RESUME broadcast → emit.
+  state: AlarmKitAlarmState | 'removed' | 'secondary_action' | 'stop_action' | 'pause_action' | 'resume_action';
   preAlertSeconds?: number;
   fixedFireMs?: number;
   relativeHour?: number;

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 잠금화면 collapsed view = OS 측 높이 제한 (~48dp) 안에 표시.
+     가로 배치: 제목 (왼쪽, 1줄 ellipsize) + chronometer (오른쪽, 작은 글자).
+     사용자가 펼치면 notification_routine_widget.xml (expanded) 측 전환. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:paddingEnd="12dp"
+        tools:text="다음 루틴 02"/>
+
+    <Chronometer
+        android:id="@+id/widget_chronometer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        tools:text="00:42"/>
+
+    <!-- 일시정지 측 정적 잔여 시간 표시 (= expanded view 측 정합) -->
+    <TextView
+        android:id="@+id/widget_paused_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="18sp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:fontFamily="sans-serif-medium"
+        android:visibility="gone"
+        tools:text="00:42"
+        tools:visibility="visible"/>
+</LinearLayout>

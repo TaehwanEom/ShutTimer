@@ -5,13 +5,12 @@ package expo.modules.alarmkitbridge
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 
 class BootReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
     // BOOT_COMPLETED 만 처리 (Phase 1 — 잠금 해제 전 direct boot 단계는 Phase 3).
     if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
     val restored = AlarmScheduler.rescheduleAllFromBoot(context)
-    Log.w("AlarmkitBridge", "BootReceiver — BOOT_COMPLETED restored=$restored alarms")
+    NativeDebugLog.log(context, "AlarmkitBridge", "BootReceiver — BOOT_COMPLETED restored=$restored alarms")
   }
 }

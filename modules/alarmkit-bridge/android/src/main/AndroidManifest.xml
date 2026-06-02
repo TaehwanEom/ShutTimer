@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Android 16+ Live Updates (Notification.ProgressStyle) 측 promoted ongoing notification 권한.
+         routine 진행 중 잠금화면 정중앙 promoted 표시 (= iOS Live Activity 가장 가까운 형태). -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
@@ -33,11 +36,23 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
         </receiver>
-        <!-- 전체화면 알람용 — 앱 MainActivity가 잠금화면 위에 뜨도록 속성 병합. -->
+        <!-- 전체화면 알람용 — 앱 MainActivity가 잠금화면 위에 뜨도록 속성 병합.
+             2026-05-31: AlarmAlertActivity 도입 후에도 미션 알람 끄기 시 MainActivity 진입에 잠금 위 표시 필요. -->
         <activity
             android:name="com.shuttimer.app.MainActivity"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             tools:node="merge"/>
+        <!-- 알람 발화 전용 Activity — 잠금/홈 위 가벼운 화면. 사용자 "끄기" 누름 후 MainActivity 진입.
+             theme = Translucent.NoTitleBar → dim 배경 + 흰 카드 sheet 형태 (= ShutTimer 표준 모달 정합). -->
+        <activity
+            android:name="expo.modules.alarmkitbridge.AlarmAlertActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
     </application>
 </manifest>

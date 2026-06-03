@@ -2,7 +2,7 @@ import './src/i18n';
 import { useTranslation } from 'react-i18next';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import React, { useRef, useEffect, useCallback } from 'react';
-import { AppState, Platform, DeviceEventEmitter, View, Text } from 'react-native';
+import { AppState, Platform, DeviceEventEmitter, View, Text, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -361,6 +361,98 @@ function AppNavigator() {
         await deleteAlarmMetadata(event.alarmId).catch(() => {});
         return;
       }
+      // 2026-06-01 (Android): 잠금화면 ongoing chronometer notification 측 "정지" 버튼 = AlarmActionReceiver ACTION_STOP broadcast 측 emit.
+      // 2026-06-02 사용자 항의 fix — 위젯 "정지" 즉시 누름 = 위젯 사라짐 = 실수 클릭 측 routine 종료 회귀.
+      //   native 측 cancel/stopService 호출 제거 (= 위젯 + alarm 유지) + AlarmAlertActivity launchMainOnly → MainActivity 진입.
+      //   JS 측 = Alert.alert 표시 ("종료하시겠습니까?" / [취소, 종료]).
+      //   "종료" 선택 시 = stopRoutine + dispatch Stop → reducer effect → cancelAlarm + stopService 측 정리.
+      //   "취소" 선택 시 = modal 닫기 + routine + 위젯 그대로.
+      // 2026-06-03 fix(#LastStepNoConfirm) — 마지막 단계 "루틴 완료" = 확인 모달 없이 바로 종료.
+      //   위젯 정지(stop_action=확인 모달+일시정지)와 구분. 네이티브 ACTION_STOP(isLastStep)이 routine_complete로 분리 emit.
+      if (event.state === 'routine_complete') {
+        // 2026-06-03 fix(#LastStepEndMission) — 마지막 단계 = 설정된 종료 미션(AlarmScreen) 표시 (바로 종료/확인 모달 X).
+        //   직전 fix가 바로 Stop → "종료 미션 안나옴" 회귀. 정정: routine endMethod로 AlarmScreen navigate (lastStep 분기 정합).
+        //   종료 미션 완료 시 AlarmScreen 측이 routine 종료 처리.
+        const cMeta = await loadAlarmMetadata(event.alarmId).catch(() => null);
+        const routineId = cMeta?.entityId;
+        const routines = await loadRoutines().catch(() => [] as any[]);
+        const r = routineId ? routines.find((x: any) => x.id === routineId) : null;
+        const endMethod = r?.endMethod ?? getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod;
+        Logger.warn('onAlarmStateChange-DBG', `routine_complete alarmId=${event.alarmId} routineId=${routineId ?? 'NULL'} endMethod=${endMethod} → 종료 미션 navigate`);
+        DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, {
+          target: 'Alarm',
+          fromRoutine: 'last_step',
+          routineId,
+          endMethod,
+        });
+        return;
+      }
+      if (event.state === 'stop_action') {
+        const stopMeta = await loadAlarmMetadata(event.alarmId).catch(() => null);
+        Logger.warn('onAlarmStateChange-DBG', `stop_action alarmId=${event.alarmId} meta=${stopMeta ? `${stopMeta.type}/${stopMeta.entityId}` : 'NULL'} — confirm modal 표시 대기`);
+        // 2026-06-02 — Alert.alert 측 AppState=active 측만 표시 (RN 한계).
+        //   AlarmAlertActivity → MainActivity launch transition 시점 = AppState=background → Alert 호출 X.
+        //   AppState change listener 측 active 측 transition 측 = Alert 표시 (= MainActivity foreground 측 직후).
+        // 2026-06-02 fix(#StopPauseDuringConfirm) — 위젯 정지 시 = 종료 확인 동안 루틴 일시정지 (= 진행 차단 + stale 팝업 방지).
+        //   문제: 정지가 팝업만 띄우고 루틴은 계속 진행 → 팝업 떠 있는데 다음 단계로 넘어가 팝업 stale.
+        //   정정: 즉시 Pause. source 미지정 = PauseAlarmNative effect 생성 → 네이티브 알람 취소 (실제 정지).
+        //     주의: source='la' 금지 — pause_action과 달리 stop 경로는 네이티브가 알람을 안 멈췄으므로 JS가 멈춰야 함.
+        //   취소/팝업 닫힘 = Resume (재개). 종료 = stopRoutine + Stop. Resume은 PAUSED 외엔 no-op이라 중복 안전.
+        await sessionDispatch({ type: 'Pause', timestamp: Date.now() }).catch(() => {});
+        const resumeRoutine = () => {
+          sessionDispatch({ type: 'Resume', timestamp: Date.now() }).catch(() => {});
+        };
+        const showConfirm = () => {
+          Alert.alert(
+            '루틴 종료',
+            '진행 중인 루틴을 종료하시겠습니까?',
+            [
+              { text: '취소', style: 'cancel', onPress: () => { resumeRoutine(); } },
+              {
+                text: '종료',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await stopRoutine();
+                  } finally {
+                    if (stopMeta?.entityId) {
+                      DeviceEventEmitter.emit('routineClearedExternally', { routineId: stopMeta.entityId });
+                    }
+                  }
+                  await sessionDispatch({ type: 'Stop', reason: 'la_widget' }).catch(() => {});
+                  await deleteAlarmMetadata(event.alarmId).catch(() => {});
+                },
+              },
+            ],
+            { cancelable: true, onDismiss: () => { resumeRoutine(); } }
+          );
+        };
+        if (AppState.currentState === 'active') {
+          showConfirm();
+        } else {
+          Logger.warn('onAlarmStateChange-DBG', `stop_action — AppState=${AppState.currentState}, AppState=active 대기 후 Alert`);
+          const sub = AppState.addEventListener('change', (nextState) => {
+            if (nextState === 'active') {
+              sub.remove();
+              setTimeout(showConfirm, 200);  // foreground transition 직후 Alert mount 안정화
+            }
+          });
+        }
+        return;
+      }
+      // 2026-06-02 (Android): iOS LA PauseRoutineIntent / ResumeRoutineIntent 정합.
+      //   잠금화면 위젯 측 일시정지/플레이 toggle = AlarmActionReceiver ACTION_PAUSE / ACTION_RESUME broadcast → emit.
+      //   dispatchPause / dispatchResume = SessionController 측 routine state paused 토글.
+      if (event.state === 'pause_action' || event.state === 'resume_action') {
+        const ts = Date.now();
+        Logger.warn('onAlarmStateChange-DBG', `${event.state} alarmId=${event.alarmId} timestamp=${ts}`);
+        if (event.state === 'pause_action') {
+          await sessionDispatch({ type: 'Pause', timestamp: ts, source: 'la' as any }).catch(() => {});
+        } else {
+          await sessionDispatch({ type: 'Resume', timestamp: ts, source: 'la' as any }).catch(() => {});
+        }
+        return;
+      }
       if (event.state !== 'alerting') return;
       // v1.9 #ListenerCancelOrder — cancelAlarm 호출 측 = meta lookup 후로 이동.
       //   직전 = state==='alerting' 즉시 cancelAlarm → AlarmScreen 측 startAlarmAudio 측 race 가능 + meta type 측 무관 cancel.
@@ -410,6 +502,14 @@ function AppNavigator() {
         }).catch(() => ({ ghost: false }));
         if (fireResult.ghost) return;
       }
+      // 2026-06-03 fix(#FireNavToTab) — 알람/루틴 발화 시 = 발화 항목의 탭으로 이동 (어느 탭에 있든 보편 규칙).
+      //   루틴 스텝(confirm_prompt): ad-hoc 알람 루틴 → AlarmTab / 저장 루틴 → RoutineTab.
+      //   (alarm_main / timer_main 은 아래 AlarmScreen navigate + goHome 측에서 각자 탭 복귀 처리됨.)
+      if (meta.type === 'confirm_prompt') {
+        const fireTab = isAdhocAlarmRoutine(meta.entityId) ? 'AlarmTab' : 'RoutineTab';
+        Logger.warn('onAlarmStateChange-DBG', `confirm_prompt fire → navigate ${fireTab} entityId=${meta.entityId}`);
+        DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, { target: fireTab });
+      }
       // 옵션 4 fix + Sub A-3 (2026-05-25) — alarm_main + timer_main 둘 다 포그라운드 + AppState='active' 시 SESSION_EVENT_NAVIGATE Alarm emit.
       //   원인: suppressFlag 가드 (line 332-337) 가 포그라운드 알람 즉시 cancel → native UI X. 위반-11 fix 후 NavigateAlarmScreen effect 제거 → in-app mount path X.
       //   옵션 2 fix (transition OnAppActive)는 background→active transition만 trigger. 이미 active 상태에서 fire = transition 없음 → 무작동.
@@ -422,7 +522,6 @@ function AppNavigator() {
         });
       }
       if (!navigationRef.current?.isReady()) return;
-      const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
 
       // v1.6 Phase 12 — 'chain' 분기 제거 (옵션 A 폐기). 잔존 mapping silent cleanup 만.
       if (meta.type === 'chain') {
@@ -478,43 +577,10 @@ function AppNavigator() {
         return;
       }
 
-      if (meta.type === 'confirm_prompt') {
-        // v1.7 hotfix #LAUnify Phase 10-G1 — setLiveActivityStage 호출 제거.
-        // AlarmKit alerting state → AlarmKitLiveActivity widget mode=.alert 자동 진입 → "다음 진행" 버튼 표시.
-        Logger.warn('onAlarmStateChange', `confirm_prompt route=${currentRoute} entityId=${meta.entityId}`);
-        // v2.0 P2-3 — markAwaitingConfirm 호출 폐기 (dual SoT 해소).
-        //   transition OnAlarmFire confirm_prompt 측 effect (SaveActiveRoutine + EmitEvent 'routineAwaitingConfirmExternally') 가 통합 처리.
-        // 옵션 A fix (정식 사이클 §3-B 7번, 2026-05-25 사용자 요구) — lastStep confirm_prompt fire 자동 navigate 제거.
-        //   옛 동작: 마지막 step alarm fire 시 자동 navigate AlarmScreen (= 사용자 입력 X) → 종료방식 화면 자동 진입.
-        //   정식 사이클 §3-B 7번: "마지막 루틴 후 사용자 행위 → 종료방식 스크린". 사용자 입력 trigger 필수.
-        //   정정: confirm_prompt fire 시점 자동 navigate X. 사용자 잠금 해제 (= OpenAppDismissIntent perform) 시점에 종료방식 진입.
-        //   진입 trigger 위치: ActionDispatcher.onLAControlSignal('open_app_dismiss') lastStep 분기 (A-2 fix).
-        // v1.7 Phase 2-B — ad-hoc 알람 routine 측 = AlarmTab (MainTabsNavigator 안 = tab bar 보존). 루틴 탭 진입 ❌.
-        const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
-        if (currentRoute === 'RoutineAlarm' || (currentRoute as string) === 'RoutineTab' || currentRoute === 'Alarm' || (currentRoute as string) === 'AlarmTab') return;
-        const routines = await loadRoutines();
-        const r = routines.find(x => x.id === meta.entityId);
-        if (!r) {
-          if (isAdhoc) {
-            navigationRef.current?.reset({
-              index: 0,
-              routes: [{ name: 'Home', state: { routes: [{ name: 'AlarmTab' }] } }],
-            });
-          } else {
-            Logger.warn('NAV-DBG', `reset target=RoutineTab source=onAlarmStateChange/confirm_prompt-noRoutine currentRoute=${currentRoute}`);
-            navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', state: { routes: [{ name: 'RoutineTab' }] } }] } as any);
-          }
-          return;
-        }
-        if (!navigationRef.current?.isReady()) return;
-        // v1.6 A-1 — 모달 통일. 일반 routine = RoutineList. (v1.7 Phase 2-B — ad-hoc = AlarmTab nested)
-        if (isAdhoc) {
-          (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
-        } else {
-          Logger.warn('NAV-DBG', `navigate target=RoutineTab source=onAlarmStateChange/confirm_prompt-routine currentRoute=${currentRoute}`);
-          (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
-        }
-      }
+      // 2026-06-03 (#FireNavToTab) — 옛 confirm_prompt navigate 블록 제거.
+      //   위 #FireNavToTab emit(SESSION_EVENT_NAVIGATE {target:fireTab})가 발화 시 탭 이동을 전담.
+      //   옛 블록은 RoutineTab/AlarmTab guard 때문에 "다른 탭에서 루틴 알람 울려도 이동 안 됨" 버그 + 신규 emit과 중복 navigate(ad-hoc 시 reset) 원인이라 제거.
+      //   (LA "다음 진행" 버튼은 AlarmKit alerting state가 자동 표시 — navigate와 무관.)
     });
     return () => sub.remove();
   }, []);

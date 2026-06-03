@@ -196,14 +196,29 @@ object AlarmScheduler {
     val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val survivors = mutableListOf<AlarmRecord>()
     for (record in readAll(context)) {
-      if (record.fireAt > now) {
-        am.setAlarmClock(
-          AlarmManager.AlarmClockInfo(record.fireAt, showIntent(context)),
-          firePendingIntent(context, record.id)
-        )
-        survivors.add(record)
+      var rec = record
+      // 2026-06-03 fix(#DailyAlarmBootRevive) — 반복 알람(daily/weekly)의 발화 시각이 재부팅 다운타임 중 지나간 경우,
+      //   버리지 말고 다음 미래 발생 시각으로 굴려서 유지. (= 데일리 알람의 반복 심장 chain[0] 보존)
+      //   직전: fireAt <= now 면 무조건 영속에서 삭제 → 폰이 알람 시각에 꺼져 있다 재부팅하면 데일리 알람 영구 소실
+      //         (복구는 syncAllAlarms = cold start 한정이라, 앱을 며칠 안 켜면 토글 ON인데 영영 안 울림).
+      //   iOS는 AlarmKit가 OS 차원에서 재부팅을 넘겨 반복을 유지하므로, 본 정정으로 Android 동작을 iOS 표준에 맞춤.
+      //   안전체인(chainIndex 1+, recurrenceMode='never')은 단발 백업이므로 기존대로 과거 건 폐기.
+      if (rec.fireAt <= now && rec.recurrenceMode != "never") {
+        var guard = 0
+        while (rec.fireAt <= now && guard < 1000) {
+          val next = computeNextOccurrence(rec) ?: break
+          rec = rec.copy(fireAt = next)
+          guard++
+        }
       }
-      // fireAt <= now = 다운타임 중 놓친 알람 → 재등록 안 함 (survivors 제외 = 영속 정리).
+      if (rec.fireAt > now) {
+        am.setAlarmClock(
+          AlarmManager.AlarmClockInfo(rec.fireAt, showIntent(context)),
+          firePendingIntent(context, rec.id)
+        )
+        survivors.add(rec)
+      }
+      // fireAt <= now 이면서 비반복(once) = 다운타임 중 놓친 일회성 → 재등록 안 함 (survivors 제외 = 영속 정리).
     }
     writeAll(context, survivors)
     clearAlerting(context)  // 재부팅 = 발화 중인 알람 없음.

@@ -443,6 +443,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
     //   사용자 "밀어서 종료" 의도 측 Session=null + AlarmScreen 잔존 + 사용자 또 진입 시 자동 routine 시작 회귀 차단.
     const currentSession = await getCurrentSession();
     const alarmEntityId = (route.params as { alarmEntityId?: string } | undefined)?.alarmEntityId;
+    let routineStartedFromAlarm = false;
     if (alarmEntityId) {
       try {
         const alarms = await loadAlarms();
@@ -453,6 +454,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
           //   위반-1 fix 후 (handleAfterAd 측 confirmAndAdvance 제거): schedule X → ad-hoc routine fail 시 다음 step 진행 X (멈춤 회귀).
           //   정정: pendingResult 무관 startRoutineFromAlarm 호출. §5 "fail/success 무관 다음 단계 진행" 정합.
           await startRoutineFromAlarm(a).catch(() => {});
+          routineStartedFromAlarm = true;  // 2026-06-03 — 알람 내 루틴 시작됨 → 진행 중 루틴 화면으로 이동
         } else if (a && a.steps && a.steps.length > 0 && !currentSession) {
           // R-7 fix — Session=null + alarm.steps 측 자동 시작 차단. navigate AlarmTab만.
           Logger.warn('AlarmScreen-R7', `goHome Session=null + alarm.steps=${a.steps.length} → 자동 ad-hoc routine 시작 차단 (사용자 stop 의도 정합)`);
@@ -474,8 +476,9 @@ export default function AlarmScreen({ navigation, route }: Props) {
       if (sessNow && (sessNow.kind === 'timer' || sessNow.kind === 'simple_alarm')) {
         await sessionDispatch({ type: 'Stop', reason: 'user_button' }).catch(() => {});
       }
-      // v1.8 #BannerTapPrematureUnmount — goHome alarmEntityId 분기 진입 추적용 (silent reset → AlarmScreen 즉시 unmount 원인 추적).
-      Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset AlarmTab alarmEntityId=${alarmEntityId} dismissMethod=${dismissMethod}`);
+      // 2026-06-03 — 알람 내부 루틴(ad-hoc)은 AlarmTab의 그 알람 카드에 진행 루틴이 표시됨 → AlarmTab 복귀 = "진행 루틴으로 이동".
+      //   (직전 fix②가 RoutineTab으로 보냈으나 RoutineTab엔 ad-hoc 루틴 미표시 → 회귀. AlarmTab으로 복원.)
+      Logger.warn('NAV-DBG-COLD', `AlarmScreen-goHome reset AlarmTab alarmEntityId=${alarmEntityId} routineStarted=${routineStartedFromAlarm} dismissMethod=${dismissMethod}`);
       navigation.reset({
         index: 0,
         routes: [{
@@ -722,9 +725,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const startAlarmAudio = () => {
       if (audioStarted) return;
       audioStarted = true;
-      // v1.8 #AndroidNativeSound — 안드로이드는 네이티브 AlarmService가 사운드를 단일 재생함.
-      //   앱 자체 사운드(expo-av)는 안 냄 → 겹침/작은음 회피. iOS는 기존대로 (포그라운드 = 앱 사운드).
-      if (Platform.OS === 'android') return;
+      // v1.8 #AndroidNativeSound — 안드로이드는 네이티브 AlarmService가 사운드를 단일 재생함 (울림 단계).
+      //   2026-06-03 fix(#MissionSoundAndroid, 회귀 복원) — 끄기 후 미션 단계(endMethod≠tap)는 네이티브 사운드가
+      //   이미 멈춘 상태(handleStop→stopAlarmService) → in-app 사운드를 내야 미션 중 무음 회귀가 해소됨.
+      //   AudioFirstThenStop 패턴(재생 직후 native stop)이 겹침 처리. 단순(tap) 알람만 in-app skip (네이티브 단일 유지).
+      if (Platform.OS === 'android' && dismissMethod === 'tap') return;
       Promise.all([
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
         AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),

@@ -255,6 +255,7 @@
       ],
       "./plugins/withInfoPlistLocalizations.js",
       "./plugins/withWidgetAppIntentsMetadata.js",
+      "./plugins/withMainActivityWidgetStop.js",
       "@react-native-community/datetimepicker",
       "@bacons/apple-targets",
       "expo-audio"

@@ -526,6 +526,8 @@ export default function AlarmListScreen({ navigation }: Props) {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   // v1.7 Phase 2-B — activeRoutine 측 ad-hoc 알람 routine 인 경우 = 본 화면 측 펼침 영역 안 ActiveRoutineSection 마운트.
   const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
+  // 2026-06-03 (#FireNavToTab) — 진행 중 ad-hoc 루틴 카드로 화면 자동 스크롤용 리스트 ref.
+  const listRef = useRef<FlatList<Alarm>>(null);
   const supported = isAlarmKitSupported();
 
   const reload = useCallback(async () => {
@@ -573,6 +575,20 @@ export default function AlarmListScreen({ navigation }: Props) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [activeRoutine?.routineId]);
+
+  // 2026-06-03 (#FireNavToTab) — 진행 중 ad-hoc 루틴이 있으면 그 알람 카드로 자동 스크롤.
+  //   #2(다른 탭→AlarmTab 이동) 후, 활성 알람이 목록 아래쪽이면 화면 밖이라 안 보임 →
+  //   진행 중 루틴 카드를 화면 상단으로 맞춰 사용자가 바로 보게 함. (카드 펼침은 AlarmRow autoExpand가 별도 처리)
+  useEffect(() => {
+    const rid = activeRoutine?.routineId;
+    if (!rid || !isAdhocAlarmRoutine(rid)) return;
+    const idx = alarms.findIndex(a => createAlarmAdhocRoutineId(a.id) === rid);
+    if (idx < 0) return;
+    const tid = setTimeout(() => {
+      try { listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0 }); } catch {}
+    }, 350);
+    return () => clearTimeout(tid);
+  }, [activeRoutine?.routineId, alarms]);
 
   // v1.7 Phase 2-B — ActiveRoutineSection onClose — useCallback stable. 부모 리렌더마다 새 inline arrow 회피.
   const handleActiveRoutineClose = useCallback(() => {
@@ -692,9 +708,15 @@ export default function AlarmListScreen({ navigation }: Props) {
       </View>
 
       <FlatList
+        ref={listRef}
         data={alarms}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            try { listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0 }); } catch {}
+          }, 300);
+        }}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <MaterialIcons name="alarm-off" size={48} color={colors.secondary} />

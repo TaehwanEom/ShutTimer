@@ -874,6 +874,34 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     return () => clearTimeout(timer);
   }, [activeRoutine?.routineId, routines, activeTab]);
 
+  // 2026-06-03 (#FireNavToTab) — 다른 탭→RoutineTab 진입(포커스) 시 진행 중 저장 루틴 카드로 스크롤.
+  //   위 effect(routineId당 1회 autoFocusedRef 가드)는 이미 본 루틴으로 재진입 시 스크롤 안 함.
+  //   #2(다른 탭→RoutineTab 이동) 후, 저장 루틴이 많아 활성 카드가 화면 밖이면 안 보임 →
+  //   포커스 시점에 활성 루틴 카드로 한 번 더 맞춤. (AlarmTab #FireNavToTab 스크롤과 대칭)
+  useFocusEffect(
+    useCallback(() => {
+      const id = activeRoutine?.routineId;
+      if (!id || isAdhocAlarmRoutine(id)) return;
+      const routine = routines.find(r => r.id === id);
+      if (!routine) return;
+      if (activeTab !== getRoutineMode(routine)) return; // 탭 다르면 위 effect가 탭 전환 후 스크롤 담당
+      const timer = setTimeout(() => {
+        const card = cardRefs.current[id];
+        const sv = scrollViewRef.current;
+        const container = scrollContainerRef.current;
+        if (!card || !sv || !container) return;
+        container.measure((_cx: number, _cy: number, _cw: number, _ch: number, _cpx: number, containerPageY: number) => {
+          card.measure((_x: number, _y: number, _w: number, _h: number, _pageX: number, cardPageY: number) => {
+            const offsetInViewport = cardPageY - containerPageY;
+            const target = scrollOffsetYRef.current + offsetInViewport - 16;
+            sv.scrollTo({ y: Math.max(0, target), animated: true });
+          });
+        });
+      }, 300);
+      return () => clearTimeout(timer);
+    }, [activeRoutine?.routineId, routines, activeTab])
+  );
+
   // v1.7 Phase 2-A — ad-hoc 알람 routine (= prefix 'aa_') 측 = 루틴 탭 비노출. UI 격리.
   const filteredRoutines = useMemo(
     () => routines.filter(r => !isAdhocAlarmRoutine(r.id) && getRoutineMode(r) === activeTab),

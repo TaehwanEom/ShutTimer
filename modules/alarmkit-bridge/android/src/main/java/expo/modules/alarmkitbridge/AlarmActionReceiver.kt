@@ -120,10 +120,12 @@ class AlarmActionReceiver : BroadcastReceiver() {
     }
   }
 
-  // 2026-06-01 — "정지" 액션 = 잠금화면 ongoing chronometer notification 측 "정지" 버튼 측.
-  //   JS alive = emit("stop_action") → App.tsx 측 onAlarmStateChange listener 측 routine stop dispatch.
-  //   JS dead = SharedPreferences la_control_signal {action:'stop', routineId} write → 다음 active 시 ActionDispatcher 측 처리.
-  //   양쪽 = AlarmScheduler.cancel + stopService 측 native cleanup + ongoing chronometer notification 측 자동 cancel.
+  // ACTION_STOP = 루틴 "마지막 단계 완료" 경로. (AlarmAlertActivity의 isLastStep 정지 버튼이 발신)
+  //   2026-06-03(#LastStepNoConfirm) — 위젯 "정지"(확인 모달)와 구분 위해, 여기서는 routine_complete를 emit.
+  //   ※ 잠금화면 위젯 "정지" 버튼은 방안 B(AlarmScheduler WIDGET_STOP_MODE="B")로 MainActivity에 직접 진입하므로
+  //      이 핸들러로 들어오지 않음. (= 위젯 정지 ≠ ACTION_STOP)
+  //   JS alive = emit("routine_complete") → App.tsx가 확인 모달 없이 루틴 종료 + 종료 미션으로 이동.
+  //   JS dead  = la_control_signal {action:'stop', routineId} 기록 → 다음 active 시 ActionDispatcher 처리.
   private fun handleStop(context: Context, alarmId: String) {
     val prefs = context.getSharedPreferences(APP_GROUP_PREFS, Context.MODE_PRIVATE)
     val snapshotRaw = prefs.getString(KEY_ROUTINE_SNAPSHOT, null)
@@ -146,23 +148,20 @@ class AlarmActionReceiver : BroadcastReceiver() {
       prefs.edit().putString(KEY_LA_CONTROL_SIGNAL, signal.toString()).apply()
     }
 
-    // 2026-06-02 — 사용자 항의 fix: 위젯 "정지" 즉시 누름 = 위젯 사라짐 = 실수 클릭 측 routine 종료 회귀.
-    //   정정 = native 측 cancel/stopService 호출 X = 위젯 + alarm 그대로 유지.
-    //   대신 = 앱 진입 + confirmation modal 표시 (= "종료하시겠습니까?" / [취소, 종료]).
-    //   사용자 "종료" 선택 시 = JS 측 dispatch Stop → reducer effect → AlarmkitBridge.cancelAlarm + stopService 측 정리.
-    //   사용자 "취소" 선택 시 = modal 닫기 + routine + 위젯 그대로.
-    //
-    // AlarmAlertActivity launchMainOnly mode 측 trigger = 잠금 시 KeyguardManager dismiss → 패턴/지문/Face ID 인증 → MainActivity launch + finish.
-    // 잠금 해제 시 = 즉시 MainActivity launch.
+    // 마지막 단계 완료 후, 앱을 전면으로 가져와 "종료 미션"을 표시하기 위한 진입.
+    //   종료/이동 자체는 위 routine_complete emit이 담당. 여기서는 앱을 앞으로 띄우는 역할만 함.
+    //   AlarmAlertActivity를 launchMainOnly로 띄움 = 잠금 시 KeyguardManager dismiss → 인증 → MainActivity launch + finish.
+    //   ※ EXTRA_ALARM_ID는 일부러 전달하지 않음 → enterLaunchMainOnly에서 stop_action을 emit하지 않음
+    //      (= 확인 모달이 뜨지 않음. 마지막 단계는 routine_complete로만 처리).
     val launchIntent = Intent(context, AlarmAlertActivity::class.java).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       putExtra(AlarmAlertActivity.EXTRA_LAUNCH_MAIN_ONLY, true)
     }
     try {
       context.startActivity(launchIntent)
-      NativeDebugLog.log(context, TAG, "stop_action → AlarmAlertActivity launchMainOnly trigger (= 앱 진입 + confirm modal 대기)")
+      NativeDebugLog.log(context, TAG, "routine_complete → AlarmAlertActivity launchMainOnly (= 앱 전면화, 종료 미션 표시용)")
     } catch (e: Exception) {
-      NativeDebugLog.log(context, TAG, "stop_action — AlarmAlertActivity launchMainOnly FAIL: $e")
+      NativeDebugLog.log(context, TAG, "routine_complete — AlarmAlertActivity launchMainOnly FAIL: $e")
     }
   }
 

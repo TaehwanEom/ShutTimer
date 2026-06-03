@@ -132,10 +132,12 @@ class AlarmActionReceiver : BroadcastReceiver() {
     } else ""
 
     if (AlarmEventBus.listener != null) {
-      NativeDebugLog.log(context, TAG, "stop_action — JS alive, emit + cleanup routineId=$routineId")
-      AlarmEventBus.emit(alarmId, "stop_action")
+      // 2026-06-03 fix(#LastStepNoConfirm) — ACTION_STOP은 마지막 단계 "루틴 완료" 완료에만 발신됨(AlarmAlertActivity isLastStep).
+      //   위젯 정지(stop_action=확인 모달)와 구분 위해 routine_complete로 분리 emit → JS 측 확인 모달 없이 바로 종료.
+      NativeDebugLog.log(context, TAG, "routine_complete — JS alive, emit + cleanup routineId=$routineId")
+      AlarmEventBus.emit(alarmId, "routine_complete")
     } else {
-      NativeDebugLog.log(context, TAG, "stop_action — JS dead, native signal write routineId=$routineId")
+      NativeDebugLog.log(context, TAG, "routine_complete — JS dead, native signal write routineId=$routineId")
       val signal = JSONObject().apply {
         put("action", "stop")
         put("timestamp", System.currentTimeMillis().toDouble())

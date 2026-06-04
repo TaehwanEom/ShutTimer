@@ -258,7 +258,9 @@
       "./plugins/withMainActivityWidgetStop.js",
       "@react-native-community/datetimepicker",
       "@bacons/apple-targets",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset",
+      "expo-secure-store"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

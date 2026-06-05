@@ -39,6 +39,26 @@ class AlarmService : Service() {
     val record = alarmId?.let { AlarmScheduler.get(this, it) }
     NativeDebugLog.log(this, TAG, "AlarmService start — alarmId=$alarmId title=${record?.title}")
 
+    // 2026-06-05 fix(#OrphanAlarmGuard) — prefs 레코드 없는 orphan 알람 발화 억제 (= 시스템 기본음 폴백 차단).
+    //   원인: AlarmManager 등록은 남았는데 prefs 레코드가 사라진 orphan 알람이 발화하면 record=null →
+    //         startSound(null) → resolveSoundUri 가 RingtoneManager 시스템 기본 알람음(삼성 기본음)으로 폴백 +
+    //         full-screen-intent 로 빈 AlarmAlertActivity(alarmId=null)까지 띄움. 앱 데이터에 없는 알람은 울리면 안 됨.
+    //   정정: record=null 이면 startForegroundService 계약상 무음 알림으로 foreground 충족 후 즉시 종료 +
+    //         해당 AlarmManager 등록 cancel (재발 방지 — 재부팅 불필요). 사운드/진동/FSI/alerting emit 전부 생략.
+    if (record == null) {
+      NativeDebugLog.log(this, TAG, "AlarmService — orphan(레코드 없음) alarmId=$alarmId → 발화 억제 + cancel")
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(NOTIF_ID, buildSilentNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+      } else {
+        startForeground(NOTIF_ID, buildSilentNotification())
+      }
+      if (alarmId != null) AlarmScheduler.cancel(this, alarmId)
+      AlarmScheduler.clearAlerting(this)
+      stopForeground(STOP_FOREGROUND_REMOVE)
+      stopSelf()
+      return START_NOT_STICKY
+    }
+
     // Phase 2-2: 발화 시점 측 = ongoing chronometer notification 측 제거 (= 알람 측 활성 상태 측 = countdown 측 표시 X).
     if (alarmId != null) {
       AlarmScheduler.stopOngoingTimerNotification(this, alarmId)
@@ -137,6 +157,30 @@ class AlarmService : Service() {
       builder.addAction(0, secondaryLabel, secondaryPending)
     }
     return builder.build()
+  }
+
+  // orphan(레코드 없음) 알람 억제 시 startForegroundService 계약 충족용 무음 알림. 사운드/FSI 없음 → 즉시 제거.
+  private fun buildSilentNotification(): Notification {
+    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val channel = NotificationChannel(
+        CHANNEL_ID, "알람", NotificationManager.IMPORTANCE_LOW
+      ).apply {
+        setSound(null, null)
+        enableVibration(false)
+      }
+      nm.createNotificationChannel(channel)
+    }
+    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      Notification.Builder(this, CHANNEL_ID)
+    } else {
+      @Suppress("DEPRECATION")
+      Notification.Builder(this)
+    }
+    return builder
+      .setSmallIcon(applicationInfo.icon)
+      .setContentTitle("")
+      .build()
   }
 
   // ── 사운드 (알람 스트림 — 무음모드 우회). soundName → res/raw 우리 wav, 없으면 시스템 기본음 ──

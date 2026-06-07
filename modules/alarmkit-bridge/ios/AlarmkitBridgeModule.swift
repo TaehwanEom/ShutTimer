@@ -624,6 +624,26 @@ public class AlarmkitBridgeModule: Module {
       return true
     }
 
+    // #BackupRestore Phase 2 — iCloud Key-Value Store (NSUbiquitousKeyValueStore).
+    //   기기 교체/초기화에도 알람·온보딩 복원. entitlement: com.apple.developer.ubiquity-kvstore-identifier 필요.
+    Function("icloudSetString") { (key: String, value: String?) -> Bool in
+      let store = NSUbiquitousKeyValueStore.default
+      if let v = value {
+        store.set(v, forKey: key)
+      } else {
+        store.removeObject(forKey: key)
+      }
+      return store.synchronize()
+    }
+
+    Function("icloudGetString") { (key: String) -> String? in
+      return NSUbiquitousKeyValueStore.default.string(forKey: key)
+    }
+
+    Function("icloudSync") { () -> Bool in
+      return NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
     // v1.6 T1 — listAlarms 반환 형식 변경 ([String] → [{ id, state }]). 콜드스타트 alerting filter.
     // v1.7 hotfix #G5 Phase A — return type 측 = [[String: Any]] 측 swap (= preAlertSeconds Double + fixedFireMs Double + relativeHour/Minute Int 측 추가 영역 정합).
     // v1.7 hotfix #ColdStartLA-2 — Activity<AlarmAttributes<...>>.activities 측 측정 + hasLiveActivity field emit.

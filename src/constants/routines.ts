@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from './sessions';
+import { mirrorToBackup } from '../utils/backupRestore';
 
 // ─── 타입 ────────────────────────────────────────────────────
 
@@ -136,6 +137,8 @@ export async function loadRoutines(): Promise<Routine[]> {
 
 export async function saveRoutines(list: Routine[]): Promise<void> {
   await AsyncStorage.setItem(ROUTINES_KEY, JSON.stringify(list));
+  // 삭제 후 재설치 복원용 백업 미러 (fire-and-forget).
+  mirrorToBackup().catch(() => {});
 }
 
 export async function upsertRoutine(r: Routine): Promise<Routine[]> {

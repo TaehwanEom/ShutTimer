@@ -2,6 +2,7 @@
 // 루틴 (routines.ts) 과 별개 entity. AlarmKit 단독 (iOS 26+).
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mirrorToBackup } from '../utils/backupRestore';
 import { RoutineStep } from './routines';
 
 export type AlarmRepeat = 'once' | 'daily' | 'weekly';
@@ -127,6 +128,8 @@ export async function loadAlarms(): Promise<Alarm[]> {
 
 export async function saveAlarms(list: Alarm[]): Promise<void> {
   await AsyncStorage.setItem(ALARMS_KEY, JSON.stringify(list));
+  // 삭제 후 재설치 복원용 백업 미러 (fire-and-forget, 실패해도 무시).
+  mirrorToBackup().catch(() => {});
 }
 
 export async function upsertAlarm(a: Alarm): Promise<Alarm[]> {

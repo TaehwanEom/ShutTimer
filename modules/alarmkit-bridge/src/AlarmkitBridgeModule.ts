@@ -44,6 +44,12 @@ declare class AlarmkitBridgeModule extends NativeModule<AlarmkitBridgeEvents> {
   readAppGroupString(key: string): string | null;
   /** v1.6 Phase 10-A — App Group UserDefaults key 삭제. */
   removeAppGroupKey(key: string): boolean;
+  /** #BackupRestore Phase 2 — iCloud KV(NSUbiquitousKeyValueStore) write. value=null 시 삭제. */
+  icloudSetString(key: string, value: string | null): boolean;
+  /** #BackupRestore Phase 2 — iCloud KV read (캐시값; 최초엔 sync 후 download 지연 가능). */
+  icloudGetString(key: string): string | null;
+  /** #BackupRestore Phase 2 — iCloud KV 동기화 트리거. */
+  icloudSync(): boolean;
 }
 
 // Native binary 에 모듈 미포함 (구 dev client / Expo Go) → app init throw 회피.
@@ -65,6 +71,9 @@ try {
     writeAppGroupString: () => false,
     readAppGroupString: () => null,
     removeAppGroupKey: () => false,
+    icloudSetString: () => false,
+    icloudGetString: () => null,
+    icloudSync: () => false,
     addListener: () => ({ remove: () => {} }),
     removeListener: () => {},
   } as unknown as AlarmkitBridgeModule;

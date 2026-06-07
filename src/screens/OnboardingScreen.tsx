@@ -31,6 +31,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
 import { isSamsung, openSamsungDeviceCare } from '../utils/oemBatteryHelper';
+import { mirrorToBackup } from '../utils/backupRestore';
 import { useTranslation } from 'react-i18next';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 import { RootStackParamList } from '../../App';
@@ -357,6 +358,8 @@ export default function OnboardingScreen({ navigation }: Props) {
     await AsyncStorage.setItem('onboardingCompleted', 'true');
     // v1.8 #OnboardingResume — 완료 시 = resume key 측 삭제 (= 다음 설치 측 = page 0 측 시작 정합).
     await AsyncStorage.removeItem('onboardingCurrentPage').catch(() => {});
+    // 삭제 후 재설치 복원용 백업 미러 (온보딩 완료 상태 + 알람 보존).
+    mirrorToBackup().catch(() => {});
     navigation.dispatch(
       CommonActions.reset({
         index: 0,

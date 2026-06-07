@@ -1,7 +1,7 @@
 import './src/i18n';
 import { useTranslation } from 'react-i18next';
 import * as ExpoSplashScreen from 'expo-splash-screen';
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { AppState, Platform, DeviceEventEmitter, View, Text, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
@@ -57,6 +57,7 @@ import {
   migrateSoundRename,
   migrateChainFixedSafety,
   ALARM_CHAIN_MAX_INDEX,
+  ALARM_CHAIN_INTERVAL_MS,
   rearmSafetyChain,
 } from './src/utils/alarmScheduler';
 import { cleanupStaleAdhocRoutines, isAdhocAlarmRoutine } from './src/utils/alarmRoutineLink';
@@ -71,6 +72,7 @@ import {
 import { onAlarmFire, onLAControlSignal, onAppActive } from './src/state/ActionDispatcher';
 import { dispatch as sessionDispatch } from './src/state/SessionController';
 import { migrateLegacyToSession } from './src/state/SessionStore';
+import { restoreIfNeeded, mirrorToBackup } from './src/utils/backupRestore';
 /*
   ═══════════════════════════════════════════════════════════
    @preserve @v1.5-poc — PoCPhotoValidationScreen require 영역
@@ -585,12 +587,56 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
+  // #LockedColdStartGap (2026-06-05) — alerting 알람이 없을 때(안전체인 2분 gap) "발화 사이클 진행 중 +
+  //   미해제" 알람을 메타로 추론해 라이브 alerting 케이스와 동일 흐름(onAlarmFire+navigate)으로 진입.
+  //   상세/근거: docs/analysis-2026-06-05-locked-routine-coldstart.md
+  const runLockedColdStartGapFallback = useCallback(async () => {
+    // iOS 전용 — 본 추론은 iOS 체인 구조(chainIndex 1+ = .fixed 단발 소비형) 전제.
+    //   Android 는 chainIndex 1+ 가 native daily 반복(소비 X)이라 fireAt 계산이 달라 오작동 위험 → 제외.
+    //   (Android 잠금-발화 복원은 Android창에서 별도 처리.)
+    if (Platform.OS !== 'ios') return;
+    const curRoute = navigationRef.current?.getCurrentRoute()?.name;
+    // 다른 핸들러가 이미 알람/루틴 화면으로 보냈으면 skip. ('RoutineTab'은 Home 내부 탭 → string 캐스트.)
+    if ((curRoute as string) === 'RoutineTab' || curRoute === 'RoutineAlarm' || curRoute === 'Alarm') return;
+    const now = Date.now();
+    const allMeta = await listAllAlarmMetadata();
+    const enabledIds = new Set((await loadAlarms()).filter(a => a.enabled).map(a => a.id));
+    // 미해제 진행 중 신호 = 다음 안전멤버(chainIndex≥1)가 2분 내 발화 예정 (= 사이클 살아있음).
+    //   해제 시 안전체인 삭제 → 없음. 내일치 안전체인(base=내일)은 fireAt≈23h → 윈도우 밖 → 제외.
+    const liveSafety = allMeta.find(m => {
+      if (m.type !== 'alarm_main' || m.deleted === true) return false;
+      if ((m.chainIndex ?? 0) < 1) return false;
+      if (!enabledIds.has(m.entityId)) return false;
+      if (m.chainBaseFireAt == null) return false;
+      const fireAt = m.chainBaseFireAt + (m.chainIndex ?? 0) * ALARM_CHAIN_INTERVAL_MS;
+      return fireAt > now && fireAt <= now + ALARM_CHAIN_INTERVAL_MS;
+    });
+    if (!liveSafety) return;
+    const entityId = liveSafety.entityId;
+    // 세션의 currentAlarmId = chain0(.relative) 우선, 없으면 안전멤버 id.
+    const chain0 = allMeta.find(
+      m => m.type === 'alarm_main' && m.entityId === entityId && (m.chainIndex ?? 0) === 0 && m.deleted !== true,
+    );
+    const fireAlarmId = chain0?.alarmId ?? liveSafety.alarmId;
+    Logger.warn('NAV-DBG-COLD', `lockedColdStartGap detected entityId=${entityId} fireAlarmId=${fireAlarmId} → onAlarmFire+navigate Alarm`);
+    // 라이브 케이스에서 onAlarmStateChange listener 가 하던 세션 생성을 직접 수행 (gap 엔 alerting 이벤트 X).
+    //   AlarmScreen goHome(dismiss) 의 routine 시작은 currentSession 존재가 전제(R-7 가드)이므로 필수.
+    await onAlarmFire({ alarmId: fireAlarmId, entityId, alarmType: 'main' }).catch(() => ({ ghost: false }));
+    await recordAlarmSession().catch(() => {});
+    await disableOnceAlarmIfNeeded(entityId).catch(() => {});
+    navigationRef.current?.navigate('Alarm', {
+      endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
+      alarmEntityId: entityId,
+    });
+  }, []);
+
   // v1.6 T1 / v1.8 FIX-④ — alerting 알람 조회 + navigate.
   //   호출 시점:
   //     (1) 콜드 스타트 1.5초 뒤 (= 앱 kill 후 알람 발화 case)
   //     (2) AppState 'background → active' 전환 시 (= 백그라운드 발화 → 배너 탭으로 진입 case)
   //   직전 (1)만 있어서 — 백그라운드 알람 발화 후 배너 탭으로 active 진입 시 다음 체인 멤버(최대 2분)
   //   까지 AlarmScreen 미마운트. 이때 onAlarmStateChange listener 는 'background return' 가드로 skip.
+  //   #LockedColdStartGap (2026-06-05) — alerting 없을 때 runLockedColdStartGapFallback 로 gap 보완.
   const runAlertingAlarmCheck = useCallback(async () => {
     if (!navigationRef.current?.isReady()) return;
     // v1.8 FIX-⑥ #SplashGate — Splash 상태에서 navigate 시 Splash→Home 전환 중 pop 회귀 차단. 최대 5초 polling.
@@ -602,7 +648,18 @@ function AppNavigator() {
     try {
       const alarms = await AlarmkitBridge.listAlarms();
       const alerting = alarms.find(a => a.state === 'alerting');
-      if (!alerting) return;
+      if (!alerting) {
+        // #LockedColdStartGap (2026-06-05) — 잠금 중 루틴알람 발화 → 잠금해제 cold-start 가
+        //   안전체인(2분 간격) 멤버 사이 "gap"에 떨어지면 현재 alerting 알람이 없어 진입 못 하던 회귀.
+        //   (앱이 잠금 중 죽어 발화 listener 미실행 → 세션 X → 루틴 미시작. 다음 안전멤버 발화까지 최대 2분 공백.)
+        //   메타로 "발화 사이클 진행 중 + 미해제" 를 추론해, 라이브 alerting alarm_main 케이스와
+        //   동일하게 onAlarmFire(세션 생성) + navigate('Alarm') → 미션 → 루틴 시작.
+        //   부활방지 가드: 해제 시 cancelSafetyChainPreservingDaily 가 안전체인(chainIndex≥1) metadata
+        //     를 삭제/deleted=true → near-future 안전멤버 없음 → 미진입. (내일치 안전체인은 fireAt≈23h → 제외.)
+        //   ⚠️ 공통 JS — Android 는 체인 구현이 달라 동일 보장 X (Android창 별도 검증). iOS 표준 경로.
+        await runLockedColdStartGapFallback();
+        return;
+      }
       const meta = await loadAlarmMetadata(alerting.id);
       if (!meta) return;
       const currentRoute = navigationRef.current?.getCurrentRoute()?.name;
@@ -854,6 +911,16 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
+  // #BackupRestore — 앱이 백그라운드로 갈 때 백업 미러 (설정·카테고리 등 모든 변경 catch-all).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'background' || s === 'inactive') {
+        mirrorToBackup().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     // v2.0 P3.6 — Session 모델 effect runner 부트스트랩. 1회성 가드 내장.
     bootstrapEffectRunner();
@@ -869,6 +936,9 @@ function AppNavigator() {
     // v1.7 hotfix #GhostAlarmCleanup — syncAllAlarms 후 = framework 측 mapping table 측 등록 ❌ 유령 알람 cleanup. 순차 호출 (= race 회피).
     (async () => {
       try {
+        // 삭제 후 재설치 복원 (#BackupRestore) — 알람 sync 전에 실행해야 복원된 알람이 재예약됨.
+        //   프레시 설치 + Keychain 백업 있으면 알람·온보딩 복원. 정상 사용 중엔 no-op.
+        await restoreIfNeeded().catch(() => false);
         // v1.8 #SoundRenameMigration — 사운드 리네임 회귀 1회성 정정. syncAllAlarms 앞에서 실행
         //   → 옛 체인 재등록 후 syncAllAlarms 가 fresh 체인을 live 로 인식해 skip.
         await migrateSoundRename();
@@ -985,6 +1055,22 @@ function AppNavigator() {
 }
 
 export default function App() {
+  // #BackupRestore 타이밍 수정 — 앱 트리(ThemeProvider/SplashScreen) 렌더 전에 복원을 완료.
+  //   사유: ThemeProvider(다크모드·primary color)와 SplashScreen(온보딩 분기)이 mount 시 AsyncStorage 를 읽음.
+  //         복원이 그 뒤에 끝나면 = 재설치 시 온보딩 재노출 + 설정 기본값으로 회귀(= 레이스).
+  //         → 렌더 전에 restoreIfNeeded 를 await 해서 복원된 값으로 초기화되게 게이팅.
+  //   정상 실행(온보딩 완료 상태): onboardingCompleted!=null → restoreIfNeeded 즉시 no-op(지연 없음).
+  //   guard(restoreAttempted) 가 있어 부트스트랩의 restoreIfNeeded 와 중복 호출돼도 1회만 수행됨.
+  const [restoreReady, setRestoreReady] = useState(false);
+  useEffect(() => {
+    restoreIfNeeded().catch(() => false).finally(() => setRestoreReady(true));
+  }, []);
+
+  // 복원 완료 전 — 네이티브 스플래시(흰 배경) 유지로 깜빡임 방지.
+  if (!restoreReady) {
+    return <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />;
+  }
+
   return (
     <ErrorBoundary>
       <ThemeProvider>

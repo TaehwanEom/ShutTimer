@@ -360,7 +360,8 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     if (steps.length === 0) return { ok: false, error: t('routine.edit.validationStepsEmpty') };
     for (let i = 0; i < steps.length; i++) {
       const s = steps[i];
-      if (!s.name.trim() || s.durationSeconds <= 0) {
+      // 이름 미입력은 허용(저장 시 "루틴 01~" 자동 채움). 시간(durationSeconds)만 필수.
+      if (s.durationSeconds <= 0) {
         return { ok: false, error: t('routine.edit.validationStepIncomplete', { n: i + 1 }) };
       }
     }
@@ -373,9 +374,10 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
       Alert.alert(t('routine.edit.validationFailTitle'), v.error ?? '');
       return;
     }
-    const finalSteps: RoutineStep[] = steps.map(s => ({
+    const finalSteps: RoutineStep[] = steps.map((s, idx) => ({
       id: s.id,
-      name: s.name.trim(),
+      // 이름 미입력 시 placeholder와 동일하게 "루틴 01~" 자동 채움.
+      name: s.name.trim() || t('routine.edit.stepNamePlaceholder', { n: String(idx + 1).padStart(2, '0') }),
       durationSeconds: Math.max(0, s.durationSeconds),
     }));
     const routine: Routine = {

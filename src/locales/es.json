@@ -330,29 +330,17 @@
     "title": "Avisos",
     "empty": "No hay avisos",
     "content": {
-      "v18_dial_edit": {
-        "title": "Ajustar el tiempo en pausa",
-        "message": "Mientras el temporizador está en pausa, ahora puedes girar el dial o tocar los dígitos digitales para abrir el teclado y añadir o reducir tiempo."
+      "v189_locked_routine": {
+        "title": "Corrección de rutina con bloqueo",
+        "message": "Se corrigió un problema por el que la rutina no continuaba tras descartar una alarma con el dispositivo bloqueado."
       },
-      "v18_calendar_categories": {
-        "title": "Categorías de calendario + segundos",
-        "message": "Los registros del calendario ahora se dividen en 3 categorías: Temporizador, Rutina y Alarma. El plegado de dos niveles y la visualización por segundos permiten revisar los registros con más detalle."
+      "v188_reinstall_restore": {
+        "title": "Restauración tras reinstalar",
+        "message": "Tus alarmas, rutinas y ajustes se restauran aunque elimines y vuelvas a instalar la app."
       },
-      "v18_settings_help": {
-        "title": "Ayuda añadida a Ajustes",
-        "message": "Se han añadido 5 elementos de ayuda a la pantalla de Ajustes: Método de parada, Guía de rutinas, Guía de rutinas de alarma, Guía del dial y Reporte de errores."
-      },
-      "v18_digital_ring_removed": {
-        "title": "Temporizador digital ordenado",
-        "message": "Se ha eliminado el anillo de progreso del temporizador digital para una visualización más limpia."
-      },
-      "v18_mission_slot_machine": {
-        "title": "Tragamonedas de misión + rojo al fallar",
-        "message": "Se ha añadido un efecto de tragamonedas al aparecer las misiones de matemáticas y dictado. Cuando se responde mal, el texto de la pregunta parpadea brevemente en rojo."
-      },
-      "v18_mission_unlimited": {
-        "title": "Temporizador de misión \"Ilimitado\"",
-        "message": "Se ha añadido la opción \"Ilimitado\" al temporizador de misión. Puedes usarlo como un clarín de despertar sin límite de tiempo."
+      "v188_routine_autoname": {
+        "title": "Nombres de pasos automáticos",
+        "message": "Deja en blanco el nombre de un paso de la rutina y se completará automáticamente, como \"Rutina 01\"."
       }
     }
   },

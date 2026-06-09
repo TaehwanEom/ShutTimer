@@ -337,29 +337,17 @@
     "title": "Notices",
     "empty": "No notices",
     "content": {
-      "v18_dial_edit": {
-        "title": "Adjust time while paused",
-        "message": "While the timer is paused, you can now turn the dial or tap the digital digits to open the keypad and add or reduce time."
+      "v189_locked_routine": {
+        "title": "Locked alarm routine fix",
+        "message": "Fixed an issue where the routine wouldn't continue after dismissing an alarm while the device was locked."
       },
-      "v18_calendar_categories": {
-        "title": "Calendar categories + seconds",
-        "message": "Calendar records are now split into 3 categories: Timer, Routine, and Alarm. Two-level collapse and seconds-level display let you inspect records in more detail."
+      "v188_reinstall_restore": {
+        "title": "Restore after reinstall",
+        "message": "Your alarms, routines, and settings are restored even after you delete and reinstall the app."
       },
-      "v18_settings_help": {
-        "title": "Help added to Settings",
-        "message": "Added 5 help items to the Settings screen: Stop method, Routine guide, Alarm routine guide, Dial guide, and Bug report."
-      },
-      "v18_digital_ring_removed": {
-        "title": "Digital timer cleanup",
-        "message": "Removed the ring gauge from the digital timer for a cleaner display."
-      },
-      "v18_mission_slot_machine": {
-        "title": "Mission slot machine + red error",
-        "message": "Added a slot machine effect when math and dictation missions appear. On a wrong answer, the question text briefly flashes red."
-      },
-      "v18_mission_unlimited": {
-        "title": "Unlimited mission timer",
-        "message": "Added an \"Unlimited\" option to the mission timer, so it can be used as a wake-up bugle without any time limit."
+      "v188_routine_autoname": {
+        "title": "Auto step names",
+        "message": "Leave a routine step name blank and it fills in automatically, like \"Routine 01\"."
       }
     }
   },

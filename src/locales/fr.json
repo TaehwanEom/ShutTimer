@@ -330,29 +330,17 @@
     "title": "Notifications",
     "empty": "Aucune notification",
     "content": {
-      "v18_dial_edit": {
-        "title": "Ajuster le temps en pause",
-        "message": "Lorsque le minuteur est en pause, vous pouvez désormais tourner la molette ou toucher les chiffres numériques pour ouvrir le clavier et ajouter ou réduire du temps."
+      "v189_locked_routine": {
+        "title": "Correctif routine en veille",
+        "message": "Correction d'un problème où la routine ne reprenait pas après l'arrêt d'une alarme, appareil verrouillé."
       },
-      "v18_calendar_categories": {
-        "title": "Catégories de calendrier + secondes",
-        "message": "Les enregistrements du calendrier sont désormais répartis en 3 catégories : Minuteur, Routine et Alarme. Le repli à deux niveaux et l'affichage des secondes permettent une consultation plus détaillée."
+      "v188_reinstall_restore": {
+        "title": "Restauration après réinstallation",
+        "message": "Vos alarmes, routines et réglages sont restaurés même après avoir supprimé et réinstallé l'app."
       },
-      "v18_settings_help": {
-        "title": "Aide ajoutée aux Réglages",
-        "message": "5 éléments d'aide ont été ajoutés à l'écran Réglages : Méthode d'arrêt, Guide des routines, Guide des routines d'alarme, Guide de la molette et Signalement de bug."
-      },
-      "v18_digital_ring_removed": {
-        "title": "Nettoyage du minuteur numérique",
-        "message": "La jauge en anneau du minuteur numérique a été retirée pour un affichage plus épuré."
-      },
-      "v18_mission_slot_machine": {
-        "title": "Effet machine à sous + rouge si erreur",
-        "message": "Un effet de machine à sous a été ajouté à l'apparition des missions de calcul et de dictée. En cas de mauvaise réponse, le texte de la question clignote brièvement en rouge."
-      },
-      "v18_mission_unlimited": {
-        "title": "Minuteur de mission « Illimité »",
-        "message": "Une option « Illimité » a été ajoutée au minuteur de mission. Vous pouvez l'utiliser comme un clairon de réveil, sans aucune limite de temps."
+      "v188_routine_autoname": {
+        "title": "Noms d'étapes automatiques",
+        "message": "Laissez vide le nom d'une étape de routine et il sera rempli automatiquement, comme « Routine 01 »."
       }
     }
   },

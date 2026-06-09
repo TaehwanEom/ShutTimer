@@ -330,29 +330,17 @@
     "title": "Avvisi",
     "empty": "Nessun avviso",
     "content": {
-      "v18_dial_edit": {
-        "title": "Regola il tempo in pausa",
-        "message": "Mentre il timer è in pausa, ora puoi ruotare la manopola o toccare le cifre digitali per aprire il tastierino e aggiungere o ridurre il tempo."
+      "v189_locked_routine": {
+        "title": "Correzione routine a schermo bloccato",
+        "message": "Risolto un problema per cui la routine non proseguiva dopo aver disattivato una sveglia con il dispositivo bloccato."
       },
-      "v18_calendar_categories": {
-        "title": "Categorie del calendario + secondi",
-        "message": "I record del calendario sono ora suddivisi in 3 categorie: Timer, Routine e Sveglia. La compressione a due livelli e la visualizzazione dei secondi consentono di esaminare i record più nel dettaglio."
+      "v188_reinstall_restore": {
+        "title": "Ripristino dopo reinstallazione",
+        "message": "Le tue sveglie, routine e impostazioni vengono ripristinate anche dopo aver eliminato e reinstallato l'app."
       },
-      "v18_settings_help": {
-        "title": "Aiuto aggiunto alle Impostazioni",
-        "message": "Sono stati aggiunti 5 elementi di aiuto alla schermata Impostazioni: Metodo di arresto, Guida alle routine, Guida alle routine di sveglia, Guida alla manopola e Segnalazione bug."
-      },
-      "v18_digital_ring_removed": {
-        "title": "Riordino del timer digitale",
-        "message": "L'indicatore ad anello del timer digitale è stato rimosso per una visualizzazione più pulita."
-      },
-      "v18_mission_slot_machine": {
-        "title": "Slot machine missione + rosso in caso di errore",
-        "message": "È stato aggiunto un effetto slot machine all'apparire delle missioni di matematica e dettato. In caso di risposta sbagliata, il testo della domanda lampeggia brevemente in rosso."
-      },
-      "v18_mission_unlimited": {
-        "title": "Timer missione \"Illimitato\"",
-        "message": "È stata aggiunta l'opzione \"Illimitato\" al timer della missione. Può essere utilizzato come una sveglia senza limiti di tempo."
+      "v188_routine_autoname": {
+        "title": "Nomi passaggi automatici",
+        "message": "Lascia vuoto il nome di un passaggio della routine e verrà compilato automaticamente, come \"Routine 01\"."
       }
     }
   },

@@ -330,29 +330,17 @@
     "title": "Bildirimler",
     "empty": "Bildirim yok",
     "content": {
-      "v18_dial_edit": {
-        "title": "Duraklatılmışken süreyi ayarla",
-        "message": "Zamanlayıcı duraklatıldığında bile, kadranı çevirerek veya dijital rakamlara dokunarak klavyeyi açıp süre ekleyip azaltabilirsiniz."
+      "v189_locked_routine": {
+        "title": "Kilitli alarm rutini düzeltmesi",
+        "message": "Cihaz kilitliyken alarmı kapattıktan sonra rutinin devam etmemesi sorunu giderildi."
       },
-      "v18_calendar_categories": {
-        "title": "Takvim kategorileri + saniye",
-        "message": "Takvim kayıtları artık 3 kategoriye bölündü: Zamanlayıcı, Rutin ve Alarm. İki düzey katlanma ve saniye düzeyinde görüntüleme ile kayıtları daha ayrıntılı inceleyebilirsiniz."
+      "v188_reinstall_restore": {
+        "title": "Yeniden yükleme sonrası geri yükleme",
+        "message": "Uygulamayı silip yeniden yükleseniz bile alarmlarınız, rutinleriniz ve ayarlarınız geri yüklenir."
       },
-      "v18_settings_help": {
-        "title": "Ayarlara yardım eklendi",
-        "message": "Ayarlar ekranına 5 yardım maddesi eklendi: Durdurma yöntemi, Rutin rehberi, Alarm rutini rehberi, Kadran rehberi ve Hata bildirimi."
-      },
-      "v18_digital_ring_removed": {
-        "title": "Dijital zamanlayıcı düzenlendi",
-        "message": "Dijital zamanlayıcıdan halka göstergesi kaldırılarak daha sade bir görünüm sağlandı."
-      },
-      "v18_mission_slot_machine": {
-        "title": "Görev slot makinesi + yanlışta kırmızı",
-        "message": "Matematik ve dikte görevleri belirirken slot makinesi efekti eklendi. Yanlış cevap verildiğinde soru metni kısa süreliğine kırmızı yanıp söner."
-      },
-      "v18_mission_unlimited": {
-        "title": "Görev zamanlayıcısı \"Sınırsız\"",
-        "message": "Görev zamanlayıcısına \"Sınırsız\" seçeneği eklendi. Süre sınırı olmadan uyandırma borusu olarak da kullanabilirsiniz."
+      "v188_routine_autoname": {
+        "title": "Otomatik adım adları",
+        "message": "Bir rutin adımının adını boş bırakın; \"Rutin 01\" gibi otomatik doldurulsun."
       }
     }
   },

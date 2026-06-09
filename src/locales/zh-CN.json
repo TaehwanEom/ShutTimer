@@ -337,29 +337,17 @@
     "title": "通知",
     "empty": "暂无通知",
     "content": {
-      "v18_dial_edit": {
-        "title": "暂停时调整时间",
-        "message": "计时器暂停中也可以转动表盘，或点击数字打开键盘来增减时间。"
+      "v189_locked_routine": {
+        "title": "锁屏闹钟例程修复",
+        "message": "修复了锁屏状态下关闭闹钟后例程不继续的问题。"
       },
-      "v18_calendar_categories": {
-        "title": "日历分类 + 秒级显示",
-        "message": "日历记录现已分为计时器、日程、闹钟三个分类。支持两级折叠 + 秒级显示，可更详细地查看记录。"
+      "v188_reinstall_restore": {
+        "title": "重装后恢复",
+        "message": "即使删除并重新安装应用，您的闹钟、例程和设置也会自动恢复。"
       },
-      "v18_settings_help": {
-        "title": "设置中新增帮助",
-        "message": "在设置页面新增了「停止方式」「日程使用方法」「闹钟日程使用方法」「表盘使用方法」「问题反馈」5 项帮助。"
-      },
-      "v18_digital_ring_removed": {
-        "title": "数字计时器整理",
-        "message": "去除了数字计时器的环形进度条，显示更整洁。"
-      },
-      "v18_mission_slot_machine": {
-        "title": "任务老虎机效果 + 错误变红",
-        "message": "数学与听写任务出现时新增老虎机滚动效果。回答错误时题目文字会短暂闪红。"
-      },
-      "v18_mission_unlimited": {
-        "title": "任务计时器「无限制」",
-        "message": "任务计时器新增「无限制」选项。可作为没有时间限制的起床号角使用。"
+      "v188_routine_autoname": {
+        "title": "步骤名称自动填入",
+        "message": "例程步骤名称留空时，将自动填入“例程 01”等。"
       }
     }
   },

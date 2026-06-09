@@ -34,6 +34,8 @@ import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../
 import { setCachedDismissMethod } from '../utils/settingsCache';
 import { clearPreloadedSound } from '../utils/alarmSoundPreload';
 import { isSamsung, openSamsungDeviceCare, requestIgnoreBatteryOptimization } from '../utils/oemBatteryHelper';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 // v1.7 hotfix #DebugUIGate — EAS profile env 측 디버그 UI 분기 (production = false / dev + preview = true).
 const SHOW_DEBUG_UI = process.env.EXPO_PUBLIC_SHOW_DEBUG_UI === 'true';
@@ -792,6 +794,11 @@ export default function SettingsScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
         )}
+
+        {/* 앱 버전 표시 — 설치된 빌드 식별용 (어떤 버전인지 확인) */}
+        <Text style={{ textAlign: 'center', color: colors.secondary, fontSize: 12, opacity: 0.6, marginTop: 24, marginBottom: 8 }}>
+          {`v${Constants.expoConfig?.version ?? '?'} (${Application.nativeBuildVersion ?? '-'})`}
+        </Text>
 
         {/*
           ═══════════════════════════════════════════════════════════

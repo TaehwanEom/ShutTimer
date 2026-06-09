@@ -699,7 +699,10 @@ function AppNavigator() {
         //   뒤늦게 그 미션 화면을 stack 에서 pop(밀어냄) → "마지막 단계 미션 갑자기 종료" 회귀.
         //   정정: navigate 직전(await 후) route 재확인 — Alarm/RoutineAlarm 떠 있으면 navigate-away 금지.
         const routeAfterFire = navigationRef.current?.getCurrentRoute()?.name;
-        if (routeAfterFire === 'Alarm' || routeAfterFire === 'RoutineAlarm') return;
+        if (routeAfterFire === 'Alarm' || routeAfterFire === 'RoutineAlarm') {
+          Logger.warn('NAV-DBG-COLD', `LastStepMissionPop 가드 발동(alertingCheck) — route=${routeAfterFire} 미션화면 유지, navigate-away skip`);
+          return;
+        }
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
@@ -903,12 +906,13 @@ function AppNavigator() {
         } as never);
       } else if (payload.target === 'AlarmTab') {
         const route = navigationRef.current?.getCurrentRoute()?.name;
-        if (route !== 'Alarm' && (route as string) !== 'AlarmTab') {
+        // #LastStepMissionPop fix (2026-06-09) — RoutineAlarm(미션 화면)도 가드에 포함 → 미션 중 pop 방지.
+        if (route !== 'Alarm' && route !== 'RoutineAlarm' && (route as string) !== 'AlarmTab') {
           (navigationRef.current as any).navigate('Home', { screen: 'AlarmTab' });
         }
       } else if (payload.target === 'RoutineTab') {
         const route = navigationRef.current?.getCurrentRoute()?.name;
-        if (route !== 'Alarm' && (route as string) !== 'RoutineTab') {
+        if (route !== 'Alarm' && route !== 'RoutineAlarm' && (route as string) !== 'RoutineTab') {
           Logger.warn('NAV-DBG', `SESSION_EVENT_NAVIGATE RoutineTab route=${route}`);
           (navigationRef.current as any).navigate('Home', { screen: 'RoutineTab' });
         }
@@ -986,7 +990,10 @@ function AppNavigator() {
           //   그 사이 AlarmScreen(미션, last_step 등)이 mount되면 아래 navigateTarget/resetTarget 가
           //   그 미션 화면을 stack 에서 pop 함. navigate 직전 route 재확인으로 방지.
           const routeNow = navigationRef.current?.getCurrentRoute()?.name;
-          if (routeNow === 'Alarm' || routeNow === 'RoutineAlarm') return;
+          if (routeNow === 'Alarm' || routeNow === 'RoutineAlarm') {
+            Logger.warn('NAV-DBG-COLD', `LastStepMissionPop 가드 발동(restoreRoutineState) — route=${routeNow} 미션화면 유지, navigate-away skip`);
+            return;
+          }
           const navigateTarget = (isAdhoc: boolean) => {
             if (isAdhoc) {
               // v1.7 Phase 2-B — ad-hoc = AlarmTab (nested = tab bar 보존).

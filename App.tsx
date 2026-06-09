@@ -692,6 +692,14 @@ function AppNavigator() {
           entityId: meta.entityId,
           alarmType: 'confirm_prompt',
         }).catch(() => ({ ghost: false }));
+        // #LastStepMissionPop fix (2026-06-09) — cold-start race 가드.
+        //   위 await onAlarmFire 는 이전 confirm_prompt 알람 cancel(AlarmKit, ~3초 지연) 포함 → 그 사이
+        //   onAlarmStateChange/LA signal 경로가 AlarmScreen(미션, 특히 last_step camera)을 mount 함.
+        //   667 가드는 await 전 1회 체크라 그땐 아직 Alarm route 아님 → 통과 → 아래 navigate/reset 이
+        //   뒤늦게 그 미션 화면을 stack 에서 pop(밀어냄) → "마지막 단계 미션 갑자기 종료" 회귀.
+        //   정정: navigate 직전(await 후) route 재확인 — Alarm/RoutineAlarm 떠 있으면 navigate-away 금지.
+        const routeAfterFire = navigationRef.current?.getCurrentRoute()?.name;
+        if (routeAfterFire === 'Alarm' || routeAfterFire === 'RoutineAlarm') return;
         const isAdhoc = isAdhocAlarmRoutine(meta.entityId);
         const routines = await loadRoutines();
         const r = routines.find(x => x.id === meta.entityId);
@@ -974,6 +982,11 @@ function AppNavigator() {
       restoreRoutineState()
         .then(async (res) => {
           if (!navigationRef.current?.isReady()) return;
+          // #LastStepMissionPop fix (2026-06-09) — 위 981 가드는 async restoreRoutineState 전 1회 체크라,
+          //   그 사이 AlarmScreen(미션, last_step 등)이 mount되면 아래 navigateTarget/resetTarget 가
+          //   그 미션 화면을 stack 에서 pop 함. navigate 직전 route 재확인으로 방지.
+          const routeNow = navigationRef.current?.getCurrentRoute()?.name;
+          if (routeNow === 'Alarm' || routeNow === 'RoutineAlarm') return;
           const navigateTarget = (isAdhoc: boolean) => {
             if (isAdhoc) {
               // v1.7 Phase 2-B — ad-hoc = AlarmTab (nested = tab bar 보존).

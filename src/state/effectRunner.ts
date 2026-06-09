@@ -520,6 +520,14 @@ async function runEffect(effect: SideEffect): Promise<void> {
       // v2.0 C.H — native AdvanceNextStepIntent 측 새 alarm id 동기.
       //   옛 syncRoutineFromSnapshot line 490 (currentConfirmPromptId = snapshot.currentAlarmId) 등가.
       currentRunningAlarmId = effect.alarmId || null;
+      // #ReArmChurn fix (2026-06-10) — native advance 로 새 step 알람이 생기면 그 dedup key 를 동기화한다.
+      //   안 하면 lastScheduleKey 가 옛 step 에 머물러, 직후 background→active Resync 의 ScheduleConfirmPrompt 가
+      //   #ReArmChurn skip 가드(lastScheduleKey===key)를 통과하지 못하고 살아있는 알람을 cancel→재생성(깜빡임)한다.
+      //   (log02 2026-06-09 18:13:56 DC3C→2D05) cold-start 시엔 모듈변수 초기화 → 정상 재-arm(복구) 유지.
+      if (effect.scheduleKey && currentRunningAlarmId) {
+        lastScheduleKey = effect.scheduleKey;
+        lastScheduleAt = Date.now();
+      }
       return;
     }
   }

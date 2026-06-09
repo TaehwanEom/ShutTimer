@@ -96,7 +96,7 @@ export type SideEffect =
     } // App Group routine_snapshot mirror
   | { kind: 'CancelRoutinePrealerts'; routineId: string } // 잔존 prealert 일괄 cancel
   // v2.0 C.H — OnSnapshotChange transition 측 effectRunner 모듈 변수 갱신
-  | { kind: 'SetCurrentRunningAlarmId'; alarmId: string };
+  | { kind: 'SetCurrentRunningAlarmId'; alarmId: string; scheduleKey?: string };
 
 export type TransitionResult = {
   next: Session | null;
@@ -700,7 +700,15 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       awaitingConfirm: false,
       state: 'SCHEDULED',
     };
-    effects.push({ kind: 'SetCurrentRunningAlarmId', alarmId: action.currentAlarmId });
+    // #ReArmChurn fix (2026-06-10) — native AdvanceNextStepIntent 로 진행되면 effectRunner.ScheduleConfirmPrompt 를
+    //   거치지 않아 lastScheduleKey 가 옛 step 에 머문다 → 직후 background→active Resync 가 같은 step 의 살아있는
+    //   알람을 churn(cancel→재생성)한다(log02 2026-06-09 DC3C→2D05). native 가 만든 새 step 알람의 dedup key 를
+    //   함께 넘겨 effectRunner 가 lastScheduleKey 를 동기화 → 직후 Resync 가 #ReArmChurn skip 가드에 정상 진입.
+    effects.push({
+      kind: 'SetCurrentRunningAlarmId',
+      alarmId: action.currentAlarmId,
+      scheduleKey: `${current.sessionId}:${next.currentStepIndex}:${next.stepEndAt}`,
+    });
     effects.push({ kind: 'SaveActiveRoutine', session: next });
     effects.push({
       kind: 'EmitEvent',

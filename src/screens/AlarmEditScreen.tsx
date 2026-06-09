@@ -217,6 +217,8 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
       ...(s.icon ? { icon: s.icon } : {}),
     }));
     setSteps(copied);
+    // 2026-06-02 — routine 불러오기 시 label = routine.name 항상 자동 채움 (예: "아침운동" routine → 알람 라벨도 "아침운동").
+    setLabel(routine.name);
     setImportPickerVisible(false);
   };
 
@@ -288,12 +290,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         };
       }
       for (const step of populatedSteps) {
-        if (step.name.trim().length === 0) {
-          return {
-            ok: false,
-            error: t('alarm.validate.stepNameEmpty', { defaultValue: '루틴 단계 이름을 입력해주세요' }),
-          };
-        }
+        // 이름 미입력 허용 — 저장 시 "루틴 01~" 자동 채움(루틴탭과 동일). 시간(durationSeconds)만 필수.
         if (step.durationSeconds <= 0) {
           return {
             ok: false,
@@ -318,7 +315,12 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
     // v1.7 Phase 1 — steps[] 측 빈 이름 + duration 0 모두 trim. trim 후 0개 = 단독 알람.
     const trimmedSteps = steps
       .map(s => ({ ...s, name: s.name.trim() }))
-      .filter(s => s.name.length > 0 || s.durationSeconds > 0);
+      .filter(s => s.name.length > 0 || s.durationSeconds > 0)
+      .map((s, idx) => ({
+        ...s,
+        // 이름 미입력 시 루틴탭과 동일 키로 "루틴 01~" 자동 채움(저장 순간 언어로 고정).
+        name: s.name || t('routine.edit.stepNamePlaceholder', { n: String(idx + 1).padStart(2, '0') }),
+      }));
 
     const alarm: Alarm = {
       id: editingId ?? createAlarmId(),

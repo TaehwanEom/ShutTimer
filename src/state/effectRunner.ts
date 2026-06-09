@@ -208,6 +208,20 @@ async function runEffect(effect: SideEffect): Promise<void> {
       // v2.0 C — 옛 scheduleBackgroundNotif 등가 처리.
       //   DupSched 가드 + 이전 confirm_prompt cancel + LA metadata 7인자 전달 + currentRunningAlarmId 캐싱.
       const key = `${effect.routineId}:${effect.stepIndex ?? 0}:${effect.fireAt}`;
+      // #ReArmChurn fix (2026-06-10) — app background→active 시 restoreRoutineState 가 진행 중 단계를
+      //   무조건 Resync → ScheduleConfirmPrompt 재방출. 아래 1초 창을 넘기면(예: "다음 진행" 누른 ~4초 뒤
+      //   앱이 foreground 로 깨어남) 멀쩡히 살아있는 confirm_prompt 를 cancel→동일 key 재생성 →
+      //   잠금화면 LiveActivity 카드 파괴·재생성(깜빡임) + 비-마지막 단계서 "다음 진행" 버튼 재등장 +
+      //   사용자 재press 시 AdvanceNextStepIntent 중복 발화 → step skip 위험. (log02 2026-06-09 18:13:56 DC3C→2D05 재현)
+      //   정정: 같은 JS 런타임에서 동일 key(routineId+stepIndex+fireAt) 알람이 이미 살아있으면(currentRunningAlarmId 보유)
+      //         cancel·재생성하지 않고 그대로 유지 → 깜빡임/중복 press 제거.
+      //   cold-start 시엔 모듈 변수(lastScheduleKey/currentRunningAlarmId) 가 초기화되므로 이 가드를 통과하지 못해
+      //   정상적으로 재-arm(알람 유실 복구) 됨. 알람을 의도적으로 cancel 한 경로는 currentRunningAlarmId 를 null 로
+      //   비우므로(아래 218줄, CancelConfirmPrompt) 역시 이 가드를 건너뛰어 재-arm 된다.
+      if (lastScheduleKey === key && currentRunningAlarmId) {
+        Logger.warn('effectRunner', `ScheduleConfirmPrompt SKIP same-step rearm key=${key} keep=${currentRunningAlarmId}`);
+        return;
+      }
       if (lastScheduleKey === key && Date.now() - lastScheduleAt < 1000) {
         Logger.warn('effectRunner', `ScheduleConfirmPrompt SKIP duplicate key=${key}`);
         return;
@@ -250,9 +264,10 @@ async function runEffect(effect: SideEffect): Promise<void> {
           effect.currentStepName,
           effect.stepIndex,
           effect.totalSteps,
+          effect.endMethod,  // 2026-05-31 — Android 미션 알람 잠금 해제 강제
         );
         currentRunningAlarmId = id;
-        Logger.warn('effectRunner', `ScheduleConfirmPrompt id=${id ?? '(null)'} key=${key}`);
+        Logger.warn('effectRunner', `ScheduleConfirmPrompt id=${id ?? '(null)'} key=${key} endMethod=${effect.endMethod ?? '(null)'}`);
       } catch (e) {
         Logger.warn('effectRunner', `ScheduleConfirmPrompt error=${String(e)}`);
       }

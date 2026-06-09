@@ -6,6 +6,8 @@ import { RootStackParamList } from '../../App';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MISSIONS_STORAGE_KEY } from '../constants/missions';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Splash'>;
@@ -50,6 +52,10 @@ export default function SplashScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      {/* 앱 버전 — 스플래시 좌측 하단 (앱 켤 때마다 빌드 식별). Apple 표준 "1.8.9 (246)". */}
+      <Text style={styles.version}>
+        {`${Constants.expoConfig?.version ?? '?'} (${Application.nativeBuildVersion ?? '-'})`}
+      </Text>
       <Animated.View style={[styles.center, { opacity: fadeAnim }]}>
         <View style={styles.titleRow}>
           <MaterialIcons name="alarm" size={36} color="#ff2424" />
@@ -81,6 +87,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1a1c1f',
     letterSpacing: -1,
+  },
+  version: {
+    position: 'absolute',
+    bottom: 48,
+    left: 20,
+    fontSize: 11,
+    color: '#bbbbbb',
+    fontWeight: '500',
   },
   byline: {
     position: 'absolute',

@@ -2,7 +2,7 @@
   "expo": {
     "name": "ShutTimer",
     "slug": "ShutTimer",
-    "version": "1.8.8",
+    "version": "1.8.9",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

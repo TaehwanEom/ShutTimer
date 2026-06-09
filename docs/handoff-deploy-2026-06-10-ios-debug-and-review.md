@@ -6,6 +6,41 @@
 
 ---
 
+## ⚡ 최신 업데이트 (2026-06-10 추가 — 이 블록 우선)
+
+### 새 커밋 (build 246 이후 추가됨 → 246은 구버전)
+| 커밋 | 내용 |
+|---|---|
+| `295b7d6` | 알람탭 단계이름 자동채움(루틴탭과 동일 "루틴 01~") + #ReArmChurn 1차(불충분) |
+| `ebcd1dd` | **#ReArmChurn 보강(실 수정)** — 잠금화면 루틴 진행 중 깜빡임+버튼 재등장 원인 수정 |
+
+### #ReArmChurn = 이번 핵심 수정
+- 증상: 잠금 중 루틴 "다음 진행" 후 앱 깨어날 때 **잠금화면 카드 깜빡임 + "다음" 버튼 재등장**(재press 시 step skip 위험).
+- 수정: native advance 후 Resync가 살아있는 알람을 cancel→재생성하던 churn 차단. **전부 JS 변경 → pod install 불요.**
+- 검증 마커: 실기기 로그에 `[effectRunner] ScheduleConfirmPrompt SKIP same-step rearm` 뜨면 가드 작동.
+
+### ✅ 빌드 순서 (반드시 이대로 — "고침 ≠ 확인됨")
+**1단계: 디버그 빌드 → 실기기 검증 먼저**
+- 대상 기기: **iPhone 12 mini** (iPhone13,1). build UDID `00008101-001E49D0027A001E` (devicectl: `156007CD-3C9F-59AC-ABDD-DD2CDB4EC010`). 연결·페어링 확인됨, 개발자모드 ON.
+- 검증 절차: 루틴(2단계 이상) 잠금 진행 → "다음 진행" 누르고 앱 깨우기 → `idevicesyslog`에서
+  - `SKIP same-step rearm` 마커 확인 + **LiveActivity 안 깜빡임** 확인
+  - 알람탭에서 단계 이름 비우고 저장 → "루틴 01" 자동 들어가는지
+- ⚠️ **시뮬레이터 불가**(AlarmKit 미발화) → 반드시 실기기.
+
+**2단계: 디버그 검증 통과 후에만 → 심사용 재빌드(247)**
+- `eas build -p ios --profile production --local` (watchOS 26.5 설치됨, iCloud 제외 상태 그대로)
+- 버전 1.8.9. "이 버전의 새로운 기능" = 잠금 루틴 수정 (영·한·일·중, `docs/release-notes-1.8.9-*` 참조)
+- `eas submit` 업로드는 **유저 승인 후**.
+
+### ⚠️ 주의
+- 빌드는 working tree 전체 포함 → **타 창 미커밋분(카메라/TFLite/UI)도 들어감** (240/246과 동일 상태).
+- 타입에러 1건 `AlarmEditScreen:221` = 타 창, 런타임 무해.
+- 깜빡임 fix는 **실기기 미검증** 상태(시뮬레이터 한계) → 1단계가 그 검증임.
+
+---
+
+---
+
 ## 0. 현황 한눈에
 
 | 항목 | 상태 |

@@ -11,9 +11,9 @@ const isExpoGo = (Constants as any).appOwnership === 'expo';
 // v1.8 #AdHideGate — Debug 빌드 (= Xcode 직접 / expo run:ios / EAS dev|preview) 측 = 광고 호출 차단.
 // Release 빌드 (= EAS production / Xcode Archive) 측 = EXPO_PUBLIC_HIDE_ADS=false → 광고 정상 표시.
 // __DEV__ = React Native 빌드 configuration 자동 분기 (= Debug=true / Release=false).
-// TEMP DISABLE (2026-05-27) — 베너 광고 측 = 노란색 바 형태 측 = 버그 의심 → 광고 해제 대기 중 측 일시 비활성.
-//   복원 시 = 아래 `true ||` 측 = 제거 → 원래 환경 분기 측 복원.
-const HIDE_ADS = true || __DEV__ || process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
+// TEMP DISABLE (2026-05-27) — 베너 광고 노란색 바 버그 의심으로 `true ||` 강제 비활성했었음.
+// RESTORED (2026-06-10) — 광고 해제(재활성)되어 `true ||` 제거 → 원래 환경 분기로 복원 (전면 광고 AlarmScreen.tsx와 동일 게이트).
+const HIDE_ADS = __DEV__ || process.env.EXPO_PUBLIC_HIDE_ADS === 'true';
 
 // PROD IDs kept for restoration after verification build
 // iOS: ca-app-pub-3043284478228309/4187716112

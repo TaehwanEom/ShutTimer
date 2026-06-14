@@ -240,8 +240,8 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
   return (
     <View style={styles.container} {...(onSeek ? panResponder.panHandlers : {})}>
       <Svg width={SIZE} height={SIZE} style={StyleSheet.absoluteFill}>
-        {/* 1. 회색 디스크 */}
-        <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill={colors.surfaceContainerLow} />
+        {/* 1. 디스크 (메뉴바 흰색 기준) */}
+        <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill={colors.surfaceContainerLowest} />
 
         {/* 3. 빨간 게이지바 */}
         {displayProgress >= 0.999 ? (
@@ -257,7 +257,7 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
         <Defs>
           <RadialGradient id="innerShadow" cx="50%" cy="50%" r="50%">
             <Stop offset="80%" stopColor={colors.onBackground} stopOpacity={0} />
-            <Stop offset="100%" stopColor={colors.onBackground} stopOpacity={0.15} />
+            <Stop offset="100%" stopColor={colors.onBackground} stopOpacity={0.025} />
           </RadialGradient>
         </Defs>
         <Circle cx={cx} cy={cy} r={SECTOR_RADIUS} fill="url(#innerShadow)" />

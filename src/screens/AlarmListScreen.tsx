@@ -94,10 +94,8 @@ function formatDurationLabel(sec: number, t: (k: string, opts?: any) => string):
   return parts.join(' ');
 }
 
-// v1.7 Phase 1.5 — swipe 상수 (= RoutineCard 동일).
-const SWIPE_MAX = 96;
+// 우측 스와이프로 노출되는 삭제 슬라이드 폭/임계값 (= RoutineCard 동일).
 const EDIT_SLIDE_WIDTH = 56;
-const TRASH_DISTANCE_THRESHOLD = 32;
 const EDIT_DISTANCE_THRESHOLD = 18;
 const VELOCITY_THRESHOLD = 0.25;
 
@@ -115,8 +113,7 @@ type AlarmStepRowProps = {
 function AlarmStepRow({ step, idx, colors, visible, totalSteps, isDark }: AlarmStepRowProps) {
   const { t } = useTranslation();
   const anim = useRef(new Animated.Value(0)).current;
-  const stepCardBg = isDark ? colors.surfaceContainerLow : '#d1dceaff';
-  const durationBadgeBg = isDark ? colors.surfaceContainerLowest : '#d1dceaff';
+  const stepCardBg = colors.surfaceContainerLowest;
 
   useEffect(() => {
     // 펼치기: 위→아래 (idx 0 부터). 접기: 아래→위 (마지막 idx 부터, 등장 역순).
@@ -140,32 +137,40 @@ function AlarmStepRow({ step, idx, colors, visible, totalSteps, isDark }: AlarmS
     <Animated.View
       style={{
         backgroundColor: stepCardBg,
-        borderRadius: 14,
-        padding: 18,
-        marginTop: 10,
+        borderRadius: 0,
+        paddingVertical: 14,
+        paddingHorizontal: 0,
+        marginTop: 0,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
         opacity: anim,
         transform: [{ translateY }],
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 7,
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onPrimary }}>
+            {idx + 1}
+          </Text>
+        </View>
         <Text
           style={{ flex: 1, fontSize: 17, fontWeight: '700', color: colors.onBackground }}
           numberOfLines={1}
         >
           {step.name || placeholderName}
         </Text>
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            borderRadius: 8,
-            backgroundColor: durationBadgeBg,
-          }}
-        >
-          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.onBackground }}>
-            {formatDurationLabel(step.durationSeconds, t)}
-          </Text>
-        </View>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.onBackground }}>
+          {formatDurationLabel(step.durationSeconds, t)}
+        </Text>
       </View>
     </Animated.View>
   );
@@ -175,6 +180,8 @@ function AlarmStepRow({ step, idx, colors, visible, totalSteps, isDark }: AlarmS
 
 type AlarmRowProps = {
   item: Alarm;
+  index: number;
+  totalCount: number;
   styles: ReturnType<typeof makeStyles>;
   colors: ThemeColors;
   isDark: boolean;
@@ -188,23 +195,29 @@ type AlarmRowProps = {
   isActive?: boolean;
   /** 2026-05-27 fix — 루틴/ad-hoc routine 진행 중 측 = 모든 알람 토글 disable (= 진행 중 routine 측 영향 차단). */
   toggleDisabled?: boolean;
+  /** 다른 알람/루틴 진행 중 = 본 카드도 swipe 편집/삭제 차단 */
+  swipeDisabled?: boolean;
 };
 
-function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive, toggleDisabled }: AlarmRowProps) {
+function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive, toggleDisabled, swipeDisabled }: AlarmRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
   const [expanded, setExpanded] = useState(false);
   const [renderSteps, setRenderSteps] = useState(false);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mainCardHeight, setMainCardHeight] = useState(0);
-  const [swipeRevealEdit, setSwipeRevealEdit] = useState(false);
-  // v1.7 — iOS Mail 패턴: swipe open 상태에서 카드 본체 tap = swipe 닫기 (= 토글 ❌).
-  const [swipeRevealTrash, setSwipeRevealTrash] = useState(false);
+  // 우측 스와이프 시 왼쪽 삭제 버튼 노출. 편집은 토글 위 "편집" 텍스트 버튼이 담당(펜슬 스와이프 제거).
+  const [swipeRevealDelete, setSwipeRevealDelete] = useState(false);
   // v1.7 Phase 2-B — 진행 시작 시 자동 펼침 (= cold-start / 알람 dismiss 후 진입). routineId 단위 1회.
   const autoExpandedRef = useRef(false);
 
-  const mainCardBg = isDark ? colors.surfaceContainerLowest : '#e2e8f1ff';
   const hasSteps = !!item.steps && item.steps.length > 0;
+  // 루틴(스텝) 포함 시 총 시간 = 스텝 duration 합. 메타에 "루틴 시간 X" 표시(루틴 탭과 동일).
+  const totalStepSec = (item.steps ?? []).reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
+  const formattedTime = formatTimeKr(item.time);
+  const timeTokens = formattedTime.split(' ');
+  const periodText = timeTokens.length > 1 ? timeTokens[0] : '';
+  const timeText = timeTokens.length > 1 ? timeTokens.slice(1).join(' ') : formattedTime;
 
   // 펼침/접기 토글 — 접기 시 reverse stagger 끝난 뒤 unmount.
   const toggleExpanded = useCallback(() => {
@@ -244,106 +257,74 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
   }, [activeRunNode]);
 
   // v1.7 Phase 2-B — 진행 중 알람 카드 = swipe state 강제 리셋 (= 진입 시 swipe 잔존 방지).
+  //   swipeDisabled (= 다른 알람/루틴 진행 시작) 도 동일 처리 → 열려 있던 swipe 즉시 닫기.
   useEffect(() => {
-    if (isActive) {
+    if (isActive || swipeDisabled) {
       translateX.setValue(0);
       swipeOffsetRef.current = 0;
-      setSwipeRevealEdit(false);
-      setSwipeRevealTrash(false);
+      setSwipeRevealDelete(false);
     }
-  }, [isActive, translateX]);
+  }, [isActive, swipeDisabled, translateX]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
         // v1.7 Phase 2-B — 진행 중 알람 측 swipe 차단 (= 실수로 편집/삭제 진입 방지).
+        //   swipeDisabled = 다른 알람/루틴 진행 중 → 본 카드 swipe 도 차단.
         onMoveShouldSetPanResponder: (_, g) =>
-          !isActive && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+          !isActive && !swipeDisabled && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
         // ScrollView termination 거부 — drag 중 vertical scroll 가 responder 회수해 snap-to-0 되는 문제 차단.
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           translateX.stopAnimation();
         },
         onPanResponderMove: (_, g) => {
-          // 양방향 — 우→좌 (음수, 휴지통) + 좌→우 (양수, 편집 펜슬) 둘 다 허용.
-          const next = Math.max(-SWIPE_MAX, Math.min(EDIT_SLIDE_WIDTH, g.dx));
+          // 우측 스와이프(양수)만 허용 → 왼쪽 삭제 버튼 노출. (펜슬 편집 스와이프 제거)
+          const next = Math.max(0, Math.min(EDIT_SLIDE_WIDTH, g.dx));
           translateX.setValue(next);
           swipeOffsetRef.current = next;
         },
         onPanResponderRelease: (_, g) => {
           const tx = swipeOffsetRef.current;
-          const trashByDist = -tx >= TRASH_DISTANCE_THRESHOLD;
-          const trashByVel = g.vx <= -VELOCITY_THRESHOLD;
-          const editByDist = tx >= EDIT_DISTANCE_THRESHOLD;
-          const editByVel = g.vx >= VELOCITY_THRESHOLD;
-          if (trashByDist || (tx < 0 && trashByVel)) {
-            Animated.spring(translateX, { toValue: -SWIPE_MAX, useNativeDriver: true, bounciness: 0 }).start();
-            setSwipeRevealEdit(false);
-            setSwipeRevealTrash(true);
-          } else if (editByDist || (tx > 0 && editByVel)) {
+          const revealByDist = tx >= EDIT_DISTANCE_THRESHOLD;
+          const revealByVel = g.vx >= VELOCITY_THRESHOLD;
+          if (revealByDist || revealByVel) {
             Animated.spring(translateX, { toValue: EDIT_SLIDE_WIDTH, useNativeDriver: true, bounciness: 0 }).start();
-            setSwipeRevealEdit(true);
-            setSwipeRevealTrash(false);
+            setSwipeRevealDelete(true);
           } else {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-            setSwipeRevealEdit(false);
-            setSwipeRevealTrash(false);
+            setSwipeRevealDelete(false);
           }
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          setSwipeRevealEdit(false);
-          setSwipeRevealTrash(false);
+          setSwipeRevealDelete(false);
         },
       }),
-    [translateX, isActive],
+    [translateX, isActive, swipeDisabled],
   );
 
-  const swipeEditOpacity = translateX.interpolate({
+  const swipeDeleteOpacity = translateX.interpolate({
     inputRange: [0, EDIT_SLIDE_WIDTH],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  return (
-    <View style={{ position: 'relative', marginHorizontal: 16, marginBottom: 12 }}>
-      {/* 휴지통 — 우측 absolute. touch area = reveal 영역 풀 (= forgiving) / 시각 = 원형 56×56. */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        disabled={isActive}
-        onPress={() => {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          setSwipeRevealEdit(false);
-          onDelete();
-        }}
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          height: mainCardHeight,
-          width: SWIPE_MAX,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: colors.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
-        </View>
-      </TouchableOpacity>
+  const handleCardPress = () => {
+    if (swipeRevealDelete) {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      setSwipeRevealDelete(false);
+      return;
+    }
+    toggleExpanded();
+  };
 
-      {/* 편집 펜슬 — 좌측 absolute. v1.7 Phase 2-B — 진행 중 알람 = pointerEvents none. */}
+  return (
+    <View style={{ position: 'relative', marginHorizontal: 16, marginBottom: 0 }}>
+      {/* 삭제 — 우측 스와이프로 왼쪽(펜슬 있던 자리)에 노출 (동그라미). 편집은 토글 위 "편집" 텍스트. */}
       <Animated.View
-        pointerEvents={swipeRevealEdit && !isActive ? 'auto' : 'none'}
+        pointerEvents={swipeRevealDelete && !isActive ? 'auto' : 'none'}
         style={{
           position: 'absolute',
           left: 0,
@@ -351,34 +332,33 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
           height: mainCardHeight,
           width: EDIT_SLIDE_WIDTH,
           paddingRight: 6,
-          opacity: swipeEditOpacity,
+          opacity: swipeDeleteOpacity,
         }}
       >
         <TouchableOpacity
           onPress={() => {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-            setSwipeRevealEdit(false);
-            onEdit();
+            setSwipeRevealDelete(false);
+            onDelete();
           }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{
-            flex: 1,
-            borderRadius: 14,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: mainCardBg,
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3,
-          }}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
         >
-          <MaterialIcons name="edit" size={22} color={colors.primary} />
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+          </View>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* 카드 본체 — translateX 스와이프 */}
       <Animated.View
         {...panResponder.panHandlers}
         style={{
@@ -387,131 +367,108 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
         }}
       >
         <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => {
-            // v1.7 — iOS Mail 패턴: swipe open 상태 측 = 닫기 우선. 그 외 = 펼침 토글.
-            if (swipeRevealTrash || swipeRevealEdit) {
-              Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-              setSwipeRevealTrash(false);
-              setSwipeRevealEdit(false);
-              return;
-            }
-            toggleExpanded();
-          }}
-          onLayout={e => setMainCardHeight(e.nativeEvent.layout.height)}
-          style={{
-            alignSelf: 'stretch',
-            backgroundColor: mainCardBg,
-            borderRadius: 14,
-            padding: 16,
-            paddingBottom: hasSteps ? 28 : 16,
-            position: 'relative',
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3,
-          }}
+          activeOpacity={0.92}
+          onPress={handleCardPress}
+          onLongPress={onEdit}
+          style={[
+            styles.alarmCard,
+            !item.enabled && styles.alarmCardDisabled,
+          ]}
         >
-          {/* 시간 + 라벨 + meta + Switch */}
-          <View style={{ position: 'relative', minHeight: 60, justifyContent: 'center' }}>
-            <View style={{ paddingRight: 60 }}>
-              <Text style={[styles.itemTime, !item.enabled && styles.itemDisabled]}>
-                {formatTimeKr(item.time)}
+      <View
+        style={styles.alarmCardMain}
+        onLayout={e => setMainCardHeight(e.nativeEvent.layout.height + 28)}
+      >
+        {/* 라벨 + "편집" = 한 줄 (편집을 라벨 수평 위치에 맞춤). */}
+        <View style={styles.alarmLabelRow}>
+          <Text style={[styles.itemLabel, { flex: 1, marginEnd: 8 }, !item.enabled && styles.itemDisabled]} numberOfLines={1}>
+            {item.label}
+          </Text>
+          <TouchableOpacity onPress={onEdit} hitSlop={{ top: 6, bottom: 6, left: 10, right: 6 }}>
+            <Text style={styles.alarmEditText}>
+              {t('alarm.editBtn', { defaultValue: '편집' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {/* 시간행 + 토글 = 한 줄, 토글을 시간 세로 중앙에 정렬. */}
+        <View style={styles.alarmTopRow}>
+          <View style={styles.alarmTimeRow}>
+            <Text style={[styles.itemTime, !item.enabled && styles.itemDisabled]}>
+              {timeText}
+            </Text>
+            {!!periodText && (
+              <Text style={[styles.itemPeriod, !item.enabled && styles.itemDisabled]}>
+                {periodText}
               </Text>
-              {item.label.length > 0 && (
-                <Text style={[styles.itemLabel, !item.enabled && styles.itemDisabled]} numberOfLines={1}>
-                  {item.label}
-                </Text>
-              )}
-              <View style={styles.itemMetaRow}>
-                <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]}>
-                  {formatRepeat(item, t)}
-                </Text>
-                {/* alarm.steps[] 보유 시 배지 노출 */}
-                {hasSteps && (
-                  <View
-                    style={[
-                      styles.stepBadge,
-                      !item.enabled && { opacity: 0.4 },
-                    ]}
-                  >
-                    <MaterialIcons name="playlist-play" size={12} color={colors.onPrimary} />
-                    <Text style={styles.stepBadgeText}>
-                      {t('alarm.stepBadge', {
-                        defaultValue: `${item.steps!.length}단계`,
-                        count: item.steps!.length,
-                      })}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            {/* Switch — 절대 우측 */}
-            <View
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                justifyContent: 'center',
-              }}
-            >
-              <Switch
-                value={item.enabled}
-                onValueChange={onToggle}
-                disabled={!!toggleDisabled}
-                trackColor={{ false: colors.outlineVariant, true: colors.primary }}
-                style={toggleDisabled ? { opacity: 0.4 } : undefined}
-              />
-            </View>
+            )}
           </View>
-
-          {/* v자 펼침/접힘 토글 — alarm.steps 보유 시만 노출 */}
+          <Switch
+            value={item.enabled}
+            onValueChange={onToggle}
+            disabled={!!toggleDisabled}
+            trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+            style={[{ transform: [{ scale: 0.9 }, { translateY: Platform.select({ ios: 14, android: 0 }) ?? 14 }] }, toggleDisabled ? { opacity: 0.4 } : undefined]}
+          />
+        </View>
+        <View style={styles.itemMetaRow}>
+          <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]}>
+            {formatRepeat(item, t)}
+          </Text>
           {hasSteps && (
-            <TouchableOpacity
-              onPress={toggleExpanded}
-              hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
-              style={{
-                position: 'absolute',
-                bottom: 4,
-                left: 0,
-                right: 0,
-                alignItems: 'center',
-                paddingVertical: 2,
-              }}
-            >
-              <MaterialIcons
-                name={expanded ? 'expand-less' : 'expand-more'}
-                size={22}
-                color={colors.secondary}
-              />
-            </TouchableOpacity>
+            <View style={[styles.stepBadge, !item.enabled && { opacity: 0.4 }]}>
+              <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
+              <Text style={styles.stepBadgeText}>
+                {t('alarm.stepBadge', {
+                  defaultValue: `${item.steps!.length}단계`,
+                  count: item.steps!.length,
+                })}
+              </Text>
+            </View>
           )}
-        </TouchableOpacity>
+          {hasSteps && (
+            <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]} numberOfLines={1}>
+              {t('routine.totalDurationFmt', {
+                duration: formatDurationLabel(totalStepSec, t),
+                count: item.steps!.length,
+                defaultValue: `루틴 시간 ${formatDurationLabel(totalStepSec, t)}`,
+              })}
+            </Text>
+          )}
+        </View>
+      </View>
 
-        {/* 펼침 영역.
-            v1.7 Phase 2-B — 진행 중 (= activeRunNode 있음) → ActiveRoutineSection 마운트 (= 카운트다운 + 컨트롤).
-            그 외 → 정적 StepRow stagger.
-            진행 중 expanded 토글 = display:none/flex (= unmount ❌. timer/sound/모달 진행 상태 보존). */}
-        {activeRunNode ? (
-          <View style={{ marginTop: 8, display: expanded ? 'flex' : 'none' }}>
-            {activeRunNode}
+      {activeRunNode ? (
+        <View style={[styles.alarmExpanded, { display: expanded ? 'flex' : 'none' }]}>
+          {activeRunNode}
+        </View>
+      ) : (
+        renderSteps && (
+          <View style={styles.alarmExpanded}>
+            {item.steps?.map((step, idx) => (
+              <AlarmStepRow
+                key={step.id}
+                step={step}
+                idx={idx}
+                colors={colors}
+                visible={expanded}
+                totalSteps={item.steps?.length ?? 0}
+                isDark={isDark}
+              />
+            ))}
           </View>
-        ) : (
-          renderSteps && item.steps?.map((step, idx) => (
-            <AlarmStepRow
-              key={step.id}
-              step={step}
-              idx={idx}
-              colors={colors}
-              visible={expanded}
-              totalSteps={item.steps?.length ?? 0}
-              isDark={isDark}
-            />
-          ))
-        )}
+        )
+      )}
+
+      {hasSteps && (
+        <View style={styles.expandIndicator}>
+          <MaterialIcons
+            name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={18}
+            color="#C7C7CC"
+          />
+        </View>
+      )}
+        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -522,7 +479,7 @@ function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t,
 export default function AlarmListScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, isDark);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   // v1.7 Phase 2-B — activeRoutine 측 ad-hoc 알람 routine 인 경우 = 본 화면 측 펼침 영역 안 ActiveRoutineSection 마운트.
   const [activeRoutine, setActiveRoutine] = useState<ActiveRoutine | null>(null);
@@ -666,12 +623,14 @@ export default function AlarmListScreen({ navigation }: Props) {
   // 2026-05-27 fix — 루틴 / ad-hoc routine 진행 중 측 = 모든 알람 토글 disabled (= 진행 중 routine 영향 차단).
   //   activeRoutine 측 = SessionController kind=routine 또는 ad_hoc_routine 측 active 상태 측 mirror.
   const anyRoutineRunning = !!activeRoutine;
-  const renderItem = ({ item }: { item: Alarm }) => {
+  const renderItem = ({ item, index }: { item: Alarm; index: number }) => {
     // v1.7 Phase 2-B — 본 알람 측 ad-hoc routine 진행 중 = ActiveRoutineSection 마운트.
     const isActive = !!activeRoutine && activeRoutine.routineId === createAlarmAdhocRoutineId(item.id);
     return (
       <AlarmRow
         item={item}
+        index={index}
+        totalCount={alarms.length}
         styles={styles}
         colors={colors}
         isDark={isDark}
@@ -681,6 +640,7 @@ export default function AlarmListScreen({ navigation }: Props) {
         onDelete={() => handleDelete(item)}
         isActive={isActive}
         toggleDisabled={anyRoutineRunning}
+        swipeDisabled={anyRoutineRunning}
         activeRunNode={
           isActive ? (
             <ActiveRoutineSection
@@ -696,14 +656,11 @@ export default function AlarmListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <MaterialIcons name="alarm" size={24} color={colors.onBackground} />
-          <Text style={styles.headerTitle}>
-            {t('alarm.title', { defaultValue: '알람' })}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
-          <MaterialIcons name="add" size={28} color={colors.onBackground} />
+        <Text style={styles.headerTitle}>
+          {t('alarm.title', { defaultValue: '알람' })}
+        </Text>
+        <TouchableOpacity style={styles.addBtn} onPress={handleAdd} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <MaterialIcons name="add" size={28} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -739,65 +696,120 @@ export default function AlarmListScreen({ navigation }: Props) {
   );
 }
 
-const makeStyles = (colors: ThemeColors) => {
+const makeStyles = (colors: ThemeColors, isDark: boolean) => {
   // RTL 분기 — flexDirection 측 = RN 자동 mirror ❌, 명시 영영.
   const flexRow: 'row' | 'row-reverse' = I18nManager.isRTL ? 'row-reverse' : 'row';
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surfaceContainerLowest,
     },
     header: {
       flexDirection: flexRow,
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderBottomWidth: 0.5,
-      borderBottomColor: colors.outlineVariant,
-    },
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
+      paddingTop: 2,
+      paddingBottom: 10,
     },
     headerTitle: {
-      fontSize: 22,
-      fontWeight: '600',
+      fontSize: 32,
+      fontWeight: '700',
       color: colors.onBackground,
+      letterSpacing: -0.5,
     },
     addBtn: {
-      width: 40,
-      height: 40,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
     },
     content: {
-      paddingTop: 16,
+      paddingTop: 0,
       paddingBottom: 8,
+    },
+    alarmCard: {
+      marginBottom: 0,
+      backgroundColor: colors.surfaceContainerLowest,
+      borderRadius: 0,
+      padding: 14,
+      position: 'relative',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
+    },
+    alarmCardDisabled: {
+      opacity: 1,
+    },
+    alarmCardMain: {
+      flexDirection: 'column',
+      gap: 3,
+    },
+    // 시간행 + 토글 = 한 줄, 토글을 시간 세로 중앙 정렬.
+    alarmTopRow: {
+      flexDirection: flexRow,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    // 라벨 + "편집" = 한 줄 (편집을 라벨 수평 위치에 맞춤)
+    alarmLabelRow: {
+      flexDirection: flexRow,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    alarmEditText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    alarmTimeRow: {
+      flexDirection: flexRow,
+      alignItems: 'baseline',
+      gap: 4,
+    },
+    alarmExpanded: {
+      marginTop: 14,
+      paddingTop: 14,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: isDark ? colors.outlineVariant : '#D1D1D6',
+      backgroundColor: colors.surfaceContainerLowest,
+    },
+    expandIndicator: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+      minHeight: 10,
     },
     emptyContent: {
       paddingTop: 80,
       alignItems: 'center',
     },
     itemTime: {
-      fontSize: 28,
-      fontWeight: '800',
+      fontSize: 34,
+      fontWeight: '700',
       color: colors.onBackground,
+      letterSpacing: -0.5,
+    },
+    itemPeriod: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.secondary,
     },
     itemLabel: {
-      fontSize: 14,
+      fontSize: 15,
+      fontWeight: '500',
       color: colors.onBackground,
       marginTop: 2,
     },
     itemMetaRow: {
       flexDirection: flexRow,
       alignItems: 'center',
-      marginTop: 4,
+      marginTop: 2,
       flexWrap: 'wrap',
     },
     itemMeta: {
-      fontSize: 12,
+      fontSize: 13,
       color: colors.secondary,
     },
     itemDisabled: {
@@ -809,15 +821,15 @@ const makeStyles = (colors: ThemeColors) => {
       alignItems: 'center',
       marginStart: 8,
       paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 10,
-      backgroundColor: colors.primary,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: isDark ? colors.primary : '#FFEBE9',
       gap: 3,
     },
     stepBadgeText: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.onPrimary,
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDark ? colors.onPrimary : colors.primary,
     },
     emptyWrap: {
       alignItems: 'center',

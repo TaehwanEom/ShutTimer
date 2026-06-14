@@ -38,7 +38,7 @@ type Props = {
 const makeStyles = (colors: ThemeColors, screenWidth: number) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   header: {
     flexDirection: 'row',
@@ -70,7 +70,7 @@ const makeStyles = (colors: ThemeColors, screenWidth: number) => StyleSheet.crea
     paddingVertical: 18,
     paddingHorizontal: 16,
     borderRadius: 14,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   typeRowLeft: {
     fontSize: 15,
@@ -120,7 +120,7 @@ const makeStyles = (colors: ThemeColors, screenWidth: number) => StyleSheet.crea
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceContainerLowest,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -135,7 +135,7 @@ const makeStyles = (colors: ThemeColors, screenWidth: number) => StyleSheet.crea
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   iconCellWrapper: {
     width: 36,
@@ -194,7 +194,9 @@ export default function AddTimerScreen({ navigation, route }: Props) {
     (route?.params?.dialType as DialType | undefined) ?? 'classic'
   );
   const dialSlide = useRef(new Animated.Value(0)).current;
-  const DIAL_SIZE = 350;
+  // 2026-05-31 — slide animation 거리. 화면 너비 기준 (= S23 360pt에서 350 슬라이드 = 화면 밖 정합 X).
+  //   TimerDial / TimerDigital 자체 사이즈와 별개 (= 이 값은 슬라이드 거리 only).
+  const DIAL_SIZE = Math.min(350, SCREEN_WIDTH - 20);
 
   // 마운트 시 AsyncStorage에서 마지막 사용 dial 읽기 (Home과 동기화)
   useEffect(() => {

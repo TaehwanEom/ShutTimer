@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, PanResponder, Animated, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, PanResponder, Animated, TouchableOpacity, TextInput, Dimensions, Platform, Keyboard } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import SevenSegment from './SevenSegment';
@@ -17,14 +18,22 @@ type Props = {
   totalSeconds?: number;
 };
 
-const SIZE = 330;
-const DIGIT_SIZE = 55;
-const MS_DIGIT_SIZE = 26;
+// 2026-05-31 — TimerDial과 동일 반응형 사이즈 (Galaxy S23 360pt 등 작은 화면 정합).
+//   직전 SIZE = 330 하드코딩 → Android 다이얼(290)과 height 차이 40px → HomeScreen 플레이 버튼 위치 어긋남.
+//   iOS = 330 상한 유지 (회귀 X), Android = 290 (= TimerDial과 동일).
+//   DIGIT_SIZE / MS_DIGIT_SIZE도 SIZE 비율로 동적 (= 디자인 비율 100% 유지).
+const SCREEN_W = Dimensions.get('window').width;
+const SIZE = Platform.OS === 'android'
+  ? Math.min(290, SCREEN_W - 80)
+  : Math.min(330, SCREEN_W - 60);
+const DIGIT_SIZE = Math.round(SIZE * (55 / 330));
+const MS_DIGIT_SIZE = Math.round(SIZE * (26 / 330));
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 
 export default function TimerDigital({ progress, timeText, subText: _subText, onSeek, onSeekStart, onSeekEnd, isWarning = false, isRunning = false, isPaused = false }: Props) {
   const { colors } = useTheme();
+  const isFocused = useIsFocused();
   const now = new Date();
   const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
 
@@ -50,6 +59,17 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
     anim.start();
     return () => anim.stop();
   }, [isEditing]);
+
+  // v1.8 #DigitalKeypadTabLeak — 탭 전환(설정 등)으로 화면이 blur 되면 숨겨진 입력칸 focus 가 남아
+  //   다른 탭 위로 소프트 키보드가 다시 노출됨 (하단 탭은 화면을 unmount 하지 않음).
+  //   화면 blur 시 입력칸 blur + 편집모드 해제 + 키보드 dismiss 로 정리 (iOS/Android 공통 = 올바른 동작).
+  useEffect(() => {
+    if (!isFocused && isEditing) {
+      hiddenInputRef.current?.blur();
+      setIsEditing(false);
+      Keyboard.dismiss();
+    }
+  }, [isFocused, isEditing]);
 
   const handleTap = () => {
     // v1.8 #PausedDialEdit — paused 측 = 키패드 노출 활성. running + !paused 측만 차단.
@@ -211,7 +231,7 @@ export default function TimerDigital({ progress, timeText, subText: _subText, on
       <TouchableOpacity activeOpacity={1} onPress={handleTap}>
         <Animated.View style={[styles.display, { opacity: isWarning ? blinkAnim : 1 }]}>
           <View
-            style={[styles.screen, { backgroundColor: colors.surfaceContainerLow, borderRadius: 20 }]}
+            style={[styles.screen, { backgroundColor: colors.surfaceContainerLowest, borderRadius: 20 }]}
             onLayout={(e) => setScreenSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
           >
             {/* 아웃라인 — v1.8 측 ring 게이지 제거 (= 사용자분 부탁). 배경 아웃라인만 잔존. */}

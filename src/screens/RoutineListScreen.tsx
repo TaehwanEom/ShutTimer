@@ -70,11 +70,9 @@ type Props = {
 };
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-// 시각 캡 (Move 시 translateX 가 막히는 위치)
-const SWIPE_MAX = 96;
+// 우측 스와이프로 노출되는 삭제 슬라이드 폭 (= 펜슬 자리).
 const EDIT_SLIDE_WIDTH = 56;
-// Release 시 거리 임계값 — 시각 캡의 1/3 정도로 낮춤. velocity 기반 보조 트리거 함께 사용.
-const TRASH_DISTANCE_THRESHOLD = 32;  // SWIPE_MAX / 3
+// Release 시 거리 임계값 — 슬라이드 폭의 1/3. velocity 기반 보조 트리거 함께 사용.
 const EDIT_DISTANCE_THRESHOLD = 18;   // EDIT_SLIDE_WIDTH / 3
 // Release 시 속도 (px/ms) 임계값 — 짧게 flick 해도 잡힘
 const VELOCITY_THRESHOLD = 0.25;
@@ -124,9 +122,7 @@ function formatDurationLabel(sec: number): string {
 function StepRow({ step, idx, colors, visible, totalSteps }: { step: RoutineStep; idx: number; colors: ThemeColors; visible: boolean; totalSteps: number }) {
   const { isDark } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
-  // 라이트: theme 톤이 배경(#f9f9fe)과 차이 미세 → 명확한 회색 hardcode. 다크: 원본 hierarchy 유지.
-  const stepCardBg = isDark ? colors.surfaceContainerLow : '#d1dceaff';
-  const durationBadgeBg = isDark ? colors.surfaceContainerLowest : '#d1dceaff';
+  const stepCardBg = colors.surfaceContainerLowest;
 
   useEffect(() => {
     // 펼치기: 위 → 아래 (idx 0 부터). 접기: 아래 → 위 (마지막 idx 부터, 등장 역순).
@@ -145,32 +141,40 @@ function StepRow({ step, idx, colors, visible, totalSteps }: { step: RoutineStep
     <Animated.View
       style={{
         backgroundColor: stepCardBg,
-        borderRadius: 14,
-        padding: 18,
-        marginTop: 10,
+        borderRadius: 0,
+        paddingVertical: 14,
+        paddingHorizontal: 0,
+        marginTop: 0,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
         opacity: anim,
         transform: [{ translateY }],
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 7,
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onPrimary }}>
+            {idx + 1}
+          </Text>
+        </View>
         <Text
           style={{ flex: 1, fontSize: 17, fontWeight: '700', color: colors.onBackground }}
           numberOfLines={1}
         >
           {step.name}
         </Text>
-        <View
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 12,
-            borderRadius: 8,
-            backgroundColor: durationBadgeBg,
-          }}
-        >
-          <Text style={{ fontSize: 17, fontWeight: '700', color: colors.onBackground }}>
-            {formatDurationLabel(step.durationSeconds)}
-          </Text>
-        </View>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.onBackground }}>
+          {formatDurationLabel(step.durationSeconds)}
+        </Text>
       </View>
     </Animated.View>
   );
@@ -195,8 +199,12 @@ function groupByCategory(routines: Routine[], t: (k: string) => string): Array<{
 
 type CardProps = {
   routine: Routine;
+  index: number;
+  totalCount: number;
   categoryLabel: string;
+  styles: ReturnType<typeof makeStyles>;
   colors: ThemeColors;
+  /** 섹션 "편집" 모드 — true 면 ▶ 대신 펜슬, swipe 차단 */
   isEditMode: boolean;
   onPlayPress: () => void;
   onToggleActive: (value: boolean) => void;
@@ -210,24 +218,23 @@ type CardProps = {
   collapseSignal?: number;
   /** 진행 중인 본인 카드인지 — collapseSignal 발동 시 active 카드는 접기 X */
   isActiveCard?: boolean;
+  /** 다른 루틴 진행 중 = 본 카드도 swipe 편집/삭제 차단 */
+  swipeDisabled?: boolean;
   /** 카드 외곽 wrapper 의 native ref — 부모가 measureLayout 으로 스크롤 위치 계산 시 사용 */
   wrapperRef?: (node: View | null) => void;
 };
 
-function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, onToggleActive, onDelete, onEditPencil, activeRunNode, activeRoutine, collapseSignal, isActiveCard, wrapperRef }: CardProps) {
+function RoutineCard({ routine, index, totalCount, categoryLabel, styles, colors, isEditMode, onPlayPress, onToggleActive, onDelete, onEditPencil, activeRunNode, activeRoutine, collapseSignal, isActiveCard, swipeDisabled, wrapperRef }: CardProps) {
   const { t } = useTranslation();
   const { isDark } = useTheme();
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
-  const editAnim = useRef(new Animated.Value(0)).current;
   const [expanded, setExpanded] = useState(false);
   const [renderSteps, setRenderSteps] = useState(false);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // cold-start 복원 시 활성 카드 자동 펼침 (routineId 단위 1회 — 사용자가 이후 수동 접기 가능)
   const autoExpandedRef = useRef(false);
   const [mainCardHeight, setMainCardHeight] = useState(0);
-  // 라이트: theme 톤이 배경(#f9f9fe)과 차이 미세 → 명확한 회색 hardcode. 다크: 원본 hierarchy 유지.
-  const mainCardBg = isDark ? colors.surfaceContainerLowest : '#e2e8f1ff';
 
   // 펼침/접기 토글 — 접기 시 reverse stagger 끝난 뒤 unmount.
   const toggleExpanded = () => {
@@ -278,29 +285,17 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
     }
   }, [activeRunNode]);
 
-  // 편집 모드 진입/해제 애니메이션 (좌→우 슬라이드로 편집 아이콘 노출)
-  // 진행 중 카드는 isEditMode 무시 — 카드 슬라이드/펜슬 opacity 둘 다 0 유지
-  useEffect(() => {
-    Animated.spring(editAnim, {
-      toValue: isEditMode && !isActiveCard ? 1 : 0,
-      useNativeDriver: true,
-      bounciness: 4,
-      speed: 14,
-    }).start();
-  }, [isEditMode, isActiveCard, editAnim]);
-
-  // swipe 양수 도달 시 편집 펜슬 클릭 가능 (pointerEvents 'auto'). isEditMode 와 OR.
-  const [swipeRevealEdit, setSwipeRevealEdit] = useState(false);
-  // v1.7 — iOS Mail 패턴: swipe open 상태에서 카드 본체 tap = swipe 닫기 (= 토글 ❌).
-  const [swipeRevealTrash, setSwipeRevealTrash] = useState(false);
+  // 스와이프 양수(우측) 도달 시 왼쪽 삭제 버튼 노출. 편집은 섹션 "편집" 버튼 → 카드 탭 시 편집창 이동.
+  const [swipeRevealDelete, setSwipeRevealDelete] = useState(false);
 
   // 편집 모드 중엔 스와이프 비활성
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
+        // swipeDisabled = 다른 루틴 진행 중 → 본 카드 swipe 편집/삭제 차단.
         onMoveShouldSetPanResponder: (_, g) =>
-          !isEditMode && !isActiveCard && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+          !isEditMode && !isActiveCard && !swipeDisabled && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
         // ★ 핵심 — ScrollView 가 vertical scroll 트리거하려고 termination 요청해도 거부.
         //   미설정 시 default true → drag 중 ScrollView 가 responder 회수 → onPanResponderTerminate
         //   → snap-to-0. 사용자가 충분히 끌어도 lock 안 되는 진짜 원인.
@@ -309,49 +304,37 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
           translateX.stopAnimation();
         },
         onPanResponderMove: (_, g) => {
-          // 우→좌 (음수, 휴지통) + 좌→우 (양수, 편집 펜슬) 둘 다 허용
-          const next = Math.max(-SWIPE_MAX, Math.min(EDIT_SLIDE_WIDTH, g.dx));
+          // 우측 스와이프(양수)만 허용 → 왼쪽 삭제 버튼 노출. (편집 펜슬 스와이프 제거)
+          const next = Math.max(0, Math.min(EDIT_SLIDE_WIDTH, g.dx));
           translateX.setValue(next);
           swipeOffsetRef.current = next;
         },
         onPanResponderRelease: (_, g) => {
-          // 거리 OR 속도 중 하나라도 임계 초과하면 잠금 — flick / 짧은 드래그 모두 자연스럽게 잡힘
-          const tx = swipeOffsetRef.current; // 시각 위치 (캡 적용된 값)
-          const trashByDist = -tx >= TRASH_DISTANCE_THRESHOLD;
-          const trashByVel = g.vx <= -VELOCITY_THRESHOLD;
-          const editByDist = tx >= EDIT_DISTANCE_THRESHOLD;
-          const editByVel = g.vx >= VELOCITY_THRESHOLD;
-          if (trashByDist || (tx < 0 && trashByVel)) {
-            Animated.spring(translateX, { toValue: -SWIPE_MAX, useNativeDriver: true, bounciness: 0 }).start();
-            setSwipeRevealEdit(false);
-            setSwipeRevealTrash(true);
-          } else if (editByDist || (tx > 0 && editByVel)) {
+          // 거리 OR 속도 중 하나라도 임계 초과하면 삭제 버튼 노출 — flick / 짧은 드래그 모두 잡힘
+          const tx = swipeOffsetRef.current;
+          const revealByDist = tx >= EDIT_DISTANCE_THRESHOLD;
+          const revealByVel = g.vx >= VELOCITY_THRESHOLD;
+          if (revealByDist || revealByVel) {
             Animated.spring(translateX, { toValue: EDIT_SLIDE_WIDTH, useNativeDriver: true, bounciness: 0 }).start();
-            setSwipeRevealEdit(true);
-            setSwipeRevealTrash(false);
+            setSwipeRevealDelete(true);
           } else {
             Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-            setSwipeRevealEdit(false);
-            setSwipeRevealTrash(false);
+            setSwipeRevealDelete(false);
           }
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          setSwipeRevealEdit(false);
-          setSwipeRevealTrash(false);
+          setSwipeRevealDelete(false);
         },
       }),
-    [isEditMode, isActiveCard, translateX, t, onDelete]
+    [isEditMode, isActiveCard, swipeDisabled, translateX, t, onDelete]
   );
-
-  const editSlide = editAnim.interpolate({ inputRange: [0, 1], outputRange: [0, EDIT_SLIDE_WIDTH] });
-  // swipe 양수 시 편집 펜슬 자동 노출 (isEditMode 와 OR 조합)
-  const swipeEditOpacity = translateX.interpolate({
+  // 스와이프 양수(우측) → 왼쪽 삭제 버튼 노출 opacity.
+  const swipeDeleteOpacity = translateX.interpolate({
     inputRange: [0, EDIT_SLIDE_WIDTH],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
-  const editIconOpacity = Animated.add(editAnim, swipeEditOpacity);
 
   const mode = getRoutineMode(routine);
 
@@ -365,14 +348,14 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
   }, [isActiveCard]);
 
   // isActiveCard 진입 시 swipe lock 강제 리셋 — swipe 후 ▶ 진행 시 휴지통/펜슬 잔존 방지
+  //   swipeDisabled (= 다른 루틴 진행 시작) 도 동일 처리 → 열려 있던 swipe 즉시 닫기.
   useEffect(() => {
-    if (isActiveCard) {
+    if (isActiveCard || swipeDisabled) {
       translateX.setValue(0);
       swipeOffsetRef.current = 0;
-      setSwipeRevealEdit(false);
-      setSwipeRevealTrash(false);
+      setSwipeRevealDelete(false);
     }
-  }, [isActiveCard, translateX]);
+  }, [isActiveCard, swipeDisabled, translateX]);
 
   // progress / isPaused 계산 — active 카드 + activeRoutine 있을 때만
   let progress: number | undefined;
@@ -423,6 +406,9 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
     onPlayPress();
   };
   const timeStr = routine.schedule?.startTime ? formatTimeKr(routine.schedule.startTime) : '--:--';
+  const timeTokens = timeStr.split(' ');
+  const periodText = timeTokens.length > 1 ? timeTokens[0] : '';
+  const timeText = timeTokens.length > 1 ? timeTokens.slice(1).join(' ') : timeStr;
   const label = daysLabel(routine.schedule?.days ?? [], t);
   const totalDurationLabel = t('routine.totalDurationFmt', {
     duration: formatDurationLabel(getRoutineTotalSeconds(routine)),
@@ -437,66 +423,20 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
     return `${names[0]} 외 ${names.length - 1}개`;
   })();
 
-  return (
-    <View
-      ref={wrapperRef}
-      style={{ position: 'relative', marginHorizontal: 16, marginBottom: 12 }}
-    >
-      {/* 휴지통 (뒤에 깔림, 스와이프 후 탭하면 삭제 확인 팝업) — touch area = reveal 영역 풀 / 시각 = 원형 56×56.
-          진행 중 카드는 disabled 로 클릭 차단 (편집/삭제 양방향 차단). */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        disabled={isActiveCard}
-        onPress={() => {
-          Alert.alert(
-            t('routine.deleteConfirmTitle'),
-            t('routine.deleteConfirmBody'),
-            [
-              {
-                text: t('common.cancel'),
-                style: 'cancel',
-                onPress: () => {
-                  Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-                },
-              },
-              {
-                text: t('routine.actionDelete'),
-                style: 'destructive',
-                onPress: () => {
-                  Animated.timing(translateX, { toValue: -500, duration: 220, useNativeDriver: true }).start(onDelete);
-                },
-              },
-            ],
-            { cancelable: true, onDismiss: () => Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start() }
-          );
-        }}
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: 0,
-          height: mainCardHeight,
-          width: SWIPE_MAX,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: colors.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
-        </View>
-      </TouchableOpacity>
+  const handleCardPress = () => {
+    if (swipeRevealDelete) {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      setSwipeRevealDelete(false);
+      return;
+    }
+    toggleExpanded();
+  };
 
-      {/* 편집 연필 카드 (왼쪽, 메인 카드와 동일 높이) — 진행 중 카드는 강제 비노출 */}
+  return (
+    <View ref={wrapperRef} style={{ position: 'relative', marginHorizontal: 16, marginBottom: 0 }}>
+      {/* 삭제 — 우측 스와이프로 왼쪽(펜슬 있던 자리)에 노출. */}
       <Animated.View
-        pointerEvents={(isEditMode || swipeRevealEdit) && !isActiveCard ? 'auto' : 'none'}
+        pointerEvents={swipeRevealDelete && !isActiveCard ? 'auto' : 'none'}
         style={{
           position: 'absolute',
           left: 0,
@@ -504,209 +444,157 @@ function RoutineCard({ routine, categoryLabel, colors, isEditMode, onPlayPress, 
           height: mainCardHeight,
           width: EDIT_SLIDE_WIDTH,
           paddingRight: 6,
-          opacity: editIconOpacity,
+          opacity: swipeDeleteOpacity,
         }}
       >
         <TouchableOpacity
           onPress={() => {
-            // 편집 화면 진입 전 swipe 상태 리셋 — 복귀 시 펜슬 노출 상태 잔존 방지
-            Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-            setSwipeRevealEdit(false);
-            onEditPencil();
+            Alert.alert(
+              t('routine.deleteConfirmTitle'),
+              t('routine.deleteConfirmBody'),
+              [
+                {
+                  text: t('common.cancel'),
+                  style: 'cancel',
+                  onPress: () => {
+                    Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+                    setSwipeRevealDelete(false);
+                  },
+                },
+                {
+                  text: t('routine.actionDelete'),
+                  style: 'destructive',
+                  onPress: () => {
+                    Animated.timing(translateX, { toValue: 500, duration: 220, useNativeDriver: true }).start(onDelete);
+                  },
+                },
+              ],
+              { cancelable: true, onDismiss: () => { Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start(); setSwipeRevealDelete(false); } }
+            );
           }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           style={{
             flex: 1,
-            borderRadius: 14,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: mainCardBg,
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3,
           }}
         >
-          <MaterialIcons name="edit" size={22} color={colors.primary} />
+          <View
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialIcons name="delete" size={24} color={colors.onPrimary} />
+          </View>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* 카드 본체 (스와이프 + 편집 슬라이드) */}
       <Animated.View
         {...panResponder.panHandlers}
         style={{
-          transform: [{ translateX: Animated.add(translateX, editSlide) }],
+          transform: [{ translateX }],
           alignSelf: 'stretch',
         }}
       >
-        {/* 칸반 카드 — 카드 본체 누르면 펼침 토글 (즉시 실행은 ▶ 버튼). v1.7 — swipe open 시 = 닫기 우선. */}
         <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => {
-            if (swipeRevealTrash || swipeRevealEdit) {
-              Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-              setSwipeRevealTrash(false);
-              setSwipeRevealEdit(false);
-              return;
-            }
-            toggleExpanded();
-          }}
-          onLayout={e => setMainCardHeight(e.nativeEvent.layout.height)}
-          style={{
-            alignSelf: 'stretch',
-            backgroundColor: mainCardBg,
-            borderRadius: 14,
-            padding: 16,
-            paddingBottom: 28, // chevron absolute 공간 확보
-            justifyContent: 'center', // 컨텐츠 (시간행) 카드 본체 수직 가운데
-            position: 'relative',
-            shadowColor: '#000',
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-            elevation: 3,
-          }}
+          activeOpacity={0.92}
+          onPress={handleCardPress}
+          onLongPress={onEditPencil}
+          style={styles.routineCard}
         >
-          {/* 루틴 명 라벨 (예약 only — 일반은 시간행 좌측 텍스트로 표시) */}
-          {mode === 'scheduled' && !!routine.name && (
-            <View
-              style={{
-                alignSelf: 'flex-start',
-                backgroundColor: colors.primary,
-                paddingHorizontal: 8,
-                paddingVertical: 3,
-                borderRadius: 6,
-                marginBottom: 10,
-              }}
-            >
-              <Text style={{ fontSize: 9, fontWeight: '700', color: colors.onPrimary }} numberOfLines={1}>
-                {routine.name}
-              </Text>
-            </View>
-          )}
-
-          {/* 예약: 시간(좌) ▶(가운데) 토글(우)  /  일반: name+duration column(좌, 수직 가운데) ▶(우 끝, 수직 가운데) */}
-          <View style={{ position: 'relative', minHeight: 60, justifyContent: 'center' }}>
+        <View
+          style={styles.routineCardMain}
+          onLayout={e => setMainCardHeight(e.nativeEvent.layout.height + 28)}
+        >
+          <View style={styles.routineCardLeft}>
             {mode === 'scheduled' ? (
-              <Text style={{ fontSize: 27, fontWeight: '800', color: colors.onBackground }}>{timeStr}</Text>
+              <View style={styles.routineTimeRow}>
+                <Text style={styles.routineTimeText}>{timeText}</Text>
+                {!!periodText && <Text style={styles.routinePeriodText}>{periodText}</Text>}
+              </View>
             ) : (
-              <View style={{ flexDirection: 'column', maxWidth: '70%' }}>
-                <Text
-                  style={{ fontSize: 28, fontWeight: '800', color: colors.onBackground }}
-                  numberOfLines={1}
-                >
-                  {routine.name || categoryLabel}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 4,
-                    fontSize: 8,
-                    fontWeight: '700',
-                    color: colors.onBackground,
-                    opacity: 0.75,
-                    lineHeight: 12,
-                  }}
-                  numberOfLines={2}
-                >
-                  {totalDurationLabel}
-                </Text>
-              </View>
-            )}
-
-            {/* ▶ 재생 — 예약: 시간행 가운데 / 일반: 시간행 우측 끝.
-                pointerEvents 'box-none' 제거 — 카드 본체 onPress 가 toggleExpanded 라 ▶ 가 자기 onPress 받아야 함. */}
-            <View
-              pointerEvents="box-none"
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                alignItems: mode === 'manual' ? 'flex-end' : 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <TouchableOpacity
-                onPress={playButtonHandler}
-                activeOpacity={0.7}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              <Text
+                style={styles.routineTimeText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
               >
-                {playButtonVisual}
-              </TouchableOpacity>
+                {routine.name || categoryLabel}
+              </Text>
+            )}
+            <Text style={styles.routineNameText} numberOfLines={1}>
+              {mode === 'scheduled' ? (routine.name || categoryLabel) : (stepSummary || categoryLabel)}
+            </Text>
+            <View style={styles.routineMetaRow}>
+              {mode === 'scheduled' ? (
+                <DaysRow label={label} colors={colors} />
+              ) : (
+                <Text style={styles.routineMetaText} numberOfLines={1}>{categoryLabel}</Text>
+              )}
+              <View style={styles.routineStepBadge}>
+                <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
+                <Text style={styles.routineStepBadgeText}>{routine.steps.length}단계</Text>
+              </View>
+              <Text style={styles.routineMetaText} numberOfLines={1}>{totalDurationLabel}</Text>
             </View>
-
-            {/* 토글 — 절대 우측 (예약 only) */}
-            {mode === 'scheduled' && (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  justifyContent: 'center',
-                }}
-              >
-                <Switch
-                  value={routine.active}
-                  onValueChange={onToggleActive}
-                  trackColor={{ false: colors.outlineVariant, true: colors.primary }}
-                  thumbColor={colors.onPrimary}
-                  style={{ transform: [{ scale: 0.8 }] }}
-                />
-              </View>
-            )}
           </View>
-
-          {/* 요일 (예약 only) — 일반 duration 은 시간행 안 wrapper 로 통합됨 */}
-          {mode === 'scheduled' && (
-            <View style={{ marginTop: 10 }}>
-              <DaysRow label={label} colors={colors} />
-            </View>
-          )}
-
-          {/* v자 펼침/접힘 토글 — absolute bottom. v1.7 — swipe open 시 = 닫기 우선. */}
-          <TouchableOpacity
-            onPress={() => {
-              if (swipeRevealTrash || swipeRevealEdit) {
-                Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-                setSwipeRevealTrash(false);
-                setSwipeRevealEdit(false);
-                return;
-              }
-              toggleExpanded();
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
-            style={{
-              position: 'absolute',
-              bottom: 4,
-              left: 0,
-              right: 0,
-              alignItems: 'center',
-              paddingVertical: 2,
-            }}
-          >
-            <MaterialIcons
-              name={expanded ? 'expand-less' : 'expand-more'}
-              size={22}
-              color={colors.secondary}
+          {isActiveCard ? null : isEditMode ? (
+            // 편집 모드 — ▶ 대신 펜슬. 누르면 그 루틴 편집창으로.
+            <TouchableOpacity
+              onPress={onEditPencil}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialIcons name="edit" size={26} color={colors.primary} />
+              </View>
+            </TouchableOpacity>
+          ) : mode === 'scheduled' ? (
+            <Switch
+              value={routine.active}
+              onValueChange={onToggleActive}
+              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+              thumbColor={colors.onPrimary}
+              style={{ transform: [{ scale: 0.78 }] }}
             />
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={playButtonHandler}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              {playButtonVisual}
+            </TouchableOpacity>
+          )}
+        </View>
 
-        </TouchableOpacity>
-
-        {/* 펼침 영역 — 진행 중 일반 루틴이면 ActiveRoutineSection 표시, 아니면 단계 카드 stagger.
-            진행 중에는 expanded 토글로 display:none/flex 변경 — unmount 안 해서 timer/sound/모달 진행 상태 유지. */}
         {activeRunNode ? (
-          <View style={{ marginTop: 8, display: expanded ? 'flex' : 'none' }}>
+          <View style={[styles.routineExpanded, { display: expanded ? 'flex' : 'none' }]}>
             {activeRunNode}
           </View>
         ) : (
-          renderSteps && routine.steps.map((step, idx) => (
-            <StepRow key={step.id} step={step} idx={idx} colors={colors} visible={expanded} totalSteps={routine.steps.length} />
-          ))
+          renderSteps && (
+            <View style={styles.routineExpanded}>
+              {routine.steps.map((step, idx) => (
+                <StepRow key={step.id} step={step} idx={idx} colors={colors} visible={expanded} totalSteps={routine.steps.length} />
+              ))}
+            </View>
+          )
         )}
+
+        <View style={styles.routineExpandIndicator}>
+          <MaterialIcons
+            name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+            size={18}
+            color="#C7C7CC"
+          />
+        </View>
+        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -749,14 +637,15 @@ function DaysRow({ label, colors }: { label: ReturnType<typeof daysLabel>; color
 // ─── 메인 스크린 ─────────────────────────────────────────────
 
 export default function RoutineListScreen({ navigation, route }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, isDark);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleStatus | null>(null);
   // v2.0 C-3-4 — useState<ActiveRoutine> 측 useActiveRoutineAr() 측 대체. 1초 polling 폐기 + dispatch 자동 갱신.
   //   alias `activeRoutine` 측 caller 측 변경 0.
   const { ar: activeRoutine } = useActiveRoutineAr();
+  // 섹션 "편집" 모드 — 해당 카테고리 카드들의 ▶ 를 펜슬로 교체.
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [customCategories, setCustomCategories] = useState<CategoryDef[]>([]);
   // v1.6 hotfix — @preserve scheduled-routine. 예약 루틴 임시 비활성. 'manual' 기본 강제.
@@ -1051,22 +940,24 @@ export default function RoutineListScreen({ navigation, route }: Props) {
     navigation.navigate('RoutineEdit', { routineId: routine.id });
   };
 
+  // 섹션 "편집" 토글 — 누른 카테고리 편집모드 on/off.
   const toggleSectionEdit = (category: string) => {
     setEditingCategory(prev => (prev === category ? null : category));
   };
 
+  // 진행 중인 루틴이 하나라도 있으면 모든 카드 swipe 편집/삭제 차단 (= 진행 중 다른 항목 실수 변경 방지).
+  const anyRoutineActive = !!activeRoutine?.routineId || activeManualRoutineId !== null;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <MaterialIcons name="repeat" size={24} color={colors.onBackground} />
-          <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
-        </View>
+        <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialIcons name="add" size={28} color={colors.onBackground} />
+          <MaterialIcons name="add" size={28} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -1192,14 +1083,17 @@ export default function RoutineListScreen({ navigation, route }: Props) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              {items.map(r => {
+              {items.map((r, index) => {
                 // activeManualRoutineId 포함 — ▶ trigger 직후 polling 전이라도 자기 카드 isActive 인식
                 const isActiveCard = (!!activeRoutine && activeRoutine.routineId === r.id) || activeManualRoutineId === r.id;
                 return (
                   <RoutineCard
                     key={r.id}
                     routine={r}
+                    index={index}
+                    totalCount={items.length}
                     categoryLabel={formatCategoryLabel(r.category)}
+                    styles={styles}
                     colors={colors}
                     isEditMode={editingCategory === category}
                     onPlayPress={async () => {
@@ -1221,6 +1115,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
                     activeRoutine={isActiveCard ? activeRoutine : undefined}
                     collapseSignal={collapseSignal}
                     isActiveCard={isActiveCard}
+                    swipeDisabled={anyRoutineActive}
                     wrapperRef={node => { cardRefs.current[r.id] = node; }}
                     activeRunNode={
                       activeManualRoutineId === r.id ? (
@@ -1244,16 +1139,17 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   );
 }
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.outlineVariant,
+    paddingTop: 2,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1261,15 +1157,96 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 32,
+    fontWeight: '700',
     color: colors.onBackground,
+    letterSpacing: -0.5,
   },
   iconBtn: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  routineCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
+    padding: 14,
+    position: 'relative',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
+  },
+  routineCardMain: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  routineCardLeft: {
+    flex: 1,
+    paddingEnd: 12,
+    gap: 3,
+  },
+  routineTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  routineTimeText: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: colors.onBackground,
+    letterSpacing: -0.5,
+  },
+  routinePeriodText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.secondary,
+  },
+  routineNameText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.onBackground,
+    marginTop: 2,
+  },
+  routineMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  routineMetaText: {
+    fontSize: 13,
+    color: colors.secondary,
+  },
+  routineStepBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: isDark ? colors.primary : '#FFEBE9',
+  },
+  routineStepBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: isDark ? colors.onPrimary : colors.primary,
+  },
+  routineExpanded: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: isDark ? colors.outlineVariant : '#D1D1D6',
+    backgroundColor: colors.surfaceContainerLowest,
+  },
+  routineExpandIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 10,
   },
   tabBar: {
     flexDirection: 'row',
@@ -1381,7 +1358,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.onBackground,
     letterSpacing: -0.3,

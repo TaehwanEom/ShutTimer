@@ -13,6 +13,7 @@ import {
   AppState,
   Animated,
   Modal,
+  Platform,
   Vibration,
   DeviceEventEmitter,
 } from 'react-native';
@@ -75,7 +76,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, isDark);
 
   const [routine, setRoutine] = useState<Routine | null>(null);
   // v2.0 C-3-2 — useState<ActiveRoutine> 측 useActiveRoutineAr() hook 측 대체.
@@ -266,24 +267,53 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routine, ar, isPaused, modalVisible]);
 
-  // ─── AppState 복귀 시 endAt 기준 재계산 ─────────────────
+  // ─── AppState 복귀 시 endAt 기준 재계산 + 마지막 step 종료방식 navigate ─────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && ar && !isPaused && !ar.awaitingConfirm) {
-        const remainMs = ar.stepEndAt - Date.now();
-        // 2026-05-27 fix — ceil → floor (위 update 측 동일 정합).
-        setRemainingSec(Math.max(0, Math.floor(remainMs / 1000)));
-        if (remainMs <= 0) {
-          // M0 진단: T8 미스터리 1 후보 — AppState active 진입 시 endAt 만료 caller 식별.
-          Logger.warn('T8-DBG', `handleMissionEnd trigger caller=AppState-active stepEndAt=${ar.stepEndAt} now=${Date.now()} diff=${Date.now() - ar.stepEndAt}ms routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
-          // v2.0 P2-1 — 옛 onEndAtReached() 부수 호출 폐기. handleMissionEnd 측 dispatch 충분.
-          handleMissionEnd();
+      if (state !== 'active' || !ar) return;
+
+      // 2026-06-01 — 마지막 step background fire 후 사용자 잠금 해제 시 종료방식 화면 자동 navigate.
+      //   원인: lastStep useEffect (line 199~) 측 = AppState=background 시 skip → ActionDispatcher (2.5) lastStep 분기로 위임.
+      //         단 ActionDispatcher (2.5) 측 = onLAControlSignal('open_app_dismiss') 트리거 전용 = iOS LA widget "Open App" 버튼 누름만 호출.
+      //         Android 측 = LA widget 없음 + AlarmAlertActivity dismiss + 앱 직접 진입 시 트리거 경로 없음 → routine state stuck (= countdown 잔존).
+      //         iOS 측도 사용자가 LA widget 안 누르고 다른 경로로 앱 진입 시 동일 결함.
+      //   정정: AppState='active' 진입 시 = ar.awaitingConfirm=true + isLastStep 판별 → ActionDispatcher (2.5) 동일 navigate.
+      //   양 플랫폼 정합 (= iOS LA widget 신호 외 경로 fallback).
+      if (ar.awaitingConfirm && routine) {
+        const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
+        if (isLastStep) {
+          const sig = `${routine.id}-${ar.currentStepIndex}`;
+          const currentRoute = (navigation as any).getState?.()?.routes?.slice(-1)?.[0]?.name;
+          if (lastStepNavigatedFor !== sig && currentRoute !== 'Alarm') {
+            lastStepNavigatedFor = sig;
+            Logger.warn('ActiveRoutineSection', `AppState-active lastStep navigate routineId=${routine.id} stepIdx=${ar.currentStepIndex}`);
+            navigation.navigate('Alarm', {
+              fromRoutine: 'last_step',
+              routineId: routine.id,
+              endMethod: getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod,
+            });
+          }
+          return;
         }
+        // 일반 step alerting 상태로 active 진입 = useEffect-awaitingConfirm (line 199~) 측이 modal 자동 표시. 본 listener 측 추가 처리 없음.
+        return;
+      }
+
+      // 카운트다운 만료 측 처리 (기존 동작).
+      if (isPaused) return;
+      const remainMs = ar.stepEndAt - Date.now();
+      // 2026-05-27 fix — ceil → floor (위 update 측 동일 정합).
+      setRemainingSec(Math.max(0, Math.floor(remainMs / 1000)));
+      if (remainMs <= 0) {
+        // M0 진단: T8 미스터리 1 후보 — AppState active 진입 시 endAt 만료 caller 식별.
+        Logger.warn('T8-DBG', `handleMissionEnd trigger caller=AppState-active stepEndAt=${ar.stepEndAt} now=${Date.now()} diff=${Date.now() - ar.stepEndAt}ms routineId=${ar.routineId} stepIdx=${ar.currentStepIndex}`);
+        // v2.0 P2-1 — 옛 onEndAtReached() 부수 호출 폐기. handleMissionEnd 측 dispatch 충분.
+        handleMissionEnd();
       }
     });
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ar, isPaused]);
+  }, [ar, isPaused, routine]);
 
   // ─── 알람 효과 (refs) ─────────────────────────────────────
   const soundRef = useRef<AudioPlayer | null>(null);
@@ -317,6 +347,13 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // v1.7 hotfix #StartAlarmEffectsRace — inProgressRef guard 추가. 200ms 지연 + Audio.createAsync 영역 측 = 같은 시점 두 호출 race 시 두번째 측 skip → 1회 fire 보장.
     if (inProgressRef.current) {
       Logger.warn('SOUND-DBG', 'startAlarmEffects SKIP — inProgress');
+      return;
+    }
+    // 2026-06-01 — Android = AlarmService MediaPlayer 단독 사운드 재생 (= AlarmScreen.startAlarmAudio:727 정합).
+    //   JS expo-audio 측 = Android 측 = 항상 skip. log01 (2026-06-01) 측 = routine 측 startAlarmEffects 측
+    //   Android skip 분기 누락 → native MediaPlayer + JS expo-audio = 2중 재생 회귀.
+    if (Platform.OS === 'android') {
+      Logger.warn('SOUND-DBG', 'startAlarmEffects SKIP — Android (native AlarmService 단독 재생)');
       return;
     }
     // v1.9 #SoundDoubleStopFix — AppState=background 시점 = JS in-app 사운드 시작 skip.
@@ -469,9 +506,10 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const LONG_PRESS_DURATION = 1000;
-  const BTN_SIZE = 72;
-  const BTN_RADIUS = 42;
-  const BTN_CIRCUMFERENCE = 2 * Math.PI * BTN_RADIUS;
+  // 시안 구조 — 활성 단계 행의 작은 원형 정지버튼 + 롱프레스 링
+  const SMALL_RING_R = 22;
+  const SMALL_RING_SVG = 52;
+  const SMALL_RING_C = 2 * Math.PI * SMALL_RING_R;
 
   const handlePrimaryPressIn = useCallback(() => {
     longPressFiredRef.current = false;
@@ -506,9 +544,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     };
   }, []);
 
-  const longPressDashoffset = longPressAnim.interpolate({
+  const smallLongPressDashoffset = longPressAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [BTN_CIRCUMFERENCE, 0],
+    outputRange: [SMALL_RING_C, 0],
   });
 
   // ─── Modal handlers ──────────────────────────────────────
@@ -653,102 +691,71 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     return null;
   }
 
-  const step = routine.steps[ar.currentStepIndex];
-  const missionLabel = step?.name ?? '';
   const m = Math.floor(remainingSec / 60);
   const s = remainingSec % 60;
-  const hasNext = ar.currentStepIndex + 1 < routine.steps.length;
 
   return (
     <View style={styles.container}>
-      <View style={styles.missionBox}>
-        <Text style={styles.missionStepIdx}>
-          {ar.currentStepIndex + 1} / {routine.steps.length}
-        </Text>
-        <Text style={styles.missionName} numberOfLines={2}>{missionLabel}</Text>
-      </View>
-
-      <Text style={styles.timerText}>
-        {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
-      </Text>
-
-      <View style={styles.controls}>
-        <View style={{ width: BTN_SIZE + 16, height: BTN_SIZE + 16, alignItems: 'center', justifyContent: 'center' }}>
-          <Svg width={BTN_SIZE + 16} height={BTN_SIZE + 16} style={{ position: 'absolute' }}>
-            <SvgCircle
-              cx={(BTN_SIZE + 16) / 2}
-              cy={(BTN_SIZE + 16) / 2}
-              r={BTN_RADIUS}
-              fill="none"
-              stroke={colors.outlineVariant}
-              strokeWidth={3}
-              opacity={0.3}
-            />
-            <AnimatedSvgCircle
-              cx={(BTN_SIZE + 16) / 2}
-              cy={(BTN_SIZE + 16) / 2}
-              r={BTN_RADIUS}
-              fill="none"
-              stroke={colors.primary}
-              strokeWidth={3}
-              strokeDasharray={BTN_CIRCUMFERENCE}
-              strokeDashoffset={longPressDashoffset}
-              strokeLinecap="round"
-              rotation="-90"
-              origin={`${(BTN_SIZE + 16) / 2}, ${(BTN_SIZE + 16) / 2}`}
-            />
-          </Svg>
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => { if (longPressFiredRef.current) return; handlePauseResume(); }}
-            onPressIn={handlePrimaryPressIn}
-            onPressOut={handlePrimaryPressOut}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons
-              name={isPaused ? 'play-arrow' : 'pause'}
-              size={36}
-              color={colors.onPrimary}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {hasNext && (
-        <ScrollView
-          style={{ marginTop: 16, maxHeight: 220 }}
-          contentContainerStyle={{ paddingBottom: 8 }}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled
-        >
-          {routine.steps.map((s2, idx) => {
-            if (idx <= ar.currentStepIndex) return null;
-            return (
-              <View
-                key={s2.id}
-                style={{
-                  backgroundColor: isDark ? colors.surfaceContainerLow : '#d1dceaff',
-                  borderRadius: 12,
-                  padding: 14,
-                  marginBottom: 8,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Text
-                    style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.onBackground }}
-                    numberOfLines={1}
-                  >
-                    {s2.name}
-                  </Text>
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onBackground }}>
-                    {formatDurationLabel(s2.durationSeconds)}
-                  </Text>
-                </View>
+      {/* 시안 구조 — 단계별 한 줄. 진행 단계만 잔여시간 + 원형 정지버튼, 다음 단계는 설정시간 우측 끝. */}
+      <ScrollView
+        style={{ maxHeight: 320 }}
+        contentContainerStyle={{ paddingBottom: 4 }}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        {routine.steps.map((s2, idx) => {
+          if (idx < ar.currentStepIndex) return null;
+          const isActive = idx === ar.currentStepIndex;
+          const stepName = s2.name || t('routine.run.stepName', {
+            n: String(idx + 1).padStart(2, '0'),
+            defaultValue: `루틴 ${String(idx + 1).padStart(2, '0')}`,
+          });
+          return (
+            <View key={s2.id} style={styles.stepRow}>
+              <View style={styles.stepNum}>
+                <Text style={styles.stepNumText}>{idx + 1}</Text>
               </View>
-            );
-          })}
-        </ScrollView>
-      )}
+              <Text style={styles.stepName} numberOfLines={1}>{stepName}</Text>
+              {isActive ? (
+                <View style={styles.activeRight}>
+                  <Text style={styles.stepCountdown}>
+                    {String(m).padStart(2, '0')}:{String(s).padStart(2, '0')}
+                  </Text>
+                  <View style={styles.smallBtnWrap}>
+                    <Svg width={SMALL_RING_SVG} height={SMALL_RING_SVG} style={{ position: 'absolute', top: -6, left: -6 }}>
+                      <AnimatedSvgCircle
+                        cx={SMALL_RING_SVG / 2}
+                        cy={SMALL_RING_SVG / 2}
+                        r={SMALL_RING_R}
+                        fill="none"
+                        stroke={colors.primary}
+                        strokeWidth={3}
+                        strokeDasharray={SMALL_RING_C}
+                        strokeDashoffset={smallLongPressDashoffset}
+                        strokeLinecap="round"
+                        rotation="-90"
+                        origin={`${SMALL_RING_SVG / 2}, ${SMALL_RING_SVG / 2}`}
+                      />
+                    </Svg>
+                    <TouchableOpacity
+                      style={styles.smallBtn}
+                      onPress={() => { if (longPressFiredRef.current) return; handlePauseResume(); }}
+                      onPressIn={handlePrimaryPressIn}
+                      onPressOut={handlePrimaryPressOut}
+                      hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialIcons name={isPaused ? 'play-arrow' : 'pause'} size={24} color={colors.onPrimary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.stepSetTime}>{formatDurationLabel(s2.durationSeconds)}</Text>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
 
       {/* tap/shake/auto 알람 Modal */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => {}}>
@@ -904,42 +911,66 @@ async function askUser(
   });
 }
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
-    paddingTop: 12,
-    paddingHorizontal: 4,
+    paddingTop: 0,
+    paddingHorizontal: 0,
   },
-  missionBox: { alignItems: 'center', gap: 4 },
-  missionStepIdx: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.secondary,
-    letterSpacing: 1,
-  },
-  missionName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.onBackground,
-    textAlign: 'center',
-  },
-  timerText: {
-    fontSize: 56,
-    fontWeight: '800',
-    color: colors.primary,
-    textAlign: 'center',
-    marginTop: 8,
-    letterSpacing: -1.5,
-  },
-  controls: {
+  // 시안 구조 — 단계 한 줄 (StepRow 와 픽셀 동일: 시작 시 레이아웃 점프 방지)
+  stepRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
-  primaryBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  stepNum: {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.onPrimary,
+  },
+  stepName: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.onBackground,
+  },
+  stepSetTime: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onBackground,
+  },
+  activeRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepCountdown: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  smallBtnWrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  smallBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,

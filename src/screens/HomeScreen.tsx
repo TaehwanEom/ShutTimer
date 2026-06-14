@@ -10,6 +10,7 @@ import {
   PanResponder,
   DeviceEventEmitter,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
@@ -87,7 +88,7 @@ function formatTime(seconds: number): string {
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   header: {
     flexDirection: 'row',
@@ -143,7 +144,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 16,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -164,7 +165,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 16,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -322,6 +323,13 @@ export default function HomeScreen({ navigation, route }: Props) {
         const readIds: string[] = readJson ? JSON.parse(readJson) : [];
         setHasUnread(list.some((n: { id: string }) => !readIds.includes(n.id)));
       });
+    }, [])
+  );
+
+  // v1.8 #DigitalKeypadTabLeak — 홈 탭 blur 시 소프트 키보드 강제 닫기 (디지털 타이머 키패드 잔존 방지 보조).
+  useFocusEffect(
+    useCallback(() => {
+      return () => { Keyboard.dismiss(); };
     }, [])
   );
 
@@ -1270,16 +1278,19 @@ export default function HomeScreen({ navigation, route }: Props) {
               />
             </TouchableOpacity>
           </View>
+          {/* @preserve favorites — 즐겨찾기 진입 버튼 숨김(삭제 아님). Play 중앙 유지 위해 빈 flex 칸은 유지. 되살리려면 아래 주석 해제. */}
           <View style={{ flex: 1, alignItems: 'flex-end' }} pointerEvents={isRunning ? 'none' : 'auto'}>
+            {/*
             <TouchableOpacity
               onPress={() => navigation.navigate('FavoritesList')}
               style={{ opacity: isRunning ? 0.3 : 1 }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.surfaceContainerLow }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.surfaceContainerLowest }}>
                 <MaterialIcons name="format-list-bulleted" size={20} color={colors.primary} />
                 <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>{t('home.list', { defaultValue: 'List' })}</Text>
               </View>
             </TouchableOpacity>
+            */}
           </View>
         </View>
       </View>

@@ -35,7 +35,7 @@ function toKey(year: number, month: number, day: number) {
 
 // ─── 스타일 ────────────────────────────────────────────────────
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -101,8 +101,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     marginHorizontal: 16, marginBottom: 8,
     padding: 14, borderRadius: 14,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
     gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   sessionIconWrap: {
     width: 40, height: 40, borderRadius: 11,
@@ -140,8 +145,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexBasis: '48%',
     flexGrow: 1,
     padding: 16, borderRadius: 14,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
     alignItems: 'center', gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   statValue: { fontSize: 22, fontWeight: '800', color: colors.primary },
   statLabel: { fontSize: 11, fontWeight: '600', color: colors.secondary, opacity: 0.8 },

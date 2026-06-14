@@ -30,10 +30,11 @@ type ItemProps = {
   onEdit: () => void;
   onDelete: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
+  isDark: boolean;
   t: ReturnType<typeof useTranslation>['t'];
 };
 
-function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemProps) {
+function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, isDark, t }: ItemProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
   const [swipeRevealEdit, setSwipeRevealEdit] = useState(false);
@@ -115,7 +116,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
   };
 
   return (
-    <View style={{ marginBottom: 8, position: 'relative' }}>
+    <View style={{ marginBottom: 0, position: 'relative' }}>
       {/* 휴지통 (뒤에 깔림, 우측) — touch area = reveal 영역 풀 / 시각 = 원형 56×56. */}
       <TouchableOpacity
         activeOpacity={0.85}
@@ -164,7 +165,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
             borderRadius: 12,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: colors.surfaceContainerLow,
+            backgroundColor: colors.surfaceContainerLowest,
           }}
         >
           <MaterialIcons name="edit" size={22} color={colors.primary} />
@@ -178,7 +179,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
         style={{ transform: [{ translateX }] }}
       >
         <TouchableOpacity
-          style={[styles.itemRow, { backgroundColor: colors.surfaceContainerLow }]}
+          style={[styles.itemRow, { backgroundColor: colors.surfaceContainerLowest, borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6' }]}
           onPress={() => {
             // v1.7 — iOS Mail 패턴: swipe open 시 = 닫기 우선. 그 외 = 선택.
             if (swipeRevealTrash || swipeRevealEdit) {
@@ -212,7 +213,7 @@ function FavoriteItem({ mission, onSelect, onEdit, onDelete, colors, t }: ItemPr
 }
 
 export default function FavoritesListScreen({ navigation }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const [missionList, setMissionList] = useState<Mission[]>(MISSIONS);
 
@@ -256,8 +257,8 @@ export default function FavoritesListScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.surfaceContainerLowest }]} edges={['top', 'left', 'right']}>
+      <View style={[styles.header, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6' }]}>
         <TouchableOpacity onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <MaterialIcons name="arrow-back" size={28} color={colors.onBackground} />
         </TouchableOpacity>
@@ -292,6 +293,7 @@ export default function FavoritesListScreen({ navigation }: Props) {
               onEdit={() => handleEdit(item)}
               onDelete={() => handleDelete(item)}
               colors={colors}
+              isDark={isDark}
               t={t}
             />
           )}
@@ -331,7 +333,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   itemLabel: {
     fontSize: 16,

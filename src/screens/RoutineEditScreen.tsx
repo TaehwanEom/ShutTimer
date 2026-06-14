@@ -129,9 +129,9 @@ function formatDaysLabel(days: number[], t: (k: string) => string): string {
 // ─── 컴포넌트 ────────────────────────────────────────────
 
 export default function RoutineEditScreen({ navigation, route }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, isDark);
   const editingId = route.params?.routineId ?? null;
   const isEditMode = editingId !== null;
   // 모드: 신규 → params.mode (default 'manual' — v1.6 hotfix 예약 비활성), 편집 → 기존 routine 의 schedule 유무로 마운트 시 보정
@@ -658,14 +658,16 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   );
 }
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   iconBtn: { padding: 8, borderRadius: 50, minWidth: 44, alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.onBackground, letterSpacing: -0.5 },
@@ -724,10 +726,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 8,
   },
   slotCard: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 10,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 0,
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    marginBottom: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   slotRow: {
     flexDirection: 'row',
@@ -802,11 +807,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceContainerLow,
-    marginBottom: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+    borderRadius: 0,
+    backgroundColor: colors.surfaceContainerLowest,
+    marginBottom: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   settingLabel: {
     fontSize: 14,
@@ -844,7 +851,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 24,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   deleteBtnText: {
     fontSize: 14,

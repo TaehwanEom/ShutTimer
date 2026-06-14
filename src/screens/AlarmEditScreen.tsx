@@ -677,7 +677,7 @@ const makeStyles = (colors: ThemeColors) => {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: colors.surfaceContainerLowest,
     },
     header: {
       flexDirection: flexRow,
@@ -744,8 +744,13 @@ const makeStyles = (colors: ThemeColors) => {
       flex: 1,
       paddingVertical: 10,
       borderRadius: 8,
-      backgroundColor: colors.surfaceContainerLow,
+      backgroundColor: colors.surfaceContainerLowest,
       alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
     },
     repeatBtnActive: {
       backgroundColor: colors.primary,
@@ -767,9 +772,14 @@ const makeStyles = (colors: ThemeColors) => {
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: colors.surfaceContainerLow,
+      backgroundColor: colors.surfaceContainerLowest,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
     },
     dayBtnActive: {
       backgroundColor: colors.primary,
@@ -853,7 +863,7 @@ const makeStyles = (colors: ThemeColors) => {
     stepDurationBtn: {
       paddingHorizontal: 10,
       paddingVertical: 6,
-      backgroundColor: colors.surfaceContainerLow,
+      backgroundColor: colors.surfaceContainerLowest,
       borderRadius: 6,
     },
     stepDurationText: {

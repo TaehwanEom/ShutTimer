@@ -13,6 +13,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -37,11 +38,13 @@ type Props = {
 };
 
 export default function RoutineCategoryScreen({ navigation, route }: Props) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
-  const styles = makeStyles(colors);
+  const styles = makeStyles(colors, isDark);
   const current = route.params?.current ?? null;
 
+  // 선택은 로컬 상태로만 — 탭 시 자동 탈출 X. 뒤로가기 버튼으로 적용+복귀.
+  const [selected, setSelected] = useState<string | null>(current);
   const [custom, setCustom] = useState<CategoryDef[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [inputName, setInputName] = useState('');
@@ -56,9 +59,26 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
   }, [refresh]);
 
   const handleSelect = (id: string) => {
-    (navigation as any).popTo?.('RoutineEdit', { selectedCategory: id }) ??
-      navigation.navigate({ name: 'RoutineEdit', params: { selectedCategory: id }, merge: true } as any);
+    setSelected(id);
   };
+
+  // 뒤로가기 버튼 = 선택한 카테고리 적용하며 RoutineEdit 로 복귀.
+  const handleBack = useCallback(() => {
+    (navigation as any).popTo?.('RoutineEdit', { selectedCategory: selected }) ??
+      navigation.navigate({ name: 'RoutineEdit', params: { selectedCategory: selected }, merge: true } as any);
+  }, [navigation, selected]);
+
+  // 회귀 방지 — 어떤 백 경로로 나가도 선택 적용.
+  //   iOS 엣지 스와이프 백 차단(헤더 백으로 유도), 안드로이드 하드웨어 백은 handleBack 으로 적용.
+  //   (선택을 로컬 state 로만 보관하므로, handleBack 외 경로로 나가면 선택이 유실되던 회귀 차단)
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [navigation, handleBack]);
 
   const handleAddOpen = () => {
     setInputName('');
@@ -105,11 +125,11 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
   };
 
   const renderRow = (def: CategoryDef, displayLabel: string, canDelete: boolean) => {
-    const isSelected = current === def.id;
+    const isSelected = selected === def.id;
     return (
       <TouchableOpacity
         key={def.id}
-        style={[styles.row, isSelected && styles.rowSelected]}
+        style={styles.row}
         onPress={() => handleSelect(def.id)}
         onLongPress={canDelete ? () => handleDeleteCustom(def.id) : undefined}
         activeOpacity={0.7}
@@ -131,7 +151,7 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
           <MaterialIcons name="chevron-left" size={32} color={colors.onBackground} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('routine.category.title')}</Text>
@@ -198,14 +218,16 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
   );
 }
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.surfaceContainerLowest },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   backBtn: { padding: 8, borderRadius: 50, width: 44, alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.onBackground, letterSpacing: -0.5 },
@@ -223,16 +245,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceContainerLow,
-    marginBottom: 8,
-  },
-  rowSelected: {
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderRadius: 0,
     backgroundColor: colors.surfaceContainerLowest,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+    marginBottom: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
   },
   iconWrap: {
     width: 36,
@@ -252,7 +271,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
     marginTop: 16,
   },
   addBtnDisabled: { opacity: 0.5 },
@@ -267,7 +286,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceContainerLowest,
     borderRadius: 16,
     padding: 20,
   },

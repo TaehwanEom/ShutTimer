@@ -52,16 +52,17 @@ const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 // sig: routineId + currentStepIndex. AlarmScreen 의 stopRoutine 후에는 routine 정리되므로 sig 무효.
 let lastStepNavigatedFor: string | null = null;
 
-function formatDurationLabel(sec: number): string {
-  if (sec <= 0) return '0분';
+function formatDurationLabel(sec: number, t: (k: string, opts?: any) => string): string {
+  const minLabel = t('routine.duration.minute', { defaultValue: '분' });
+  if (sec <= 0) return `0${minLabel}`;
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
   const parts: string[] = [];
-  if (h > 0) parts.push(`${h}시간`);
-  if (m > 0) parts.push(`${m}분`);
-  if (s > 0) parts.push(`${s}초`);
-  if (parts.length === 0) parts.push('0분');
+  if (h > 0) parts.push(`${h}${t('routine.duration.hour', { defaultValue: '시간' })}`);
+  if (m > 0) parts.push(`${m}${minLabel}`);
+  if (s > 0) parts.push(`${s}${t('routine.duration.second', { defaultValue: '초' })}`);
+  if (parts.length === 0) parts.push(`0${minLabel}`);
   return parts.join(' ');
 }
 
@@ -750,7 +751,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
                   </View>
                 </View>
               ) : (
-                <Text style={styles.stepSetTime}>{formatDurationLabel(s2.durationSeconds)}</Text>
+                <Text style={styles.stepSetTime}>{formatDurationLabel(s2.durationSeconds, t)}</Text>
               )}
             </View>
           );

@@ -11,6 +11,7 @@ ExpoSplashScreen.preventAutoHideAsync();
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom-tabs';
 import AdBanner from './src/components/AdBanner';
+import TabSwipeContainer from './src/components/TabSwipeContainer';
 import { MaterialIcons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import AsyncStorage from '@react-native-async-storage/async-storage';

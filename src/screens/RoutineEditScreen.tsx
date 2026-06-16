@@ -89,27 +89,27 @@ function dateToHhmm(d: Date): string {
 }
 
 /** "HH:MM" 시각 표시 → "오전/오후 H:MM" */
-function formatTimeKr(hhmm: string): string {
+function formatTimeKr(hhmm: string, t: (k: string, opts?: any) => string): string {
   if (!hhmm) return '--:--';
   const m = parseHHMM(hhmm);
   if (m === null) return '--:--';
   const h = Math.floor(m / 60);
   const mm = m % 60;
-  const ampm = h < 12 ? '오전' : '오후';
+  const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${ampm} ${h12}:${String(mm).padStart(2, '0')}`;
 }
 
 /** 초 단위 → 사람이 읽는 "Xh Ym Zs" / "Ym Zs" / "Zs". 0 이면 placeholder. */
-function formatDuration(sec: number, emptyLabel: string): string {
+function formatDuration(sec: number, emptyLabel: string, t: (k: string, opts?: any) => string): string {
   if (sec <= 0) return emptyLabel;
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
   const parts: string[] = [];
-  if (h > 0) parts.push(`${h}시간`);
-  if (m > 0) parts.push(`${m}분`);
-  if (s > 0 || parts.length === 0) parts.push(`${s}초`);
+  if (h > 0) parts.push(`${h}${t('routine.duration.hour', { defaultValue: '시간' })}`);
+  if (m > 0) parts.push(`${m}${t('routine.duration.minute', { defaultValue: '분' })}`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}${t('routine.duration.second', { defaultValue: '초' })}`);
   return parts.join(' ');
 }
 
@@ -132,7 +132,10 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
   const styles = makeStyles(colors, isDark);
-  const editingId = route.params?.routineId ?? null;
+  // editingId 는 마운트 시 1회만 캡처. 카테고리 선택 복귀 등으로 params 가 비워져도(routineId 유실)
+  //   저장 시 새 id 가 발급돼 루틴이 복제되던 버그(#RoutineEditDup) 차단.
+  const editingIdRef = useRef<string | null>(route.params?.routineId ?? null);
+  const editingId = editingIdRef.current;
   const isEditMode = editingId !== null;
   // 모드: 신규 → params.mode (default 'manual' — v1.6 hotfix 예약 비활성), 편집 → 기존 routine 의 schedule 유무로 마운트 시 보정
   // @preserve scheduled-routine — 예약 패러다임 결정 후 default 'scheduled' 복원 검토
@@ -464,7 +467,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
     return def.labelKey ? t(def.labelKey) : def.label ?? category;
   })();
   const daysLabel = formatDaysLabel(days, t);
-  const startTimeLabel = formatTimeKr(startTime);
+  const startTimeLabel = formatTimeKr(startTime, t);
 
   // ─── 렌더 ───────────────────────────────────────────
 
@@ -564,7 +567,7 @@ export default function RoutineEditScreen({ navigation, route }: Props) {
                 />
                 <TouchableOpacity onPress={() => handleStepDurationTap(idx)} style={styles.slotDurationBtn}>
                   <Text style={[styles.slotDurationText, step.durationSeconds <= 0 && styles.slotDurationEmpty]}>
-                    {formatDuration(step.durationSeconds, t('routine.edit.tapToSetDuration'))}
+                    {formatDuration(step.durationSeconds, t('routine.edit.tapToSetDuration'), t)}
                   </Text>
                 </TouchableOpacity>
                 {steps.length > 1 && (

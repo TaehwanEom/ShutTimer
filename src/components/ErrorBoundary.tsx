@@ -2,6 +2,8 @@ import React, { ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Logger } from '../utils/logger';
+// 클래스 컴포넌트라 useTranslation 훅 불가 → i18n 인스턴스 직접 사용 (routineScheduler와 동일).
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -82,36 +84,36 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       return (
         <View style={styles.container}>
           <View style={styles.content}>
-            <Text style={styles.title}>⚠️ 앱 오류 발생</Text>
+            <Text style={styles.title}>⚠️ {i18n.t('errorBoundary.title', { defaultValue: '앱 오류 발생' })}</Text>
 
             <ScrollView style={styles.errorBox}>
-              <Text style={styles.errorTitle}>에러 메시지:</Text>
+              <Text style={styles.errorTitle}>{i18n.t('errorBoundary.errorLabel', { defaultValue: '에러 메시지:' })}</Text>
               <Text selectable style={styles.errorText}>
                 {this.state.error?.toString()}
               </Text>
 
-              <Text style={styles.stackTitle}>스택 트레이스:</Text>
+              <Text style={styles.stackTitle}>{i18n.t('errorBoundary.stackLabel', { defaultValue: '스택 트레이스:' })}</Text>
               <Text selectable style={styles.stackText}>
                 {this.state.errorInfo?.componentStack}
               </Text>
             </ScrollView>
 
             <Text style={styles.instruction}>
-              아래 "공유" 버튼으로 개발자에게 에러 전체 전송 가능
+              {i18n.t('errorBoundary.instruction', { defaultValue: '아래 "공유" 버튼으로 개발자에게 에러 전체 전송 가능' })}
             </Text>
 
             <TouchableOpacity
               style={[styles.button, styles.shareButton]}
               onPress={this.handleShare}
             >
-              <Text style={styles.buttonText}>에러 공유 / 복사</Text>
+              <Text style={styles.buttonText}>{i18n.t('errorBoundary.shareBtn', { defaultValue: '에러 공유 / 복사' })}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.button}
               onPress={this.handleReset}
             >
-              <Text style={styles.buttonText}>앱 다시 시작</Text>
+              <Text style={styles.buttonText}>{i18n.t('errorBoundary.restartBtn', { defaultValue: '앱 다시 시작' })}</Text>
             </TouchableOpacity>
           </View>
         </View>

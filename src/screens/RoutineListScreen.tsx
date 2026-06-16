@@ -35,7 +35,6 @@ import {
   loadRoutines,
   deleteRoutine,
   upsertRoutine,
-  loadActiveRoutine, // v2.0 C-3-4 — caller 0 후 폐기 가능 (refreshAll 측 setActiveRoutine 폐기됨)
   getRoutineMode,
   getRoutineTotalSeconds,
   PENDING_DISABLED_ALARMS_KEY,
@@ -92,34 +91,36 @@ function daysLabel(days: number[], t: (k: string, o?: any) => string): 'weekday'
 
 // ─── 시간 포맷: 24h → "오전/오후 H:MM" ──────────────────────
 
-function formatTimeKr(hhmm: string): string {
+function formatTimeKr(hhmm: string, t: (k: string, opts?: any) => string): string {
   const [hStr, mStr] = hhmm.split(':');
   const h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   if (isNaN(h) || isNaN(m)) return hhmm;
-  const ampm = h < 12 ? '오전' : '오후';
+  const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
 }
 
 // ─── 단계 시간 포맷: 초 → "Xh Ym Zs" 한국어 ─────────────────
 
-function formatDurationLabel(sec: number): string {
-  if (sec <= 0) return '0분';
+function formatDurationLabel(sec: number, t: (k: string, opts?: any) => string): string {
+  const minLabel = t('routine.duration.minute', { defaultValue: '분' });
+  if (sec <= 0) return `0${minLabel}`;
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = sec % 60;
   const parts: string[] = [];
-  if (h > 0) parts.push(`${h}시간`);
-  if (m > 0) parts.push(`${m}분`);
-  if (s > 0) parts.push(`${s}초`);
-  if (parts.length === 0) parts.push('0분');
+  if (h > 0) parts.push(`${h}${t('routine.duration.hour', { defaultValue: '시간' })}`);
+  if (m > 0) parts.push(`${m}${minLabel}`);
+  if (s > 0) parts.push(`${s}${t('routine.duration.second', { defaultValue: '초' })}`);
+  if (parts.length === 0) parts.push(`0${minLabel}`);
   return parts.join(' ');
 }
 
 // ─── 단계 카드 (펼침 시 stagger 등장 애니메이션) ─────────────
 
 function StepRow({ step, idx, colors, visible, totalSteps }: { step: RoutineStep; idx: number; colors: ThemeColors; visible: boolean; totalSteps: number }) {
+  const { t } = useTranslation();
   const { isDark } = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
   const stepCardBg = colors.surfaceContainerLowest;
@@ -173,7 +174,7 @@ function StepRow({ step, idx, colors, visible, totalSteps }: { step: RoutineStep
           {step.name}
         </Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: colors.onBackground }}>
-          {formatDurationLabel(step.durationSeconds)}
+          {formatDurationLabel(step.durationSeconds, t)}
         </Text>
       </View>
     </Animated.View>
@@ -199,8 +200,6 @@ function groupByCategory(routines: Routine[], t: (k: string) => string): Array<{
 
 type CardProps = {
   routine: Routine;
-  index: number;
-  totalCount: number;
   categoryLabel: string;
   styles: ReturnType<typeof makeStyles>;
   colors: ThemeColors;
@@ -224,7 +223,7 @@ type CardProps = {
   wrapperRef?: (node: View | null) => void;
 };
 
-function RoutineCard({ routine, index, totalCount, categoryLabel, styles, colors, isEditMode, onPlayPress, onToggleActive, onDelete, onEditPencil, activeRunNode, activeRoutine, collapseSignal, isActiveCard, swipeDisabled, wrapperRef }: CardProps) {
+function RoutineCard({ routine, categoryLabel, styles, colors, isEditMode, onPlayPress, onToggleActive, onDelete, onEditPencil, activeRunNode, activeRoutine, collapseSignal, isActiveCard, swipeDisabled, wrapperRef }: CardProps) {
   const { t } = useTranslation();
   const { isDark } = useTheme();
   const translateX = useRef(new Animated.Value(0)).current;
@@ -405,22 +404,26 @@ function RoutineCard({ routine, index, totalCount, categoryLabel, styles, colors
     }
     onPlayPress();
   };
-  const timeStr = routine.schedule?.startTime ? formatTimeKr(routine.schedule.startTime) : '--:--';
+  const timeStr = routine.schedule?.startTime ? formatTimeKr(routine.schedule.startTime, t) : '--:--';
   const timeTokens = timeStr.split(' ');
   const periodText = timeTokens.length > 1 ? timeTokens[0] : '';
   const timeText = timeTokens.length > 1 ? timeTokens.slice(1).join(' ') : timeStr;
   const label = daysLabel(routine.schedule?.days ?? [], t);
   const totalDurationLabel = t('routine.totalDurationFmt', {
-    duration: formatDurationLabel(getRoutineTotalSeconds(routine)),
+    duration: formatDurationLabel(getRoutineTotalSeconds(routine), t),
     count: routine.steps.length,
-    defaultValue: `${formatDurationLabel(getRoutineTotalSeconds(routine))} · ${routine.steps.length}단계`,
+    defaultValue: `${formatDurationLabel(getRoutineTotalSeconds(routine), t)} · ${routine.steps.length}단계`,
   });
   const stepSummary = (() => {
     const names = routine.steps.map(s => s.name).filter(Boolean);
     if (names.length === 0) return '';
     if (names.length === 1) return names[0];
     if (names.length === 2) return `${names[0]} · ${names[1]}`;
-    return `${names[0]} 외 ${names.length - 1}개`;
+    return t('routine.moreCount', {
+      name: names[0],
+      count: names.length - 1,
+      defaultValue: `${names[0]} 외 ${names.length - 1}개`,
+    });
   })();
 
   const handleCardPress = () => {
@@ -530,18 +533,30 @@ function RoutineCard({ routine, index, totalCount, categoryLabel, styles, colors
             <Text style={styles.routineNameText} numberOfLines={1}>
               {mode === 'scheduled' ? (routine.name || categoryLabel) : (stepSummary || categoryLabel)}
             </Text>
-            <View style={styles.routineMetaRow}>
-              {mode === 'scheduled' ? (
-                <DaysRow label={label} colors={colors} />
-              ) : (
-                <Text style={styles.routineMetaText} numberOfLines={1}>{categoryLabel}</Text>
-              )}
-              <View style={styles.routineStepBadge}>
-                <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
-                <Text style={styles.routineStepBadgeText}>{routine.steps.length}단계</Text>
+            {/* 예약 루틴: 요일을 첫 줄, [N단계]+루틴 시간을 둘째 줄로 분리(한 줄에 몰려 잘리던 문제 해결). */}
+            {mode === 'scheduled' ? (
+              <>
+                <View style={styles.routineMetaRow}>
+                  <DaysRow label={label} colors={colors} />
+                </View>
+                <View style={styles.routineMetaRow}>
+                  <View style={styles.routineStepBadge}>
+                    <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
+                    <Text style={styles.routineStepBadgeText}>{t('alarm.stepBadge', { count: routine.steps.length, defaultValue: `${routine.steps.length}단계` })}</Text>
+                  </View>
+                  <Text style={styles.routineMetaText} numberOfLines={1}>{totalDurationLabel}</Text>
+                </View>
+              </>
+            ) : (
+              // manual 루틴: 카테고리는 섹션 제목과 중복이라 제외. [N단계] + 루틴 시간만 한 줄.
+              <View style={styles.routineMetaRow}>
+                <View style={styles.routineStepBadge}>
+                  <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
+                  <Text style={styles.routineStepBadgeText}>{t('alarm.stepBadge', { count: routine.steps.length, defaultValue: `${routine.steps.length}단계` })}</Text>
+                </View>
+                <Text style={styles.routineMetaText} numberOfLines={1}>{totalDurationLabel}</Text>
               </View>
-              <Text style={styles.routineMetaText} numberOfLines={1}>{totalDurationLabel}</Text>
-            </View>
+            )}
           </View>
           {isActiveCard ? null : isEditMode ? (
             // 편집 모드 — ▶ 대신 펜슬. 누르면 그 루틴 편집창으로.
@@ -635,6 +650,9 @@ function DaysRow({ label, colors }: { label: ReturnType<typeof daysLabel>; color
 }
 
 // ─── 메인 스크린 ─────────────────────────────────────────────
+
+// 릴리스 빌드 루틴 생성 상한 (디버그 빌드 __DEV__ 는 무제한). 단계 제한 MAX_STEPS=3 과 동일한 비즈니스 의도.
+const MAX_ROUTINES = 3;
 
 export default function RoutineListScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
@@ -948,16 +966,31 @@ export default function RoutineListScreen({ navigation, route }: Props) {
   // 진행 중인 루틴이 하나라도 있으면 모든 카드 swipe 편집/삭제 차단 (= 진행 중 다른 항목 실수 변경 방지).
   const anyRoutineActive = !!activeRoutine?.routineId || activeManualRoutineId !== null;
 
+  // 릴리스 빌드 루틴 개수 상한 도달 여부. 디버그(__DEV__)는 무제한.
+  const atRoutineLimit = !__DEV__ && routines.length >= MAX_ROUTINES;
+  const handleCreateRoutine = () => {
+    // 상한 도달 시 = 안내 팝업으로 차단 (추후 인앱 구매/구독 안내로 교체 가능).
+    if (atRoutineLimit) {
+      Alert.alert(
+        t('routine.limitTitle', { defaultValue: '루틴 개수 제한' }),
+        t('routine.limitBody', { defaultValue: '루틴은 최대 3개까지 만들 수 있어요.' })
+      );
+      return;
+    }
+    navigation.navigate('RoutineEdit', { mode: 'manual' });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('routine.listTitle')}</Text>
         <TouchableOpacity
           style={styles.iconBtn}
-          onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
+          onPress={handleCreateRoutine}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialIcons name="add" size={28} color={colors.primary} />
+          {/* 상한 도달 시 회색 — 누르면 안내 팝업 */}
+          <MaterialIcons name="add" size={28} color={atRoutineLimit ? colors.secondary : colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -1061,7 +1094,7 @@ export default function RoutineListScreen({ navigation, route }: Props) {
             </Text>
             <TouchableOpacity
               style={styles.emptyBtn}
-              onPress={() => navigation.navigate('RoutineEdit', { mode: 'manual' })}
+              onPress={handleCreateRoutine}
             >
               <MaterialIcons name="add" size={20} color={colors.onPrimary} />
               <Text style={styles.emptyBtnText}>
@@ -1083,15 +1116,13 @@ export default function RoutineListScreen({ navigation, route }: Props) {
                   </Text>
                 </TouchableOpacity>
               </View>
-              {items.map((r, index) => {
+              {items.map((r) => {
                 // activeManualRoutineId 포함 — ▶ trigger 직후 polling 전이라도 자기 카드 isActive 인식
                 const isActiveCard = (!!activeRoutine && activeRoutine.routineId === r.id) || activeManualRoutineId === r.id;
                 return (
                   <RoutineCard
                     key={r.id}
                     routine={r}
-                    index={index}
-                    totalCount={items.length}
                     categoryLabel={formatCategoryLabel(r.category)}
                     styles={styles}
                     colors={colors}
@@ -1150,11 +1181,6 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   headerTitle: {
     fontSize: 32,
@@ -1331,11 +1357,6 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     marginTop: 12,
     marginBottom: 20,
     textAlign: 'center',
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: colors.secondary,
-    opacity: 0.8,
   },
   emptyBtn: {
     flexDirection: 'row',

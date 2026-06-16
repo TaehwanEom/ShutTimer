@@ -1,30 +1,10 @@
-// @v1.5 — 첫 실행 온보딩 화면
-// 흐름: Welcome → 기능 소개 3개 → 권한 priming 2개 (ATT/알림) → 시작하기
-// 권한 priming 패턴: 자체 설명 화면 → "허용" 버튼 → iOS native popup
-// AsyncStorage 'onboardingCompleted' = 'true' 저장 후 Home으로 이동
+// @v1.5 — 첫 실행 온보딩 (간소화: 한 페이지에서 권한만 요청)
+// 흐름: 인사 + 권한 목록 안내 → "허용하고 시작" → 알림/카메라/ATT(/삼성) 팝업 순차 → onboardingCompleted 저장 → Home.
+//   소개·기능·튜토리얼 슬라이드 전부 제거. 권한 거부해도 앱은 정상 작동.
 
-import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  useWindowDimensions,
-  AppState,
-  Platform,
-  Animated,
-  Dimensions,
-} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, AppState, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// 2026-05-31 — TimerDial 측 SIZE 정합 (= TimerDial.tsx 측 Platform 분기 동일 계산).
-//   HomePreview spacer 측 = dialSize 동기화 필수 (= 다이얼 위치 정합 보장).
-//   iOS = Math.min(330, SCREEN_W - 60), Android = Math.min(290, SCREEN_W - 80) (= 즐겨찾기 잘림 방지).
-const SCREEN_W = Dimensions.get('window').width;
-const DIAL_SIZE = Platform.OS === 'android'
-  ? Math.min(290, SCREEN_W - 80)
-  : Math.min(330, SCREEN_W - 60);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -33,11 +13,9 @@ import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler'
 import { isSamsung, openSamsungDeviceCare } from '../utils/oemBatteryHelper';
 import { mirrorToBackup } from '../utils/backupRestore';
 import { useTranslation } from 'react-i18next';
-import Svg, { Circle as SvgCircle, Path as SvgPath, Defs, ClipPath, Rect as SvgRect } from 'react-native-svg';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
-import TimerDial from '../components/TimerDial';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
@@ -45,1713 +23,289 @@ type Props = {
 
 type PermissionType = 'att' | 'notification' | 'camera' | 'samsung-battery';
 
-type Card = { icon: string; label: string; description: string };
-
-type Slide =
-  | { kind: 'greeting'; text: string }
-  | { kind: 'welcome'; title: string }
-  | { kind: 'feature-anim'; icon: string; title: string; body: string }
-  | { kind: 'feature-cards'; title: string; cards: Card[] }
-  | { kind: 'feature'; icon: string; title: string; body: string }
-  | {
-      kind: 'permission';
-      permission: PermissionType;
-      icon: string;
-      title: string;
-      body: string;
-      buttonLabel: string;
-    };
+async function requestPermission(permission: PermissionType) {
+  try {
+    if (permission === 'att') {
+      if (Platform.OS !== 'ios') return;
+      if (AppState.currentState !== 'active') return;
+      const att = require('expo-tracking-transparency');
+      const current = await att.getTrackingPermissionsAsync();
+      if (current.status === 'undetermined') {
+        const result = await att.requestTrackingPermissionsAsync();
+        await AsyncStorage.setItem('attStatus', result.status);
+      } else {
+        await AsyncStorage.setItem('attStatus', current.status);
+      }
+    } else if (permission === 'notification') {
+      // iOS 26+ = AlarmKit framework 자체 권한 요청. iOS 25 이하 = 'unavailable' silent skip.
+      await requestAlarmKitAuthorizationIfNeeded();
+      await AsyncStorage.setItem('notificationsAsked', 'true');
+    } else if (permission === 'camera') {
+      const { Camera } = require('react-native-vision-camera');
+      const result = await Camera.requestCameraPermission();
+      await AsyncStorage.setItem('cameraStatus', result);
+      await AsyncStorage.setItem('cameraAsked', 'true');
+    } else if (permission === 'samsung-battery') {
+      if (Platform.OS !== 'android') return;
+      await openSamsungDeviceCare();
+      await AsyncStorage.setItem('samsungBatteryAsked', 'true');
+    }
+  } catch {
+    // 환경 미지원 무시 (e.g., Expo Go)
+  }
+}
 
 export default function OnboardingScreen({ navigation }: Props) {
-  const { t, i18n } = useTranslation();
-  // RTL 언어 (아랍어) 감지 — 마스크 reveal 방향 반전용
-  const isRTL = i18n.language === 'ar';
+  const { t } = useTranslation();
   const { colors } = useTheme();
-  // useWindowDimensions 측 = 동적 정합 (= 회전/화면 swap 시 자동 update). iPhone 12 mini 등 작은 화면 측 정합.
-  const { width: SCREEN_W } = useWindowDimensions();
-  const styles = useMemo(() => makeStyles(colors, SCREEN_W), [colors, SCREEN_W]);
-  const scrollRef = useRef<ScrollView>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  // 페이지별 애니메이션 완료 여부 — true면 이동 버튼 노출
-  const [pageAnimComplete, setPageAnimComplete] = useState<Record<number, boolean>>({});
-  const markPageComplete = useCallback((idx: number) => {
-    setPageAnimComplete((prev) => (prev[idx] ? prev : { ...prev, [idx]: true }));
+  const styles = makeStyles(colors);
+  const [busy, setBusy] = useState(false);
+
+  // 타자기 효과. revealed = 지금까지 노출된 누적 글자 수. 위→아래 단락 순서로 한 자씩 찍힘.
+  const [revealed, setRevealed] = useState(0);
+  const revealedRef = useRef(0);
+  const totalRef = useRef(0);
+  const speedRef = useRef(1); // 화면을 누르고 있으면 배속.
+  const startedRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const lastTsRef = useRef(0);
+
+  const tick = useCallback((ts: number) => {
+    if (!lastTsRef.current) lastTsRef.current = ts;
+    const dt = (ts - lastTsRef.current) / 1000;
+    lastTsRef.current = ts;
+    const CHARS_PER_SEC = 75;
+    const next = Math.min(totalRef.current, revealedRef.current + dt * CHARS_PER_SEC * speedRef.current);
+    revealedRef.current = next;
+    setRevealed(next);
+    rafRef.current = next < totalRef.current ? requestAnimationFrame(tick) : null;
   }, []);
-  // v1.8 #SkipButton — 페이지별 skip counter. 증가 시 = 해당 페이지 측 애니메이션 측 snap to final.
-  const [skipSignal, setSkipSignal] = useState<Record<number, number>>({});
 
-  // v1.8 #OnboardingResume — currentPage 측 AsyncStorage 측 persist + 콜드 스타트 측 resume.
-  //   강제 종료 시 = 마지막 진행 페이지 측 = 다음 실행 시 = 자동 scroll.
-  //   온보딩 완료 (= handleStart) 시 = key 측 삭제.
+  const startTyping = useCallback(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    revealedRef.current = 0;
+    lastTsRef.current = 0;
+    setRevealed(0);
+    rafRef.current = requestAnimationFrame(tick);
+  }, [tick]);
 
-  // 슬라이드 정의 — 마지막 "시작하기" 슬라이드는 별도 처리
-  const slides: Slide[] = [
+  useEffect(() => {
+    // 스플래시→온보딩 화면 전환이 끝난 뒤 시작해야 글자가 찍히는 게 보임.
+    const sub = navigation.addListener('transitionEnd', (e: any) => {
+      if (!e?.data?.closing) startTyping();
+    });
+    // 전환 이벤트가 없는 경우 폴백.
+    const fallback = setTimeout(startTyping, 600);
+    return () => {
+      sub();
+      clearTimeout(fallback);
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [navigation, startTyping]);
+
+  const rows: { key: PermissionType; icon: string; label: string; desc: string }[] = [
     {
-      kind: 'greeting',
-      text: t('onboarding.greeting', { defaultValue: '안녕하세요.' }),
-    },
-    {
-      kind: 'welcome',
-      // \n으로 명시 줄바꿈 — 한 줄씩 reveal
-      title: t('onboarding.welcomeTitle', { defaultValue: 'ShutTimer에 오신 것을\n환영합니다' }),
-    },
-    {
-      kind: 'feature-anim',
-      icon: 'timer',
-      title: t('onboarding.feature1Title', { defaultValue: '타이머와 알람' }),
-      // \n으로 명시 줄바꿈 — "세요" 분리 방지 + 한 줄씩 reveal
-      body: t('onboarding.feature1Body', { defaultValue: '원하는 시간을 설정하고\n나만의 루틴을 만들어보세요' }),
-    },
-    {
-      kind: 'feature-anim',
-      icon: 'photo-camera',
-      title: t('onboarding.feature2Title', { defaultValue: '사진 스캔으로 타이머 종료' }),
-      body: t('onboarding.feature2Body', { defaultValue: '카메라로 사물을 스캔하면\n타이머가 종료됩니다.' }),
-    },
-    {
-      kind: 'feature-cards',
-      title: t('onboarding.feature3Title', { defaultValue: '다양한 종료 방식' }),
-      cards: [
-        {
-          icon: 'photo-camera',
-          label: t('onboarding.cardCameraLabel', { defaultValue: '사진 스캔' }),
-          description: t('onboarding.cardCameraDesc', { defaultValue: '카메라로 사물을 스캔하여 종료' }),
-        },
-        {
-          icon: 'vibration',
-          label: t('onboarding.cardShakeLabel', { defaultValue: '흔들기' }),
-          description: t('onboarding.cardShakeDesc', { defaultValue: '기기를 흔들어 종료' }),
-        },
-        {
-          icon: 'touch-app',
-          label: t('onboarding.cardTapLabel', { defaultValue: '탭' }),
-          description: t('onboarding.cardTapDesc', { defaultValue: '버튼을 눌러 종료' }),
-        },
-      ],
-    },
-    {
-      kind: 'permission',
-      permission: 'att',
-      icon: 'campaign',
-      title: t('onboarding.permissionAttTitle', { defaultValue: '맞춤형 광고로 무료 유지' }),
-      body: t('onboarding.permissionAttBody', { defaultValue: '더 적합한 광고를 위해\n추적 권한이 필요합니다.\n거부해도 앱은 정상 작동합니다.' }),
-      buttonLabel: t('onboarding.permissionAttButton', { defaultValue: '계속' }),
-    },
-    {
-      kind: 'permission',
-      permission: 'notification',
+      key: 'notification',
       icon: 'notifications-active',
-      title: t('onboarding.permissionNotifTitle', { defaultValue: '타이머 종료 알림' }),
-      body: t('onboarding.permissionNotifBody', { defaultValue: '잠금 화면에서 타이머 종료를\n받으려면 알림 권한이 필요합니다.\n루틴 진행에 필수입니다.' }),
-      buttonLabel: t('onboarding.permissionNotifButton', { defaultValue: '계속' }),
+      label: t('onboarding.permRowNotifLabel', { defaultValue: '타이머 종료 알림' }),
+      desc: t('onboarding.permRowNotifDesc', { defaultValue: '잠금 화면 알람·루틴 진행에 필요' }),
     },
-    // Phase 3-5 (Android, Samsung) — Device Care "잠자는 앱" 측 = 알람 fire 차단 방지 안내.
-    //   iOS 측 = isSamsung() 측 false 측 = 슬라이드 미추가 → 인덱스 / 길이 / 흐름 측 = iOS 측 불변.
+    {
+      key: 'camera',
+      icon: 'photo-camera',
+      label: t('onboarding.permRowCameraLabel', { defaultValue: '사진 스캔 종료' }),
+      desc: t('onboarding.permRowCameraDesc', { defaultValue: '카메라로 사물을 스캔하는 미션에 사용' }),
+    },
+    {
+      key: 'att',
+      icon: 'campaign',
+      label: t('onboarding.permRowAttLabel', { defaultValue: '맞춤형 광고' }),
+      desc: t('onboarding.permRowAttDesc', { defaultValue: '더 적합한 광고 제공 (거부해도 정상 작동)' }),
+    },
     ...(isSamsung()
       ? [
           {
-            kind: 'permission' as const,
-            permission: 'samsung-battery' as const,
+            key: 'samsung-battery' as const,
             icon: 'battery-saver',
-            title: t('onboarding.permissionSamsungBatteryTitle', {
-              defaultValue: '삼성 디바이스 케어 설정',
-            }),
-            body: t('onboarding.permissionSamsungBatteryBody', {
-              defaultValue:
-                '삼성 폰의 "잠자는 앱" 기능이\n알람을 차단할 수 있습니다.\n디바이스 케어에서 본 앱을\n"제외" 목록에 추가해주세요.',
-            }),
-            buttonLabel: t('onboarding.permissionSamsungBatteryButton', {
-              defaultValue: '설정 열기',
-            }),
+            label: t('onboarding.permRowSamsungLabel', { defaultValue: '디바이스 케어 설정' }),
+            desc: t('onboarding.permRowSamsungDesc', { defaultValue: '"잠자는 앱" 제외 — 알람 차단 방지' }),
           },
         ]
       : []),
   ];
 
-  const totalPages = slides.length + 2; // +2: 준비 완료 슬라이드 + home-preview 슬라이드
+  // 표시 텍스트
+  const greeting = t('onboarding.greeting', { defaultValue: '안녕하세요' });
+  const intro = t('onboarding.permIntro', { defaultValue: 'ShutTimer를 원활히 쓰려면\n아래 권한이 필요합니다.' });
+  const note = t('onboarding.permNote', { defaultValue: '권한을 거부해도 앱은 사용할 수 있어요.' });
 
-  const goToPage = (idx: number) => {
-    scrollRef.current?.scrollTo({ x: idx * SCREEN_W, animated: true });
-  };
+  // 위→아래 순서대로 각 텍스트가 시작되는 누적 글자 오프셋 계산.
+  const LOGO_LEAD = 3;
+  const BUTTON_LEAD = 4;
+  let cur = LOGO_LEAD;
+  const greetingOff = cur;
+  cur += greeting.length;
+  const introOff = cur;
+  cur += intro.length;
+  const rowOffs = rows.map((r) => {
+    const labelOff = cur;
+    cur += r.label.length;
+    const descOff = cur;
+    cur += r.desc.length;
+    return { labelOff, descOff };
+  });
+  const noteOff = cur;
+  cur += note.length;
+  const buttonOff = cur;
+  cur += BUTTON_LEAD;
+  totalRef.current = cur;
 
-  // v1.8 #OnboardingResume — 콜드 스타트 측 resume = 저장된 page 측 = 즉시 scroll (= animated false).
-  const resumedRef = useRef(false);
-  useEffect(() => {
-    if (resumedRef.current) return;
-    if (!SCREEN_W || SCREEN_W === 0) return;
-    AsyncStorage.getItem('onboardingCurrentPage')
-      .then((saved) => {
-        if (resumedRef.current) return;
-        resumedRef.current = true;
-        if (!saved) return;
-        const idx = parseInt(saved, 10);
-        if (isNaN(idx) || idx <= 0 || idx >= totalPages) return;
-        // ScrollView 측 mount 직후 측 = 100ms 측 지연 후 scrollTo (= ref 준비 보장).
-        setTimeout(() => {
-          scrollRef.current?.scrollTo({ x: idx * SCREEN_W, animated: false });
-          setCurrentPage(idx);
-        }, 100);
-      })
-      .catch(() => {
-        resumedRef.current = true;
-      });
-  }, [SCREEN_W, totalPages]);
+  // 해당 오프셋 기준 지금까지 찍힌 글자 수.
+  const typedLen = (off: number, text: string) =>
+    Math.max(0, Math.min(text.length, Math.floor(revealed - off)));
+  // 텍스트 없는 요소(로고·아이콘·버튼)의 페이드 정도(0~1).
+  const fadeOp = (off: number, w = 6) => Math.max(0, Math.min(1, (revealed - off) / w));
 
-  // v1.8 #OnboardingResume — currentPage 변경 시 = AsyncStorage 측 persist.
-  useEffect(() => {
-    AsyncStorage.setItem('onboardingCurrentPage', String(currentPage)).catch(() => {});
-  }, [currentPage]);
+  const handleAllowAndStart = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    // 순서대로 네이티브 권한 팝업 요청 (알림 → 카메라 → ATT → [삼성]).
+    await requestPermission('notification');
+    await requestPermission('camera');
+    await requestPermission('att');
+    if (isSamsung()) await requestPermission('samsung-battery');
 
-  // feature-cards(다양한 종료 방식) → next 시 카메라 권한 요청 (한 번만)
-  const cameraAskedRef = useRef(false);
-  const triggerCameraIfLeavingCards = (fromPage: number) => {
-    if (cameraAskedRef.current) return;
-    if (slides[fromPage]?.kind !== 'feature-cards') return;
-    cameraAskedRef.current = true;
-    requestPermission('camera');
-  };
-
-  const handleNext = () => {
-    triggerCameraIfLeavingCards(currentPage);
-    if (currentPage < totalPages - 1) {
-      goToPage(currentPage + 1);
-    }
-  };
-
-  // v1.8 #SkipButton — 스킵 버튼 측 동작.
-  //  1번 누름 (= 애니메이션 진행 중) → skipSignal[currentPage]++ → 슬라이드 측 = snap to final + markPageComplete.
-  //  2번 누름 (= 애니메이션 완료, 자체 버튼 ❌ 페이지) → handleNext.
-  //  자체 버튼 보유 페이지 (= permission / HomePreview / ReadySlide) 측 = 애니메이션 완료 후 = 버튼 측 숨김 (= isNextButtonSlide false).
-  const handleSkipOrNext = () => {
-    if (pageAnimComplete[currentPage]) {
-      handleNext();
-    } else {
-      setSkipSignal((prev) => ({ ...prev, [currentPage]: (prev[currentPage] ?? 0) + 1 }));
-    }
-  };
-
-  // greeting 슬라이드 — 글자별 fade-in stagger + loop (글씨쓰듯 부드럽게)
-  const greetingFull = slides[0].kind === 'greeting' ? slides[0].text : '';
-  const charAnimsRef = useRef<Animated.Value[]>([]);
-  if (charAnimsRef.current.length !== greetingFull.length) {
-    charAnimsRef.current = greetingFull.split('').map(() => new Animated.Value(0));
-  }
-
-  // welcome 슬라이드 (page 1) — 로고 fade-in → 줄별 좌→우 reveal (1회)
-  const welcomeFull = slides[1]?.kind === 'welcome' ? slides[1].title : '';
-  const welcomeLines = welcomeFull.split('\n');
-  const [welcomeLineWidths, setWelcomeLineWidths] = useState<number[]>([]);
-  const welcomeLogoOpacity = useRef(new Animated.Value(0)).current;
-  const welcomeLineMasksRef = useRef<Animated.Value[]>([]);
-  if (welcomeLineMasksRef.current.length !== welcomeLines.length) {
-    welcomeLineMasksRef.current = welcomeLines.map(() => new Animated.Value(0));
-  }
-
-  // feature-anim 슬라이드 — 별도 컴포넌트로 추출 (FeatureAnimSlide). 여러 페이지 지원.
-
-  // greeting fade-in stagger 루프 (천천히) — 첫 사이클 완료 시 이동 버튼 활성화
-  useEffect(() => {
-    if (currentPage !== 0) return;
-    const anims = charAnimsRef.current;
-    // v1.8 #SkipButton — skipSignal[0] > 0 시 = snap to final + 즉시 markComplete + 루프 ❌.
-    if ((skipSignal[0] ?? 0) > 0) {
-      anims.forEach((a) => {
-        a.stopAnimation();
-        a.setValue(1);
-      });
-      markPageComplete(0);
-      return;
-    }
-    let stopped = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const run = (isFirst: boolean) => {
-      if (stopped) return;
-      anims.forEach((a) => a.setValue(0));
-      Animated.stagger(
-        280,
-        anims.map((a) =>
-          Animated.timing(a, { toValue: 1, duration: 700, useNativeDriver: true })
-        )
-      ).start(({ finished }) => {
-        if (!finished || stopped) return;
-        if (isFirst) markPageComplete(0); // 첫 사이클 완료 → 이동 버튼 활성
-        timeoutId = setTimeout(() => run(false), 1800);
-      });
-    };
-    run(true);
-    return () => {
-      stopped = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      anims.forEach((a) => a.stopAnimation());
-    };
-  }, [currentPage, greetingFull, markPageComplete, skipSignal]);
-
-  // welcome 시퀀스: 로고 fade-in → 줄별 좌→우 reveal 순차 (1회, 재진입 시 스냅)
-  const welcomePlayedRef = useRef(false);
-  useEffect(() => {
-    if (currentPage !== 1) return;
-    if (welcomeLineWidths.length !== welcomeLines.length) return;
-    if (welcomeLineWidths.some((w) => !w || w === 0)) return;
-
-    // v1.8 #SkipButton — skipSignal[1] > 0 시 = snap to final + 즉시 markComplete.
-    if ((skipSignal[1] ?? 0) > 0) {
-      welcomeLogoOpacity.stopAnimation();
-      welcomeLogoOpacity.setValue(1);
-      welcomeLineMasksRef.current.forEach((m, i) => {
-        m.stopAnimation();
-        m.setValue(welcomeLineWidths[i]);
-      });
-      welcomePlayedRef.current = true;
-      markPageComplete(1);
-      return;
-    }
-
-    if (welcomePlayedRef.current) {
-      welcomeLogoOpacity.setValue(1);
-      welcomeLineMasksRef.current.forEach((m, i) => m.setValue(welcomeLineWidths[i]));
-      markPageComplete(1);
-      return;
-    }
-
-    let stopped = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    welcomeLogoOpacity.setValue(0);
-    welcomeLineMasksRef.current.forEach((m) => m.setValue(0));
-
-    const animateLine = (idx: number) => {
-      if (stopped) return;
-      if (idx >= welcomeLines.length) {
-        markPageComplete(1); // 모든 줄 완료 → 이동 버튼 활성
-        return;
-      }
-      const anim = welcomeLineMasksRef.current[idx];
-      const target = welcomeLineWidths[idx];
-      Animated.timing(anim, {
-        toValue: target,
-        duration: 1500,
-        useNativeDriver: false,
-      }).start(({ finished }) => {
-        if (!finished || stopped) return;
-        timeoutId = setTimeout(() => animateLine(idx + 1), 400);
-      });
-    };
-
-    Animated.timing(welcomeLogoOpacity, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished || stopped) return;
-      timeoutId = setTimeout(() => animateLine(0), 300);
-    });
-
-    return () => {
-      stopped = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      welcomeLogoOpacity.stopAnimation();
-      welcomeLineMasksRef.current.forEach((m) => m.stopAnimation());
-      welcomePlayedRef.current = true;
-    };
-  }, [currentPage, welcomeLineWidths, welcomeLines.length, welcomeLogoOpacity, markPageComplete, skipSignal]);
-
-  const handleStart = useCallback(async () => {
     await AsyncStorage.setItem('onboardingCompleted', 'true');
-    // v1.8 #OnboardingResume — 완료 시 = resume key 측 삭제 (= 다음 설치 측 = page 0 측 시작 정합).
-    await AsyncStorage.removeItem('onboardingCurrentPage').catch(() => {});
-    // 삭제 후 재설치 복원용 백업 미러 (온보딩 완료 상태 + 알람 보존).
+    // 삭제 후 재설치 복원용 백업 미러.
     mirrorToBackup().catch(() => {});
     navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      })
+      CommonActions.reset({ index: 0, routes: [{ name: 'Home' }] })
     );
-  }, [navigation]);
-
-  // HomePreview 확인 버튼 — ReadySlide(마지막 시작하기 페이지)로 swipe
-  const handleHomePreviewAdvance = useCallback(() => {
-    scrollRef.current?.scrollTo({ x: (totalPages - 1) * SCREEN_W, animated: true });
-  }, [totalPages]);
-
-  const requestPermission = useCallback(async (permission: PermissionType) => {
-    try {
-      if (permission === 'att') {
-        if (Platform.OS !== 'ios') return;
-        if (AppState.currentState !== 'active') return;
-        const att = require('expo-tracking-transparency');
-        const current = await att.getTrackingPermissionsAsync();
-        if (current.status === 'undetermined') {
-          const result = await att.requestTrackingPermissionsAsync();
-          await AsyncStorage.setItem('attStatus', result.status);
-        } else {
-          await AsyncStorage.setItem('attStatus', current.status);
-        }
-      } else if (permission === 'notification') {
-        // v1.7 hotfix Phase 13 G4-A — expo-notifications 측 폐기 + AlarmKit 측 권한 요청.
-        // iOS 26+ 측 = AlarmKit framework 측 자체 권한 요청 (= AlarmManager.shared.requestAuthorization).
-        // iOS 25 이하 측 = 'unavailable' 반환 = silent skip (= AlarmKit 미지원).
-        await requestAlarmKitAuthorizationIfNeeded();
-        await AsyncStorage.setItem('notificationsAsked', 'true');
-      } else if (permission === 'camera') {
-        const { Camera } = require('react-native-vision-camera');
-        const result = await Camera.requestCameraPermission();
-        await AsyncStorage.setItem('cameraStatus', result);
-        await AsyncStorage.setItem('cameraAsked', 'true');
-      } else if (permission === 'samsung-battery') {
-        if (Platform.OS !== 'android') return;
-        await openSamsungDeviceCare();
-        await AsyncStorage.setItem('samsungBatteryAsked', 'true');
-      }
-    } catch (e) {
-      // 환경 미지원 무시 (e.g., Expo Go)
-    }
-  }, []);
-
-  const handlePermissionContinue = async (permission: PermissionType) => {
-    await requestPermission(permission);
-    handleNext();
-  };
-
-  const onScroll = (e: any) => {
-    const offsetX = e.nativeEvent.contentOffset.x;
-    const page = Math.round(offsetX / SCREEN_W);
-    if (page !== currentPage) {
-      // feature-cards → 다음 페이지 전환 시 카메라 권한 요청
-      if (page > currentPage) triggerCameraIfLeavingCards(currentPage);
-      setCurrentPage(page);
-    }
-  };
-
-  // 스크롤 위치 추적 — HomePreview 진입 시 chrome(상단 nav + 하단 dots) 부드럽게 fade-out.
-  // HomePreview는 slides.length 위치 (마지막은 ReadySlide). HomePreview에서만 chrome 0, 앞뒤에서는 1.
-  const scrollXAnim = useRef(new Animated.Value(0)).current;
-  const chromeOpacity = scrollXAnim.interpolate({
-    inputRange: [
-      (slides.length - 1) * SCREEN_W,
-      slides.length * SCREEN_W,
-      (slides.length + 1) * SCREEN_W,
-    ],
-    outputRange: [1, 0, 1],
-    extrapolate: 'clamp',
-  });
-
-  // v1.8 #SkipButton — 모든 슬라이드 측 = 애니메이션 진행 중 측 = 건너뛰기 표시.
-  //   permission / HomePreview / ReadySlide 측 = 자체 버튼 (계속 / 확인 / 시작하기) 보유 →
-  //     애니메이션 완료 후 측 = 건너뛰기 숨김 (= 사용자 측 = 자체 버튼 누름 강제).
-  const isAnimatedSlide =
-    slides[currentPage]?.kind === 'greeting' ||
-    slides[currentPage]?.kind === 'welcome' ||
-    slides[currentPage]?.kind === 'feature' ||
-    slides[currentPage]?.kind === 'feature-anim' ||
-    slides[currentPage]?.kind === 'feature-cards' ||
-    slides[currentPage]?.kind === 'permission' ||
-    currentPage === slides.length ||      // HomePreview
-    currentPage === totalPages - 1;       // ReadySlide
-
-  const hasOwnAdvanceButton =
-    slides[currentPage]?.kind === 'permission' ||
-    currentPage === slides.length ||      // HomePreview = 확인 버튼
-    currentPage === totalPages - 1;       // ReadySlide = 시작하기 버튼
-
-  // 건너뛰기 버튼 표시 = 애니메이션 진행 중 (= 모든 슬라이드) || 애니메이션 완료 + 자체 버튼 ❌ (= 다음 페이지 진입용)
-  const isNextButtonSlide = isAnimatedSlide && (!pageAnimComplete[currentPage] || !hasOwnAdvanceButton);
-
-  // 현재 페이지 애니메이션 완료 여부 (이동 버튼 가드). 모든 슬라이드는 자체 onComplete 호출.
-  const isCurrentPageAnimComplete = pageAnimComplete[currentPage] === true;
-  const isLastSlide = currentPage === totalPages - 1;
-
-  const handlePrev = () => {
-    if (currentPage > 0) goToPage(currentPage - 1);
-  };
+  }, [busy, navigation]);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 상단 네비게이션 — HomePreview 진입 시 스크롤과 동기화 fade-out */}
-      <Animated.View
-        style={[styles.topNav, { opacity: chromeOpacity }]}
-        pointerEvents={currentPage === slides.length ? 'none' : 'box-none'}
+      {/* 화면을 누르고 있으면 글자가 더 빨리 찍힘 */}
+      <Pressable
+        style={styles.flex}
+        onPressIn={() => {
+          speedRef.current = 4;
+        }}
+        onPressOut={() => {
+          speedRef.current = 1;
+        }}
       >
-        <View style={{ width: 44 }}>
-          {currentPage > 0 && isCurrentPageAnimComplete && (
-            <TouchableOpacity
-              onPress={handlePrev}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={styles.topNavBtn}
-            >
-              <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-        {/* v1.8 #SkipButton — 스킵 버튼 = 통일 "건너뛰기" 텍스트 (= 사용자 명시 측 chevron-right → 텍스트). */}
-        <View style={{ alignItems: 'flex-end', minWidth: 44 }}>
-          {isNextButtonSlide && (
-            <TouchableOpacity
-              onPress={handleSkipOrNext}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={styles.topNavBtn}
-            >
-              <Text style={styles.topNavText}>Skip</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </Animated.View>
+        <View style={styles.content}>
+          <View style={[styles.logoWrap, { opacity: fadeOp(0, LOGO_LEAD) }]}>
+            <MaterialIcons name="alarm" size={56} color="#ff2424" />
+          </View>
+          {/* 미노출 글자는 opacity 0 으로 자리만 차지 → 레이아웃 흔들림 없이 한 자씩 노출 */}
+          <Text style={styles.greeting}>
+            {greeting.slice(0, typedLen(greetingOff, greeting))}
+            <Text style={styles.hiddenChar}>{greeting.slice(typedLen(greetingOff, greeting))}</Text>
+          </Text>
+          <Text style={styles.subtitle}>
+            {intro.slice(0, typedLen(introOff, intro))}
+            <Text style={styles.hiddenChar}>{intro.slice(typedLen(introOff, intro))}</Text>
+          </Text>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onScroll}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollXAnim } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
-        scrollEnabled={(isNextButtonSlide && isCurrentPageAnimComplete) || isLastSlide}
-      >
-        {slides.map((slide, idx) => {
-          if (slide.kind === 'greeting') {
-            return (
-              <View key={idx} style={styles.slide}>
-                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-                  {greetingFull.split('').map((ch, i) => (
-                    <Animated.Text
-                      key={i}
-                      style={[
-                        styles.greetingText,
-                        {
-                          opacity: charAnimsRef.current[i] ?? 0,
-                          transform: [
-                            {
-                              translateY: (charAnimsRef.current[i] ?? new Animated.Value(0)).interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [8, 0],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      {ch}
-                    </Animated.Text>
-                  ))}
+          <View style={styles.list}>
+            {rows.map((r, i) => (
+              <View key={r.key} style={[styles.row, { opacity: fadeOp(rowOffs[i].labelOff) }]}>
+                <View style={styles.rowIcon}>
+                  <MaterialIcons name={r.icon as any} size={24} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>
+                    {r.label.slice(0, typedLen(rowOffs[i].labelOff, r.label))}
+                    <Text style={styles.hiddenChar}>{r.label.slice(typedLen(rowOffs[i].labelOff, r.label))}</Text>
+                  </Text>
+                  <Text style={styles.rowDesc}>
+                    {r.desc.slice(0, typedLen(rowOffs[i].descOff, r.desc))}
+                    <Text style={styles.hiddenChar}>{r.desc.slice(typedLen(rowOffs[i].descOff, r.desc))}</Text>
+                  </Text>
                 </View>
               </View>
-            );
-          }
-          if (slide.kind === 'welcome') {
-            return (
-              <View key={idx} style={styles.slide}>
-                {/* 로고 — 부드럽게 fade-in (사이즈 +5px) */}
-                <Animated.View style={{ marginBottom: 24, opacity: welcomeLogoOpacity }}>
-                  <MaterialIcons name="alarm" size={61} color="#ff2424" />
-                </Animated.View>
-                {/* 텍스트 — 줄별 좌→우 reveal */}
-                <View style={{ alignItems: 'center' }}>
-                  {welcomeLines.map((line, lineIdx) => (
-                    <View key={lineIdx} style={{ position: 'relative', marginVertical: 2 }}>
-                      <Text
-                        style={[styles.welcomeText, { textAlign: 'center' }]}
-                        onLayout={(e) => {
-                          const w = e.nativeEvent.layout.width;
-                          setWelcomeLineWidths((prev) => {
-                            if (prev[lineIdx] === w) return prev;
-                            const next = [...prev];
-                            next[lineIdx] = w;
-                            return next;
-                          });
-                        }}
-                      >
-                        {line}
-                      </Text>
-                      <Animated.View
-                        pointerEvents="none"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          ...(isRTL
-                            ? { left: 0, right: welcomeLineMasksRef.current[lineIdx] ?? 0 }
-                            : { left: welcomeLineMasksRef.current[lineIdx] ?? 0, right: 0 }),
-                          backgroundColor: colors.background,
-                        }}
-                      />
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          }
-          if (slide.kind === 'feature-anim') {
-            return (
-              <FeatureAnimSlide
-                key={idx}
-                active={currentPage === idx}
-                icon={slide.icon}
-                title={slide.title}
-                body={slide.body}
-                colors={colors}
-                styles={styles}
-                isRTL={isRTL}
-                onComplete={() => markPageComplete(idx)}
-                skipSignal={skipSignal[idx] ?? 0}
-              />
-            );
-          }
-          if (slide.kind === 'feature-cards') {
-            return (
-              <FeatureCardsSlide
-                key={idx}
-                active={currentPage === idx}
-                title={slide.title}
-                cards={slide.cards}
-                colors={colors}
-                styles={styles}
-                onComplete={() => markPageComplete(idx)}
-                skipSignal={skipSignal[idx] ?? 0}
-              />
-            );
-          }
-          if (slide.kind === 'permission') {
-            return (
-              <PermissionAnimSlide
-                key={idx}
-                active={currentPage === idx}
-                icon={slide.icon}
-                title={slide.title}
-                body={slide.body}
-                buttonLabel={slide.buttonLabel}
-                onPress={() => handlePermissionContinue(slide.permission)}
-                colors={colors}
-                styles={styles}
-                isRTL={isRTL}
-                onComplete={() => markPageComplete(idx)}
-                skipSignal={skipSignal[idx] ?? 0}
-              />
-            );
-          }
-          // feature (legacy fallback — 현재 사용 슬라이드 없음)
-          return (
-            <View key={idx} style={styles.slide}>
-              <View style={styles.iconWrap}>
-                <MaterialIcons name={slide.icon as any} size={120} color={colors.primary} />
-              </View>
-              <Text style={styles.title}>{slide.title}</Text>
-              <Text style={styles.body}>{slide.body}</Text>
-            </View>
-          );
-        })}
-
-        {/* Home Preview — 튜토리얼 (확인 버튼 → ReadySlide로 swipe) */}
-        <HomePreviewSlide
-          active={currentPage === slides.length}
-          colors={colors}
-          styles={styles}
-          onStart={handleHomePreviewAdvance}
-          startLabel={t('onboarding.start', { defaultValue: '시작하기' })}
-          favLabel={t('home.favorites', { defaultValue: 'Favorites' })}
-          addLabel={t('home.add', { defaultValue: 'Add' })}
-          minutesLabel={t('home.minutes', { defaultValue: 'MINUTES' })}
-          tooltipPlayLabel={t('onboarding.tooltipPlay', { defaultValue: '재생 버튼을 길게 누르면 타이머를 정지할 수 있습니다' })}
-          confirmLabel={t('onboarding.confirm', { defaultValue: '확인' })}
-          onComplete={() => markPageComplete(slides.length)}
-          skipSignal={skipSignal[slides.length] ?? 0}
-        />
-
-        {/* 마지막 — 준비 완료 + 시작하기 버튼 → Home 이동 */}
-        <ReadySlide
-          active={currentPage === totalPages - 1}
-          title={t('onboarding.readyTitle', { defaultValue: '준비 완료!' })}
-          body={t('onboarding.readyBody', { defaultValue: '이제 ShutTimer를 사용하세요' })}
-          buttonLabel={t('onboarding.start', { defaultValue: '시작하기' })}
-          onPress={handleStart}
-          colors={colors}
-          styles={styles}
-          onComplete={() => markPageComplete(totalPages - 1)}
-          skipSignal={skipSignal[totalPages - 1] ?? 0}
-        />
-      </ScrollView>
-
-      {/* 점 인디케이터 — HomePreview 진입 시 스크롤과 동기화 fade-out */}
-      <Animated.View
-        style={[styles.bottomBar, { opacity: chromeOpacity }]}
-        pointerEvents={currentPage === slides.length ? 'none' : 'box-none'}
-      >
-        <View style={styles.dots}>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                { backgroundColor: i === currentPage ? colors.primary : colors.outlineVariant },
-              ]}
-            />
-          ))}
+            ))}
+          </View>
         </View>
-      </Animated.View>
+
+        <View style={styles.footer}>
+          <Text style={styles.note}>
+            {note.slice(0, typedLen(noteOff, note))}
+            <Text style={styles.hiddenChar}>{note.slice(typedLen(noteOff, note))}</Text>
+          </Text>
+          <View style={[styles.buttonWrap, { opacity: fadeOp(buttonOff, BUTTON_LEAD) }]}>
+            <TouchableOpacity
+              style={[styles.button, busy && { opacity: 0.6 }]}
+              onPress={handleAllowAndStart}
+              disabled={busy}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.buttonText}>
+                {t('onboarding.permAllowStart', { defaultValue: '허용하고 시작' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Pressable>
     </SafeAreaView>
   );
 }
 
-// feature-anim 슬라이드 — icon+title fade-in → body 줄별 좌→우 reveal (1회).
-// 각 페이지마다 독립 anim refs 사용 (여러 feature-anim 페이지 지원).
-function FeatureAnimSlide({
-  active,
-  icon,
-  title,
-  body,
-  colors,
-  styles,
-  isRTL,
-  onComplete,
-  skipSignal,
-}: {
-  active: boolean;
-  icon: string;
-  title: string;
-  body: string;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  isRTL: boolean;
-  onComplete: () => void;
-  skipSignal: number;
-}) {
-  const lines = useMemo(() => body.split('\n'), [body]);
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const lineMasksRef = useRef<Animated.Value[]>([]);
-  if (lineMasksRef.current.length !== lines.length) {
-    lineMasksRef.current = lines.map(() => new Animated.Value(0));
-  }
-  const [lineWidths, setLineWidths] = useState<number[]>([]);
-  const playedRef = useRef(false);
-
-  useEffect(() => {
-    if (!active) return;
-    if (lineWidths.length !== lines.length) return;
-    if (lineWidths.some((w) => !w || w === 0)) return;
-
-    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
-    if (skipSignal > 0) {
-      headerOpacity.stopAnimation();
-      headerOpacity.setValue(1);
-      lineMasksRef.current.forEach((m, i) => {
-        m.stopAnimation();
-        m.setValue(lineWidths[i]);
-      });
-      playedRef.current = true;
-      onComplete();
-      return;
-    }
-
-    if (playedRef.current) {
-      headerOpacity.setValue(1);
-      lineMasksRef.current.forEach((m, i) => m.setValue(lineWidths[i]));
-      onComplete();
-      return;
-    }
-
-    let stopped = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    headerOpacity.setValue(0);
-    lineMasksRef.current.forEach((m) => m.setValue(0));
-
-    const animateLine = (idx: number) => {
-      if (stopped) return;
-      if (idx >= lines.length) {
-        onComplete(); // 모든 줄 완료 → 이동 버튼 활성
-        return;
-      }
-      Animated.timing(lineMasksRef.current[idx], {
-        toValue: lineWidths[idx],
-        duration: 1500,
-        useNativeDriver: false,
-      }).start(({ finished }) => {
-        if (!finished || stopped) return;
-        timeoutId = setTimeout(() => animateLine(idx + 1), 400);
-      });
-    };
-
-    Animated.timing(headerOpacity, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished || stopped) return;
-      timeoutId = setTimeout(() => animateLine(0), 300);
-    });
-
-    return () => {
-      stopped = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      headerOpacity.stopAnimation();
-      lineMasksRef.current.forEach((m) => m.stopAnimation());
-      playedRef.current = true;
-    };
-  }, [active, lineWidths, lines, headerOpacity, onComplete, skipSignal]);
-
-  return (
-    <View style={styles.slide}>
-      <Animated.View style={{ alignItems: 'center', opacity: headerOpacity }}>
-        <View style={styles.iconWrap}>
-          <MaterialIcons name={icon as any} size={120} color={colors.primary} />
-        </View>
-        <Text style={styles.title}>{title}</Text>
-      </Animated.View>
-      <View style={{ marginTop: 8, alignItems: 'center' }}>
-        {lines.map((line, lineIdx) => (
-          <View key={lineIdx} style={{ position: 'relative', marginVertical: 2 }}>
-            <Text
-              style={[styles.body, { textAlign: 'center', marginBottom: 0 }]}
-              onLayout={(e) => {
-                const w = e.nativeEvent.layout.width;
-                setLineWidths((prev) => {
-                  if (prev[lineIdx] === w) return prev;
-                  const next = [...prev];
-                  next[lineIdx] = w;
-                  return next;
-                });
-              }}
-            >
-              {line}
-            </Text>
-            <Animated.View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                ...(isRTL
-                  ? { left: 0, right: lineMasksRef.current[lineIdx] ?? 0 }
-                  : { left: lineMasksRef.current[lineIdx] ?? 0, right: 0 }),
-                backgroundColor: colors.background,
-              }}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// permission 슬라이드 — icon+title fade-in → body 줄별 reveal → 버튼 fade-in (1회)
-function PermissionAnimSlide({
-  active,
-  icon,
-  title,
-  body,
-  buttonLabel,
-  onPress,
-  colors,
-  styles,
-  isRTL,
-  onComplete,
-  skipSignal,
-}: {
-  active: boolean;
-  icon: string;
-  title: string;
-  body: string;
-  buttonLabel: string;
-  onPress: () => void;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  isRTL: boolean;
-  onComplete: () => void;
-  skipSignal: number;
-}) {
-  const lines = useMemo(() => body.split('\n'), [body]);
-  const headerOpacity = useRef(new Animated.Value(0)).current;
-  const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const lineMasksRef = useRef<Animated.Value[]>([]);
-  if (lineMasksRef.current.length !== lines.length) {
-    lineMasksRef.current = lines.map(() => new Animated.Value(0));
-  }
-  const [lineWidths, setLineWidths] = useState<number[]>([]);
-  const playedRef = useRef(false);
-
-  useEffect(() => {
-    if (!active) return;
-    if (lineWidths.length !== lines.length) return;
-    if (lineWidths.some((w) => !w || w === 0)) return;
-
-    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
-    if (skipSignal > 0) {
-      headerOpacity.stopAnimation();
-      headerOpacity.setValue(1);
-      lineMasksRef.current.forEach((m, i) => {
-        m.stopAnimation();
-        m.setValue(lineWidths[i]);
-      });
-      buttonOpacity.stopAnimation();
-      buttonOpacity.setValue(1);
-      playedRef.current = true;
-      onComplete();
-      return;
-    }
-
-    if (playedRef.current) {
-      headerOpacity.setValue(1);
-      lineMasksRef.current.forEach((m, i) => m.setValue(lineWidths[i]));
-      buttonOpacity.setValue(1);
-      onComplete();
-      return;
-    }
-
-    let stopped = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    headerOpacity.setValue(0);
-    lineMasksRef.current.forEach((m) => m.setValue(0));
-    buttonOpacity.setValue(0);
-
-    const showButton = () => {
-      if (stopped) return;
-      Animated.timing(buttonOpacity, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && !stopped) onComplete();
-      });
-    };
-
-    const animateLine = (idx: number) => {
-      if (stopped) return;
-      if (idx >= lines.length) {
-        // 모든 줄 reveal 완료 → 버튼 fade-in
-        timeoutId = setTimeout(showButton, 300);
-        return;
-      }
-      Animated.timing(lineMasksRef.current[idx], {
-        toValue: lineWidths[idx],
-        duration: 1500,
-        useNativeDriver: false,
-      }).start(({ finished }) => {
-        if (!finished || stopped) return;
-        timeoutId = setTimeout(() => animateLine(idx + 1), 400);
-      });
-    };
-
-    Animated.timing(headerOpacity, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished || stopped) return;
-      timeoutId = setTimeout(() => animateLine(0), 300);
-    });
-
-    return () => {
-      stopped = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      headerOpacity.stopAnimation();
-      lineMasksRef.current.forEach((m) => m.stopAnimation());
-      buttonOpacity.stopAnimation();
-      playedRef.current = true;
-    };
-  }, [active, lineWidths, lines, headerOpacity, buttonOpacity, onComplete, skipSignal]);
-
-  return (
-    <View style={styles.slide}>
-      <Animated.View style={{ alignItems: 'center', opacity: headerOpacity }}>
-        <View style={styles.iconWrap}>
-          <MaterialIcons name={icon as any} size={120} color={colors.primary} />
-        </View>
-        <Text style={styles.title}>{title}</Text>
-      </Animated.View>
-      <View style={{ marginTop: 8, alignItems: 'center' }}>
-        {lines.map((line, lineIdx) => (
-          <View key={lineIdx} style={{ position: 'relative', marginVertical: 2 }}>
-            <Text
-              style={[styles.body, { textAlign: 'center', marginBottom: 0 }]}
-              onLayout={(e) => {
-                const w = e.nativeEvent.layout.width;
-                setLineWidths((prev) => {
-                  if (prev[lineIdx] === w) return prev;
-                  const next = [...prev];
-                  next[lineIdx] = w;
-                  return next;
-                });
-              }}
-            >
-              {line}
-            </Text>
-            <Animated.View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                ...(isRTL
-                  ? { left: 0, right: lineMasksRef.current[lineIdx] ?? 0 }
-                  : { left: lineMasksRef.current[lineIdx] ?? 0, right: 0 }),
-                backgroundColor: colors.background,
-              }}
-            />
-          </View>
-        ))}
-      </View>
-      <Animated.View style={{ opacity: buttonOpacity, marginTop: 24 }}>
-        <TouchableOpacity style={styles.permissionButton} onPress={onPress}>
-          <Text style={styles.permissionButtonText}>{buttonLabel}</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  );
-}
-
-// 준비 완료 슬라이드 — icon → title → body → 시작하기 버튼 순차 fade-in (1회, 재진입 시 스냅)
-function ReadySlide({
-  active,
-  title,
-  body,
-  buttonLabel,
-  onPress,
-  colors,
-  styles,
-  onComplete,
-  skipSignal,
-}: {
-  active: boolean;
-  title: string;
-  body: string;
-  buttonLabel: string;
-  onPress: () => void;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  onComplete: () => void;
-  skipSignal: number;
-}) {
-  const iconOp = useRef(new Animated.Value(0)).current;
-  const titleOp = useRef(new Animated.Value(0)).current;
-  const bodyOp = useRef(new Animated.Value(0)).current;
-  const buttonOp = useRef(new Animated.Value(0)).current;
-  const playedRef = useRef(false);
-
-  useEffect(() => {
-    if (!active) return;
-
-    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
-    if (skipSignal > 0) {
-      iconOp.stopAnimation();
-      iconOp.setValue(1);
-      titleOp.stopAnimation();
-      titleOp.setValue(1);
-      bodyOp.stopAnimation();
-      bodyOp.setValue(1);
-      buttonOp.stopAnimation();
-      buttonOp.setValue(1);
-      playedRef.current = true;
-      onComplete();
-      return;
-    }
-
-    if (playedRef.current) {
-      iconOp.setValue(1);
-      titleOp.setValue(1);
-      bodyOp.setValue(1);
-      buttonOp.setValue(1);
-      onComplete();
-      return;
-    }
-    let stopped = false;
-    iconOp.setValue(0);
-    titleOp.setValue(0);
-    bodyOp.setValue(0);
-    buttonOp.setValue(0);
-
-    Animated.sequence([
-      Animated.timing(iconOp, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(titleOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(bodyOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(buttonOp, { toValue: 1, duration: 600, useNativeDriver: true }),
-    ]).start(({ finished }) => {
-      if (finished && !stopped) onComplete();
-    });
-
-    return () => {
-      stopped = true;
-      iconOp.stopAnimation();
-      titleOp.stopAnimation();
-      bodyOp.stopAnimation();
-      buttonOp.stopAnimation();
-      playedRef.current = true;
-    };
-  }, [active, iconOp, titleOp, bodyOp, buttonOp, onComplete, skipSignal]);
-
-  return (
-    <View style={styles.slide}>
-      <Animated.View style={{ opacity: iconOp }}>
-        <View style={styles.iconWrap}>
-          <MaterialIcons name="check-circle" size={120} color={colors.primary} />
-        </View>
-      </Animated.View>
-      <Animated.Text style={[styles.title, { opacity: titleOp }]}>{title}</Animated.Text>
-      <Animated.Text style={[styles.body, { opacity: bodyOp }]}>{body}</Animated.Text>
-      <Animated.View style={{ opacity: buttonOp }}>
-        <TouchableOpacity style={styles.startButton} onPress={onPress}>
-          <Text style={styles.startButtonText}>{buttonLabel}</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
-  );
-}
-
-// 즐겨찾기 long-press 게이지 sector path (MissionItem과 동일 스펙, 60x60 icon 기준)
-function getFavSectorPath(progress: number): string {
-  const cx = 30, cy = 30, r = 55;
-  if (progress <= 0) return '';
-  if (progress >= 0.999) return `M ${cx} ${cy} m 0 ${-r} a ${r} ${r} 0 1 1 0.001 0 Z`;
-  const endAngle = progress * 360;
-  const rad = (endAngle - 90) * (Math.PI / 180);
-  const endX = cx + r * Math.cos(rad);
-  const endY = cy + r * Math.sin(rad);
-  const largeArc = endAngle > 180 ? 1 : 0;
-  return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${largeArc} 1 ${endX} ${endY} Z`;
-}
-
-// home-preview 슬라이드 — HomeScreen 비주얼 그대로 복제 (기능 없음, TV 즐겨찾기 1개 추가)
-function HomePreviewSlide({
-  active,
-  colors,
-  styles,
-  onComplete,
-  onStart,
-  startLabel,
-  favLabel,
-  addLabel,
-  minutesLabel,
-  tooltipPlayLabel,
-  confirmLabel,
-  skipSignal,
-}: {
-  active: boolean;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  onComplete: () => void;
-  onStart: () => void;
-  startLabel: string;
-  favLabel: string;
-  addLabel: string;
-  minutesLabel: string;
-  tooltipPlayLabel: string;
-  confirmLabel: string;
-  skipSignal: number;
-}) {
-  // 시퀀스 애니메이션: play tooltip → 확인 버튼 순차 fade-in
-  const playTooltipOp = useRef(new Animated.Value(0)).current;
-  const confirmOp = useRef(new Animated.Value(0)).current;
-  const playedRef = useRef(false);
-  // onComplete를 ref로 — parent re-render로 인한 useEffect 재실행 방지
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-
-  useEffect(() => {
-    if (!active) return;
-
-    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
-    if (skipSignal > 0) {
-      playTooltipOp.stopAnimation();
-      playTooltipOp.setValue(1);
-      confirmOp.stopAnimation();
-      confirmOp.setValue(1);
-      playedRef.current = true;
-      onCompleteRef.current();
-      return;
-    }
-
-    if (playedRef.current) {
-      playTooltipOp.setValue(1);
-      confirmOp.setValue(1);
-      onCompleteRef.current();
-      return;
-    }
-    let stopped = false;
-    playTooltipOp.setValue(0);
-    confirmOp.setValue(0);
-
-    const animation = Animated.sequence([
-      Animated.timing(playTooltipOp, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.delay(500),
-      Animated.timing(confirmOp, { toValue: 1, duration: 600, useNativeDriver: true }),
-    ]);
-    animation.start(({ finished }) => {
-      if (finished && !stopped) {
-        playedRef.current = true;
-        onCompleteRef.current();
-      }
-    });
-    return () => {
-      stopped = true;
-      animation.stop();
-    };
-  }, [active, playTooltipOp, confirmOp, skipSignal]);
-
-  // 13분 진행 중(일시정지 상태) 시각
-  const timeText = '13:00';
-  const dialProgress = 13 / 60;
-
-  return (
-    // marginTop: -48 — onboarding topNav 공간 상쇄 (실제 Home 화면처럼 SafeArea 바로 아래에서 시작)
-    <View style={[styles.slide, { paddingHorizontal: 0, justifyContent: 'flex-start', paddingTop: 0, paddingBottom: 0, marginTop: -48 }]}>
-      <View pointerEvents="none" style={{ width: '100%', flex: 1 }}>
-        {/* Header — HomeScreen 동일 구조 */}
-        <View style={hp.header}>
-          <View style={hp.headerLeft}>
-            <MaterialIcons name="timer" size={24} color={colors.primary} />
-            <Text style={[hp.headerTitle, { color: colors.onBackground }]}>ShutTimer</Text>
-          </View>
-          <View style={hp.headerRight}>
-            <MaterialIcons name="notifications" size={24} color={colors.secondary} style={{ opacity: 0.4 }} />
-            <MaterialIcons name="calendar-today" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-            <MaterialIcons name="settings" size={24} color={colors.onBackground} style={{ opacity: 0.6 }} />
-          </View>
-        </View>
-
-        {/* Dial — TimerDial 직접 사용 (정적, onSeek 미전달, 13분 위치) */}
-        <View style={hp.dialSection}>
-          <TimerDial
-            progress={dialProgress}
-            timeText={timeText}
-            subText={minutesLabel}
-          />
-
-          {/* 다이얼 전환 버튼 모양 (정적) */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
-            <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
-            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} />
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.outlineVariant }} />
-            </View>
-            <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
-          </View>
-        </View>
-
-        {/* 13:00 pill + Pause button + 게이지바 링 (long-press 취소 indicator 배경) */}
-        {/* Android — 재생 버튼 링이 Favorites 구분선과 겹쳐 섹션 간격 확대. iOS는 6 유지. */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 12 : 6, gap: 8 }}>
-          <View style={{ borderWidth: 2, borderColor: colors.outlineVariant, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
-            <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onBackground, letterSpacing: 1 }}>
-              13 : 00
-            </Text>
-          </View>
-          <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-            <Svg width={80} height={80} style={{ position: 'absolute' }}>
-              <SvgCircle
-                cx={40}
-                cy={40}
-                r={38}
-                fill="none"
-                stroke={colors.outlineVariant}
-                strokeWidth={3}
-                opacity={0.8}
-              />
-              <SvgCircle
-                cx={40}
-                cy={40}
-                r={38}
-                fill="none"
-                stroke={colors.primary}
-                strokeWidth={3}
-                strokeDasharray={2 * Math.PI * 38}
-                strokeDashoffset={2 * Math.PI * 38 * 0.5}
-                strokeLinecap="round"
-                rotation="-90"
-                origin="40, 40"
-              />
-            </Svg>
-            <View style={[hp.playButton, { backgroundColor: colors.primary }]}>
-              <MaterialIcons name="pause" size={40} color={colors.onPrimary} />
-            </View>
-          </View>
-        </View>
-
-        {/* Favorites — HomeScreen 동일 (TV 1개), 좌측 정렬 */}
-        <View style={{ width: '100%', marginBottom: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: '100%' }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-            <Text style={[hp.favTitle, { color: colors.onBackground }]}>{favLabel}</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-          </View>
-          <View style={hp.missionList}>
-            <View style={hp.missionItem}>
-              <View style={[hp.addBtn, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.secondary }]}>
-                <MaterialIcons name="add" size={26} color={colors.secondary} />
-              </View>
-              <Text style={[hp.missionLabel, { color: colors.secondary }]}>{addLabel}</Text>
-            </View>
-            <View style={hp.missionItem}>
-              <View style={[hp.missionIcon, { backgroundColor: colors.surfaceContainerLow, borderColor: colors.primary }]}>
-                <Svg width={60} height={60} style={StyleSheet.absoluteFill}>
-                  <Defs>
-                    <ClipPath id="clip-tv-main">
-                      <SvgRect x="0" y="0" width={60} height={60} rx="16" ry="16" />
-                    </ClipPath>
-                  </Defs>
-                  <SvgPath d={getFavSectorPath(0.7)} fill={colors.primary} fillOpacity={0.9} clipPath="url(#clip-tv-main)" />
-                </Svg>
-                <MaterialIcons name="tv" size={28} color={colors.onPrimary} />
-              </View>
-              <Text style={[hp.missionLabel, { color: colors.primary }]}>TV</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* 흰색 오버레이 — preview를 dim 처리 (tooltip 강조용 backdrop) */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.5)',
-        }}
-      />
-
-      {/* Play button + tooltip — overlay 위로 올림 (하이라이트 레이어).
-          원본 layout 그대로 mirror 후 opacity:0 spacer로 위치 맞춤.
-          pointerEvents="box-none" — 확인 버튼 터치 허용, 나머지는 자식이 none 처리. */}
-      <View
-        pointerEvents="box-none"
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-      >
-        <View style={{ width: '100%', flex: 1 }}>
-          {/* Header 공간 spacer */}
-          <View style={[hp.header, { opacity: 0 }]}>
-            <View style={hp.headerLeft}>
-              <MaterialIcons name="timer" size={24} color={colors.primary} />
-              <Text style={[hp.headerTitle, { color: colors.onBackground }]}>ShutTimer</Text>
-            </View>
-          </View>
-          {/* Dial 공간 spacer — TimerDial 반응형 (= Platform 분기 정합).
-              iOS = Math.min(330, screenW - 60), Android = Math.min(290, screenW - 80).
-              Android — includeFontPadding으로 실제 스위처 행이 하드코딩 32보다 ~20px 높음 → 실제 행 미러로 자동 정합.
-              iOS — ~32로 맞아 기존 하드코딩 유지 (iOS 무변경 보장, Android 작업이 iOS 회귀 일으키지 않도록 분기). */}
-          <View style={[hp.dialSection, { opacity: 0 }]}>
-            <View style={{ width: DIAL_SIZE, height: DIAL_SIZE }} />
-            {Platform.OS === 'android' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
-                <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
-                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} />
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.outlineVariant }} />
-                </View>
-                <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
-              </View>
-            ) : (
-              <View style={{ height: 32, marginTop: 12 }} />
-            )}
-          </View>
-          {/* Play button 섹션 (링 + tooltip) */}
-          {/* Android — preview 측과 동일 간격 확대 (레이어 정렬 유지). iOS는 6 유지. */}
-          <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: Platform.OS === 'android' ? 12 : 6, gap: 8 }}>
-            <View style={{ opacity: 0, borderWidth: 2, borderColor: 'transparent', borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '800', letterSpacing: 1 }}>13 : 00</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <View style={{ width: 130 }} />
-              <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-                <Svg width={80} height={80} style={{ position: 'absolute' }}>
-                  <SvgCircle cx={40} cy={40} r={38} fill="none" stroke={colors.outlineVariant} strokeWidth={3} opacity={0.8} />
-                  <SvgCircle
-                    cx={40}
-                    cy={40}
-                    r={38}
-                    fill="none"
-                    stroke={colors.primary}
-                    strokeWidth={3}
-                    strokeDasharray={2 * Math.PI * 38}
-                    strokeDashoffset={2 * Math.PI * 38 * 0.5}
-                    strokeLinecap="round"
-                    rotation="-90"
-                    origin="40, 40"
-                  />
-                </Svg>
-                <View style={[hp.playButton, { backgroundColor: colors.primary }]}>
-                  <MaterialIcons name="pause" size={40} color={colors.onPrimary} />
-                </View>
-              </View>
-              <Animated.Text style={{ width: 130, fontSize: 13, fontWeight: '600', color: colors.onBackground, lineHeight: 18, opacity: playTooltipOp }}>
-                {tooltipPlayLabel}
-              </Animated.Text>
-            </View>
-          </View>
-          {/* Favorites 섹션 — divider/Add/TV 모두 spacer (메인에서 렌더). 확인 버튼 위치용 */}
-          <View style={{ width: '100%', marginBottom: 4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, width: '100%', opacity: 0 }}>
-              <View style={{ flex: 1, height: 1 }} />
-              <Text style={hp.favTitle}>Favorites</Text>
-              <View style={{ flex: 1, height: 1 }} />
-            </View>
-            <View style={[hp.missionList, { alignItems: 'center' }]}>
-              {/* Add spacer */}
-              <View style={[hp.missionItem, { opacity: 0 }]}>
-                <View style={hp.addBtn} />
-              </View>
-              {/* TV spacer */}
-              <View style={[hp.missionItem, { opacity: 0 }]}>
-                <View style={hp.missionIcon} />
-              </View>
-            </View>
-          </View>
-        </View>
-        {/* 2026-05-31 — 확인 버튼: 화면 정중앙 absolute (iOS + Android 통일).
-            기존 Android 미러 flow 측 = S23 화면 길이 초과로 화면 밖 → absolute center로 통일. */}
-        <Animated.View
-          pointerEvents="box-none"
-          style={{
-            opacity: confirmOp,
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <TouchableOpacity style={styles.startButton} onPress={onStart}>
-            <Text style={styles.startButtonText}>{confirmLabel}</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </View>
-  );
-}
-
-const hp = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  dialSection: {
-    marginTop: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  missionList: {
-    flexDirection: 'row',
-    paddingHorizontal: 8,
-    gap: 24,
-  },
-  missionItem: {
-    alignItems: 'center',
-    gap: 8,
-    width: 64,
-  },
-  addBtn: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    opacity: 0.7,
-  },
-  missionIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  favTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginHorizontal: 12,
-  },
-  missionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-});
-
-// feature-cards 슬라이드 — 타이틀 → 카드 1개씩 fade-in (slide up).
-function FeatureCardsSlide({
-  active,
-  title,
-  cards,
-  colors,
-  styles,
-  onComplete,
-  skipSignal,
-}: {
-  active: boolean;
-  title: string;
-  cards: Card[];
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  onComplete: () => void;
-  skipSignal: number;
-}) {
-  const titleOpacity = useRef(new Animated.Value(0)).current;
-  const cardOpsRef = useRef<Animated.Value[]>([]);
-  const cardYsRef = useRef<Animated.Value[]>([]);
-  if (cardOpsRef.current.length !== cards.length) {
-    cardOpsRef.current = cards.map(() => new Animated.Value(0));
-    cardYsRef.current = cards.map(() => new Animated.Value(20));
-  }
-  const playedRef = useRef(false);
-
-  useEffect(() => {
-    if (!active) return;
-
-    // v1.8 #SkipButton — skipSignal > 0 시 = snap to final + markComplete.
-    if (skipSignal > 0) {
-      titleOpacity.stopAnimation();
-      titleOpacity.setValue(1);
-      cardOpsRef.current.forEach((o) => {
-        o.stopAnimation();
-        o.setValue(1);
-      });
-      cardYsRef.current.forEach((y) => {
-        y.stopAnimation();
-        y.setValue(0);
-      });
-      playedRef.current = true;
-      onComplete();
-      return;
-    }
-
-    if (playedRef.current) {
-      titleOpacity.setValue(1);
-      cardOpsRef.current.forEach((o) => o.setValue(1));
-      cardYsRef.current.forEach((y) => y.setValue(0));
-      onComplete();
-      return;
-    }
-    let stopped = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    titleOpacity.setValue(0);
-    cardOpsRef.current.forEach((o) => o.setValue(0));
-    cardYsRef.current.forEach((y) => y.setValue(20));
-
-    const animateCard = (idx: number) => {
-      if (stopped) return;
-      if (idx >= cards.length) {
-        onComplete(); // 모든 카드 완료 → 이동 버튼 활성
-        return;
-      }
-      Animated.parallel([
-        Animated.timing(cardOpsRef.current[idx], {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(cardYsRef.current[idx], {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        if (!finished || stopped) return;
-        timeoutId = setTimeout(() => animateCard(idx + 1), 350);
-      });
-    };
-
-    Animated.timing(titleOpacity, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start(({ finished }) => {
-      if (!finished || stopped) return;
-      timeoutId = setTimeout(() => animateCard(0), 300);
-    });
-
-    return () => {
-      stopped = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      titleOpacity.stopAnimation();
-      cardOpsRef.current.forEach((o) => o.stopAnimation());
-      cardYsRef.current.forEach((y) => y.stopAnimation());
-      playedRef.current = true;
-    };
-  }, [active, cards.length, titleOpacity, onComplete, skipSignal]);
-
-  return (
-    <View style={styles.slide}>
-      <Animated.Text style={[styles.title, { opacity: titleOpacity, marginBottom: 32 }]}>
-        {title}
-      </Animated.Text>
-      <View style={{ width: '100%', gap: 12 }}>
-        {cards.map((card, i) => (
-          <Animated.View
-            key={i}
-            style={{
-              opacity: cardOpsRef.current[i] ?? 0,
-              transform: [{ translateY: cardYsRef.current[i] ?? new Animated.Value(0) }],
-            }}
-          >
-            <View style={styles.cardOption}>
-              <View style={styles.cardOptionIconWrapper}>
-                <MaterialIcons name={card.icon as any} size={22} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.cardOptionLabel}>{card.label}</Text>
-                <Text style={styles.cardOptionDescription}>{card.description}</Text>
-              </View>
-            </View>
-          </Animated.View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const makeStyles = (colors: ThemeColors, SCREEN_W: number) =>
+const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
     },
-    topNav: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-      height: 48,
-    },
-    topNavBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    topNavText: {
-      fontSize: 14,
-      color: colors.secondary,
-      fontWeight: '600',
-    },
-    greetingText: {
-      fontSize: 39,
-      fontWeight: '800',
-      color: colors.onBackground,
-      letterSpacing: -1,
-      textAlign: 'center',
-    },
-    welcomeText: {
-      fontSize: 24,
-      fontWeight: '800',
-      color: colors.onBackground,
-      letterSpacing: -1,
-      textAlign: 'center',
-      lineHeight: 32,
-    },
-    slide: {
-      width: SCREEN_W,
+    flex: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
+    },
+    buttonWrap: {
+      alignSelf: 'stretch',
+    },
+    hiddenChar: {
+      opacity: 0,
+    },
+    content: {
+      flex: 1,
       paddingHorizontal: 32,
-      paddingBottom: 80,
-    },
-    iconWrap: {
-      width: 160,
-      height: 160,
-      borderRadius: 80,
-      backgroundColor: colors.surfaceContainerLow,
-      alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 32,
     },
-    title: {
-      fontSize: 24,
+    logoWrap: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    greeting: {
+      fontSize: 30,
       fontWeight: '800',
       color: colors.onBackground,
       textAlign: 'center',
-      marginBottom: 16,
       letterSpacing: -0.5,
+      marginBottom: 8,
     },
-    body: {
+    subtitle: {
       fontSize: 15,
       lineHeight: 22,
       color: colors.secondary,
       textAlign: 'center',
       marginBottom: 32,
-      paddingHorizontal: 8,
     },
-    permissionButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 32,
+    list: {
+      gap: 12,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
       paddingVertical: 14,
-      borderRadius: 28,
-      marginTop: 8,
-      alignItems: 'center',
-    },
-    permissionButtonText: {
-      color: colors.onPrimary,
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    startButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 48,
-      paddingVertical: 16,
-      borderRadius: 32,
-      marginTop: 8,
-      alignItems: 'center',
-    },
-    startButtonText: {
-      color: colors.onPrimary,
-      fontSize: 18,
-      fontWeight: '800',
-    },
-    bottomBar: {
-      paddingHorizontal: 24,
-      paddingVertical: 20,
-      gap: 16,
-      alignItems: 'center',
-    },
-    dots: {
-      flexDirection: 'row',
-      gap: 8,
-      alignItems: 'center',
-    },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    cardOption: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-      paddingVertical: 16,
       paddingHorizontal: 16,
-      borderRadius: 12,
+      borderRadius: 14,
       backgroundColor: colors.surfaceContainerLow,
     },
-    cardOptionIconWrapper: {
+    rowIcon: {
       width: 44,
       height: 44,
       borderRadius: 12,
@@ -1759,28 +313,37 @@ const makeStyles = (colors: ThemeColors, SCREEN_W: number) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    cardOptionLabel: {
+    rowLabel: {
       fontSize: 15,
       fontWeight: '700',
       color: colors.onBackground,
     },
-    cardOptionDescription: {
+    rowDesc: {
       fontSize: 12,
       color: colors.secondary,
-      opacity: 0.8,
+      marginTop: 2,
     },
-    nextButton: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 24,
-      paddingVertical: 12,
-      borderRadius: 24,
-      flexDirection: 'row',
+    footer: {
+      paddingHorizontal: 32,
+      paddingBottom: 24,
+      gap: 12,
       alignItems: 'center',
-      gap: 6,
     },
-    nextButtonText: {
+    note: {
+      fontSize: 12,
+      color: colors.secondary,
+      textAlign: 'center',
+    },
+    button: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 28,
+      alignItems: 'center',
+      alignSelf: 'stretch',
+    },
+    buttonText: {
       color: colors.onPrimary,
-      fontSize: 15,
-      fontWeight: '700',
+      fontSize: 17,
+      fontWeight: '800',
     },
   });

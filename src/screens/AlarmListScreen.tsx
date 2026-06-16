@@ -57,12 +57,12 @@ function isAlarmKitSupported(): boolean {
 }
 
 /** "HH:MM" → "오전/오후 H:MM" */
-function formatTimeKr(hhmm: string): string {
+function formatTimeKr(hhmm: string, t: (k: string, opts?: any) => string): string {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
   if (!m) return '--:--';
   const h = parseInt(m[1], 10);
   const mm = parseInt(m[2], 10);
-  const ampm = h < 12 ? '오전' : '오후';
+  const ampm = h < 12 ? t('common.am', { defaultValue: '오전' }) : t('common.pm', { defaultValue: '오후' });
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${ampm} ${h12}:${String(mm).padStart(2, '0')}`;
 }
@@ -72,14 +72,19 @@ function formatRepeat(alarm: Alarm, t: (k: string, opts?: any) => string): strin
   if (alarm.repeat === 'daily') return t('alarm.repeat.daily', { defaultValue: '매일' });
   // weekly
   if (alarm.days.length === 0) return t('alarm.repeat.weekly', { defaultValue: '요일 선택' });
-  const sorted = [...alarm.days].sort();
+  const sorted = [...alarm.days].sort((a, b) => a - b);
+  // 특정 요일 조합은 축약 표기 (월화수목금 나열 대신).
+  const key = sorted.join(',');
+  if (key === '0,1,2,3,4,5,6') return t('alarm.repeat.daily', { defaultValue: '매일' });
+  if (key === '1,2,3,4,5') return t('alarm.repeat.weekdays', { defaultValue: '주중' });
+  if (key === '0,6') return t('alarm.repeat.weekend', { defaultValue: '주말' });
   return sorted
     .map(d => t(`routine.weekday.${WEEKDAY_KEYS[d]}`, { defaultValue: WEEKDAY_KEYS[d] }))
     .join(' ');
 }
 
 
-/** step duration 표시용 (RoutineListScreen 패턴). i18n 영영. */
+/** step duration 표시용 (RoutineListScreen 패턴). */
 function formatDurationLabel(sec: number, t: (k: string, opts?: any) => string): string {
   const minLabel = t('routine.duration.minute', { defaultValue: '분' });
   if (sec <= 0) return `0${minLabel}`;
@@ -180,8 +185,6 @@ function AlarmStepRow({ step, idx, colors, visible, totalSteps, isDark }: AlarmS
 
 type AlarmRowProps = {
   item: Alarm;
-  index: number;
-  totalCount: number;
   styles: ReturnType<typeof makeStyles>;
   colors: ThemeColors;
   isDark: boolean;
@@ -199,7 +202,7 @@ type AlarmRowProps = {
   swipeDisabled?: boolean;
 };
 
-function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive, toggleDisabled, swipeDisabled }: AlarmRowProps) {
+function AlarmRow({ item, styles, colors, isDark, onEdit, onToggle, onDelete, t, activeRunNode, isActive, toggleDisabled, swipeDisabled }: AlarmRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const swipeOffsetRef = useRef(0);
   const [expanded, setExpanded] = useState(false);
@@ -214,7 +217,7 @@ function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onT
   const hasSteps = !!item.steps && item.steps.length > 0;
   // 루틴(스텝) 포함 시 총 시간 = 스텝 duration 합. 메타에 "루틴 시간 X" 표시(루틴 탭과 동일).
   const totalStepSec = (item.steps ?? []).reduce((sum, s) => sum + (s.durationSeconds || 0), 0);
-  const formattedTime = formatTimeKr(item.time);
+  const formattedTime = formatTimeKr(item.time, t);
   const timeTokens = formattedTime.split(' ');
   const periodText = timeTokens.length > 1 ? timeTokens[0] : '';
   const timeText = timeTokens.length > 1 ? timeTokens.slice(1).join(' ') : formattedTime;
@@ -370,10 +373,7 @@ function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onT
           activeOpacity={0.92}
           onPress={handleCardPress}
           onLongPress={onEdit}
-          style={[
-            styles.alarmCard,
-            !item.enabled && styles.alarmCardDisabled,
-          ]}
+          style={styles.alarmCard}
         >
       <View
         style={styles.alarmCardMain}
@@ -410,11 +410,14 @@ function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onT
             style={[{ transform: [{ scale: 0.9 }, { translateY: Platform.select({ ios: 14, android: 0 }) ?? 14 }] }, toggleDisabled ? { opacity: 0.4 } : undefined]}
           />
         </View>
+        {/* 단계 있는 알람(알람 루틴): 반복요일 1줄, [N단계]+루틴 시간 2줄째로 분리. */}
         <View style={styles.itemMetaRow}>
           <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]}>
             {formatRepeat(item, t)}
           </Text>
-          {hasSteps && (
+        </View>
+        {hasSteps && (
+          <View style={styles.itemMetaRow}>
             <View style={[styles.stepBadge, !item.enabled && { opacity: 0.4 }]}>
               <MaterialIcons name="playlist-play" size={12} color={isDark ? colors.onPrimary : colors.primary} />
               <Text style={styles.stepBadgeText}>
@@ -424,8 +427,6 @@ function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onT
                 })}
               </Text>
             </View>
-          )}
-          {hasSteps && (
             <Text style={[styles.itemMeta, !item.enabled && styles.itemDisabled]} numberOfLines={1}>
               {t('routine.totalDurationFmt', {
                 duration: formatDurationLabel(totalStepSec, t),
@@ -433,8 +434,8 @@ function AlarmRow({ item, index, totalCount, styles, colors, isDark, onEdit, onT
                 defaultValue: `루틴 시간 ${formatDurationLabel(totalStepSec, t)}`,
               })}
             </Text>
-          )}
-        </View>
+          </View>
+        )}
       </View>
 
       {activeRunNode ? (
@@ -623,14 +624,12 @@ export default function AlarmListScreen({ navigation }: Props) {
   // 2026-05-27 fix — 루틴 / ad-hoc routine 진행 중 측 = 모든 알람 토글 disabled (= 진행 중 routine 영향 차단).
   //   activeRoutine 측 = SessionController kind=routine 또는 ad_hoc_routine 측 active 상태 측 mirror.
   const anyRoutineRunning = !!activeRoutine;
-  const renderItem = ({ item, index }: { item: Alarm; index: number }) => {
+  const renderItem = ({ item }: { item: Alarm }) => {
     // v1.7 Phase 2-B — 본 알람 측 ad-hoc routine 진행 중 = ActiveRoutineSection 마운트.
     const isActive = !!activeRoutine && activeRoutine.routineId === createAlarmAdhocRoutineId(item.id);
     return (
       <AlarmRow
         item={item}
-        index={index}
-        totalCount={alarms.length}
         styles={styles}
         colors={colors}
         isDark={isDark}
@@ -697,7 +696,7 @@ export default function AlarmListScreen({ navigation }: Props) {
 }
 
 const makeStyles = (colors: ThemeColors, isDark: boolean) => {
-  // RTL 분기 — flexDirection 측 = RN 자동 mirror ❌, 명시 영영.
+  // RTL 분기 — flexDirection은 RN이 자동 mirror하지 않아 명시 지정.
   const flexRow: 'row' | 'row-reverse' = I18nManager.isRTL ? 'row-reverse' : 'row';
   return StyleSheet.create({
     container: {
@@ -738,9 +737,6 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => {
       position: 'relative',
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: isDark ? colors.outlineVariant : '#D1D1D6',
-    },
-    alarmCardDisabled: {
-      opacity: 1,
     },
     alarmCardMain: {
       flexDirection: 'column',
@@ -807,6 +803,7 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => {
       alignItems: 'center',
       marginTop: 2,
       flexWrap: 'wrap',
+      gap: 6,
     },
     itemMeta: {
       fontSize: 13,
@@ -819,7 +816,6 @@ const makeStyles = (colors: ThemeColors, isDark: boolean) => {
     stepBadge: {
       flexDirection: flexRow,
       alignItems: 'center',
-      marginStart: 8,
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 999,

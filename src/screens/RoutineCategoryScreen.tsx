@@ -64,7 +64,9 @@ export default function RoutineCategoryScreen({ navigation, route }: Props) {
 
   // 뒤로가기 버튼 = 선택한 카테고리 적용하며 RoutineEdit 로 복귀.
   const handleBack = useCallback(() => {
-    (navigation as any).popTo?.('RoutineEdit', { selectedCategory: selected }) ??
+    // merge=true 로 호출해야 RoutineEdit 의 기존 params(routineId 등)가 보존됨.
+    //   merge 누락 시 params 가 {selectedCategory} 로 통째 교체돼 편집 중 루틴이 복제되던 버그(#RoutineEditDup).
+    (navigation as any).popTo?.('RoutineEdit', { selectedCategory: selected }, true) ??
       navigation.navigate({ name: 'RoutineEdit', params: { selectedCategory: selected }, merge: true } as any);
   }, [navigation, selected]);
 

@@ -145,7 +145,7 @@ export default function PoCPhotoValidationScreen({ navigation }: Props) {
   // 미션 상태
   const [currentMission, setCurrentMission] = useState<string>(() => pickRandom(MISSION_POOL));
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [lastMatch, setLastMatch] = useState<Detection | null>(null);
+  const [, setLastMatch] = useState<Detection | null>(null);
   const [completed, setCompleted] = useState<Detection | null>(null);
   const [scanPhase, setScanPhase] = useState<'scanning' | 'detected' | 'filling'>('scanning');
   const [error, setError] = useState<string | null>(null);

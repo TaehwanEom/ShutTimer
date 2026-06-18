@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   Animated,
   Image,
-  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { TFunction } from 'i18next';
@@ -28,8 +27,8 @@ import { useRunOnJS, useSharedValue, type ISharedValue } from 'react-native-work
 import { parseYolov10Output, type Detection } from '../utils/objectDetection';
 import { MISSION_EMOJI } from '../constants/missionIcons';
 import { getTfliteModel } from '../utils/tfliteModelCache';
+import { Logger } from '../utils/logger';
 
-const TARGET_CONFIDENCE = 0.4;
 const THROTTLE_MS = 800;
 const HITS_REQUIRED = 3;
 const FOV_MAX = 70;
@@ -153,22 +152,15 @@ export default function AlarmCameraMode(props: Props) {
     return candidates[0] ?? device.formats[0];
   }, [device]);
 
-  // v1.8 #TfliteSingleton — module-level singleton cache (= getTfliteModel).
-  //   직전 = useTensorflowModel hook → 매 mount 시 15MB 모델 새로 load (= 발열 root cause 후보).
-  //   정정 = 첫 load 후 cache → 두 번째 알람부터 0초 영역. tap/shake 모드 측 mount 스킵 의도 잔존 ✅.
+  // tflite 모델 로드 — module-level singleton cache (= getTfliteModel) 경유.
+  // Android release 빌드 측 useTensorflowModel hook 의 MalformedURLException 회피 위해 cache 경유 필수.
   const [model, setModel] = useState<TensorflowModel | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
     getTfliteModel()
-      .then((m) => {
-        if (!cancelled) setModel(m);
-      })
-      .catch((e: any) => {
-        console.warn('[TfliteCache] load fail:', e?.message || e);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .then((m) => { if (!cancelled) setModel(m); })
+      .catch((e: any) => { Logger.warn('TfliteCache', `load fail: ${e?.message || e}`); });
+    return () => { cancelled = true; };
   }, []);
   const boxedModel = useMemo(
     () => (model != null ? NitroModules.box(model) : undefined),
@@ -188,6 +180,9 @@ export default function AlarmCameraMode(props: Props) {
     if (matched.value) return;
     if (isShufflingSV.value) return;
     if (boxedModel == null) return;
+    // #CameraResizeCrash (2026-06-17) — 무효/0 크기 프레임을 resize 로 넘기면 네이티브 vImage(vImageScale_ARGB8888)
+    //   에서 SIGSEGV 로 앱이 죽음(JS try/catch 로 못 잡힘). 카메라 종료/방향 전환 race 대비, resize 전 프레임 유효성 가드.
+    if (!frame.isValid || frame.width === 0 || frame.height === 0) return;
     const now = Date.now();
     if (now - lastRun.value < THROTTLE_MS) return;
     lastRun.value = now;
@@ -222,7 +217,7 @@ export default function AlarmCameraMode(props: Props) {
   return (
     <>
       {/* 카메라 박스 */}
-      <View style={{ width: boxWidth, height: boxHeight, borderRadius: 16, overflow: 'hidden', backgroundColor: '#111' }}>
+      <View style={[cameraStyles.cameraCard, { width: boxWidth, height: boxHeight }]}>
         {hasCameraPermission && device ? (
           <>
             <Camera
@@ -250,49 +245,49 @@ export default function AlarmCameraMode(props: Props) {
             <Animated.View pointerEvents="none" style={[
               StyleSheet.absoluteFill,
               {
-                backgroundColor: '#32CD32',
-                opacity: successBlink.interpolate({ inputRange: [0, 1], outputRange: [0, 0.4] }),
+                backgroundColor: '#22C55E',
+                opacity: successBlink.interpolate({ inputRange: [0, 1], outputRange: [0, 0.28] }),
               },
             ]} />
             {/* 감지 성공 피드백 — 연두 채움 (top → bottom) */}
             <Animated.View pointerEvents="none" style={{
               position: 'absolute', top: 0, left: 0, right: 0,
-              backgroundColor: '#32CD32',
+              backgroundColor: '#22C55E',
               height: successFill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-              opacity: successFill.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.55] }),
+              opacity: successFill.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.42] }),
             }} />
-            {/* 박스 상단 어둠 + 이모지 + 풀 문장 */}
-            <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingVertical: 16, paddingHorizontal: 12, backgroundColor: 'rgba(0,0,0,0.65)', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 60, height: 60, position: 'relative' }}>
+            {/* 박스 상단 안내 카드 */}
+            <View pointerEvents="none" style={cameraStyles.missionCard}>
+              <View style={cameraStyles.emojiFrame}>
                 {currentEmoji ? (
                   <Image
                     source={currentEmoji}
-                    style={{ position: 'absolute', top: 0, left: 0, width: 60, height: 60, opacity: isShuffling ? 0 : 1 }}
+                    style={[cameraStyles.emojiImage, { opacity: isShuffling ? 0 : 1 }]}
                     resizeMode="contain"
                   />
                 ) : (
                   <View style={{ opacity: isShuffling ? 0 : 1 }}>
-                    <MaterialIcons name={currentMission as React.ComponentProps<typeof MaterialIcons>['name']} size={54} color="#fff" />
+                    <MaterialIcons name={currentMission as React.ComponentProps<typeof MaterialIcons>['name']} size={36} color="#111827" />
                   </View>
                 )}
                 {isShuffling && shuffledList.map((k, i) => (
                   <Image
                     key={k}
                     source={MISSION_EMOJI[k]}
-                    style={{ position: 'absolute', top: 0, left: 0, width: 60, height: 60, opacity: i === shuffleIdx ? 1 : 0 }}
+                    style={[cameraStyles.emojiImage, { opacity: i === shuffleIdx ? 1 : 0 }]}
                     resizeMode="contain"
                   />
                 ))}
               </View>
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', minHeight: 20, textAlign: 'center' }}>
+              <Text style={cameraStyles.missionText}>
                 {isShuffling ? '' : missionSentence}
               </Text>
             </View>
-            {/* 박스 하단 어둠 + 남은 초. v1.8 — unlimited 시 = "∞" 표시. */}
-            <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+            {/* 남은 초. v1.8 — unlimited 시 = "∞" 표시. */}
+            <View pointerEvents="none" style={cameraStyles.timerPill}>
               <Animated.Text style={{
-                color: isDanger ? '#ff3b30' : '#fff',
-                fontSize: 28, fontWeight: '900', fontVariant: ['tabular-nums'],
+                color: isDanger ? '#EF4444' : '#111827',
+                fontSize: 24, fontWeight: '900', fontVariant: ['tabular-nums'],
                 opacity: isDanger ? dangerBlink.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] }) : 1,
               }}>
                 {unlimited ? '∞' : `${remainingSeconds}${t('settings.secondsUnit', { defaultValue: '초' })}`}
@@ -304,45 +299,45 @@ export default function AlarmCameraMode(props: Props) {
                 position: 'absolute',
                 top: 0, left: 0, right: 0,
                 height: 2,
-                backgroundColor: '#B8E986',
+                backgroundColor: '#A7F3D0',
                 transform: [{
                   translateY: scanLine.interpolate({
                     inputRange: [0, 1],
                     outputRange: [0, Math.max(0, boxHeight - 120 - 50 - 2)],
                   }),
                 }],
-                shadowColor: '#B8E986',
-                shadowOpacity: 0.9,
-                shadowRadius: 12,
+                shadowColor: '#34D399',
+                shadowOpacity: 0.55,
+                shadowRadius: 10,
                 shadowOffset: { width: 0, height: 0 },
                 elevation: 8,
               }}>
-                <View style={{ position: 'absolute', top: -8, left: 0, right: 0, height: 18, backgroundColor: '#B8E986', opacity: 0.25 }} />
+                <View style={{ position: 'absolute', top: -8, left: 0, right: 0, height: 18, backgroundColor: '#A7F3D0', opacity: 0.18 }} />
               </Animated.View>
             </View>
             {/* 중앙 크로스헤어 */}
             <View pointerEvents="none" style={{ position: 'absolute', top: 120, bottom: 50, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }}>
               <Svg width={48} height={48} style={{ position: 'absolute' }}>
-                <Circle cx={24} cy={24} r={22} stroke="#B8E986" strokeWidth={2} fill="none" />
+                <Circle cx={24} cy={24} r={22} stroke="#D1FAE5" strokeWidth={2} fill="none" />
               </Svg>
-              <View style={{ width: 18, height: 2, backgroundColor: '#B8E986', position: 'absolute' }} />
-              <View style={{ width: 2, height: 18, backgroundColor: '#B8E986', position: 'absolute' }} />
+              <View style={{ width: 18, height: 2, backgroundColor: '#D1FAE5', position: 'absolute' }} />
+              <View style={{ width: 2, height: 18, backgroundColor: '#D1FAE5', position: 'absolute' }} />
             </View>
             {/* 재시도 배너 */}
             {isRetryBannerVisible && (
-              <View style={{ position: 'absolute', top: '35%', left: 12, right: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.8)', alignItems: 'center', gap: 4 }} pointerEvents="none">
-                <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>
+              <View style={cameraStyles.retryCard} pointerEvents="none">
+                <Text style={cameraStyles.retryTitle}>
                   {t('alarm.retrying', { defaultValue: '재시도' })}
                 </Text>
-                <Text style={{ color: '#ddd', fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
+                <Text style={cameraStyles.retryText}>
                   {t('alarm.missionRetryHint', { mission: missionLabel, defaultValue: `${missionLabel}을 다시 찾아주세요` })}
                 </Text>
               </View>
             )}
           </>
         ) : (
-          <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
-            <Text style={{ color: '#fff', fontSize: 14, marginBottom: 12, textAlign: 'center' }}>{t('alarm.takePhoto')}</Text>
+          <View style={[StyleSheet.absoluteFillObject, cameraStyles.permissionFallback]}>
+            <Text style={cameraStyles.permissionTitle}>{t('alarm.takePhoto')}</Text>
             <TouchableOpacity style={permissionButtonStyle} onPress={requestPermission}>
               <Text style={permissionButtonTextStyle}>{t('alarm.allowCamera')}</Text>
             </TouchableOpacity>
@@ -351,25 +346,25 @@ export default function AlarmCameraMode(props: Props) {
       </View>
 
       {/* 다시 뽑기 + 카메라 전환 */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 32, marginTop: 8 }}>
+      <View style={cameraStyles.controlRow}>
         <TouchableOpacity
           onPress={onReshuffle}
           disabled={isRetryBannerVisible || isShuffling}
-          style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, (isRetryBannerVisible || isShuffling) && { opacity: 0.4 }]}
+          style={[cameraStyles.controlButton, (isRetryBannerVisible || isShuffling) && { opacity: 0.4 }]}
         >
-          <MaterialIcons name="shuffle" size={26} color="#fff" style={{ opacity: 0.9 }} />
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
+          <MaterialIcons name="shuffle" size={24} color="#111827" />
+          <Text style={cameraStyles.controlLabel}>
             {t('alarm.reshuffle', { defaultValue: '다시 뽑기' })}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={toggleCamera}
           disabled={isShuffling || isFlipping}
-          style={[{ alignItems: 'center', gap: 4, paddingVertical: 10 }, (isShuffling || isFlipping) && { opacity: 0.4 }]}
+          style={[cameraStyles.controlButton, (isShuffling || isFlipping) && { opacity: 0.4 }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <MaterialIcons name="flip-camera-ios" size={26} color="#fff" style={{ opacity: 0.9 }} />
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85 }}>
+          <MaterialIcons name="flip-camera-ios" size={24} color="#111827" />
+          <Text style={cameraStyles.controlLabel}>
             {t('alarm.flipCamera', { defaultValue: '카메라 전환' })}
           </Text>
         </TouchableOpacity>
@@ -377,3 +372,127 @@ export default function AlarmCameraMode(props: Props) {
     </>
   );
 }
+
+const cameraStyles = StyleSheet.create({
+  cameraCard: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#0B0F19',
+    borderWidth: 1,
+    borderColor: 'rgba(17,24,39,0.08)',
+    shadowColor: '#111827',
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
+  },
+  missionCard: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    right: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
+  },
+  emojiFrame: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  emojiImage: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    width: 40,
+    height: 40,
+  },
+  missionText: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '800',
+    minHeight: 20,
+    textAlign: 'center',
+  },
+  timerPill: {
+    position: 'absolute',
+    bottom: 14,
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryCard: {
+    position: 'absolute',
+    top: '35%',
+    left: 18,
+    right: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    gap: 4,
+  },
+  retryTitle: {
+    color: '#111827',
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  retryText: {
+    color: '#4B5563',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  permissionFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#0B0F19',
+  },
+  permissionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  controlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    marginTop: 12,
+  },
+  controlButton: {
+    minWidth: 124,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  controlLabel: {
+    color: '#111827',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+});

@@ -1,0 +1,30 @@
+diff --git a/node_modules/react-native-fast-tflite/android/src/main/java/com/margelo/nitro/tflite/HybridAssetLoader.kt b/node_modules/react-native-fast-tflite/android/src/main/java/com/margelo/nitro/tflite/HybridAssetLoader.kt
+index 0000000..0000001 100644
+--- a/node_modules/react-native-fast-tflite/android/src/main/java/com/margelo/nitro/tflite/HybridAssetLoader.kt
++++ b/node_modules/react-native-fast-tflite/android/src/main/java/com/margelo/nitro/tflite/HybridAssetLoader.kt
+@@ -4,6 +4,8 @@ import androidx.annotation.Keep
+ import com.facebook.proguard.annotations.DoNotStrip
+ import com.margelo.nitro.core.ArrayBuffer
+ import com.margelo.nitro.core.Promise
++import java.io.File
++import java.net.URI
+ import java.net.URL
+
+ @Keep
+@@ -11,7 +13,15 @@ import java.net.URL
+ class HybridAssetLoader : HybridAssetLoaderSpec() {
+   override fun loadAsset(path: String): Promise<ArrayBuffer> {
+     return Promise.async {
+-      val bytes = URL(path).readBytes()
++      // ShutTimer patch: file:// URI 측 URL.readBytes() Android 처리 실패 회피.
++      // expo-asset localUri (file:///data/user/0/.../ExponentAsset-*.tflite) 측 정상 read 보장.
++      val bytes = if (path.startsWith("file://")) {
++        File(URI(path)).readBytes()
++      } else if (path.startsWith("http://") || path.startsWith("https://")) {
++        URL(path).readBytes()
++      } else {
++        File(path).readBytes()
++      }
+       return@async ArrayBuffer.copy(bytes)
+     }
+   }

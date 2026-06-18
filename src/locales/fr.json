@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Fini\nScanner pour stop",
     "alarmTitleMath": "Fini\nCalculer pour stop",
     "alarmTitleTyping": "Fini\nÉcrire pour stop",
-    "alarmTitleRandom": "Fini"
+    "alarmTitleRandom": "Fini",
+    "timerName": "Minuteur",
+    "list": "Liste"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -107,7 +109,8 @@
       "daily": "Tous les jours",
       "weekday": "En semaine",
       "weekend": "Week-end",
-      "weekly": "En semaine"
+      "weekly": "En semaine",
+      "weekdays": "En semaine"
     },
     "label": {
       "placeholder": "ex: Réveil",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Vérification requise",
       "time": "Heure invalide",
-      "daysEmpty": "Sélectionnez au moins un jour"
+      "daysEmpty": "Sélectionnez au moins un jour",
+      "labelEmpty": "Veuillez saisir un nom d'alarme",
+      "stepDurationEmpty": "Veuillez définir la durée de l'étape"
     },
     "routineSection": {
       "title": "Ajouter une routine",
@@ -158,7 +163,15 @@
     "typingTitle": "Mission de saisie",
     "typingInstruction": "Tapez le texte affiché exactement",
     "typingPlaceholder": "Tapez ici",
-    "typingSubmit": "Confirmer"
+    "typingSubmit": "Confirmer",
+    "tapchargeInstruction": "Continuez à appuyer pour remplir la jauge",
+    "editBtn": "Modifier",
+    "defaultTitle": "Alarme",
+    "duplicate": {
+      "title": "Alarme en double",
+      "body": "Une alarme est déjà réglée à la même heure ({{time}}).\nSi elles sonnent ensemble, une seule s'exécutera.\nL'ajouter quand même ?"
+    },
+    "flipCamera": "Changer de caméra"
   },
   "addTimer": {
     "editTitle": "Modifier le favori",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Aide",
       "stopMethod": "Méthode d'arrêt",
-      "stopMethodBody": "La méthode d'arrêt de l'alarme peut être choisie dans les paramètres parmi 5 options : scan photo, secousse, tape, calcul et dictée. Lorsque l'alarme sonne, terminez la mission selon la méthode choisie pour arrêter.",
+      "stopMethodBody": "Vous pouvez choisir parmi 6 méthodes d'arrêt d'alarme dans les Réglages : scan photo, secouer, taper, tapotement rapide, calcul et saisie. Lorsqu'une alarme sonne, accomplissez la mission sélectionnée pour l'arrêter.",
       "routine": "Utilisation des routines",
       "routineBody": "Une routine est un enchaînement de plusieurs étapes. Les routines programmées démarrent automatiquement à l'heure fixée, les routines normales démarrent manuellement. Jusqu'à 3 étapes peuvent être ajoutées.",
       "alarmRoutine": "Utilisation des routines d'alarme",
       "alarmRoutineBody": "En ajoutant jusqu'à 3 étapes à une alarme, elle devient une routine d'alarme. À l'heure de l'alarme, la première mission démarre et l'étape suivante continue automatiquement après. La routine se termine quand toutes les étapes sont terminées.",
       "dial": "Utilisation de la molette",
-      "dialBody": "Avant de démarrer le minuteur, tournez la molette ou touchez les chiffres numériques pour définir l'heure via le clavier. Pendant la pause, vous pouvez également ajuster le temps avec la molette ou le clavier ; appuyez sur reprendre pour redémarrer avec la nouvelle heure.",
+      "dialBody": "Avant de démarrer le minuteur, faites tourner le cadran avec votre doigt pour régler le temps. En pause, vous pouvez augmenter ou diminuer le temps de la même manière, et appuyer sur reprendre redémarre avec le nouveau temps.",
       "bug": "Signaler un bug",
-      "bugBody": "Si vous trouvez un bug pendant l'utilisation, appuyez sur l'icône e-mail en haut à droite de l'écran principal pour accéder à l'écran de signalement. Décrivez la situation (scénario) et le problème (description), puis appuyez sur envoyer ; l'application e-mail s'ouvre automatiquement avec les informations de l'appareil jointes."
+      "bugBody": "Si vous trouvez un bug pendant l'utilisation, appuyez sur l'icône e-mail en haut à droite de l'écran principal pour accéder à l'écran de signalement. Décrivez la situation (scénario) et le problème (description), puis appuyez sur envoyer ; l'application e-mail s'ouvre automatiquement avec les informations de l'appareil jointes.",
+      "stopButton": "Arrêter un minuteur ou une routine",
+      "stopButtonBody": "Pour arrêter un minuteur ou une routine en cours, appuyez longuement sur le bouton lecture/pause central. Une jauge se remplit autour du bouton et il s'arrête après environ 1 seconde. Un appui court met en pause ou reprend.",
+      "tabSwipe": "Changer d'écran",
+      "tabSwipeBody": "Vous pouvez basculer entre les onglets du bas (Minuteur, Routine, Alarme, Calendrier, Réglages) en balayant vers la gauche ou la droite. Balayer sur une carte de liste déclenche d'abord la suppression ; balayez donc sur les zones vides ou les bords pour changer d'onglet."
     },
     "removeAdsPrice": "$2.99 · À vie",
     "restoreSuccess": "Achat restauré avec succès",
@@ -229,7 +246,11 @@
     "randomDesc": "Aléatoire parmi toucher/secouer/caméra/calcul",
     "typing": "Saisie",
     "typingDesc": "Tapez 3 mots/chiffres correctement pour arrêter",
-    "batteryOptimization": "Optimisation de batterie"
+    "batteryOptimization": "Optimisation de batterie",
+    "tapcharge": "Appui continu",
+    "tapchargeDesc": "Appuyez sans arrêt pour remplir la jauge et arrêter",
+    "select": "Sélectionner",
+    "selected": "Sélectionné"
   },
   "missions": {
     "boy": "Personne",
@@ -372,7 +393,18 @@
     "confirm": "Confirmer",
     "permissionSamsungBatteryTitle": "Configuration Samsung Device Care",
     "permissionSamsungBatteryBody": "La fonction « Apps en veille » de Samsung\npeut bloquer les alarmes.\nVeuillez ajouter cette app à la liste\ndes exclusions dans Device Care.",
-    "permissionSamsungBatteryButton": "Ouvrir les paramètres"
+    "permissionSamsungBatteryButton": "Ouvrir les paramètres",
+    "permIntro": "Pour utiliser ShutTimer correctement,\nles autorisations suivantes sont nécessaires.",
+    "permNote": "Vous pouvez utiliser l'application même si vous refusez les autorisations.",
+    "permAllowStart": "Autoriser et démarrer",
+    "permRowNotifLabel": "Alarme de fin de minuteur",
+    "permRowNotifDesc": "Nécessaire pour les alarmes sur écran verrouillé et les routines",
+    "permRowCameraLabel": "Scan photo pour arrêter",
+    "permRowCameraDesc": "Utilisé pour la mission de scan d'objet avec la caméra",
+    "permRowAttLabel": "Publicités personnalisées",
+    "permRowAttDesc": "Des publicités plus pertinentes (fonctionne même si refusé)",
+    "permRowSamsungLabel": "Configuration de Device Care",
+    "permRowSamsungDesc": "Exclure des « applications en veille » pour éviter le blocage des alarmes"
   },
   "common": {
     "save": "Enregistrer",
@@ -381,7 +413,8 @@
     "hour": "h",
     "minute": "min",
     "cancel": "Annuler",
-    "confirm": "Confirmer"
+    "confirm": "Confirmer",
+    "second": "s"
   },
   "routine": {
     "actionDelete": "Supprimer",
@@ -557,7 +590,10 @@
       "nextLabel": "Suivante",
       "nextQuestion": "Continuer avec la routine suivante ?",
       "startNext": "Démarrer la routine suivante",
-      "stop": "Arrêter la routine"
+      "stop": "Arrêter la routine",
+      "completeQuestion": "Vous avez terminé toutes les routines",
+      "completeRoutine": "Terminer la routine",
+      "stepName": "Étape {{n}}"
     },
     "scheduleOverflowBody": "{{count}} routines n'ont pas pu être programmées en raison de limites système. Supprimez celles non utilisées.",
     "scheduleOverflowTitle": "Certaines alarmes de routine non programmées",
@@ -605,11 +641,28 @@
       "wed": "Mer"
     },
     "routineAlarmLabel": "Alarme de routine en cours",
-    "timerAlarmLabel": "Minuteur en cours"
+    "timerAlarmLabel": "Minuteur en cours",
+    "add": "Ajouter une routine",
+    "limitTitle": "Limite de routines",
+    "limitBody": "Vous pouvez créer jusqu’à 3 routines.",
+    "moreCount": "{{name}} +{{count}} autres",
+    "alarmAdvance": "Étape suivante",
+    "continue": "Continuer",
+    "routineCompleteTitle": "Routine terminée",
+    "routineConflictTitle": "Routine en cours",
+    "routineConflictBody": "Une autre routine est en cours. L'arrêter et démarrer celle-ci ?",
+    "routineConflictProceed": "Démarrer la nouvelle",
+    "timerConflictStopAndStart": "Arrêter le minuteur et démarrer",
+    "advanceCountdown": "Avance auto dans {{n}}s",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "Aucun favori",
-    "addButton": "Ajouter aux favoris"
+    "addButton": "Ajouter aux favoris",
+    "title": "Favoris",
+    "actionDelete": "Supprimer",
+    "deleteConfirmTitle": "Supprimer ?",
+    "deleteConfirmBody": "Supprimer ce favori ?"
   },
   "recommend": {
     "title": "Voulez-vous le recommander à un ami ?",
@@ -617,5 +670,20 @@
     "yes": "Oui",
     "no": "Non",
     "shareMessage": "Essayez les missions d'alarme avec ShutTimer ! "
+  },
+  "tabBar": {
+    "home": "Minuteur",
+    "routine": "Routine",
+    "alarm": "Alarme",
+    "calendar": "Calendrier",
+    "settings": "Réglages"
+  },
+  "errorBoundary": {
+    "title": "Erreur de l’application",
+    "errorLabel": "Message d’erreur :",
+    "stackLabel": "Trace de la pile :",
+    "instruction": "Utilisez le bouton « Partager » ci-dessous pour envoyer l’erreur complète au développeur.",
+    "shareBtn": "Partager / Copier l’erreur",
+    "restartBtn": "Redémarrer l’app"
   }
 }

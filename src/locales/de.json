@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Fertig\nScannen zum Stopp",
     "alarmTitleMath": "Fertig\nRechnen zum Stopp",
     "alarmTitleTyping": "Fertig\nTippen zum Stopp",
-    "alarmTitleRandom": "Fertig"
+    "alarmTitleRandom": "Fertig",
+    "timerName": "Timer",
+    "list": "Liste"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -107,7 +109,8 @@
       "daily": "Täglich",
       "weekday": "Wochentage",
       "weekend": "Wochenende",
-      "weekly": "Wochentage"
+      "weekly": "Wochentage",
+      "weekdays": "Wochentags"
     },
     "label": {
       "placeholder": "z. B. Aufstehen",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Prüfen",
       "time": "Ungültige Zeit",
-      "daysEmpty": "Bitte mindestens einen Tag wählen"
+      "daysEmpty": "Bitte mindestens einen Tag wählen",
+      "labelEmpty": "Bitte einen Weckernamen eingeben",
+      "stepDurationEmpty": "Bitte die Schrittdauer festlegen"
     },
     "routineSection": {
       "title": "Routine hinzufügen",
@@ -158,7 +163,15 @@
     "typingTitle": "Tipp-Mission",
     "typingInstruction": "Den Text auf dem Bildschirm exakt eingeben",
     "typingPlaceholder": "Hier eingeben",
-    "typingSubmit": "Bestätigen"
+    "typingSubmit": "Bestätigen",
+    "tapchargeInstruction": "Weiter tippen, um die Anzeige zu füllen",
+    "editBtn": "Bearbeiten",
+    "defaultTitle": "Wecker",
+    "duplicate": {
+      "title": "Doppelter Wecker",
+      "body": "Für dieselbe Zeit ({{time}}) ist bereits ein Wecker gestellt.\nBei gleichzeitigem Auslösen läuft nur einer.\nTrotzdem hinzufügen?"
+    },
+    "flipCamera": "Kamera wechseln"
   },
   "addTimer": {
     "editTitle": "Favorit bearbeiten",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Hilfe",
       "stopMethod": "Beendigungsmethode",
-      "stopMethodBody": "Die Alarm-Beendigungsmethode kann in den Einstellungen aus 5 Optionen gewählt werden: Foto-Scan, Schütteln, Tippen, Rechnen und Diktat. Wenn der Alarm klingelt, schließe die Mission der gewählten Methode ab, um zu beenden.",
+      "stopMethodBody": "In den Einstellungen können Sie aus 6 Methoden zum Stoppen des Alarms wählen: Foto-Scan, Schütteln, Tippen, schnelles Tippen, Rechnen und Texteingabe. Wenn ein Alarm ertönt, schließen Sie die gewählte Mission ab, um ihn zu stoppen.",
       "routine": "Routine verwenden",
       "routineBody": "Eine Routine ist eine Folge mehrerer Schritte. Geplante Routinen starten automatisch zur festgelegten Zeit, normale Routinen werden manuell gestartet. Bis zu 3 Schritte können hinzugefügt werden.",
       "alarmRoutine": "Wecker-Routine verwenden",
       "alarmRoutineBody": "Wenn beim Hinzufügen eines Weckers bis zu 3 Schritte ergänzt werden, wird daraus eine Wecker-Routine. Sobald der Wecker klingelt, beginnt die erste Mission; nach Abschluss folgt automatisch der nächste Schritt. Sind alle Schritte fertig, endet die Routine.",
       "dial": "Wählrad verwenden",
-      "dialBody": "Vor Timer-Start kannst du am Wählrad drehen oder auf die Digitalzahlen tippen, um die Zeit per Tastatur einzustellen. Auch in der Pause kannst du Zeit per Wählrad oder Tastatur erhöhen oder verringern; nach „Fortsetzen“ startet der Timer mit der neuen Zeit.",
+      "dialBody": "Drehen Sie vor dem Start des Timers das Rad mit dem Finger, um die Zeit einzustellen. Im Pausenmodus können Sie die Zeit auf die gleiche Weise erhöhen oder verringern, und beim Fortsetzen startet der Timer mit der neuen Zeit.",
       "bug": "Bug melden",
-      "bugBody": "Wenn du beim Verwenden einen Bug findest, tippe oben rechts auf dem Hauptbildschirm auf das E-Mail-Symbol, um zum Bug-Melde-Bildschirm zu gelangen. Beschreibe die Situation (Szenario) und das Problem (Beschreibung) und drücke Senden – die E-Mail-App öffnet sich automatisch mit angehängten Geräteinformationen."
+      "bugBody": "Wenn du beim Verwenden einen Bug findest, tippe oben rechts auf dem Hauptbildschirm auf das E-Mail-Symbol, um zum Bug-Melde-Bildschirm zu gelangen. Beschreibe die Situation (Szenario) und das Problem (Beschreibung) und drücke Senden – die E-Mail-App öffnet sich automatisch mit angehängten Geräteinformationen.",
+      "stopButton": "Timer oder Routine stoppen",
+      "stopButtonBody": "Um einen laufenden Timer oder eine Routine zu stoppen, halten Sie die mittlere Wiedergabe-/Pause-Taste gedrückt. Eine Anzeige füllt sich um die Taste und stoppt nach etwa 1 Sekunde. Ein kurzes Tippen pausiert oder setzt fort.",
+      "tabSwipe": "Bildschirm wechseln",
+      "tabSwipeBody": "Sie können zwischen den unteren Tabs (Timer, Routine, Wecker, Kalender, Einstellungen) wechseln, indem Sie nach links oder rechts wischen. Das Wischen auf einer Listenkarte löst zuerst das Löschen aus; wischen Sie daher in leeren Bereichen oder an den Rändern, um die Tabs zu wechseln."
     },
     "removeAdsPrice": "$2.99 · Dauerhaft",
     "restoreSuccess": "Kauf erfolgreich wiederhergestellt",
@@ -229,7 +246,11 @@
     "randomDesc": "Zufällig aus Tippen/Schütteln/Kamera/Rechnen",
     "typing": "Tippen",
     "typingDesc": "3 Wörter/Zahlen korrekt eingeben zum Beenden",
-    "batteryOptimization": "Akku-Optimierung"
+    "batteryOptimization": "Akku-Optimierung",
+    "tapcharge": "Dauertippen",
+    "tapchargeDesc": "Tippe weiter, bis die Anzeige voll ist, zum Beenden",
+    "select": "Auswählen",
+    "selected": "Ausgewählt"
   },
   "missions": {
     "boy": "Person",
@@ -372,7 +393,18 @@
     "confirm": "Bestätigen",
     "permissionSamsungBatteryTitle": "Samsung Device Care Einrichtung",
     "permissionSamsungBatteryBody": "Die Samsung-Funktion „Schlafende Apps\"\nkann Alarme blockieren.\nBitte fügen Sie diese App in Device Care\nzur Ausschlussliste hinzu.",
-    "permissionSamsungBatteryButton": "Einstellungen öffnen"
+    "permissionSamsungBatteryButton": "Einstellungen öffnen",
+    "permIntro": "Damit ShutTimer reibungslos funktioniert,\nwerden folgende Berechtigungen benötigt.",
+    "permNote": "Sie können die App auch nutzen, wenn Sie Berechtigungen ablehnen.",
+    "permAllowStart": "Erlauben und starten",
+    "permRowNotifLabel": "Timer-Ende-Benachrichtigung",
+    "permRowNotifDesc": "Erforderlich für Alarme auf dem Sperrbildschirm und Routinen",
+    "permRowCameraLabel": "Foto-Scan zum Stoppen",
+    "permRowCameraDesc": "Wird für die Objektscan-Mission mit der Kamera verwendet",
+    "permRowAttLabel": "Personalisierte Werbung",
+    "permRowAttDesc": "Relevantere Werbung (funktioniert auch bei Ablehnung)",
+    "permRowSamsungLabel": "Device Care-Einrichtung",
+    "permRowSamsungDesc": "Von „Ruhende Apps\" ausschließen, um blockierte Alarme zu verhindern"
   },
   "common": {
     "save": "Speichern",
@@ -381,7 +413,8 @@
     "hour": "h",
     "minute": "m",
     "cancel": "Abbrechen",
-    "confirm": "Bestätigen"
+    "confirm": "Bestätigen",
+    "second": "Sek."
   },
   "routine": {
     "actionDelete": "Löschen",
@@ -557,7 +590,10 @@
       "nextLabel": "Weiter",
       "nextQuestion": "Mit der nächsten Routine fortfahren?",
       "startNext": "Nächste Routine starten",
-      "stop": "Routine beenden"
+      "stop": "Routine beenden",
+      "completeQuestion": "Du hast alle Routinen abgeschlossen",
+      "completeRoutine": "Routine abschließen",
+      "stepName": "Schritt {{n}}"
     },
     "scheduleOverflowBody": "{{count}} Routinen konnten wegen Systemgrenzen nicht geplant werden. Ungenutzte Routinen löschen.",
     "scheduleOverflowTitle": "Einige Routine-Wecker nicht geplant",
@@ -605,11 +641,28 @@
       "wed": "Mi"
     },
     "routineAlarmLabel": "Routine-Alarm läuft",
-    "timerAlarmLabel": "Timer läuft"
+    "timerAlarmLabel": "Timer läuft",
+    "add": "Routine hinzufügen",
+    "limitTitle": "Routine-Limit",
+    "limitBody": "Du kannst bis zu 3 Routinen erstellen.",
+    "moreCount": "{{name}} +{{count}} weitere",
+    "alarmAdvance": "Nächster Schritt",
+    "continue": "Fortfahren",
+    "routineCompleteTitle": "Routine abgeschlossen",
+    "routineConflictTitle": "Routine läuft",
+    "routineConflictBody": "Eine andere Routine läuft. Beenden und diese starten?",
+    "routineConflictProceed": "Neue Routine starten",
+    "timerConflictStopAndStart": "Timer stoppen und starten",
+    "advanceCountdown": "Auto-Weiter in {{n}}s",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "Keine Favoriten",
-    "addButton": "Favorit hinzufügen"
+    "addButton": "Favorit hinzufügen",
+    "title": "Favoriten",
+    "actionDelete": "Löschen",
+    "deleteConfirmTitle": "Löschen?",
+    "deleteConfirmBody": "Diesen Favoriten löschen?"
   },
   "recommend": {
     "title": "Möchten Sie es einem Freund empfehlen?",
@@ -617,5 +670,20 @@
     "yes": "Ja",
     "no": "Nein",
     "shareMessage": "Probiere die Alarmmissionen mit ShutTimer! "
+  },
+  "tabBar": {
+    "home": "Timer",
+    "routine": "Routine",
+    "alarm": "Wecker",
+    "calendar": "Kalender",
+    "settings": "Einstellungen"
+  },
+  "errorBoundary": {
+    "title": "App-Fehler",
+    "errorLabel": "Fehlermeldung:",
+    "stackLabel": "Stack-Trace:",
+    "instruction": "Nutze die Schaltfläche „Teilen“ unten, um den vollständigen Fehler an den Entwickler zu senden.",
+    "shareBtn": "Fehler teilen / kopieren",
+    "restartBtn": "App neu starten"
   }
 }

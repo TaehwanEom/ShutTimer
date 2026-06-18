@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Fatto\nScansiona per fermare",
     "alarmTitleMath": "Fatto\nCalcola per fermare",
     "alarmTitleTyping": "Fatto\nScrivi per fermare",
-    "alarmTitleRandom": "Fatto"
+    "alarmTitleRandom": "Fatto",
+    "timerName": "Timer",
+    "list": "Elenco"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -106,8 +108,9 @@
       "once": "Mai",
       "daily": "Ogni giorno",
       "weekday": "Giorni feriali",
-      "weekend": "Weekend",
-      "weekly": "Giorni feriali"
+      "weekend": "Fine settimana",
+      "weekly": "Giorni feriali",
+      "weekdays": "Giorni feriali"
     },
     "label": {
       "placeholder": "Es: Sveglia",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Verifica richiesta",
       "time": "Ora non valida",
-      "daysEmpty": "Seleziona almeno un giorno"
+      "daysEmpty": "Seleziona almeno un giorno",
+      "labelEmpty": "Inserisci un nome per la sveglia",
+      "stepDurationEmpty": "Imposta la durata del passo"
     },
     "routineSection": {
       "title": "Aggiungi routine",
@@ -158,7 +163,15 @@
     "typingTitle": "Missione digitazione",
     "typingInstruction": "Digita il testo sullo schermo esattamente",
     "typingPlaceholder": "Digita qui",
-    "typingSubmit": "Conferma"
+    "typingSubmit": "Conferma",
+    "tapchargeInstruction": "Continua a toccare per riempire la barra",
+    "editBtn": "Modifica",
+    "defaultTitle": "Sveglia",
+    "duplicate": {
+      "title": "Sveglia duplicata",
+      "body": "È già impostata una sveglia alla stessa ora ({{time}}).\nSe suonano insieme, ne verrà eseguita una sola.\nAggiungere comunque?"
+    },
+    "flipCamera": "Cambia fotocamera"
   },
   "addTimer": {
     "editTitle": "Modifica preferito",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Aiuto",
       "stopMethod": "Metodo di arresto",
-      "stopMethodBody": "Il metodo di chiusura della sveglia può essere scelto nelle impostazioni tra 5 opzioni: scansione foto, scuotere, toccare, calcolo e dettatura. Quando suona la sveglia, completa la missione scelta per fermarla.",
+      "stopMethodBody": "Puoi scegliere tra 6 metodi per fermare la sveglia nelle Impostazioni: scansione foto, scuoti, tocca, tocco rapido, matematica e digitazione. Quando suona una sveglia, completa la missione selezionata per fermarla.",
       "routine": "Uso delle routine",
       "routineBody": "Una routine è una sequenza di vari passaggi. Le routine programmate iniziano automaticamente all'orario impostato, quelle normali si avviano manualmente. Si possono aggiungere fino a 3 passaggi.",
       "alarmRoutine": "Uso delle routine di sveglia",
       "alarmRoutineBody": "Aggiungendo fino a 3 passaggi quando crei una sveglia, diventa una routine di sveglia. Quando suona la sveglia, inizia la prima missione e il passaggio successivo continua automaticamente. La routine termina al completamento di tutti i passaggi.",
       "dial": "Uso della manopola",
-      "dialBody": "Prima di avviare il timer, ruota la manopola o tocca le cifre per impostare il tempo con la tastiera. Anche durante la pausa puoi regolare il tempo con manopola o tastiera; toccando riprendi il timer riparte con il nuovo tempo.",
+      "dialBody": "Prima di avviare il timer, ruota il quadrante con il dito per impostare il tempo. In pausa puoi aumentare o diminuire il tempo allo stesso modo e, riprendendo, riparte con il nuovo tempo.",
       "bug": "Segnala bug",
-      "bugBody": "Se trovi un bug durante l'uso, tocca l'icona email in alto a destra della schermata principale per accedere alla segnalazione. Descrivi la situazione (scenario) e il problema (descrizione), poi premi invia; l'app email si apre automaticamente con le informazioni del dispositivo allegate."
+      "bugBody": "Se trovi un bug durante l'uso, tocca l'icona email in alto a destra della schermata principale per accedere alla segnalazione. Descrivi la situazione (scenario) e il problema (descrizione), poi premi invia; l'app email si apre automaticamente con le informazioni del dispositivo allegate.",
+      "stopButton": "Fermare un timer o una routine",
+      "stopButtonBody": "Per fermare un timer o una routine in corso, tieni premuto il pulsante centrale riproduci/pausa. Un indicatore si riempie attorno al pulsante e si ferma dopo circa 1 secondo. Un tocco breve mette in pausa o riprende.",
+      "tabSwipe": "Cambiare schermata",
+      "tabSwipeBody": "Puoi passare tra le schede in basso (Timer, Routine, Sveglia, Calendario, Impostazioni) scorrendo a sinistra o a destra. Scorrere su una scheda dell'elenco attiva prima l'eliminazione, quindi scorri nelle aree vuote o ai bordi per cambiare scheda."
     },
     "removeAdsPrice": "$2.99 · A vita",
     "restoreSuccess": "Acquisto ripristinato con successo",
@@ -229,7 +246,11 @@
     "randomDesc": "Casuale tra tocco/scuoti/fotocamera/matematica",
     "typing": "Digitazione",
     "typingDesc": "Digita 3 parole/numeri correttamente per spegnere",
-    "batteryOptimization": "Ottimizzazione batteria"
+    "batteryOptimization": "Ottimizzazione batteria",
+    "tapcharge": "Tocco continuo",
+    "tapchargeDesc": "Continua a toccare fino a riempire la barra per terminare",
+    "select": "Seleziona",
+    "selected": "Selezionato"
   },
   "missions": {
     "boy": "Persona",
@@ -372,7 +393,18 @@
     "confirm": "Conferma",
     "permissionSamsungBatteryTitle": "Configurazione Samsung Device Care",
     "permissionSamsungBatteryBody": "La funzione \"App in sospensione\" di Samsung\npuò bloccare le sveglie.\nAggiungi questa app all'elenco\ndi esclusione in Device Care.",
-    "permissionSamsungBatteryButton": "Apri impostazioni"
+    "permissionSamsungBatteryButton": "Apri impostazioni",
+    "permIntro": "Per usare ShutTimer senza problemi,\nservono le seguenti autorizzazioni.",
+    "permNote": "Puoi usare l'app anche se rifiuti le autorizzazioni.",
+    "permAllowStart": "Consenti e inizia",
+    "permRowNotifLabel": "Avviso di fine timer",
+    "permRowNotifDesc": "Necessario per sveglie a schermo bloccato e routine",
+    "permRowCameraLabel": "Scansione foto per fermare",
+    "permRowCameraDesc": "Usato per la missione di scansione oggetti con la fotocamera",
+    "permRowAttLabel": "Annunci personalizzati",
+    "permRowAttDesc": "Annunci più pertinenti (funziona anche se rifiutato)",
+    "permRowSamsungLabel": "Configurazione Device Care",
+    "permRowSamsungDesc": "Escludi dalle \"app in sospensione\" per evitare sveglie bloccate"
   },
   "common": {
     "save": "Salva",
@@ -381,7 +413,8 @@
     "hour": "h",
     "minute": "m",
     "cancel": "Annulla",
-    "confirm": "Conferma"
+    "confirm": "Conferma",
+    "second": "s"
   },
   "routine": {
     "actionDelete": "Elimina",
@@ -557,7 +590,10 @@
       "nextLabel": "Successiva",
       "nextQuestion": "Continuare con la routine successiva?",
       "startNext": "Avvia routine successiva",
-      "stop": "Ferma routine"
+      "stop": "Ferma routine",
+      "completeQuestion": "Hai completato tutte le routine",
+      "completeRoutine": "Completa routine",
+      "stepName": "Passo {{n}}"
     },
     "scheduleOverflowBody": "{{count}} routine non programmate per limiti di sistema. Elimina quelle non usate.",
     "scheduleOverflowTitle": "Alcune sveglie routine non programmate",
@@ -605,11 +641,28 @@
       "wed": "Mer"
     },
     "routineAlarmLabel": "Allarme di routine in corso",
-    "timerAlarmLabel": "Timer in corso"
+    "timerAlarmLabel": "Timer in corso",
+    "add": "Aggiungi routine",
+    "limitTitle": "Limite di routine",
+    "limitBody": "Puoi creare fino a 3 routine.",
+    "moreCount": "{{name}} +{{count}} altri",
+    "alarmAdvance": "Passo successivo",
+    "continue": "Continua",
+    "routineCompleteTitle": "Routine completata",
+    "routineConflictTitle": "Routine in corso",
+    "routineConflictBody": "Un'altra routine è in corso. Fermarla e avviare questa?",
+    "routineConflictProceed": "Avvia nuova routine",
+    "timerConflictStopAndStart": "Ferma il timer e avvia",
+    "advanceCountdown": "Avanzamento automatico tra {{n}}s",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "Nessun preferito",
-    "addButton": "Aggiungi preferito"
+    "addButton": "Aggiungi preferito",
+    "title": "Preferiti",
+    "actionDelete": "Elimina",
+    "deleteConfirmTitle": "Eliminare?",
+    "deleteConfirmBody": "Eliminare questo preferito?"
   },
   "recommend": {
     "title": "Vuoi consigliarlo a un amico?",
@@ -617,5 +670,20 @@
     "yes": "Sì",
     "no": "No",
     "shareMessage": "Prova le missioni sveglia con ShutTimer! "
+  },
+  "tabBar": {
+    "home": "Timer",
+    "routine": "Routine",
+    "alarm": "Sveglia",
+    "calendar": "Calendario",
+    "settings": "Impostazioni"
+  },
+  "errorBoundary": {
+    "title": "Errore dell’app",
+    "errorLabel": "Messaggio di errore:",
+    "stackLabel": "Traccia dello stack:",
+    "instruction": "Usa il pulsante “Condividi” qui sotto per inviare l’errore completo allo sviluppatore.",
+    "shareBtn": "Condividi / Copia errore",
+    "restartBtn": "Riavvia app"
   }
 }

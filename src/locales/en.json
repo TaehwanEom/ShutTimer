@@ -35,7 +35,9 @@
     "alarmTitleCamera": "Done\nScan to stop",
     "alarmTitleMath": "Done\nSolve to stop",
     "alarmTitleTyping": "Done\nType to stop",
-    "alarmTitleRandom": "Done"
+    "alarmTitleRandom": "Done",
+    "timerName": "Timer",
+    "list": "List"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -67,6 +69,7 @@
     "flip": "FLIP",
     "timerDone": "Timer Done",
     "tapInstruction": "Tap the button to stop the alarm",
+    "tapchargeInstruction": "Keep tapping to fill the gauge",
     "tapButton": "Tap to Stop",
     "shakeInstruction": "Shake the device to stop the alarm",
     "retakePhoto": "Please try again",
@@ -114,7 +117,8 @@
       "daily": "Every Day",
       "weekday": "Weekdays",
       "weekend": "Weekends",
-      "weekly": "Weekly"
+      "weekly": "Weekly",
+      "weekdays": "Weekdays"
     },
     "label": {
       "placeholder": "e.g. Wake up",
@@ -142,7 +146,9 @@
     "validate": {
       "title": "Check Required",
       "time": "Invalid time",
-      "daysEmpty": "Please select at least one day"
+      "daysEmpty": "Please select at least one day",
+      "labelEmpty": "Please enter an alarm label",
+      "stepDurationEmpty": "Please set the routine step duration"
     },
     "routineSection": {
       "title": "Add Routine",
@@ -165,7 +171,14 @@
     "typingTitle": "Typing Mission",
     "typingInstruction": "Type the text on screen exactly",
     "typingPlaceholder": "Type here",
-    "typingSubmit": "Submit"
+    "typingSubmit": "Submit",
+    "editBtn": "Edit",
+    "defaultTitle": "Alarm",
+    "duplicate": {
+      "title": "Duplicate alarm",
+      "body": "An alarm is already set for the same time ({{time}}).\nIf they fire together, only one will run.\nAdd it anyway?"
+    },
+    "flipCamera": "Flip camera"
   },
   "addTimer": {
     "editTitle": "Edit Favorite",
@@ -213,13 +226,17 @@
     "help": {
       "title": "Help",
       "stopMethod": "How to stop alarms",
-      "stopMethodBody": "You can choose from 5 alarm stop methods in Settings: photo scan, shake, tap, math, and typing. When an alarm fires, complete the selected mission to stop it.",
+      "stopMethodBody": "You can choose from 6 alarm stop methods in Settings: photo scan, shake, tap, rapid tap, math, and typing. When an alarm fires, complete the selected mission to stop it.",
       "routine": "Routines",
       "routineBody": "A routine is a sequence of steps. Scheduled routines start automatically at the set time, while manual routines start when you tap them. Each routine can have up to 3 steps.",
       "alarmRoutine": "Alarm routines",
       "alarmRoutineBody": "When creating an alarm, add up to 3 steps to make it an alarm routine. When the alarm fires, the first step begins. Completing each step advances to the next, and the routine ends when all steps are done.",
       "dial": "Dial",
-      "dialBody": "Before starting the timer, rotate the dial with your finger or tap the digital display to enter time via keypad. While paused, you can change the remaining time the same way, and tapping resume restarts with the new time.",
+      "dialBody": "Before starting the timer, rotate the dial with your finger to set the time. While paused, you can increase or decrease the time the same way, and tapping resume restarts with the new time.",
+      "stopButton": "Stop a timer or routine",
+      "stopButtonBody": "To stop a running timer or routine, press and hold the center play/pause button. A gauge fills around the button and it stops after about 1 second. A short tap pauses or resumes.",
+      "tabSwipe": "Switch screens",
+      "tabSwipeBody": "You can switch between the bottom tabs (Timer, Routine, Alarm, Calendar, Settings) by swiping left or right. Swiping on a list card triggers delete first, so swipe on empty areas or the edges to change tabs.",
       "bug": "Report a bug",
       "bugBody": "If you find a bug, tap the email icon at the top right of the home screen to open the bug report screen. Write the scenario (what was happening) and the description (what went wrong), then tap send. The mail app opens automatically with device info attached."
     },
@@ -236,7 +253,11 @@
     "randomDesc": "Random pick from tap/shake/camera/math",
     "typing": "Typing",
     "typingDesc": "Type 3 words/numbers correctly to dismiss",
-    "batteryOptimization": "Battery optimization"
+    "tapcharge": "Tap Charge",
+    "tapchargeDesc": "Keep tapping to fill the gauge to dismiss",
+    "batteryOptimization": "Battery optimization",
+    "select": "Select",
+    "selected": "Selected"
   },
   "missions": {
     "boy": "Person",
@@ -379,7 +400,18 @@
     "confirm": "Confirm",
     "permissionSamsungBatteryTitle": "Samsung Device Care setup",
     "permissionSamsungBatteryBody": "Samsung's \"Sleeping apps\" feature\nmay block alarms.\nPlease exclude this app in\nDevice Care.",
-    "permissionSamsungBatteryButton": "Open settings"
+    "permissionSamsungBatteryButton": "Open settings",
+    "permIntro": "To use ShutTimer smoothly,\nthe following permissions are needed.",
+    "permNote": "You can use the app even if you deny permissions.",
+    "permAllowStart": "Allow and start",
+    "permRowNotifLabel": "Timer end alarm",
+    "permRowNotifDesc": "Needed for lock-screen alarms and routines",
+    "permRowCameraLabel": "Photo scan to stop",
+    "permRowCameraDesc": "Used for the camera object-scan mission",
+    "permRowAttLabel": "Personalized ads",
+    "permRowAttDesc": "More relevant ads (works fine if denied)",
+    "permRowSamsungLabel": "Device Care setup",
+    "permRowSamsungDesc": "Exclude from \"Sleeping apps\" to prevent blocked alarms"
   },
   "common": {
     "cancel": "Cancel",
@@ -388,7 +420,8 @@
     "am": "AM",
     "pm": "PM",
     "hour": "h",
-    "minute": "m"
+    "minute": "m",
+    "second": "sec"
   },
   "routine": {
     "listTitle": "Routines",
@@ -588,7 +621,10 @@
       "completeTitle": "Routine ended",
       "completeName": "{{name}} complete",
       "confirm": "OK",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "completeQuestion": "You completed all routines",
+      "completeRoutine": "Complete routine",
+      "stepName": "Step {{n}}"
     },
     "alarmKit": {
       "permissionRequiredTitle": "AlarmKit Permission",
@@ -613,11 +649,27 @@
     "prealertTitle30m": "Routine starts in 30 minutes",
     "prealertTitle5m": "Routine starts soon",
     "routineAlarmLabel": "Routine alarm in progress",
-    "timerAlarmLabel": "Timer in progress"
+    "timerAlarmLabel": "Timer in progress",
+    "limitTitle": "Routine limit",
+    "limitBody": "You can create up to 3 routines.",
+    "moreCount": "{{name}} +{{count}} more",
+    "alarmAdvance": "Next step",
+    "continue": "Continue",
+    "routineCompleteTitle": "Routine complete",
+    "routineConflictTitle": "Routine in progress",
+    "routineConflictBody": "Another routine is running. Stop it and start this one?",
+    "routineConflictProceed": "Start new routine",
+    "timerConflictStopAndStart": "Stop timer and start",
+    "advanceCountdown": "Auto-advance in {{n}}s",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "No favorites",
-    "addButton": "Add Favorite"
+    "addButton": "Add Favorite",
+    "title": "Favorites",
+    "actionDelete": "Delete",
+    "deleteConfirmTitle": "Delete?",
+    "deleteConfirmBody": "Delete this favorite?"
   },
   "recommend": {
     "title": "Would you like to recommend it to a friend?",
@@ -625,5 +677,13 @@
     "yes": "Yes",
     "no": "No",
     "shareMessage": "Try the alarm missions with ShutTimer! "
+  },
+  "errorBoundary": {
+    "title": "App Error",
+    "errorLabel": "Error message:",
+    "stackLabel": "Stack trace:",
+    "instruction": "Use the \"Share\" button below to send the full error to the developer.",
+    "shareBtn": "Share / Copy Error",
+    "restartBtn": "Restart App"
   }
 }

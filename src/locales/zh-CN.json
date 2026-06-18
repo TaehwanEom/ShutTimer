@@ -35,7 +35,9 @@
     "alarmTitleCamera": "完成\n扫描结束",
     "alarmTitleMath": "完成\n答题结束",
     "alarmTitleTyping": "完成\n输入结束",
-    "alarmTitleRandom": "完成"
+    "alarmTitleRandom": "完成",
+    "timerName": "计时器",
+    "list": "列表"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -114,7 +116,8 @@
       "daily": "每天",
       "weekday": "工作日",
       "weekend": "周末",
-      "weekly": "工作日"
+      "weekly": "工作日",
+      "weekdays": "工作日"
     },
     "label": {
       "placeholder": "例如: 起床",
@@ -142,7 +145,9 @@
     "validate": {
       "title": "需要确认",
       "time": "时间无效",
-      "daysEmpty": "请至少选择一天"
+      "daysEmpty": "请至少选择一天",
+      "labelEmpty": "请输入闹钟名称",
+      "stepDurationEmpty": "请设置例程步骤时长"
     },
     "routineSection": {
       "title": "添加例程",
@@ -165,7 +170,15 @@
     "typingTitle": "打字任务",
     "typingInstruction": "准确输入屏幕上的文字",
     "typingPlaceholder": "在此输入",
-    "typingSubmit": "确认"
+    "typingSubmit": "确认",
+    "tapchargeInstruction": "持续点击填满进度条",
+    "editBtn": "编辑",
+    "defaultTitle": "闹钟",
+    "duplicate": {
+      "title": "闹钟重复",
+      "body": "同一时间（{{time}}）已设置闹钟。\n同时触发时只会运行一个。\n仍要添加吗？"
+    },
+    "flipCamera": "切换摄像头"
   },
   "addTimer": {
     "editTitle": "编辑收藏",
@@ -213,15 +226,19 @@
     "help": {
       "title": "帮助",
       "stopMethod": "停止方式",
-      "stopMethodBody": "闹钟终止方式可以在设置中从拍照扫描、摇晃、点击、计算、听写五种中选择。闹钟响起时完成所选方式的任务即可结束。",
+      "stopMethodBody": "可在设置中从6种闹钟解除方式中选择：拍照扫描、摇动、点击、连点、算术、打字。闹钟响起时完成所选任务即可停止。",
       "routine": "例程使用方法",
       "routineBody": "例程是按顺序执行多个步骤的组合。预定例程会在设定时间自动开始，普通例程需要手动开始。最多可添加 3 个步骤。",
       "alarmRoutine": "闹钟例程使用方法",
       "alarmRoutineBody": "添加闹钟时最多添加 3 个步骤即成为闹钟例程。在闹钟时间响起时第一步任务开始，完成后下一步自动继续。所有步骤完成后结束。",
       "dial": "表盘使用方法",
-      "dialBody": "计时器开始前可以转动表盘或点击数字打开键盘设置时间。暂停中也可以同样转动表盘或键盘增减时间，按恢复时按新设的时间重新开始。",
+      "dialBody": "开始计时前，用手指转动表盘来设置时间。暂停时也可同样转动表盘增减时间，按继续即可用新的时间重新开始。",
       "bug": "问题反馈",
-      "bugBody": "使用中发现问题时，点击主屏幕右上角的邮件图标进入问题反馈页面。填写发生情况（场景）与问题描述（说明）并发送，邮件应用会自动打开，并附上设备信息。"
+      "bugBody": "使用中发现问题时，点击主屏幕右上角的邮件图标进入问题反馈页面。填写发生情况（场景）与问题描述（说明）并发送，邮件应用会自动打开，并附上设备信息。",
+      "stopButton": "停止计时器或例程",
+      "stopButtonBody": "要停止正在进行的计时器或例程，请长按中间的播放/暂停按钮。按钮周围的进度条填满后约1秒停止。短按为暂停/继续。",
+      "tabSwipe": "切换屏幕",
+      "tabSwipeBody": "底部标签（计时器、例程、闹钟、日历、设置）也可通过左右滑动屏幕切换。在列表卡片上滑动会优先触发删除，因此在空白处或边缘滑动可切换标签。"
     },
     "removeAdsPrice": "$2.99 · 永久",
     "restoreSuccess": "购买已恢复",
@@ -236,7 +253,11 @@
     "randomDesc": "从点击/摇动/相机/算术中随机选择",
     "typing": "打字",
     "typingDesc": "正确输入3个单词/数字以关闭",
-    "batteryOptimization": "电池优化"
+    "batteryOptimization": "电池优化",
+    "tapcharge": "连续点击",
+    "tapchargeDesc": "持续点击填满进度条即可解除",
+    "select": "选择",
+    "selected": "已选择"
   },
   "missions": {
     "boy": "人",
@@ -379,7 +400,18 @@
     "confirm": "确定",
     "permissionSamsungBatteryTitle": "三星设备维护设置",
     "permissionSamsungBatteryBody": "三星手机的\"休眠应用\"功能\n可能会阻止闹钟。\n请在设备维护中\n将此应用添加到\"排除\"列表。",
-    "permissionSamsungBatteryButton": "打开设置"
+    "permissionSamsungBatteryButton": "打开设置",
+    "permIntro": "为了顺畅使用 ShutTimer，\n需要以下权限。",
+    "permNote": "即使拒绝权限也可以使用应用。",
+    "permAllowStart": "允许并开始",
+    "permRowNotifLabel": "计时结束通知",
+    "permRowNotifDesc": "用于锁屏闹钟和例程进行",
+    "permRowCameraLabel": "拍照扫描结束",
+    "permRowCameraDesc": "用于用相机扫描物体的任务",
+    "permRowAttLabel": "个性化广告",
+    "permRowAttDesc": "提供更相关的广告（拒绝也可正常使用）",
+    "permRowSamsungLabel": "设备维护设置",
+    "permRowSamsungDesc": "从\"休眠应用\"中排除 — 防止闹钟被阻止"
   },
   "common": {
     "save": "保存",
@@ -388,7 +420,8 @@
     "hour": "时",
     "minute": "分",
     "cancel": "取消",
-    "confirm": "确认"
+    "confirm": "确认",
+    "second": "秒"
   },
   "routine": {
     "actionDelete": "删除",
@@ -564,7 +597,10 @@
       "nextLabel": "下一个",
       "nextQuestion": "继续下一个例程?",
       "startNext": "开始下一个例程",
-      "stop": "停止例程"
+      "stop": "停止例程",
+      "completeQuestion": "已完成所有例程",
+      "completeRoutine": "完成例程",
+      "stepName": "步骤 {{n}}"
     },
     "scheduleOverflowBody": "由于系统限制,无法为 {{count}} 个例程安排时间。请删除未使用的例程。",
     "scheduleOverflowTitle": "部分例程闹钟未安排",
@@ -612,11 +648,28 @@
       "wed": "三"
     },
     "routineAlarmLabel": "进行中的例程闹钟",
-    "timerAlarmLabel": "进行中的计时器"
+    "timerAlarmLabel": "进行中的计时器",
+    "add": "添加例程",
+    "limitTitle": "例程数量限制",
+    "limitBody": "最多可创建3个例程。",
+    "moreCount": "{{name}} 等{{count}}个",
+    "alarmAdvance": "下一步",
+    "continue": "继续",
+    "routineCompleteTitle": "例程完成",
+    "routineConflictTitle": "正在进行的例程",
+    "routineConflictBody": "另一个例程正在运行。停止并开始此例程？",
+    "routineConflictProceed": "开始新例程",
+    "timerConflictStopAndStart": "停止计时器并开始",
+    "advanceCountdown": "{{n}}秒后自动进行",
+    "prealertStop": "确定"
   },
   "favorites": {
     "empty": "没有收藏",
-    "addButton": "添加收藏"
+    "addButton": "添加收藏",
+    "title": "收藏",
+    "actionDelete": "删除",
+    "deleteConfirmTitle": "确认删除",
+    "deleteConfirmBody": "删除此收藏？"
   },
   "recommend": {
     "title": "您要推荐给朋友吗？",
@@ -624,5 +677,13 @@
     "yes": "是",
     "no": "否",
     "shareMessage": "用 ShutTimer 来挑战闹钟任务吧！ "
+  },
+  "errorBoundary": {
+    "title": "应用出错",
+    "errorLabel": "错误信息:",
+    "stackLabel": "堆栈跟踪:",
+    "instruction": "点击下方“分享”按钮可将完整错误发送给开发者。",
+    "shareBtn": "分享 / 复制错误",
+    "restartBtn": "重启应用"
   }
 }

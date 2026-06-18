@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Pronto\nEscaneie para parar",
     "alarmTitleMath": "Pronto\nCalcule para parar",
     "alarmTitleTyping": "Pronto\nDigite para parar",
-    "alarmTitleRandom": "Pronto"
+    "alarmTitleRandom": "Pronto",
+    "timerName": "Timer",
+    "list": "Lista"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -106,8 +108,9 @@
       "once": "Nunca",
       "daily": "Todos os dias",
       "weekday": "Dias úteis",
-      "weekend": "Fim de semana",
-      "weekly": "Dias úteis"
+      "weekend": "Fins de semana",
+      "weekly": "Dias úteis",
+      "weekdays": "Dias úteis"
     },
     "label": {
       "placeholder": "Ex: Acordar",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Verificação necessária",
       "time": "Hora inválida",
-      "daysEmpty": "Selecione pelo menos um dia"
+      "daysEmpty": "Selecione pelo menos um dia",
+      "labelEmpty": "Insira um rótulo de alarme",
+      "stepDurationEmpty": "Defina a duração da etapa"
     },
     "routineSection": {
       "title": "Adicionar rotina",
@@ -158,7 +163,15 @@
     "typingTitle": "Missão de digitação",
     "typingInstruction": "Digite o texto na tela exatamente",
     "typingPlaceholder": "Digite aqui",
-    "typingSubmit": "Confirmar"
+    "typingSubmit": "Confirmar",
+    "tapchargeInstruction": "Continue tocando para encher a barra",
+    "editBtn": "Editar",
+    "defaultTitle": "Alarme",
+    "duplicate": {
+      "title": "Alarme duplicado",
+      "body": "Já existe um alarme no mesmo horário ({{time}}).\nSe dispararem juntos, apenas um será executado.\nAdicionar mesmo assim?"
+    },
+    "flipCamera": "Virar câmera"
   },
   "addTimer": {
     "editTitle": "Editar favorito",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Ajuda",
       "stopMethod": "Método de parada",
-      "stopMethodBody": "O método de encerramento do alarme pode ser escolhido nas configurações entre 5 opções: escaneamento de foto, sacudir, toque, cálculo e ditado. Quando o alarme tocar, complete a missão escolhida para parar.",
+      "stopMethodBody": "Você pode escolher entre 6 métodos para parar o alarme em Configurações: escanear foto, agitar, tocar, toque rápido, matemática e digitação. Quando um alarme tocar, conclua a missão selecionada para pará-lo.",
       "routine": "Uso de rotinas",
       "routineBody": "Uma rotina é uma sequência de várias etapas. Rotinas agendadas começam automaticamente no horário definido, rotinas comuns são iniciadas manualmente. Até 3 etapas podem ser adicionadas.",
       "alarmRoutine": "Uso de rotinas de alarme",
       "alarmRoutineBody": "Ao adicionar até 3 etapas criando um alarme, ele se torna uma rotina de alarme. Quando o alarme tocar, a primeira missão começa e a próxima etapa continua automaticamente. A rotina termina quando todas as etapas são concluídas.",
       "dial": "Uso do disco",
-      "dialBody": "Antes de iniciar o cronômetro, gire o disco ou toque os dígitos para definir o tempo com o teclado. Durante a pausa também é possível ajustar o tempo com disco ou teclado; ao tocar retomar, o cronômetro reinicia com o novo tempo.",
+      "dialBody": "Antes de iniciar o cronômetro, gire o seletor com o dedo para definir o tempo. Em pausa, você pode aumentar ou diminuir o tempo da mesma forma, e ao retomar reinicia com o novo tempo.",
       "bug": "Reportar bug",
-      "bugBody": "Se encontrar um bug durante o uso, toque o ícone de e-mail no canto superior direito da tela principal para acessar o relatório. Descreva a situação (cenário) e o problema (descrição), então pressione enviar; o app de e-mail abrirá automaticamente com as informações do dispositivo anexadas."
+      "bugBody": "Se encontrar um bug durante o uso, toque o ícone de e-mail no canto superior direito da tela principal para acessar o relatório. Descreva a situação (cenário) e o problema (descrição), então pressione enviar; o app de e-mail abrirá automaticamente com as informações do dispositivo anexadas.",
+      "stopButton": "Parar um cronômetro ou rotina",
+      "stopButtonBody": "Para parar um cronômetro ou rotina em andamento, mantenha pressionado o botão central de reproduzir/pausar. Um medidor enche ao redor do botão e ele para após cerca de 1 segundo. Um toque curto pausa ou retoma.",
+      "tabSwipe": "Alternar telas",
+      "tabSwipeBody": "Você pode alternar entre as abas inferiores (Cronômetro, Rotina, Alarme, Calendário, Configurações) deslizando para a esquerda ou direita. Deslizar sobre um cartão da lista aciona a exclusão primeiro, então deslize em áreas vazias ou nas bordas para trocar de aba."
     },
     "removeAdsPrice": "$2.99 · Vitalício",
     "restoreSuccess": "Compra restaurada com sucesso",
@@ -229,7 +246,11 @@
     "randomDesc": "Aleatório entre toque/sacudir/câmera/matemática",
     "typing": "Digitação",
     "typingDesc": "Digite 3 palavras/números corretamente para desligar",
-    "batteryOptimization": "Otimização de bateria"
+    "batteryOptimization": "Otimização de bateria",
+    "tapcharge": "Toque contínuo",
+    "tapchargeDesc": "Continue tocando até encher a barra para dispensar",
+    "select": "Selecionar",
+    "selected": "Selecionado"
   },
   "missions": {
     "boy": "Pessoa",
@@ -372,7 +393,18 @@
     "confirm": "Confirmar",
     "permissionSamsungBatteryTitle": "Configuração do Samsung Device Care",
     "permissionSamsungBatteryBody": "A função \"Apps em suspensão\" da Samsung\npode bloquear alarmes.\nAdicione este app à lista\nde exclusão no Device Care.",
-    "permissionSamsungBatteryButton": "Abrir configurações"
+    "permissionSamsungBatteryButton": "Abrir configurações",
+    "permIntro": "Para usar o ShutTimer sem problemas,\nas seguintes permissões são necessárias.",
+    "permNote": "Você pode usar o app mesmo se negar as permissões.",
+    "permAllowStart": "Permitir e começar",
+    "permRowNotifLabel": "Aviso de fim do cronômetro",
+    "permRowNotifDesc": "Necessário para alarmes na tela bloqueada e rotinas",
+    "permRowCameraLabel": "Escanear foto para parar",
+    "permRowCameraDesc": "Usado para a missão de escanear objetos com a câmera",
+    "permRowAttLabel": "Anúncios personalizados",
+    "permRowAttDesc": "Anúncios mais relevantes (funciona mesmo se recusado)",
+    "permRowSamsungLabel": "Configuração do Device Care",
+    "permRowSamsungDesc": "Excluir de \"Apps suspensos\" para evitar alarmes bloqueados"
   },
   "common": {
     "save": "Salvar",
@@ -381,7 +413,8 @@
     "hour": "h",
     "minute": "m",
     "cancel": "Cancelar",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "second": "s"
   },
   "routine": {
     "actionDelete": "Excluir",
@@ -557,7 +590,10 @@
       "nextLabel": "Próxima",
       "nextQuestion": "Continuar para a próxima rotina?",
       "startNext": "Iniciar próxima rotina",
-      "stop": "Parar rotina"
+      "stop": "Parar rotina",
+      "completeQuestion": "Você concluiu todas as rotinas",
+      "completeRoutine": "Concluir rotina",
+      "stepName": "Etapa {{n}}"
     },
     "scheduleOverflowBody": "{{count}} rotinas não foram agendadas por limites do sistema. Exclua as não utilizadas.",
     "scheduleOverflowTitle": "Alguns alarmes de rotina não agendados",
@@ -605,11 +641,28 @@
       "wed": "Qua"
     },
     "routineAlarmLabel": "Alarme de rotina em curso",
-    "timerAlarmLabel": "Cronômetro em curso"
+    "timerAlarmLabel": "Cronômetro em curso",
+    "add": "Adicionar rotina",
+    "limitTitle": "Limite de rotinas",
+    "limitBody": "Você pode criar até 3 rotinas.",
+    "moreCount": "{{name}} +{{count}} mais",
+    "alarmAdvance": "Próxima etapa",
+    "continue": "Continuar",
+    "routineCompleteTitle": "Rotina concluída",
+    "routineConflictTitle": "Rotina em andamento",
+    "routineConflictBody": "Outra rotina está em andamento. Parar e iniciar esta?",
+    "routineConflictProceed": "Iniciar nova rotina",
+    "timerConflictStopAndStart": "Parar timer e iniciar",
+    "advanceCountdown": "Avanço automático em {{n}}s",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "Sem favoritos",
-    "addButton": "Adicionar favorito"
+    "addButton": "Adicionar favorito",
+    "title": "Favoritos",
+    "actionDelete": "Excluir",
+    "deleteConfirmTitle": "Excluir?",
+    "deleteConfirmBody": "Excluir este favorito?"
   },
   "recommend": {
     "title": "Você gostaria de recomendar a um amigo?",
@@ -617,5 +670,20 @@
     "yes": "Sim",
     "no": "Não",
     "shareMessage": "Experimente as missões de alarme com o ShutTimer! "
+  },
+  "tabBar": {
+    "home": "Timer",
+    "routine": "Rotina",
+    "alarm": "Alarme",
+    "calendar": "Calendário",
+    "settings": "Configurações"
+  },
+  "errorBoundary": {
+    "title": "Erro no app",
+    "errorLabel": "Mensagem de erro:",
+    "stackLabel": "Rastreamento de pilha:",
+    "instruction": "Use o botão “Compartilhar” abaixo para enviar o erro completo ao desenvolvedor.",
+    "shareBtn": "Compartilhar / Copiar erro",
+    "restartBtn": "Reiniciar app"
   }
 }

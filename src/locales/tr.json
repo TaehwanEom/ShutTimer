@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Bitti\nTara ve durdur",
     "alarmTitleMath": "Bitti\nÇöz ve durdur",
     "alarmTitleTyping": "Bitti\nYaz ve durdur",
-    "alarmTitleRandom": "Bitti"
+    "alarmTitleRandom": "Bitti",
+    "timerName": "Zamanlayıcı",
+    "list": "Liste"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -107,7 +109,8 @@
       "daily": "Her gün",
       "weekday": "Hafta içi",
       "weekend": "Hafta sonu",
-      "weekly": "Hafta içi"
+      "weekly": "Hafta içi",
+      "weekdays": "Hafta içi"
     },
     "label": {
       "placeholder": "Örn: Uyan",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Kontrol Gerekli",
       "time": "Geçersiz saat",
-      "daysEmpty": "Lütfen en az bir gün seçin"
+      "daysEmpty": "Lütfen en az bir gün seçin",
+      "labelEmpty": "Lütfen bir alarm adı girin",
+      "stepDurationEmpty": "Lütfen adım süresini ayarlayın"
     },
     "routineSection": {
       "title": "Rutin ekle",
@@ -158,7 +163,15 @@
     "typingTitle": "Yazma Görevi",
     "typingInstruction": "Ekrandaki metni aynen yazın",
     "typingPlaceholder": "Buraya yazın",
-    "typingSubmit": "Onayla"
+    "typingSubmit": "Onayla",
+    "tapchargeInstruction": "Göstergeyi doldurmak için dokunmaya devam edin",
+    "editBtn": "Düzenle",
+    "defaultTitle": "Alarm",
+    "duplicate": {
+      "title": "Yinelenen alarm",
+      "body": "Aynı saatte ({{time}}) zaten bir alarm var.\nAynı anda çalarsa yalnızca biri çalışır.\nyine de eklensin mi?"
+    },
+    "flipCamera": "Kamerayı çevir"
   },
   "addTimer": {
     "editTitle": "Favoriyi düzenle",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Yardım",
       "stopMethod": "Durdurma yöntemi",
-      "stopMethodBody": "Alarm kapatma yöntemi ayarlardan 5 seçenek arasından seçilebilir: fotoğraf taraması, sallama, dokunma, hesaplama ve dikte. Alarm çaldığında seçilen yönteme göre görevi tamamlayarak durdurun.",
+      "stopMethodBody": "Ayarlar'da 6 alarm durdurma yönteminden birini seçebilirsiniz: fotoğraf tarama, sallama, dokunma, hızlı dokunma, matematik ve yazma. Alarm çaldığında seçilen görevi tamamlayarak durdurun.",
       "routine": "Rutin kullanımı",
       "routineBody": "Rutin, sırayla yürütülen birden fazla adımın birleşimidir. Planlanmış rutinler belirlenen saatte otomatik başlar, normal rutinler manuel başlatılır. En fazla 3 adım eklenebilir.",
       "alarmRoutine": "Alarm rutini kullanımı",
       "alarmRoutineBody": "Alarm oluştururken en fazla 3 adım eklediğinizde alarm rutinine dönüşür. Alarm çaldığında ilk görev başlar, tamamlandıktan sonra bir sonraki adım otomatik devam eder. Tüm adımlar tamamlandığında biter.",
       "dial": "Kadran kullanımı",
-      "dialBody": "Zamanlayıcıyı başlatmadan önce, süreyi ayarlamak için kadranı çevirin veya dijital rakamlara dokunarak klavyeyi açın. Duraklatma sırasında da kadran veya klavye ile süreyi artırıp azaltabilirsiniz; sürdür dokunduğunuzda zamanlayıcı yeni süreyle yeniden başlar.",
+      "dialBody": "Zamanlayıcıyı başlatmadan önce kadranı parmağınızla çevirerek süreyi ayarlayın. Duraklatıldığında süreyi aynı şekilde artırıp azaltabilir, devam'a basınca yeni süreyle yeniden başlar.",
       "bug": "Hata bildir",
-      "bugBody": "Kullanım sırasında bir hata bulursanız, ana ekranın sağ üst köşesindeki e-posta simgesine dokunarak hata bildirme ekranına erişin. Durumu (senaryo) ve sorunu (açıklama) yazıp gönder'e basın; e-posta uygulaması cihaz bilgileri ekli olarak otomatik açılır."
+      "bugBody": "Kullanım sırasında bir hata bulursanız, ana ekranın sağ üst köşesindeki e-posta simgesine dokunarak hata bildirme ekranına erişin. Durumu (senaryo) ve sorunu (açıklama) yazıp gönder'e basın; e-posta uygulaması cihaz bilgileri ekli olarak otomatik açılır.",
+      "stopButton": "Zamanlayıcıyı veya rutini durdurma",
+      "stopButtonBody": "Devam eden bir zamanlayıcıyı veya rutini durdurmak için ortadaki oynat/duraklat düğmesine basılı tutun. Düğmenin çevresinde bir gösterge dolar ve yaklaşık 1 saniye sonra durur. Kısa dokunuş duraklatır veya devam ettirir.",
+      "tabSwipe": "Ekran değiştirme",
+      "tabSwipeBody": "Alttaki sekmeler (Zamanlayıcı, Rutin, Alarm, Takvim, Ayarlar) arasında sola veya sağa kaydırarak geçebilirsiniz. Liste kartında kaydırmak önce silmeyi tetikler; bu yüzden sekme değiştirmek için boş alanlarda veya kenarlarda kaydırın."
     },
     "removeAdsPrice": "$2.99 · Ömür boyu",
     "restoreSuccess": "Satın alma başarıyla geri yüklendi",
@@ -229,7 +246,11 @@
     "randomDesc": "Dokun/salla/kamera/matematik arasından rastgele",
     "typing": "Yazma",
     "typingDesc": "Kapatmak için 3 kelime/sayıyı doğru yazın",
-    "batteryOptimization": "Pil optimizasyonu"
+    "batteryOptimization": "Pil optimizasyonu",
+    "tapcharge": "Sürekli dokunma",
+    "tapchargeDesc": "Göstergeyi doldurana kadar dokunmaya devam edin",
+    "select": "Seç",
+    "selected": "Seçildi"
   },
   "missions": {
     "boy": "Kişi",
@@ -372,7 +393,18 @@
     "confirm": "Onayla",
     "permissionSamsungBatteryTitle": "Samsung Device Care ayarı",
     "permissionSamsungBatteryBody": "Samsung'un \"Uyuyan uygulamalar\" özelliği\nalarmları engelleyebilir.\nLütfen bu uygulamayı Device Care'de\nhariç tutulanlar listesine ekleyin.",
-    "permissionSamsungBatteryButton": "Ayarları aç"
+    "permissionSamsungBatteryButton": "Ayarları aç",
+    "permIntro": "ShutTimer'ı sorunsuz kullanmak için\naşağıdaki izinler gereklidir.",
+    "permNote": "İzinleri reddetseniz de uygulamayı kullanabilirsiniz.",
+    "permAllowStart": "İzin ver ve başla",
+    "permRowNotifLabel": "Zamanlayıcı bitiş bildirimi",
+    "permRowNotifDesc": "Kilit ekranı alarmları ve rutinler için gerekli",
+    "permRowCameraLabel": "Durdurmak için fotoğraf tarama",
+    "permRowCameraDesc": "Kamerayla nesne tarama görevi için kullanılır",
+    "permRowAttLabel": "Kişiselleştirilmiş reklamlar",
+    "permRowAttDesc": "Daha alakalı reklamlar (reddedilse de çalışır)",
+    "permRowSamsungLabel": "Device Care kurulumu",
+    "permRowSamsungDesc": "\"Uyuyan uygulamalar\"dan hariç tutun — engellenen alarmları önler"
   },
   "common": {
     "save": "Kaydet",
@@ -381,7 +413,8 @@
     "hour": "s",
     "minute": "d",
     "cancel": "İptal",
-    "confirm": "Onayla"
+    "confirm": "Onayla",
+    "second": "sn"
   },
   "routine": {
     "actionDelete": "Sil",
@@ -557,7 +590,10 @@
       "nextLabel": "Sonraki",
       "nextQuestion": "Sonraki rutine geçilsin mi?",
       "startNext": "Sonraki rutini başlat",
-      "stop": "Rutini durdur"
+      "stop": "Rutini durdur",
+      "completeQuestion": "Tüm rutinleri tamamladın",
+      "completeRoutine": "Rutini tamamla",
+      "stepName": "Adım {{n}}"
     },
     "scheduleOverflowBody": "{{count}} rutin sistem sınırları nedeniyle zamanlanamadı. Kullanılmayanları silin.",
     "scheduleOverflowTitle": "Bazı rutin alarmları zamanlanamadı",
@@ -605,11 +641,28 @@
       "wed": "Çar"
     },
     "routineAlarmLabel": "Devam eden rutin alarmı",
-    "timerAlarmLabel": "Devam eden zamanlayıcı"
+    "timerAlarmLabel": "Devam eden zamanlayıcı",
+    "add": "Rutin ekle",
+    "limitTitle": "Rutin sınırı",
+    "limitBody": "En fazla 3 rutin oluşturabilirsiniz.",
+    "moreCount": "{{name}} +{{count}} diğer",
+    "alarmAdvance": "Sonraki adım",
+    "continue": "Devam et",
+    "routineCompleteTitle": "Rutin tamamlandı",
+    "routineConflictTitle": "Devam eden rutin",
+    "routineConflictBody": "Başka bir rutin çalışıyor. Durdurup bunu başlat?",
+    "routineConflictProceed": "Yeni rutini başlat",
+    "timerConflictStopAndStart": "Zamanlayıcıyı durdur ve başlat",
+    "advanceCountdown": "{{n}}sn sonra otomatik geç",
+    "prealertStop": "Tamam"
   },
   "favorites": {
     "empty": "Favori yok",
-    "addButton": "Favori ekle"
+    "addButton": "Favori ekle",
+    "title": "Favoriler",
+    "actionDelete": "Sil",
+    "deleteConfirmTitle": "Silinsin mi?",
+    "deleteConfirmBody": "Bu favori silinsin mi?"
   },
   "recommend": {
     "title": "Bir arkadaşınıza önermek ister misiniz?",
@@ -617,5 +670,20 @@
     "yes": "Evet",
     "no": "Hayır",
     "shareMessage": "ShutTimer ile alarm görevlerini deneyin! "
+  },
+  "tabBar": {
+    "home": "Zamanlayıcı",
+    "routine": "Rutin",
+    "alarm": "Alarm",
+    "calendar": "Takvim",
+    "settings": "Ayarlar"
+  },
+  "errorBoundary": {
+    "title": "Uygulama hatası",
+    "errorLabel": "Hata mesajı:",
+    "stackLabel": "Yığın izi:",
+    "instruction": "Hatanın tamamını geliştiriciye göndermek için aşağıdaki “Paylaş” düğmesini kullanın.",
+    "shareBtn": "Hatayı paylaş / kopyala",
+    "restartBtn": "Uygulamayı yeniden başlat"
   }
 }

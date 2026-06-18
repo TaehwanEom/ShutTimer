@@ -28,7 +28,9 @@
     "alarmTitleCamera": "Selesai\nPindai untuk berhenti",
     "alarmTitleMath": "Selesai\nHitung untuk berhenti",
     "alarmTitleTyping": "Selesai\nKetik untuk berhenti",
-    "alarmTitleRandom": "Selesai"
+    "alarmTitleRandom": "Selesai",
+    "timerName": "Timer",
+    "list": "Daftar"
   },
   "running": {
     "minutesLeft": "MINUTES LEFT",
@@ -106,8 +108,9 @@
       "once": "Tidak",
       "daily": "Setiap Hari",
       "weekday": "Hari Kerja",
-      "weekend": "Akhir Pekan",
-      "weekly": "Hari Kerja"
+      "weekend": "Akhir pekan",
+      "weekly": "Hari Kerja",
+      "weekdays": "Hari kerja"
     },
     "label": {
       "placeholder": "Contoh: Bangun",
@@ -135,7 +138,9 @@
     "validate": {
       "title": "Periksa",
       "time": "Waktu tidak valid",
-      "daysEmpty": "Pilih setidaknya satu hari"
+      "daysEmpty": "Pilih setidaknya satu hari",
+      "labelEmpty": "Masukkan label alarm",
+      "stepDurationEmpty": "Atur durasi langkah rutinitas"
     },
     "routineSection": {
       "title": "Tambah rutin",
@@ -158,7 +163,15 @@
     "typingTitle": "Misi Mengetik",
     "typingInstruction": "Ketik teks di layar persis sama",
     "typingPlaceholder": "Ketik di sini",
-    "typingSubmit": "Konfirmasi"
+    "typingSubmit": "Konfirmasi",
+    "tapchargeInstruction": "Terus ketuk untuk mengisi pengukur",
+    "editBtn": "Edit",
+    "defaultTitle": "Alarm",
+    "duplicate": {
+      "title": "Alarm ganda",
+      "body": "Sudah ada alarm pada waktu yang sama ({{time}}).\nJika berbunyi bersamaan, hanya satu yang berjalan.\nTetap tambahkan?"
+    },
+    "flipCamera": "Balik kamera"
   },
   "addTimer": {
     "editTitle": "Edit Favorit",
@@ -206,15 +219,19 @@
     "help": {
       "title": "Bantuan",
       "stopMethod": "Cara berhenti",
-      "stopMethodBody": "Cara mengakhiri alarm dapat dipilih di pengaturan dari 5 metode: pindai foto, goyang, ketuk, matematika, dan dikte. Saat alarm berbunyi, selesaikan misi sesuai metode yang dipilih untuk menghentikannya.",
+      "stopMethodBody": "Anda dapat memilih dari 6 metode penghentian alarm di Pengaturan: pindai foto, guncang, ketuk, ketuk cepat, matematika, dan mengetik. Saat alarm berbunyi, selesaikan misi yang dipilih untuk menghentikannya.",
       "routine": "Cara menggunakan rutinitas",
       "routineBody": "Rutinitas adalah serangkaian langkah yang dijalankan berurutan. Rutinitas terjadwal dimulai otomatis pada waktu yang ditetapkan, rutinitas biasa dimulai manual. Maksimum 3 langkah dapat ditambahkan.",
       "alarmRoutine": "Cara menggunakan rutinitas alarm",
       "alarmRoutineBody": "Saat menambah alarm dengan maksimum 3 langkah, itu menjadi rutinitas alarm. Saat alarm berbunyi, misi langkah pertama dimulai, setelah selesai langkah berikutnya otomatis berlanjut. Selesai saat semua langkah selesai.",
       "dial": "Cara menggunakan dial",
-      "dialBody": "Sebelum timer dimulai, putar dial dengan jari atau ketuk angka digital untuk mengatur waktu dengan keypad. Saat dijeda juga bisa menambah/mengurangi waktu dengan dial atau keypad, tekan lanjutkan untuk memulai ulang dengan waktu baru.",
+      "dialBody": "Sebelum memulai timer, putar dial dengan jari untuk mengatur waktu. Saat dijeda, Anda dapat menambah atau mengurangi waktu dengan cara yang sama, dan menekan lanjutkan akan memulai ulang dengan waktu baru.",
       "bug": "Laporkan bug",
-      "bugBody": "Jika menemukan bug saat menggunakan, ketuk ikon email di kanan atas layar utama untuk masuk ke halaman laporan bug. Tulis situasi yang terjadi (skenario) dan deskripsi masalah (penjelasan) lalu kirim, aplikasi email akan terbuka otomatis dengan info perangkat terlampir."
+      "bugBody": "Jika menemukan bug saat menggunakan, ketuk ikon email di kanan atas layar utama untuk masuk ke halaman laporan bug. Tulis situasi yang terjadi (skenario) dan deskripsi masalah (penjelasan) lalu kirim, aplikasi email akan terbuka otomatis dengan info perangkat terlampir.",
+      "stopButton": "Menghentikan timer atau rutin",
+      "stopButtonBody": "Untuk menghentikan timer atau rutin yang berjalan, tekan dan tahan tombol putar/jeda di tengah. Pengukur terisi di sekeliling tombol dan berhenti setelah sekitar 1 detik. Ketukan singkat menjeda atau melanjutkan.",
+      "tabSwipe": "Beralih layar",
+      "tabSwipeBody": "Anda dapat beralih antar tab bawah (Timer, Rutin, Alarm, Kalender, Pengaturan) dengan menggeser ke kiri atau kanan. Menggeser pada kartu daftar memicu hapus terlebih dahulu, jadi geser di area kosong atau tepi untuk berganti tab."
     },
     "removeAdsPrice": "$2.99 · Seumur hidup",
     "restoreSuccess": "Pembelian berhasil dipulihkan",
@@ -229,7 +246,11 @@
     "randomDesc": "Acak dari ketuk/goyang/kamera/matematika",
     "typing": "Mengetik",
     "typingDesc": "Ketik 3 kata/angka dengan benar untuk mematikan",
-    "batteryOptimization": "Pengoptimalan baterai"
+    "batteryOptimization": "Pengoptimalan baterai",
+    "tapcharge": "Ketuk Terus",
+    "tapchargeDesc": "Terus ketuk hingga pengukur penuh untuk menghentikan",
+    "select": "Pilih",
+    "selected": "Dipilih"
   },
   "missions": {
     "boy": "Orang",
@@ -372,7 +393,18 @@
     "confirm": "Konfirmasi",
     "permissionSamsungBatteryTitle": "Pengaturan Samsung Device Care",
     "permissionSamsungBatteryBody": "Fitur \"Aplikasi tidur\" Samsung\ndapat memblokir alarm.\nMohon tambahkan aplikasi ini ke\ndaftar pengecualian di Device Care.",
-    "permissionSamsungBatteryButton": "Buka pengaturan"
+    "permissionSamsungBatteryButton": "Buka pengaturan",
+    "permIntro": "Untuk menggunakan ShutTimer dengan lancar,\nizin berikut diperlukan.",
+    "permNote": "Anda tetap dapat menggunakan aplikasi meski menolak izin.",
+    "permAllowStart": "Izinkan dan mulai",
+    "permRowNotifLabel": "Notifikasi akhir timer",
+    "permRowNotifDesc": "Diperlukan untuk alarm layar kunci dan rutin",
+    "permRowCameraLabel": "Pindai foto untuk berhenti",
+    "permRowCameraDesc": "Digunakan untuk misi pindai objek dengan kamera",
+    "permRowAttLabel": "Iklan yang dipersonalisasi",
+    "permRowAttDesc": "Iklan lebih relevan (tetap berfungsi jika ditolak)",
+    "permRowSamsungLabel": "Pengaturan Device Care",
+    "permRowSamsungDesc": "Kecualikan dari \"Aplikasi tidur\" untuk mencegah alarm diblokir"
   },
   "common": {
     "save": "Simpan",
@@ -381,7 +413,8 @@
     "hour": "j",
     "minute": "m",
     "cancel": "Batal",
-    "confirm": "Konfirmasi"
+    "confirm": "Konfirmasi",
+    "second": "dtk"
   },
   "routine": {
     "actionDelete": "Hapus",
@@ -557,7 +590,10 @@
       "nextLabel": "Berikutnya",
       "nextQuestion": "Lanjut ke rutinitas berikutnya?",
       "startNext": "Mulai rutinitas berikutnya",
-      "stop": "Hentikan rutinitas"
+      "stop": "Hentikan rutinitas",
+      "completeQuestion": "Anda menyelesaikan semua rutinitas",
+      "completeRoutine": "Selesaikan rutinitas",
+      "stepName": "Langkah {{n}}"
     },
     "scheduleOverflowBody": "{{count}} rutinitas tidak dapat dijadwalkan karena batas sistem. Hapus yang tidak digunakan.",
     "scheduleOverflowTitle": "Beberapa alarm rutinitas tidak terjadwal",
@@ -605,11 +641,28 @@
       "wed": "Rab"
     },
     "routineAlarmLabel": "Alarm rutinitas berjalan",
-    "timerAlarmLabel": "Timer berjalan"
+    "timerAlarmLabel": "Timer berjalan",
+    "add": "Tambah Rutinitas",
+    "limitTitle": "Batas rutinitas",
+    "limitBody": "Anda dapat membuat maksimal 3 rutinitas.",
+    "moreCount": "{{name}} +{{count}} lainnya",
+    "alarmAdvance": "Langkah berikutnya",
+    "continue": "Lanjutkan",
+    "routineCompleteTitle": "Rutinitas selesai",
+    "routineConflictTitle": "Rutinitas berjalan",
+    "routineConflictBody": "Rutinitas lain sedang berjalan. Hentikan dan mulai ini?",
+    "routineConflictProceed": "Mulai rutinitas baru",
+    "timerConflictStopAndStart": "Hentikan timer lalu mulai",
+    "advanceCountdown": "Lanjut otomatis dalam {{n}}d",
+    "prealertStop": "OK"
   },
   "favorites": {
     "empty": "Tidak ada favorit",
-    "addButton": "Tambah favorit"
+    "addButton": "Tambah favorit",
+    "title": "Favorit",
+    "actionDelete": "Hapus",
+    "deleteConfirmTitle": "Hapus?",
+    "deleteConfirmBody": "Hapus favorit ini?"
   },
   "recommend": {
     "title": "Apakah Anda ingin merekomendasikan kepada teman?",
@@ -617,5 +670,20 @@
     "yes": "Ya",
     "no": "Tidak",
     "shareMessage": "Coba misi alarm dengan ShutTimer! "
+  },
+  "tabBar": {
+    "home": "Timer",
+    "routine": "Rutinitas",
+    "alarm": "Alarm",
+    "calendar": "Kalender",
+    "settings": "Pengaturan"
+  },
+  "errorBoundary": {
+    "title": "Kesalahan aplikasi",
+    "errorLabel": "Pesan kesalahan:",
+    "stackLabel": "Jejak tumpukan:",
+    "instruction": "Gunakan tombol “Bagikan” di bawah untuk mengirim kesalahan lengkap ke pengembang.",
+    "shareBtn": "Bagikan / Salin kesalahan",
+    "restartBtn": "Mulai ulang aplikasi"
   }
 }

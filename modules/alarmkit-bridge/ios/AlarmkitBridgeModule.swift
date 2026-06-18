@@ -4,6 +4,7 @@
 
 import ExpoModulesCore
 import Foundation
+import UIKit
 
 // v1.7 hotfix #DBG — App Group UserDefaults 측 native log 저장 helper.
 // JS 측 SettingsScreen "최근 로그 공유" → AlarmkitBridge.readAppGroupString("native_debug_log_v1") 합쳐 영역.
@@ -159,6 +160,16 @@ public class AlarmkitBridgeModule: Module {
               if alarm.state == .alerting {
                 appendNativeDbg("AlarmKit-DBG", "alerting alarmId=\(alarm.id.uuidString) schedule=\(String(describing: alarm.schedule)) countdownDuration=\(String(describing: alarm.countdownDuration))")
                 // v1.8 #WatchLAConsolidate — 별도 WatchLAManager 폐기.
+                // #FGBannerSuppress (2026-06-15) — 앱 foreground 시 AlarmKit 시스템 배너 즉시 차단.
+                //   직전 = JS(App.tsx onAlarmStateChange) 반응형 cancelAlarm 의존 → 네이티브→JS→AsyncStorage→네이티브 왕복 지연 →
+                //   배너가 한 프레임 노출 후 사라지는 깜빡임 회귀. 정정 = alerting 즉시 네이티브 stop (JS 왕복 제거).
+                //   foreground 한정 (background 알람은 정상 alerting 유지). JS 측 억제(App.tsx:474)는 백그라운드 복귀 백업으로 잔존.
+                //   foreground 사운드는 expo-av (in-app), AlarmKit 자체 사운드/배너만 차단 → 기존 설계(v1.6) 정합.
+                let isForeground = await MainActor.run { UIApplication.shared.applicationState == .active }
+                if isForeground {
+                  appendNativeDbg("AlarmKit-DBG", "alerting foreground → native stop \(alarm.id.uuidString) (#FGBannerSuppress)")
+                  try? await AlarmManager.shared.stop(id: alarm.id)
+                }
               }
 
               // v1.7 hotfix #5 — alerting 시점 native 측 LA stage='manual_prompt' 자동 갱신.

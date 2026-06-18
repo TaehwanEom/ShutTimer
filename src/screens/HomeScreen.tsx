@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   AppState,
   Animated,
-  PanResponder,
   DeviceEventEmitter,
   Alert,
   Keyboard,
@@ -38,16 +37,14 @@ import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import { Logger } from '../utils/logger';
-import { saveAlarmMetadata, deleteAlarmMetadata, listAllAlarmMetadata } from '../utils/alarmkitMappingTable';
+import { deleteAlarmMetadata, listAllAlarmMetadata } from '../utils/alarmkitMappingTable';
 // Sub A-2 fix (2026-05-25, Timer 통합) — Timer 시작 → dispatch Start kind='timer' 경유.
 //   transition Start 측 ScheduleAlarmOnce effect 발동 → effectRunner 측 AlarmkitBridge.scheduleAlarm + saveAlarmMetadata 호출.
 //   옛 HomeScreen 직접 호출 폐기.
 import { dispatch as sessionDispatch, getCurrentSession } from '../state/SessionController';
 import { writeChainAlarms, clearChainAlarms, type LAControlSignal } from '../utils/appGroupSync';
 import { requestAlarmKitAuthorizationIfNeeded } from '../utils/routineScheduler';
-import { stopRoutine } from '../utils/routineController';
-import { loadActiveRoutine, PENDING_DISABLED_ALARMS_KEY } from '../constants/routines';
-import { isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
+import { PENDING_DISABLED_ALARMS_KEY } from '../constants/routines';
 import { loadAlarms, nextAlarmOccurrenceTime, upsertAlarm } from '../constants/alarms';
 import { cancelAlarmsForEntity } from '../utils/alarmScheduler';
 
@@ -344,7 +341,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const [selectedMinutes, setSelectedMinutes] = useState(0);
   const [selectedSeconds, setSelectedSeconds] = useState(0);
-  const DIAL_TYPES: DialType[] = ['classic', 'digital'];
+  // 디지털 타이머는 디버그 빌드 전용 — 심사/배포 빌드(__DEV__=false)에선 classic만 노출.
+  const DIAL_TYPES: DialType[] = __DEV__ ? ['classic', 'digital'] : ['classic'];
   const [dialType, setDialType] = useState<DialType>('classic');
   const dialSlide = useRef(new Animated.Value(0)).current;
   const DIAL_SIZE = 350;
@@ -363,19 +361,6 @@ export default function HomeScreen({ navigation, route }: Props) {
       Animated.timing(dialSlide, { toValue: 0, duration: 220, useNativeDriver: true }).start();
     });
   };
-
-  const switchDialRef = useRef(switchDial);
-  switchDialRef.current = switchDial;
-
-  const swipeResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dy) < 40,
-      onPanResponderRelease: (_, g) => {
-        if (g.dx > 50) switchDialRef.current('right');
-        else if (g.dx < -50) switchDialRef.current('left');
-      },
-    })
-  ).current;
 
   // --- Running state ---
   const [isRunning, setIsRunning] = useState(false);
@@ -402,7 +387,9 @@ export default function HomeScreen({ navigation, route }: Props) {
     useCallback(() => {
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
       AsyncStorage.getItem(SETTINGS_KEY.DIAL_TYPE).then(v => {
-        if (v === 'classic' || v === 'digital') setDialType(v);
+        // 심사판에선 digital이 DIAL_TYPES에 없음 → 저장값이 digital이어도 classic 폴백.
+        if (v && DIAL_TYPES.includes(v as DialType)) setDialType(v as DialType);
+        else setDialType('classic');
       });
       AsyncStorage.getItem(MISSIONS_STORAGE_KEY).then(value => {
         const list: Mission[] = value ? JSON.parse(value) : MISSIONS;
@@ -473,7 +460,6 @@ export default function HomeScreen({ navigation, route }: Props) {
         await deleteAlarmMetadata(alarmkitIdRef.current).catch(() => {});
         alarmkitIdRef.current = null;
       }
-      const fireAt = Date.now() + seconds * 1000;
       const routineId = timerRoutineIdRef.current ?? `main_timer_${Date.now()}`;
       timerRoutineIdRef.current = routineId;
       // v1.8 — 잠금화면 알람 제목 = dismissMethod 6가지 분기. random = 안내 빼고 "타이머 완료"만.
@@ -1210,7 +1196,8 @@ export default function HomeScreen({ navigation, route }: Props) {
         )}
         </Animated.View>
 
-        {/* 다이얼 전환 버튼 */}
+        {/* 다이얼 전환 버튼 — 화살표로만 전환. digital은 __DEV__ 전용이라 심사판(타입 1개)에선 숨김. */}
+        {DIAL_TYPES.length > 1 && (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
           <TouchableOpacity onPress={() => switchDial('right')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <MaterialIcons name="chevron-left" size={32} color={colors.secondary} />
@@ -1224,10 +1211,11 @@ export default function HomeScreen({ navigation, route }: Props) {
             <MaterialIcons name="chevron-right" size={32} color={colors.secondary} />
           </TouchableOpacity>
         </View>
+        )}
       </View>
 
       {/* 하단 버튼 영역 + 60:00 */}
-      <View {...swipeResponder.panHandlers} style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
+      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 6, gap: 8 }}>
         {/* 60:00 표시 */}
         <View style={{ borderWidth: 2, borderColor: colors.outlineVariant, borderRadius: 50, paddingHorizontal: 24, paddingVertical: 6 }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: colors.onBackground, letterSpacing: 1 }}>

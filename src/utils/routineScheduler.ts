@@ -8,7 +8,6 @@ import i18n from '../i18n';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
   Routine,
-  RoutineStep,
   ROUTINE_PREALERT_MINUTES_LIST,
   SCHEDULED_ROUTINE_NOTIFS_KEY,
   IOS_NOTIFICATION_SAFE_CAP,
@@ -435,6 +434,8 @@ export async function scheduleRoutineConfirmPrompt(
   laStepName?: string,
   laStepIndex?: number,
   laTotalSteps?: number,
+  // 2026-05-31 — Android 미션 알람 잠금 해제 강제 (iOS 정합).
+  endMethod?: string,
 ): Promise<string | null> {
   // v1.7 hotfix #12 — fireAt 측 과거 시 = 1초 future 강제 (= scheduleBackgroundNotif id=null 회귀 차단).
   // 직전: fireAt < now 시 null 반환 → confirm_prompt alarm 등록 ❌ → 다음 step alarm fire ❌ → routine 진행 정지.
@@ -445,7 +446,7 @@ export async function scheduleRoutineConfirmPrompt(
   // v1.7 hotfix Phase 13 G4-E — AlarmKit 측만 사용 (= expo-notifications 폴백 폐기).
   const useAlarmKit = await shouldUseAlarmKit();
   if (!useAlarmKit) return null;
-  return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName, laRoutineName, laStepName, laStepIndex, laTotalSteps);
+  return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName, laRoutineName, laStepName, laStepIndex, laTotalSteps, endMethod);
 }
 
 /** AlarmKit 경로 — iOS 26+. */
@@ -457,6 +458,7 @@ async function scheduleConfirmPromptViaAlarmKit(
   laStepName?: string,
   laStepIndex?: number,
   laTotalSteps?: number,
+  endMethod?: string,
 ): Promise<string | null> {
   try {
     // v1.6 hotfix — confirm_prompt 사운드 통일. 사용자 설정 사운드 (단일 timer 와 동일 정책).
@@ -482,6 +484,8 @@ async function scheduleConfirmPromptViaAlarmKit(
       // 마지막 step 일 때 secondaryLabel 미전달 → AlarmkitBridgeModule 측 hasSecondary=false 분기로 진입 → "다음 진행" 버튼 미노출.
       secondaryLabel: isLastStep ? undefined : i18n.t('routine.alarmAdvance', { defaultValue: '다음 진행' }),
       soundName: soundItem.pushSound,
+      // 2026-05-31 — Android 미션 알람 잠금 해제 강제 (iOS 정합). 'tap' / undefined = 일반 알람.
+      endMethod: endMethod as any,
       // v1.8 #WatchLARoutine — 워치 Smart Stack LA 표시용 메타데이터.
       laRoutineName,
       laStepName,

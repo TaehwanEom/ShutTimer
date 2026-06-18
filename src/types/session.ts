@@ -31,7 +31,7 @@ export type SessionState =
 // Step — routine/timer/alarm 공통 step 단위
 // ───────────────────────────────────────────────────────────
 
-export type StepEndMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random';
+export type StepEndMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'tapcharge' | 'random';
 
 export interface Step {
   index: number;                  // 0-based

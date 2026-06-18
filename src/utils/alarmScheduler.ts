@@ -21,6 +21,7 @@ import {
 } from './alarmkitMappingTable';
 import { ALARM_SOUNDS, DEFAULT_SOUND_ID } from '../constants/sounds';
 import { Logger } from './logger';
+import i18n from '../i18n';
 import { SESSIONS_STORAGE_KEY, SessionRecord } from '../constants/sessions';
 import { SETTINGS_KEY } from '../constants/settings';
 
@@ -159,7 +160,7 @@ async function scheduleAlarmAt(
   chainBaseFireAt: number
 ): Promise<string | null> {
   const soundName = await resolveSoundName();
-  const title = alarm.label || '알람';
+  const title = alarm.label || i18n.t('alarm.defaultTitle', { defaultValue: '알람' });
   // v1.8 — alarm 측 = LA 안 만듦 (= native .alarm(schedule:) factory + alert-only presentation 측).
   // countdownTitle / laMeta 측 = .alarm 분기 측 unused. 호환성 위해 전달은 유지.
   const countdownTitle = '다음 알람\n남은 시간';

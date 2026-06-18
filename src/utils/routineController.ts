@@ -30,7 +30,6 @@ import { Step as SessionStep } from '../types/session';
 // v2.0 C.D 우선순위 3 — ad_hoc kind 분기 (sessionId prefix 측 판단)
 import { isAdhocAlarmRoutine } from './alarmRoutineLink';
 
-const IS_ROUTINE_ACTIVE_KEY = 'isRoutineActive';
 const ACTIVE_TIMER_KEY = 'activeTimer';
 const IS_TIMER_ACTIVE_KEY = 'isTimerActive';
 

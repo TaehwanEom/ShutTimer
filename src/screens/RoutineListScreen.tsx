@@ -14,7 +14,6 @@ import {
   Switch,
   Animated,
   PanResponder,
-  Modal,
   DeviceEventEmitter,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -356,11 +355,9 @@ function RoutineCard({ routine, categoryLabel, styles, colors, isEditMode, onPla
     }
   }, [isActiveCard, swipeDisabled, translateX]);
 
-  // progress / isPaused 계산 — active 카드 + activeRoutine 있을 때만
+  // progress 계산 — active 카드 + activeRoutine 있을 때만
   let progress: number | undefined;
-  let isPaused: boolean | undefined;
   if (isActiveCard && activeRoutine) {
-    isPaused = !!activeRoutine.pausedAt;
     const stepDurSec = routine.steps[activeRoutine.currentStepIndex]?.durationSeconds ?? 0;
     const totalMs = stepDurSec * 1000;
     if (totalMs > 0) {

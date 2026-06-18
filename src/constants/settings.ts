@@ -31,7 +31,7 @@ export const COLOR_PRESETS = [
   { id: 'mint', color: '#7bc4a8' },
 ] as const;
 
-export type DismissMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random';
+export type DismissMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'tapcharge' | 'random';
 
 export const DEFAULT_SETTINGS = {
   dismissMethod: 'camera' as DismissMethod,

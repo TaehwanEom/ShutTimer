@@ -15,7 +15,6 @@ import {
   Modal,
   Platform,
   Vibration,
-  DeviceEventEmitter,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -28,7 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../App';
 import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
-import { Routine, ActiveRoutine, loadRoutines } from '../constants/routines';
+import { Routine, ActiveRoutine } from '../constants/routines';
 // v2.0 C-3-2 — useSession hook 도입 (옛 ar polling + listener 5종 측 자동 갱신 대체)
 import { useActiveRoutineAr } from '../state/useSession';
 import { Logger } from '../utils/logger';

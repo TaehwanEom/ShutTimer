@@ -14,7 +14,6 @@ import {
   ScrollView,
   Vibration,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 import { ThemeColors } from '../constants/theme';
 import {
   generateTypingProblems,
@@ -137,18 +136,18 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
       const inputCh = input[i];
       const nInputCh = norm(inputCh);
       if (nInputCh === '') {
-        colors.push('#ffffff');
+        colors.push('#151820');
         continue;
       }
       if (targetIdx >= nTarget.length) {
-        colors.push('#ff6b6b');
+        colors.push('#D14343');
         targetIdx += 1;
         continue;
       }
       if (nInputCh === nTarget[targetIdx]) {
-        colors.push('#2bf213'); // 연두 = 정확 일치 (= Tailwind green-400)
+        colors.push('#168A3A'); // 초록 = 정확 일치
       } else {
-        colors.push('#ff6b6b');
+        colors.push('#D14343');
       }
       targetIdx += 1;
     }
@@ -188,7 +187,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
             </View>
 
             <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-              <Text style={[styles.problemText, wrongFlash && { color: '#ff6b6b' }]} selectable={false}>
+              <Text style={[styles.problemText, wrongFlash && { color: '#D14343' }]} selectable={false}>
                 {displayedProblem?.text ?? ''}
               </Text>
             </Animated.View>
@@ -202,8 +201,8 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
                 value={input}
                 onChangeText={setInput}
                 placeholder={input.length === 0 ? t('alarm.typingPlaceholder', { defaultValue: '여기에 입력' }) : ''}
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                selectionColor={colors.onPrimary}
+                placeholderTextColor="#9AA1AE"
+                selectionColor={colors.primary}
                 autoCorrect={false}
                 autoCapitalize="none"
                 autoComplete="off"
@@ -215,7 +214,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
               {input.length > 0 && (
                 <View pointerEvents="none" style={styles.overlay}>
                   {Array.from(input).map((ch, i) => (
-                    <Text key={i} style={[styles.overlayChar, { color: charColors[i] ?? '#ffffff' }]}>
+                    <Text key={i} style={[styles.overlayChar, { color: charColors[i] ?? '#151820' }]}>
                       {ch}
                     </Text>
                   ))}
@@ -234,7 +233,7 @@ export default function AlarmTypingMode({ colors, t, locale, onSuccess, remainin
 }
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primary },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,13 +245,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   brand: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: -0.5,
   },
   timer: {
-    fontSize: 64,
+    fontSize: 56,
     fontWeight: '900',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: -1,
     fontVariant: ['tabular-nums'],
     marginBottom: 4,
@@ -266,12 +265,11 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
   },
   subtitle: {
     fontSize: 13,
-    color: colors.onPrimary,
-    opacity: 0.85,
+    color: '#6F7480',
     textAlign: 'center',
   },
   progressRow: {
@@ -284,37 +282,38 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#D9DDE6',
   },
   progressDotActive: {
-    backgroundColor: colors.onPrimary,
+    backgroundColor: colors.primary,
     width: 14,
     height: 14,
     borderRadius: 7,
   },
   progressDotDone: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#8E96A6',
   },
   progressText: {
     marginLeft: 8,
     fontSize: 13,
     fontWeight: '700',
-    color: colors.onPrimary,
-    opacity: 0.85,
+    color: '#6F7480',
   },
   problemBox: {
     marginTop: 8,
     paddingVertical: 22,
     paddingHorizontal: 24,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
     width: '85%',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EAF0',
   },
   problemText: {
     fontSize: 28,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: 1,
     textAlign: 'center',
   },
@@ -329,10 +328,11 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: 18,
     fontSize: 22,
     fontWeight: '700',
-    color: colors.onPrimary,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#E1E4EC',
   },
   overlay: {
     position: 'absolute',
@@ -354,8 +354,8 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 12,
     paddingVertical: 14,
     paddingHorizontal: 48,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 14,
+    backgroundColor: colors.primary,
+    borderRadius: 18,
   },
   submitText: {
     fontSize: 18,

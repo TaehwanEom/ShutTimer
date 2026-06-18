@@ -127,10 +127,10 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
 
   // v1.8 — 실시간 피드백. 입력 = 정답 prefix 영역인지 영역 → 연두 / 빨강 (= 전체 색).
   const inputColor = (() => {
-    if (!input || !current) return '#ffffff';
+    if (!input || !current) return '#151820';
     const target = String(current.answer);
-    if (target.startsWith(input)) return '#2bf213'; // 연두 = 정답 진행 중
-    return '#ff6b6b'; // 빨강 = 오답
+    if (target.startsWith(input)) return '#168A3A'; // 초록 = 정답 진행 중
+    return '#D14343'; // 빨강 = 오답
   })();
 
   return (
@@ -165,7 +165,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
           </View>
 
           <Animated.View style={[styles.problemBox, { transform: [{ translateX: shakeTranslate }] }]}>
-            <Text style={[styles.problemText, wrongFlash && { color: '#ff6b6b' }]} numberOfLines={1} adjustsFontSizeToFit>{displayedProblem?.display ?? ''} = ?</Text>
+            <Text style={[styles.problemText, wrongFlash && { color: '#D14343' }]} numberOfLines={1} adjustsFontSizeToFit>{displayedProblem?.display ?? ''} = ?</Text>
           </Animated.View>
 
           <View style={styles.inputBox}>
@@ -211,7 +211,7 @@ export default function AlarmMathMode({ colors, t, onSuccess, remainingMs }: Pro
 }
 
 const makeStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primary },
+  container: { flex: 1, backgroundColor: '#F6F7FB' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -223,13 +223,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   brand: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: -0.5,
   },
   timer: {
-    fontSize: 64,
+    fontSize: 56,
     fontWeight: '900',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: -1,
     fontVariant: ['tabular-nums'],
     marginBottom: 4,
@@ -243,12 +243,11 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
   },
   subtitle: {
     fontSize: 13,
-    color: colors.onPrimary,
-    opacity: 0.85,
+    color: '#6F7480',
     textAlign: 'center',
   },
   progressRow: {
@@ -261,52 +260,54 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#D9DDE6',
   },
   progressDotActive: {
-    backgroundColor: colors.onPrimary,
+    backgroundColor: colors.primary,
     width: 14,
     height: 14,
     borderRadius: 7,
   },
   progressDotDone: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: '#8E96A6',
   },
   progressText: {
     marginLeft: 8,
     fontSize: 13,
     fontWeight: '700',
-    color: colors.onPrimary,
-    opacity: 0.85,
+    color: '#6F7480',
   },
   problemBox: {
     marginTop: 8,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
     width: '85%',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EAF0',
   },
   problemText: {
     fontSize: 38,
     fontWeight: '800',
-    color: colors.onPrimary,
+    color: '#151820',
     letterSpacing: 2,
   },
   inputBox: {
     marginTop: 8,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     minWidth: 140,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E1E4EC',
   },
   inputText: {
     fontSize: 32,
     fontWeight: '800',
-    color: colors.onPrimary,
     letterSpacing: 4,
   },
   keypad: {
@@ -321,16 +322,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   key: {
     width: '31%',
     aspectRatio: 1.6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E8EAF0',
   },
   keyClear: {
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: '#8E96A6',
+    borderColor: '#8E96A6',
   },
   keySubmit: {
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   keyPlaceholder: {
     width: '31%',
@@ -339,7 +344,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   keyText: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.onPrimary,
+    color: '#151820',
   },
   keyActionText: {
     fontSize: 22,

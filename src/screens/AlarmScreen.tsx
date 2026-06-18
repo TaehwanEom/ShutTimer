@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Accelerometer } from 'expo-sensors';
+import * as Haptics from 'expo-haptics';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -39,7 +40,6 @@ import { useSession } from '../state/useSession';
 import { getCurrentSession, dispatch as sessionDispatch } from '../state/SessionController';
 import { Session } from '../types/session';
 import { loadAlarms } from '../constants/alarms';
-import { loadActiveRoutine } from '../constants/routines';
 import { startRoutineFromAlarm, isAdhocAlarmRoutine } from '../utils/alarmRoutineLink';
 import { incrementAlarmSuccessCount, maybeRequestReview, shouldShowRecommend } from '../utils/storeReview';
 // v1.5 VisionCamera + YOLOv10 Frame Processor
@@ -49,10 +49,12 @@ import { getCachedDismissMethod } from '../utils/settingsCache';
 // @v1.5 Phase A — 카메라 모드 child. shake/tap 시 useTensorflowModel + Camera 마운트 스킵.
 import AlarmCameraMode from './AlarmCameraMode';
 import { MISSION_EMOJI, MISSION_POOL, MISSION_LABEL, MISSION_COCO_LABELS, MISSION_CONFIDENCE_OVERRIDE } from '../constants/missionIcons';
-// import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AdBanner from '../components/AdBanner';
+// import { InterstitialAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
 import AlarmMathMode from '../components/AlarmMathMode';
 import AlarmTypingMode from '../components/AlarmTypingMode';
+import TapChargeMission from '../components/TapChargeMission';
+import ShakeLiquidMission from '../components/ShakeLiquidMission';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { usePurchase } from '../context/PurchaseContext';
 
@@ -98,9 +100,13 @@ if (!isExpoGo && !HIDE_ADS) {
       const attStatus = await AsyncStorage.getItem('attStatus');
       const npa = attStatus === 'granted' ? false : true;
       const { InterstitialAd, AdEventType } = require('react-native-google-mobile-ads');
+      // v1.9 #AndroidTestAd — Android 미출시 동안 실광고 요청 차단(AdMob 미설정 앱 오염 방지).
+      //   iOS = 출시 상태라 PROD ID 유지(실광고·수익 불변). Android = Google 공식 테스트 전면 광고 ID.
+      //   Android Play 등록 + AdMob 설정 완료 시 PROD ID로 복원할 것.
+      //   Android PROD(복원용): ca-app-pub-3043284478228309/6667370376
       const INTERSTITIAL_UNIT_ID = Platform.select({
         ios: 'ca-app-pub-3043284478228309/6510839159',
-        android: 'ca-app-pub-3043284478228309/6667370376',
+        android: 'ca-app-pub-3940256099942544/1033173712',
       }) as string;
       interstitial = InterstitialAd.createForAdRequest(INTERSTITIAL_UNIT_ID, {
         requestNonPersonalizedAdsOnly: npa,
@@ -152,16 +158,19 @@ function pickInitialRandomMission(): string {
   return MISSION_POOL[Math.floor(Math.random() * MISSION_POOL.length)];
 }
 
-const SHAKE_THRESHOLD = 1.8;
-const SHAKE_COUNT_REQUIRED = 3;
-const SHAKE_COOLDOWN_MS = 500;
+// 흔들기 미션 v2 (#ShakeLiquid 2026-06-14) — 횟수 카운트 폐기, 가속도 에너지로 연두색 액체 게이지(0~1)를 채움. 100% = 성공.
+// 아래 보정값은 기기별 체감 차이가 있어 실기기 테스트 후 조정 필요. 목표 = 강하게 2~3초 / 보통 4~6초 / 미세 움직임은 거의 안 참.
+const SHAKE_UPDATE_INTERVAL_MS = 16;   // 센서 주기 (~60fps, 물 흔들림 반응 우선)
+const SHAKE_REST_MAGNITUDE = 1.0;      // 정지 시 중력 가속도(약 1.0g) 기준선
+const SHAKE_MIN_ENERGY = 0.35;         // 초과분이 이 미만이면 미세 움직임으로 보고 무시 (오작동 방지)
+const SHAKE_ENERGY_CAP = 3.0;          // 1틱당 반영 에너지 상한 (과도 입력 제한)
+const SHAKE_FILL_GAIN = 0.0011;        // 에너지 → 게이지 증가 계수 (계속 흔들면 약 8초 기준)
+const SHAKE_DECAY_DELAY_MS = 1200;     // 흔들기 멈춘 뒤 감소 시작까지 지연 (짧은 멈춤엔 안 깎임)
+const SHAKE_DECAY_PER_TICK = 0.0025;   // 1틱당 감소량 (증가보다 훨씬 느리게)
+const SHAKE_RENDER_INTERVAL_MS = 16;    // React state 갱신 최소 간격 (약 60fps, 물 움직임 체감 우선)
 // v1.5: camera 미션은 사용자 설정 타이머 × 2회로 관리되므로 제거. tap/shake만 기존 5분 유지.
 // 위반-5 fix (정식 사이클 §4) — AUTO_DISMISS_MS 제거. autoDismissNoResult 본체/호출 폐기로 unused.
 const RESULT_AUTO_CONFIRM_MS = 30 * 1000;
-const RESULT_BG = {
-  success: '#2e7d32',
-  fail: '#ff2424',
-};
 
 export default function AlarmScreen({ navigation, route }: Props) {
   const { t, i18n } = useTranslation();
@@ -235,7 +244,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
       getCachedDismissMethod() ?? DEFAULT_SETTINGS.dismissMethod;
     // v1.7 — 'random' 선택 시 mount 시점에 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택.
     if (raw === 'random') {
-      const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
+      const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing', 'tapcharge'];
       return options[Math.floor(Math.random() * options.length)];
     }
     return raw;
@@ -248,8 +257,11 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // const [failCount, setFailCount] = useState(0);
   // const [failMessage, setFailMessage] = useState(false);
   const [resultState, setResultState] = useState<ResultState>('idle');
-  const shakeCountRef = useRef(0);
+  const gaugeRef = useRef(0); // 흔들기 v2 액체 게이지 0~1
+  const [shakeLiquid, setShakeLiquid] = useState({ fill: 0, accelX: 0, accelY: 0, energy: 0 });
   const lastShakeTimeRef = useRef(0);
+  const lastShakeRenderAtRef = useRef(0);
+  const lastHapticRef = useRef(0);
 
   // @v1.5 — 슬롯머신 효과 (다시 뽑기 시 1.2초 이미지만 일정 리듬 순환, 텍스트 숨김)
   // 구현: 모든 이미지를 pre-mount해두고 opacity만 swap → 첫 디코딩 지연 제거, 리듬 일정.
@@ -269,7 +281,6 @@ export default function AlarmScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  const adLoadedRef = useRef(false);
   const dismissedRef = useRef(false);
   const resultEnteredRef = useRef(false);
   const autoResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -663,17 +674,14 @@ export default function AlarmScreen({ navigation, route }: Props) {
     AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION, SETTINGS_KEY.SELECTED_MISSIONS]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
-      const soundId = pairs[2][1] ?? DEFAULT_SOUND_ID;
-      const alarmRaw = pairs[3][1];
       const durationRaw = pairs[4][1];
       const selectedRaw = pairs[5][1];
-      const alarmEnabled = alarmRaw !== 'false';
       // v1.6 #12 — routine 마지막 step 진입 시 settingsCache override ❌ (route.params.endMethod 우선).
       const routeEndMethod = (route.params as { endMethod?: DismissMethod } | undefined)?.endMethod;
       if (method && !routeEndMethod) {
         // v1.7 — 'random' 저장값 = 5개 중 1개 즉시 선택 (= 매번 다른 미션).
         if (method === 'random') {
-          const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
+          const options: DismissMethod[] = ['tap', 'shake', 'camera', 'math', 'typing', 'tapcharge'];
           setDismissMethod(options[Math.floor(Math.random() * options.length)]);
         } else {
           setDismissMethod(method);
@@ -842,6 +850,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
     const startVibe = () => {
       if (!vibrationEnabled) return;
+      // 연타(tapcharge)·흔들기(shake) 미션은 동작마다 햅틱 → 지속 진동 제거(겹쳐서 햅틱 손맛 죽는 것 방지).
+      if (dismissMethod === 'tapcharge' || dismissMethod === 'shake') return;
       // 중복 방지: 기존 interval 먼저 clear
       if (vibrationIntervalRef.current) {
         clearInterval(vibrationIntervalRef.current);
@@ -885,32 +895,66 @@ export default function AlarmScreen({ navigation, route }: Props) {
       stopVibe();
       sub.remove();
     };
-  }, [vibrationEnabled, resultState]);
+  }, [vibrationEnabled, resultState, dismissMethod]);
 
-  // 흔들기 감지 (결과 화면 진입 시 자동 해제)
+  // 흔들기 감지 v2 (#ShakeLiquid) — 가속도 에너지로 연두색 액체 게이지를 채우고 100% 도달 시 성공.
+  // 결과 화면 진입(resultState !== 'idle') 또는 언마운트 시 자동 해제. 미션 화면(앱 활성)에서만 동작.
   useEffect(() => {
     if (dismissMethod !== 'shake' || resultState !== 'idle') return;
 
-    shakeCountRef.current = 0;
+    gaugeRef.current = 0;
+    setShakeLiquid({ fill: 0, accelX: 0, accelY: 0, energy: 0 });
     lastShakeTimeRef.current = 0;
-    Accelerometer.setUpdateInterval(100);
+    lastShakeRenderAtRef.current = 0;
+    Accelerometer.setUpdateInterval(SHAKE_UPDATE_INTERVAL_MS);
     const sub = Accelerometer.addListener(({ x, y, z }) => {
+      if (resultEnteredRef.current) return; // 이미 성공 처리 진행 중이면 무시
       const total = Math.sqrt(x * x + y * y + z * z);
       const now = Date.now();
-      if (total > SHAKE_THRESHOLD && now - lastShakeTimeRef.current > SHAKE_COOLDOWN_MS) {
+      // 중력(약 1.0g) 초과분 = 흔드는 에너지. 미세 움직임은 SHAKE_MIN_ENERGY 미만이라 무시.
+      const energy = total - SHAKE_REST_MAGNITUDE;
+      if (energy > SHAKE_MIN_ENERGY) {
         lastShakeTimeRef.current = now;
-        shakeCountRef.current += 1;
-        if (shakeCountRef.current >= SHAKE_COUNT_REQUIRED) {
-          sub.remove();
-          accelSubRef.current = null;
-          enterResult('success');
+        gaugeRef.current = Math.min(1, gaugeRef.current + Math.min(energy, SHAKE_ENERGY_CAP) * SHAKE_FILL_GAIN);
+        // 흔들 때 햅틱 피드백 — throttle 120ms + 에너지에 따라 강도. 진동 설정 ON일 때만.
+        if (vibrationEnabled && now - lastHapticRef.current > 120) {
+          lastHapticRef.current = now;
+          // 강하게 — 최소 Medium, 조금만 세게 흔들면 Heavy.
+          const style =
+            energy > SHAKE_ENERGY_CAP * 0.35
+              ? Haptics.ImpactFeedbackStyle.Heavy
+              : Haptics.ImpactFeedbackStyle.Medium;
+          Haptics.impactAsync(style).catch(() => {});
         }
+      } else if (now - lastShakeTimeRef.current > SHAKE_DECAY_DELAY_MS) {
+        // 흔들기를 멈추면 지연 뒤 천천히 감소 (증가보다 느리게).
+        gaugeRef.current = Math.max(0, gaugeRef.current - SHAKE_DECAY_PER_TICK);
+      }
+      const clampedEnergy = Math.max(0, Math.min(1, energy / SHAKE_ENERGY_CAP));
+      // 물리 시뮬용 — 화면 좌우(x)/상하(y) 가속도(중력+움직임)를 그대로 전달.
+      //   ShakeLiquidMission이 이 값으로 천수(shallow-water) 적분 → 중력 방향 쏠림·출렁임·정착.
+      if (now - lastShakeRenderAtRef.current >= SHAKE_RENDER_INTERVAL_MS || gaugeRef.current >= 1) {
+        lastShakeRenderAtRef.current = now;
+        setShakeLiquid({
+          fill: gaugeRef.current,
+          accelX: x,
+          accelY: y,
+          energy: clampedEnergy,
+        });
+      }
+      if (gaugeRef.current >= 1) {
+        sub.remove();
+        accelSubRef.current = null;
+        setShakeLiquid(prev => ({ ...prev, fill: 1 })); // 종료 직전 물 가득 채워 "완료 안 됐는데 종료" 방지
+        Logger.warn('ShakeGauge', 'complete 100% → success');
+        enterResult('success');
       }
     });
     accelSubRef.current = sub;
     return () => {
       sub.remove();
       accelSubRef.current = null;
+      lastShakeRenderAtRef.current = 0;
     };
   }, [dismissMethod, resultState, enterResult]);
 
@@ -1066,7 +1110,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
   //   appState 가드 추가. background에서 setInterval 작동 X → 사용자 잠금 풀고 active 진입 시점부터 카운트다운.
   //   잔여시간 (remainingMs) 그대로 유지 (= 사용자 잠금 풀기 전 = missionDuration 100%).
   useEffect(() => {
-    if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap' && dismissMethod !== 'shake') return;
+    // 흔들기 v2 — 시간제한 없음(물 다 찰 때까지). 카운트다운 대상에서 shake 제외.
+    if (dismissMethod !== 'camera' && dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap') return;
     if (resultState !== 'idle') return;
     if (isRetryBannerVisible) return;
     if (matched.value) return;
@@ -1086,7 +1131,8 @@ export default function AlarmScreen({ navigation, route }: Props) {
   //   흐름: enterResult('fail') → 광고 → handleAfterAd → 결과 화면 30초 → goHome → alarmEntityId 분기 (발견-B fix로 fail 시도 startRoutineFromAlarm 호출).
   //   chain cancel 무해 (Face ID 시점에 §1 회수 완료).
   useEffect(() => {
-    if (dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap' && dismissMethod !== 'shake') return;
+    // 흔들기 v2 — 시간제한 없음. 자동 fail 대상에서 shake 제외 (math/typing/tap만 만료 fail).
+    if (dismissMethod !== 'math' && dismissMethod !== 'typing' && dismissMethod !== 'tap') return;
     if (resultState !== 'idle') return;
     if (missionDuration === 0) return;
     if (remainingMs > 0) return;
@@ -1230,27 +1276,33 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
   // 결과 화면 (최우선 렌더)
   if (resultState !== 'idle') {
-    const bgColor = RESULT_BG[resultState];
-    const iconName = resultState === 'success' ? 'check-circle' : 'cancel';
+    const isSuccess = resultState === 'success';
+    const accent = isSuccess ? '#34C759' : '#FF3B30';
+    const accentSoft = isSuccess ? '#EAF9EF' : '#FFF0EF';
+    const iconName = isSuccess ? 'check' : 'close';
     const titleKey = resultState === 'success' ? 'alarm.resultSuccess' : 'alarm.resultFail';
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>ShutTimer</Text>
-          </View>
+      <SafeAreaView style={styles.resultContainer}>
+        <View style={styles.resultHeader}>
+          <Text style={styles.resultHeaderTitle}>ShutTimer</Text>
         </View>
 
-        <View style={styles.centerSection}>
-          <View style={styles.resultIconWrapper}>
-            <MaterialIcons name={iconName} size={140} color={colors.onPrimary} />
+        <View style={styles.resultBody}>
+          <View style={[styles.resultPill, { backgroundColor: accentSoft }]}>
+            <MaterialIcons name={iconName} size={18} color={accent} />
+            <Text style={[styles.resultPillText, { color: accent }]}>
+              {isSuccess ? 'MISSION CLEAR' : 'MISSION FAILED'}
+            </Text>
           </View>
-          <Text style={[styles.resultTitle]}>{t(titleKey)}</Text>
+          <View style={[styles.resultIconWrapper, { backgroundColor: accentSoft }]}>
+            <MaterialIcons name={iconName} size={78} color={accent} />
+          </View>
+          <Text style={styles.resultTitle}>{t(titleKey)}</Text>
         </View>
 
-        <View style={styles.tapSection}>
-          <TouchableOpacity style={styles.tapButton} onPress={goHome} activeOpacity={0.8}>
-            <Text style={[styles.tapButtonText, { color: bgColor }]}>{t('alarm.resultConfirm')}</Text>
+        <View style={styles.resultActionSection}>
+          <TouchableOpacity style={[styles.resultConfirmButton, { backgroundColor: accent }]} onPress={goHome} activeOpacity={0.86}>
+            <Text style={styles.resultConfirmText}>{t('alarm.resultConfirm')}</Text>
           </TouchableOpacity>
         </View>
         <AdBanner />
@@ -1278,6 +1330,16 @@ export default function AlarmScreen({ navigation, route }: Props) {
     );
   }
 
+  // 연속 탭 게이지 모드 — 계속 탭해서 게이지를 채우면 enterResult('success'). 시간제한 없음.
+  if (dismissMethod === 'tapcharge') {
+    return (
+      <View style={{ flex: 1 }}>
+        <TapChargeMission colors={colors} t={t} onSuccess={() => enterResult('success')} />
+        <AdBanner />
+      </View>
+    );
+  }
+
   // Camera 모드 레이아웃 (v1.5: VisionCamera + YOLOv10 + Fluent Emoji 아이콘)
   if (dismissMethod === 'camera') {
     const missionLabel = t(`missions.${currentMission}`, { defaultValue: MISSION_LABEL[currentMission] ?? currentMission });
@@ -1294,10 +1356,10 @@ export default function AlarmScreen({ navigation, route }: Props) {
     const boxHeight = boxWidth * 1.25; // 세로로 살짝 긴 박스 (높이 축소)
 
     return (
-      <View style={[styles.container, { backgroundColor: '#000', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <View style={styles.header}>
+      <View style={[styles.container, { backgroundColor: '#F6F7FB', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.cameraHeader}>
           <View>
-            <Text style={styles.headerTitle}>ShutTimer</Text>
+            <Text style={styles.cameraHeaderTitle}>ShutTimer</Text>
           </View>
         </View>
 
@@ -1343,33 +1405,34 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // Tap 모드 레이아웃
   if (dismissMethod === 'tap') {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+      <SafeAreaView style={styles.tapContainer}>
+        <View style={styles.tapHeader}>
           <View>
-            <Text style={styles.headerTitle}>ShutTimer</Text>
+            <Text style={styles.tapHeaderTitle}>ShutTimer</Text>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
-          <View style={[styles.centerSection, { paddingTop: 40 }]}>
-            <View style={styles.rippleWrapper}>
-              <Animated.View style={rippleStyle(tapRipple1)} />
-              <Animated.View style={rippleStyle(tapRipple2)} />
-              <View style={styles.centerIconWrapper}>
-                <Animated.View style={{ transform: [{ scale: tapFingerScale }] }}>
-                  <MaterialIcons name="touch-app" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-                </Animated.View>
+          <View style={styles.tapMissionSection}>
+            <View style={styles.tapCard}>
+              <View style={styles.tapIconHalo}>
+                <Animated.View style={[rippleStyle(tapRipple1), styles.tapPulseRing]} />
+                <Animated.View style={[rippleStyle(tapRipple2), styles.tapPulseRingSoft]} />
+                <View style={styles.tapIconWrapper}>
+                  <Animated.View style={{ transform: [{ scale: tapFingerScale }] }}>
+                    <MaterialIcons name="touch-app" size={72} color={colors.primary} />
+                  </Animated.View>
+                </View>
               </View>
-            </View>
-            <View style={{ alignItems: 'center', gap: 6 }}>
-              <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
-              <Text style={styles.centerSubtitle}>{t('alarm.tapInstruction')}</Text>
+              <Text style={styles.tapTitle}>{t('alarm.timerDone')}</Text>
+              <Text style={styles.tapSubtitle}>{t('alarm.tapInstruction')}</Text>
             </View>
           </View>
 
-          <View style={styles.tapSection}>
-            <TouchableOpacity style={styles.tapButton} onPress={() => enterResult('success')} activeOpacity={0.8}>
-              <Text style={styles.tapButtonText}>{t('alarm.tapButton')}</Text>
+          <View style={styles.tapActionSection}>
+            <TouchableOpacity style={styles.tapPrimaryButton} onPress={() => enterResult('success')} activeOpacity={0.86}>
+              <MaterialIcons name="check" size={22} color="#FFFFFF" />
+              <Text style={styles.tapPrimaryButtonText}>{t('alarm.tapButton')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1380,29 +1443,36 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
   // Shake 모드 레이아웃
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>ShutTimer</Text>
-        </View>
+    <SafeAreaView style={styles.shakeContainer}>
+      <ShakeLiquidMission
+        fill={shakeLiquid.fill}
+        accelX={shakeLiquid.accelX}
+        accelY={shakeLiquid.accelY}
+        energy={shakeLiquid.energy}
+      />
+
+      <View style={styles.shakeHeader}>
+        <Text style={styles.shakeHeaderTitle}>ShutTimer</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
-        <View style={styles.centerSection}>
-          <View style={styles.rippleWrapper}>
-            <Animated.View style={rippleStyle(ripple1)} />
-            <Animated.View style={rippleStyle(ripple2)} />
-            <Animated.View style={[styles.centerIconWrapper, {
-              transform: [
-                { scale: pulse },
-                { rotate: rotate.interpolate({ inputRange: [-1, 1], outputRange: ['-20deg', '20deg'] }) },
-              ],
-            }]}>
-              <MaterialIcons name="vibration" size={96} color={colors.onPrimary} style={{ opacity: 0.9 }} />
-            </Animated.View>
+        <View style={styles.shakeMissionSection}>
+          <View style={styles.shakePanel}>
+            <View style={styles.shakeIconHalo}>
+              <Animated.View style={rippleStyle(ripple1)} />
+              <Animated.View style={rippleStyle(ripple2)} />
+              <Animated.View style={[styles.shakeIconWrapper, {
+                transform: [
+                  { scale: pulse },
+                  { rotate: rotate.interpolate({ inputRange: [-1, 1], outputRange: ['-16deg', '16deg'] }) },
+                ],
+              }]}>
+                <MaterialIcons name="vibration" size={68} color="#FFFFFF" />
+              </Animated.View>
+            </View>
+            <Text style={styles.shakeTitle}>{t('alarm.timerDone')}</Text>
+            <Text style={styles.shakeSubtitle}>{t('alarm.shakeInstruction')}</Text>
           </View>
-          <Text style={styles.centerTitle}>{t('alarm.timerDone')}</Text>
-          <Text style={styles.centerSubtitle}>{t('alarm.shakeInstruction')}</Text>
         </View>
       </ScrollView>
       <AdBanner />
@@ -1436,6 +1506,145 @@ const styles = StyleSheet.create({
     color: colors.onPrimary,
     letterSpacing: -1,
     marginTop: 4,
+  },
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  cameraHeaderTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111827',
+    letterSpacing: -0.8,
+  },
+  tapContainer: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  tapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  tapHeaderTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111827',
+    letterSpacing: -0.8,
+  },
+  tapMissionSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  tapCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 34,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E5EA',
+    shadowColor: '#111827',
+    shadowOpacity: 0.05,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2,
+  },
+  tapIconHalo: {
+    width: 156,
+    height: 156,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  tapPulseRing: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderColor: 'rgba(255,59,48,0.18)',
+  },
+  tapPulseRingSoft: {
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    borderColor: 'rgba(255,59,48,0.12)',
+  },
+  tapIconWrapper: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: '#FFF2F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#FFD8D5',
+  },
+  missionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFF0EF',
+  },
+  missionBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.1,
+  },
+  tapTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#111827',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  tapSubtitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  tapActionSection: {
+    paddingBottom: 64,
+    paddingHorizontal: 32,
+  },
+  tapPrimaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    paddingVertical: 20,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+  tapPrimaryButtonText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   // Camera 모드
   viewfinderSection: {
@@ -1552,6 +1761,63 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: -0.2,
   },
+  shakeContainer: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
+  shakeHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  shakeHeaderTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.8,
+  },
+  shakeMissionSection: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 36,
+  },
+  shakePanel: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    backgroundColor: 'transparent',
+  },
+  shakeIconHalo: {
+    width: 142,
+    height: 142,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  shakeIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shakeTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  shakeSubtitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   // Tap 모드 버튼
   tapSection: {
     paddingBottom: 64,
@@ -1583,21 +1849,84 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   // 결과 화면
-  resultIconWrapper: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+  resultContainer: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  resultHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  resultHeaderTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111827',
+    letterSpacing: -0.8,
+  },
+  resultBody: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    paddingHorizontal: 24,
+    gap: 16,
+  },
+  resultPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  resultPillText: {
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  resultIconWrapper: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
   },
   resultTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.onPrimary,
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111827',
     textAlign: 'center',
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
     paddingHorizontal: 24,
+  },
+  resultSubtitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  resultActionSection: {
+    paddingHorizontal: 32,
+    paddingBottom: 64,
+  },
+  resultConfirmButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 19,
+    borderRadius: 22,
+    shadowColor: '#111827',
+    shadowOpacity: 0.10,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
+  },
+  resultConfirmText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
 });

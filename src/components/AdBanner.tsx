@@ -31,9 +31,13 @@ if (!isExpoGo && !HIDE_ADS) {
   }
 }
 
+// v1.9 #AndroidTestAd — Android 미출시(Play 미등록) 동안 실광고 요청 차단(AdMob 미설정 앱 오염 방지).
+//   iOS = 출시 상태라 PROD ID 유지(실광고·수익 불변). Android = Google 공식 테스트 배너 ID.
+//   Android Play 등록 + AdMob 설정 완료 시 아래 PROD ID로 복원할 것.
+//   Android PROD(복원용): ca-app-pub-3043284478228309/6158631734
 const BANNER_UNIT_ID = Platform.select({
   ios: 'ca-app-pub-3043284478228309/4187716112',
-  android: 'ca-app-pub-3043284478228309/6158631734',
+  android: 'ca-app-pub-3940256099942544/6300978111',
 }) as string;
 
 export default function AdBanner() {

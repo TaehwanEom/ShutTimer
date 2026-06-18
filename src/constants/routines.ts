@@ -28,7 +28,7 @@ export type RoutineSchedule = {
 /** step 종료 방식. auto = 알람 없이 즉시 다음 step. 나머지 3종은 알람 출력 후 해당 방식으로 종료. */
 // v1.6 Phase 12 — 'auto' 제거. iOS 백그라운드 자동 진행 = 서버 push 인프라 필요 (별도 사이클).
 // 기존 'auto' 데이터 = loadRoutines 안 silent migration → 'tap' 변환 (사용자 데이터 보존).
-export type RoutineEndMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random';
+export type RoutineEndMethod = 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'tapcharge' | 'random';
 
 export type Routine = {
   id: string;
@@ -208,7 +208,7 @@ function isValidSchedule(s: any): s is RoutineSchedule {
 
 // v1.8 — endMethod 허용 목록을 RoutineEndMethod 타입 정의 (= 6개)와 일치시킴.
 // 직전 = 'tap' / 'shake' / 'camera' 3개만 검사 → 'math' / 'typing' / 'random' endMethod 측 routine 이 loadRoutines filter 에서 제외 → findRoutine null → startRoutine 'not_found' → 알람 루틴 step 진행 시작 불가 회귀 원인.
-const VALID_END_METHODS: ReadonlyArray<RoutineEndMethod> = ['tap', 'shake', 'camera', 'math', 'typing', 'random'];
+const VALID_END_METHODS: ReadonlyArray<RoutineEndMethod> = ['tap', 'shake', 'camera', 'math', 'typing', 'tapcharge', 'random'];
 
 function isValidRoutine(r: any): r is Routine {
   return (

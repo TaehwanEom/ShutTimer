@@ -16,7 +16,7 @@ export const setCachedDismissMethod = (method: DismissMethod): void => {
 // App 시작 시 1회 호출. AsyncStorage에서 dismissMethod 읽어 캐시.
 // 실패 시 무시 (AlarmScreen이 자체 fallback 사용).
 // v1.8 #DismissMethodCache — 6개 옵션 모두 인정 (이전 = 3개만 → 'random'/'math'/'typing' 측 = 'camera' fallback root cause).
-const VALID_METHODS: DismissMethod[] = ['camera', 'tap', 'shake', 'math', 'typing', 'random'];
+const VALID_METHODS: DismissMethod[] = ['camera', 'tap', 'shake', 'math', 'typing', 'tapcharge', 'random'];
 
 export const preloadDismissMethod = async (): Promise<void> => {
   try {

@@ -14,6 +14,7 @@ import {
   type NativeSyntheticEvent,
   type NativeScrollEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ITEM_HEIGHT = 44;
 const VISIBLE_ROWS = 5; // 위 2 + 가운데 1 + 아래 2
@@ -128,6 +129,7 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
       scrollEventThrottle={32}
       contentContainerStyle={{ paddingVertical: SIDE_PADDING }}
       style={scrollStyle}
+      nestedScrollEnabled
     >
       {Array.from({ length: totalItems }, (_, i) => {
         const value = valueFromIdx(i);
@@ -184,6 +186,10 @@ export default function DurationWheelPicker(props: Props) {
     accentColor,
   } = props;
 
+  const insets = useSafeAreaInsets();
+  // 2026-05-31 — Android modal sheet 하단이 시스템 제스처/네비 바에 가려져 확인/취소 버튼이 잘리던 회귀 보정.
+  //   직전 고정 16px → S23에서 잘림. iOS는 SafeArea 자동, Android는 수동 보정 필요.
+  const sheetBottomPad = Platform.OS === 'ios' ? 32 : Math.max(16, insets.bottom + 12);
   const [hours, setHours] = useState(0);
   const [minutes, setMinutes] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -207,7 +213,7 @@ export default function DurationWheelPicker(props: Props) {
   return (
     <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: bgColor }]}>
+        <View style={[styles.sheet, { backgroundColor: bgColor, paddingBottom: sheetBottomPad }]}>
           <View style={styles.row}>
             <View style={styles.column}>
               <Wheel

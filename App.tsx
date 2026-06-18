@@ -43,7 +43,7 @@ import FavoritesListScreen from './src/screens/FavoritesListScreen';
 import AlarmListScreen from './src/screens/AlarmListScreen';
 import AlarmEditScreen from './src/screens/AlarmEditScreen';
 import { syncRollingSchedule } from './src/utils/routineScheduler';
-import { restoreRoutineState, stopRoutine, advanceRoutineFromLA, syncRoutineFromSnapshot } from './src/utils/routineController';
+import { restoreRoutineState, stopRoutine } from './src/utils/routineController';
 import { readControlSignal, clearControlSignal, readRoutineSnapshot } from './src/utils/appGroupSync';
 import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
@@ -66,7 +66,6 @@ import { recordInstallDateIfNeeded } from './src/utils/storeReview';
 // v2.0 P3.6 — Session 모델 ⑨ guard 결합. additive 변경 (기존 흐름 차단 X).
 import {
   bootstrapEffectRunner,
-  isGhostAlarmFire,
   cleanupDisabledEntityChains,
   SESSION_EVENT_NAVIGATE,
 } from './src/state/effectRunner';
@@ -88,20 +87,18 @@ import { restoreIfNeeded, mirrorToBackup } from './src/utils/backupRestore';
      : null;
   ═══════════════════════════════════════════════════════════
 */
-import { Mission } from './src/constants/missions';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 // @preserve IAP — Phase 2+ 복원용. 삭제 금지. (TS6133 회피 위해 import 라인 주석)
 // import { PurchaseProvider } from './src/context/PurchaseContext';
 import ForceUpdate from './src/components/ForceUpdate';
 
-const isExpoGo = (Constants as any).appOwnership === 'expo';
 
 export type RootStackParamList = {
   Splash: undefined;
   Onboarding: undefined;
   Home: { selectedFavoriteId?: string } | undefined;
   FavoritesList: undefined;
-  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'random'; alarmEntityId?: string } | undefined;
+  Alarm: { missionId?: string; missionIcon?: string; fromRoutine?: 'last_step'; routineId?: string; endMethod?: 'tap' | 'shake' | 'camera' | 'math' | 'typing' | 'tapcharge' | 'random'; alarmEntityId?: string } | undefined;
   // v1.8 — Settings / History / AlarmList Stack.Screen 제거. MainTabsNavigator Tab.Screen만 사용.
   EditMissions: undefined;
   AddTimer: { editId?: string; editIcon?: string; editMinutes?: number; dialType?: string } | undefined;
@@ -159,6 +156,22 @@ const TabBarWithAd = React.memo((props: any) => (
   </View>
 ));
 
+// 하단 탭 5개를 좌우 스와이프로 전환 — 각 탭 화면을 TabSwipeContainer로 감싼다.
+//   module-scope 고정 컴포넌트 (= inline 함수 시 매 렌더 새 reference → 화면 remount 회귀 방지).
+const wrapTabSwipe = (C: React.ComponentType<any>) => {
+  const Wrapped = (props: any) => (
+    <TabSwipeContainer>
+      <C {...props} />
+    </TabSwipeContainer>
+  );
+  return Wrapped;
+};
+const HomeTabScreen = wrapTabSwipe(HomeScreen as any);
+const RoutineTabScreen = wrapTabSwipe(RoutineListScreen as any);
+const AlarmTabScreen = wrapTabSwipe(AlarmListScreen as any);
+const CalendarTabScreen = wrapTabSwipe(HistoryScreen as any);
+const SettingsTabScreen = wrapTabSwipe(SettingsScreen as any);
+
 // v1.6 후속 — 하단 탭 (타이머 / 루틴 / 캘린더 / 설정).
 // v1.8 #TabBarI18n — tabBarLabel = i18n 분기 (ko / en / ja / zh-CN / zh-TW = 본인 언어 / 나머지 9개 언어 = en fallback)
 function MainTabsNavigator() {
@@ -169,28 +182,32 @@ function MainTabsNavigator() {
       tabBar={(props) => <TabBarWithAd {...props} />}
       screenOptions={{
       headerShown: false,
+      // #BlankOnForeground (2026-06-17) — animation:'shift' 는 scene opacity/transform 을 애니메이션하는데,
+      //   백그라운드 전환으로 애니메이션이 끊기면 활성 탭 scene 이 opacity 0(숨김) 상태로 멈춰 빈 화면이 됨
+      //   (탭 전환 시 새 전환이 값을 리셋해 복구되던 증상). → 'none' 으로 제거해 빈 화면 차단.
+      animation: 'none',
       tabBarActiveTintColor: colors.primary,
       tabBarInactiveTintColor: colors.secondary,
       tabBarStyle: { backgroundColor: colors.surfaceContainerLowest, borderTopColor: colors.outlineVariant },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
     }}>
-      <Tab.Screen name="HomeTab" component={HomeScreen as any} options={{
+      <Tab.Screen name="HomeTab" component={HomeTabScreen} options={{
         tabBarLabel: t('tabBar.home'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="timer" size={size} color={color} />,
       }} />
-      <Tab.Screen name="RoutineTab" component={RoutineListScreen as any} options={{
+      <Tab.Screen name="RoutineTab" component={RoutineTabScreen} options={{
         tabBarLabel: t('tabBar.routine'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="repeat" size={size} color={color} />,
       }} />
-      <Tab.Screen name="AlarmTab" component={AlarmListScreen as any} options={{
+      <Tab.Screen name="AlarmTab" component={AlarmTabScreen} options={{
         tabBarLabel: t('tabBar.alarm'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="alarm" size={size} color={color} />,
       }} />
-      <Tab.Screen name="CalendarTab" component={HistoryScreen as any} options={{
+      <Tab.Screen name="CalendarTab" component={CalendarTabScreen} options={{
         tabBarLabel: t('tabBar.calendar'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="calendar-today" size={size} color={color} />,
       }} />
-      <Tab.Screen name="SettingsTab" component={SettingsScreen as any} options={{
+      <Tab.Screen name="SettingsTab" component={SettingsTabScreen} options={{
         tabBarLabel: t('tabBar.settings'),
         tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialIcons name="settings" size={size} color={color} />,
       }} />
@@ -780,7 +797,7 @@ function AppNavigator() {
       if (inFlight) return;
       const signal = readControlSignal();
       if (!signal) return;
-      console.warn('[LAControl] signal:', signal.action, signal.routineId, 'AppState:', AppState.currentState);
+      Logger.warn('LAControl', `signal: ${signal.action} ${signal.routineId} AppState: ${AppState.currentState}`);
       inFlight = true;
       clearControlSignal();
       try {

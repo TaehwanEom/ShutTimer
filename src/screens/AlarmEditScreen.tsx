@@ -218,7 +218,7 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
     }));
     setSteps(copied);
     // 2026-06-02 — routine 불러오기 시 label = routine.name 항상 자동 채움 (예: "아침운동" routine → 알람 라벨도 "아침운동").
-    setLabel(routine.name);
+    setLabel(routine.name ?? '');
     setImportPickerVisible(false);
   };
 
@@ -346,7 +346,8 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         Alert.alert(
           t('alarm.duplicate.title', { defaultValue: '중복 알람 경고' }),
           t('alarm.duplicate.body', {
-            defaultValue: `같은 시각(${alarm.time})에 이미 알람이 등록되어 있습니다.\n동시 발화 시 한 알람만 실행됩니다.\n계속 등록할까요?`,
+            time: alarm.time,
+            defaultValue: `같은 시각({{time}})에 이미 알람이 등록되어 있습니다.\n동시 발화 시 한 알람만 실행됩니다.\n계속 등록할까요?`,
           }),
           [
             { text: t('common.cancel', { defaultValue: '취소' }), style: 'cancel', onPress: () => resolve(false) },

@@ -37,7 +37,6 @@ import {
   saveAlarmMetadata,
 } from '../utils/alarmkitMappingTable';
 import {
-  PENDING_DISABLED_ALARMS_KEY,
   ACTIVE_ROUTINE_KEY,
   ActiveRoutine,
   loadRoutines,

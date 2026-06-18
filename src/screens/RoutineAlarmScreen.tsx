@@ -14,7 +14,6 @@ import {
   Vibration,
   AppState,
   BackHandler,
-  Image,
   Animated,
   useWindowDimensions,
 } from 'react-native';
@@ -31,7 +30,6 @@ import { useTheme } from '../context/ThemeContext';
 import { ThemeColors } from '../constants/theme';
 import {
   Routine,
-  ActiveRoutine,
   RoutineEndMethod,
   loadRoutines,
   loadActiveRoutine,
@@ -48,6 +46,7 @@ import { useSharedValue } from 'react-native-worklets-core';
 import AlarmCameraMode from './AlarmCameraMode';
 import AlarmMathMode from '../components/AlarmMathMode';
 import AlarmTypingMode from '../components/AlarmTypingMode';
+import TapChargeMission from '../components/TapChargeMission';
 import { getCachedDismissMethod } from '../utils/settingsCache';
 import { DEFAULT_SETTINGS } from '../constants/settings';
 import type { Detection } from '../utils/objectDetection';
@@ -176,6 +175,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         globalEndMethod !== 'camera' &&
         globalEndMethod !== 'math' &&
         globalEndMethod !== 'typing' &&
+        globalEndMethod !== 'tapcharge' &&
         globalEndMethod !== 'random'
       ) {
         // v1.8 — RoutineList Stack.Screen 제거. MainTabsNavigator RoutineTab 측으로 reset.
@@ -186,7 +186,7 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
       // 'random' 영역 = 5개 (tap/shake/camera/math/typing) 중 1개 즉시 선택. 매 발화 다름.
       let target: Routine = { ...original, endMethod: globalEndMethod };
       if (globalEndMethod === 'random') {
-        const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math', 'typing'];
+        const options: RoutineEndMethod[] = ['tap', 'shake', 'camera', 'math', 'typing', 'tapcharge'];
         const pick = options[Math.floor(Math.random() * options.length)];
         target = { ...original, endMethod: pick };
       }
@@ -652,10 +652,18 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
   const renderDismissArea = () => {
     if (routine.endMethod === 'tap') {
       return (
-        <TouchableOpacity style={styles.dismissArea} activeOpacity={0.9} onPress={handleDismiss}>
-          <MaterialIcons name="alarm" size={96} color={colors.primary} />
-          <Text style={styles.completeText}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
-          <Text style={styles.dismissHint}>{t('routine.tapToDismiss', { defaultValue: '화면을 탭하여 계속' })}</Text>
+        <TouchableOpacity style={styles.routineTapShell} activeOpacity={0.92} onPress={handleDismiss}>
+          <View style={styles.routineTapCard}>
+            <View style={styles.routineTapIconWrapper}>
+              <MaterialIcons name="touch-app" size={70} color={colors.primary} />
+            </View>
+            <Text style={styles.routineTapTitle}>{t('routine.missionComplete', { defaultValue: '미션 완료' })}</Text>
+            <Text style={styles.routineTapHint}>{t('routine.tapToDismiss', { defaultValue: '화면을 탭하여 계속' })}</Text>
+          </View>
+          <View style={styles.routineTapButton}>
+            <MaterialIcons name="check" size={22} color="#FFFFFF" />
+            <Text style={styles.routineTapButtonText}>{t('routine.continue', { defaultValue: '계속하기' })}</Text>
+          </View>
         </TouchableOpacity>
       );
     }
@@ -682,14 +690,21 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
         </View>
       );
     }
+    if (routine.endMethod === 'tapcharge') {
+      return (
+        <View style={{ flex: 1 }}>
+          <TapChargeMission colors={colors} t={t} onSuccess={handleDismiss} />
+        </View>
+      );
+    }
     if (routine.endMethod === 'camera' && cameraMission) {
       // v1.6 Phase 6.5 — Step C: AlarmCameraMode 마운트 (props 29개 매핑).
       // onMatchDetected / onReshuffle 은 Step D 에서 정식 핸들러로 교체 (현재 placeholder).
-      // wrapper: AlarmScreen 패턴 (검정 배경 + 헤더 + flex:1 박스 영역) 차용 — 분리 정책: 코드 별도 작성.
+      // wrapper: AlarmScreen 패턴 (헤더 + flex:1 박스 영역) 차용 — 분리 정책: 코드 별도 작성.
       return (
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <View style={{ flex: 1, backgroundColor: '#F6F7FB' }}>
           <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
-            <Text style={{ fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: -0.5 }}>
+            <Text style={{ fontSize: 30, fontWeight: '900', color: '#111827', letterSpacing: -0.5 }}>
               ShutTimer
             </Text>
           </View>
@@ -740,12 +755,12 @@ export default function RoutineAlarmScreen({ navigation, route }: Props) {
     );
   };
 
-  // camera 분기 진입 시 SafeAreaView 자체를 검정 배경으로 (노치 inset 영역 흰색 노출 방지).
+  // camera 분기 진입 시 SafeAreaView 자체를 카메라 셸 배경으로 맞춤.
   // 다른 분기 (tap/shake/auto) 는 기존 styles.container 그대로 — 회귀 X.
   // dismissed 후 (다음 미션 modal) 는 흰 배경으로 복원 — 라이트 theme 색상 충돌 방지.
   const isCameraMode = routine?.endMethod === 'camera' && !dismissed;
   return (
-    <SafeAreaView style={[styles.container, isCameraMode && { backgroundColor: '#000' }]}>
+    <SafeAreaView style={[styles.container, isCameraMode && { backgroundColor: '#F6F7FB' }]}>
       {!dismissed ? (
         renderDismissArea()
       ) : (
@@ -807,6 +822,80 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 14,
     color: colors.secondary,
     opacity: 0.8,
+  },
+  routineTapShell: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+    backgroundColor: '#F6F7FB',
+    gap: 28,
+  },
+  routineTapCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9ECF3',
+    shadowColor: '#111827',
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 4,
+  },
+  routineTapIconWrapper: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: '#FFF1F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FFD7D7',
+    marginBottom: 8,
+  },
+  routineTapTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: colors.onBackground,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  routineTapHint: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.secondary,
+    opacity: 0.85,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  routineTapButton: {
+    width: '100%',
+    maxWidth: 360,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 20,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+  routineTapButtonText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
   cameraEmoji: {
     width: 96,

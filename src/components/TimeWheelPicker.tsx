@@ -10,9 +10,10 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Wheel, WHEEL_CONSTANTS } from './DurationWheelPicker';
 
-const { ITEM_HEIGHT, PICKER_HEIGHT } = WHEEL_CONSTANTS;
+const { PICKER_HEIGHT } = WHEEL_CONSTANTS;
 
 type Props = {
   isVisible: boolean;
@@ -71,6 +72,10 @@ export default function TimeWheelPicker(props: Props) {
 
   const initialAmPm = hour24To12(initialHour).ampm;
   const initialHour12 = hour24To12(initialHour).hour12;
+
+  const insets = useSafeAreaInsets();
+  // 2026-05-31 — Android modal sheet 하단 안전 영역 보정 (DurationWheelPicker와 동일 정합).
+  const sheetBottomPad = Platform.OS === 'ios' ? 32 : Math.max(16, insets.bottom + 12);
 
   const [ampm, setAmpm] = useState<0 | 1>(initialAmPm);
   const [hour12, setHour12] = useState<number>(initialHour12);
@@ -168,7 +173,7 @@ export default function TimeWheelPicker(props: Props) {
   return (
     <Modal visible={isVisible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: bgColor }]}>
+        <View style={[styles.sheet, { backgroundColor: bgColor, paddingBottom: sheetBottomPad }]}>
           {wheels}
 
           <View style={styles.actions}>

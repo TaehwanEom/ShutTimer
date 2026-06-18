@@ -233,6 +233,8 @@ export default function TimerDial({ progress, timeText: _timeText, subText: _sub
       prevMinutesRef.current = minutes;
       onSeek(minutes);
     },
+    // #DialSwipeSteal (2026-06-18) — 회전 중 부모 탭 스와이프가 제스처를 뺏지 못하게 양보 거부. 다이얼 영역은 회전만.
+    onPanResponderTerminationRequest: () => false,
     onPanResponderRelease: () => { isDragging.current = false; prevMinutesRef.current = null; onSeekEnd?.(); },
     onPanResponderTerminate: () => { isDragging.current = false; prevMinutesRef.current = null; onSeekEnd?.(); },
   }), [onSeek, onSeekStart, onSeekEnd]);

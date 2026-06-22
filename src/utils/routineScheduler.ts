@@ -516,6 +516,7 @@ async function scheduleConfirmPromptViaAlarmKit(
     //   취소: 다음 step ScheduleConfirmPrompt의 #ConfirmPromptDedup(type=confirm_prompt+entityId 전체) + ClearActiveRoutine가
     //   모든 멤버 일괄 제거. (재알림 fire는 auto-advance 아님 → 취소 전 spurious 발화돼도 추가 배너뿐, 다음 dedup이 자가치유.)
     //   eager 필수: lazy(발화 시 다음 1개 등록)는 잠금 suspend 시 깨짐(project_alarm_chain_must_be_eager).
+    let realertOk = 0;
     for (let i = 1; i <= CONFIRM_PROMPT_REALERT_COUNT; i++) {
       const realertAt = fireAt.getTime() + i * CONFIRM_PROMPT_REALERT_INTERVAL_MS;
       try {
@@ -531,6 +532,7 @@ async function scheduleConfirmPromptViaAlarmKit(
           endMethod: endMethod as any,
         });
         if (realertId) {
+          realertOk++;
           await saveAlarmMetadata({
             alarmId: realertId,
             type: 'confirm_prompt',
@@ -541,6 +543,8 @@ async function scheduleConfirmPromptViaAlarmKit(
         Logger.warn('routine', `confirm_prompt realert[${i}] schedule error=${String(e)}`);
       }
     }
+    // 검증용 — 재알림 몇 개 깔렸는지(2분 간격). baseFireAt = 단계 종료 시각.
+    Logger.warn('routine', `confirm_prompt realert scheduled ${realertOk}/${CONFIRM_PROMPT_REALERT_COUNT} routineId=${routineId} baseFireAt=${fireAt.getTime()}`);
 
     return id;
   } catch (e) {

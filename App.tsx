@@ -628,22 +628,28 @@ function AppNavigator() {
     //   판별: enabled 알람의 직전 발화 시각(lastAlarmOccurrenceTime)이 활성 윈도우(체인 전체 ≈ 60분) 안 + 아직 미처리(handledFireAt < lastOcc).
     const ACTIVE_WINDOW_MS = (ALARM_CHAIN_MAX_INDEX + 1) * ALARM_CHAIN_INTERVAL_MS; // 30회 × 2분 = 60분
     let target: { entityId: string; fireAlarmId: string } | null = null;
+    const diag: string[] = []; // 검증용 — 각 enabled 알람이 왜 탈락했는지(실패 진단).
     for (const alarm of alarms) {
       if (!alarm.enabled) continue;
       const lastOcc = lastAlarmOccurrenceTime(alarm, new Date(now));
-      if (lastOcc == null) continue;
-      if (now - lastOcc > ACTIVE_WINDOW_MS) continue; // 발화 활성 윈도우 밖 = 이미 끝난 사이클
+      if (lastOcc == null) { diag.push(`${alarm.id}:noLastOcc`); continue; }
+      const sinceMin = Math.round((now - lastOcc) / 60000);
+      if (now - lastOcc > ACTIVE_WINDOW_MS) { diag.push(`${alarm.id}:window(${sinceMin}m>60m)`); continue; } // 활성 윈도우 밖
       const handledAt = await getHandledFireAt(alarm.id);
-      if (handledAt != null && handledAt >= lastOcc) continue; // 이 발화는 사용자가 이미 처리(해제/루틴시작)
+      if (handledAt != null && handledAt >= lastOcc) { diag.push(`${alarm.id}:handled`); continue; } // 이미 처리됨
       // 세션의 currentAlarmId = chain0(.relative) 우선. 메타 없으면 해당 알람 skip (= 발화 알람 식별 불가).
       const chain0 = allMeta.find(
         m => m.type === 'alarm_main' && m.entityId === alarm.id && (m.chainIndex ?? 0) === 0 && m.deleted !== true,
       );
-      if (!chain0) continue;
+      if (!chain0) { diag.push(`${alarm.id}:noChain0`); continue; }
       target = { entityId: alarm.id, fireAlarmId: chain0.alarmId };
       break;
     }
-    if (!target) return;
+    if (!target) {
+      // 검증용 — fallback이 루틴을 못 시작시킨 경우 원인 진단(윈도우 밖/이미 처리/chain0 없음 등).
+      Logger.warn('NAV-DBG-COLD', `lockedColdStartGap(recentFire) no-target enabledCnt=${alarms.filter(a => a.enabled).length} reasons=[${diag.join(',')}]`);
+      return;
+    }
     const { entityId, fireAlarmId } = target;
     Logger.warn('NAV-DBG-COLD', `lockedColdStartGap(recentFire) detected entityId=${entityId} fireAlarmId=${fireAlarmId} → onAlarmFire+navigate Alarm`);
     // 라이브 케이스에서 onAlarmStateChange listener 가 하던 세션 생성을 직접 수행 (gap 엔 alerting 이벤트 X).

@@ -38,6 +38,8 @@ type Props = {
    * iOS 시스템 알람 측 패턴. 값 변경 시 즉시 onConfirm 호출 (= 확인/취소 버튼 미노출).
    */
   inline?: boolean;
+  /** 다이얼 행 변경마다 클릭 사운드 재생. 알람 입력(AlarmEditScreen)만 true. 기본 false. */
+  playTickSound?: boolean;
 };
 
 function hour24To12(h: number): { ampm: 0 | 1; hour12: number } {
@@ -68,6 +70,7 @@ export default function TimeWheelPicker(props: Props) {
     bgColor,
     accentColor,
     inline,
+    playTickSound = false,
   } = props;
 
   const initialAmPm = hour24To12(initialHour).ampm;
@@ -112,6 +115,7 @@ export default function TimeWheelPicker(props: Props) {
         <Wheel
           key={`ampm-${seedKey}`}
           count={2}
+          playTickSound={playTickSound}
           initial={ampm}
           onChange={(v) => {
             const next = v as 0 | 1;
@@ -130,6 +134,7 @@ export default function TimeWheelPicker(props: Props) {
         <Wheel
           key={`h-${seedKey}`}
           count={12}
+          playTickSound={playTickSound}
           initial={hour12 - 1}
           onChange={(v) => {
             const next = v + 1;
@@ -147,6 +152,7 @@ export default function TimeWheelPicker(props: Props) {
         <Wheel
           key={`m-${seedKey}`}
           count={60}
+          playTickSound={playTickSound}
           initial={minute}
           onChange={(v) => {
             setMinute(v);

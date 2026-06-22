@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { playDialTick } from '../utils/dialTickSound';
 import {
   Modal,
   View,
@@ -51,6 +52,8 @@ type WheelProps = {
   width?: number;
   /** 텍스트 정렬. 기본 'flex-end' (숫자+단위 가까이). 'center' = wheel 가운데. */
   align?: 'center' | 'flex-end';
+  /** 행 변경마다 클릭 사운드 재생. 알람 입력 다이얼(TimeWheelPicker)만 true. 기본 false. */
+  playTickSound?: boolean;
 };
 
 // 무한 루프 wheel — boundary contentOffset reset 패턴.
@@ -60,7 +63,7 @@ type WheelProps = {
 const LOOP_REPEAT = 5;
 const CENTER_CYCLE = 2;
 
-export function Wheel({ count, initial, onChange, textColor, dimColor, formatLabel, loop = true, width, align = 'flex-end' }: WheelProps) {
+export function Wheel({ count, initial, onChange, textColor, dimColor, formatLabel, loop = true, width, align = 'flex-end', playTickSound = false }: WheelProps) {
   const ref = useRef<ScrollView>(null);
   const isJumpingRef = useRef(false);
   const repeat = loop ? LOOP_REPEAT : 1;
@@ -113,6 +116,8 @@ export function Wheel({ count, initial, onChange, textColor, dimColor, formatLab
       // 2026-05-27 — iOS native UIPickerView 정합. row 변경 시점마다 haptic + 시스템 click sound.
       //   TimeWheelPicker (시:분 선택) + DurationWheelPicker (시:분:초 duration) 둘 다 본 Wheel 재사용.
       Haptics.selectionAsync().catch(() => {});
+      // 2026-06-23 — 알람 입력 다이얼만 클릭 사운드 추가(playTickSound=true). 타이머 duration 다이얼은 무음(기본 false).
+      if (playTickSound) playDialTick();
     }
   };
 

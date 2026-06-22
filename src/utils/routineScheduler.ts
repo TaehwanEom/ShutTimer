@@ -449,6 +449,14 @@ export async function scheduleRoutineConfirmPrompt(
   return scheduleConfirmPromptViaAlarmKit(routineId, fireAt, nextStepName, laRoutineName, laStepName, laStepIndex, laTotalSteps, endMethod);
 }
 
+// #ConfirmPromptRealert (2026-06-22) — 단계 전환 알림 재알림 체인 상수.
+//   confirm_prompt는 .timer(postAlert nil)라 발화 후 OS가 즉시 제거 → 한 번 울리고 끝 → 잠든 사용자가 놓치면
+//   루틴이 다음 단계로 못 넘어가고 조용히 멈춤(2026-06-22 Log_0622 실측: 단계종료 1회 알림 후 3.5h 정지).
+//   본체 알람 안전체인(.alarm(.fixed) 2분 간격 eager)과 동일 방식으로, 단계 종료 후 재알림을 미리 깔아 끌 때까지 깨운다.
+//   개수 15회 × 2분 = 30분(기상 깨움 충분 + AlarmKit 동시 한계 여유). 필요 시 조정 가능한 단일 지점.
+const CONFIRM_PROMPT_REALERT_COUNT = 15;
+const CONFIRM_PROMPT_REALERT_INTERVAL_MS = 120000; // 2분 (본체 ALARM_CHAIN_INTERVAL_MS 동일)
+
 /** AlarmKit 경로 — iOS 26+. */
 async function scheduleConfirmPromptViaAlarmKit(
   routineId: string,
@@ -500,6 +508,40 @@ async function scheduleConfirmPromptViaAlarmKit(
       type: 'confirm_prompt',
       entityId: routineId,
     });
+
+    // #ConfirmPromptRealert (2026-06-22) — 단계 종료 + 2분 간격 재알림 체인을 eager 예약 (본체 안전체인 미러링).
+    //   primary(위) = .timer 카운트다운(LA·일시정지 유지). 재알림 = recurrence{mode:'never'} → 네이티브 .alarm(.fixed)
+    //   분기(alert-only, LA 생성 ❌, stopIntent=OpenAppDismissIntent → 탭 시 앱 진입). .alarm 분기는 secondaryIntent를
+    //   못 달므로 재알림은 "확인"(앱 진입)만 = 본체 알람과 동일 UX. Stop 전용이라 중복 advance 위험 없음(앱 진입 후 진행).
+    //   취소: 다음 step ScheduleConfirmPrompt의 #ConfirmPromptDedup(type=confirm_prompt+entityId 전체) + ClearActiveRoutine가
+    //   모든 멤버 일괄 제거. (재알림 fire는 auto-advance 아님 → 취소 전 spurious 발화돼도 추가 배너뿐, 다음 dedup이 자가치유.)
+    //   eager 필수: lazy(발화 시 다음 1개 등록)는 잠금 suspend 시 깨짐(project_alarm_chain_must_be_eager).
+    for (let i = 1; i <= CONFIRM_PROMPT_REALERT_COUNT; i++) {
+      const realertAt = fireAt.getTime() + i * CONFIRM_PROMPT_REALERT_INTERVAL_MS;
+      try {
+        const realertId = await AlarmkitBridge.scheduleAlarm({
+          entityId: routineId,
+          title,
+          fireAt: realertAt,
+          stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
+          type: 'confirm_prompt',
+          // recurrence{mode:'never'} → 네이티브 .alarm(.fixed) 강제(지속 알림). secondaryLabel 미전달(=깨진 버튼 방지).
+          recurrence: { mode: 'never' },
+          soundName: soundItem.pushSound,
+          endMethod: endMethod as any,
+        });
+        if (realertId) {
+          await saveAlarmMetadata({
+            alarmId: realertId,
+            type: 'confirm_prompt',
+            entityId: routineId,
+          });
+        }
+      } catch (e) {
+        Logger.warn('routine', `confirm_prompt realert[${i}] schedule error=${String(e)}`);
+      }
+    }
+
     return id;
   } catch (e) {
     Logger.warn('routine', `scheduleConfirmPromptViaAlarmKit error=${String(e)}`);

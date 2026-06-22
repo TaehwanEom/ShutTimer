@@ -404,6 +404,9 @@ export async function cancelAlarmsForEntity(alarmEntityId: string): Promise<void
 //   once 알람 / lookup 실패 / Android Platform = cancelAlarmsForEntity 위임 (= 기존 동작 보존, 회귀 0).
 //   chain[0] alerting 중 = AlarmkitBridge.stopAlarm 호출 (= alerting 종료 + .relative daily 보존).
 export async function cancelSafetyChainPreservingDaily(alarmEntityId: string): Promise<void> {
+  // #LockedColdStartGap (2026-06-21) — 해제(dismiss/stop) 시점 기록 → 콜드 스타트 fallback 재진입 차단.
+  //   본 함수는 Dismiss / Stop / lastStep 모든 해제 경로의 공통 chokepoint. iOS 내부 게이트는 recordHandledFire에 있음.
+  await recordHandledFire(alarmEntityId).catch(() => {});
   // iOS 외 = 기존 cancelAlarmsForEntity 위임 (= Android 회귀 0). production Android 빌드 사이클 시 별도 fix.
   if (Platform.OS !== 'ios') {
     return cancelAlarmsForEntity(alarmEntityId);
@@ -503,6 +506,34 @@ export async function cancelSafetyChainPreservingDaily(alarmEntityId: string): P
 //   v1.9 — chain 50 → 30 축소 (= 100분 → 60분 ringing 보장). 사용자 100분까지 도달하지 않을 영역.
 export const ALARM_CHAIN_INTERVAL_MS = 120000; // 2분
 export const ALARM_CHAIN_MAX_INDEX = 29; // chainIndex 0..29 = 총 30회 = 60분
+
+// #LockedColdStartGap (2026-06-21) — entity별 "사용자가 발화를 처리(해제/루틴시작)한 시각" 기록.
+//   콜드 스타트 fallback이 lastAlarmOccurrenceTime(과거 발화 시각)과 비교해 "이미 처리한 발화 재진입"을 차단.
+//   기존 재진입 차단은 안전체인 메타 존재 여부였으나, daily는 chain[0]이 항상 보존돼 해제 여부를 구분 못 함 → 명시 타임스탬프 신설.
+//   iOS 전용 (fallback이 iOS 전용). Android는 기록·조회 모두 미사용.
+const HANDLED_FIRE_KEY = '@shuttimer/handled_fire_at_v1';
+export async function recordHandledFire(entityId: string, at: number = Date.now()): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  try {
+    const raw = await AsyncStorage.getItem(HANDLED_FIRE_KEY);
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {};
+    map[entityId] = at;
+    await AsyncStorage.setItem(HANDLED_FIRE_KEY, JSON.stringify(map));
+  } catch {
+    // 기록 실패 무시 — 최악의 경우 fallback이 1회 재진입(중복 알람 화면) 가능, 안전 방향.
+  }
+}
+export async function getHandledFireAt(entityId: string): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(HANDLED_FIRE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    const v = map?.[entityId];
+    return typeof v === 'number' ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 앱 기동 / 루틴 복원 시 호출. alarm_main 체인 정합성 동기화.

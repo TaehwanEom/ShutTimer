@@ -73,6 +73,41 @@ export function nextAlarmOccurrenceTime(alarm: Alarm, now: Date = new Date()): n
   return null;
 }
 
+// 방금 지나간(과거) 가장 최근 발화 시각을 반환 — nextAlarmOccurrenceTime의 과거 거울.
+//   #LockedColdStartGap (2026-06-21) — 잠금 중 발화 후 OS가 알람을 이미 dismiss해
+//   listAlarms에 alerting이 없는 콜드 스타트에서, AlarmKit이 "방금 발화" 신호를 안 주므로
+//   알람 HH:MM로 직접 직전 발화 시각을 추론하는 용도. (Apple AlarmKit framework 한계 대응.)
+export function lastAlarmOccurrenceTime(alarm: Alarm, now: Date = new Date()): number | null {
+  if (!alarm.enabled) return null;
+  const t = parseHHMM(alarm.time);
+  if (!t) return null;
+
+  const buildAt = (offsetDays: number): Date => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + offsetDays);
+    d.setHours(t.h, t.m, 0, 0);
+    return d;
+  };
+
+  if (alarm.repeat === 'once' || alarm.repeat === 'daily') {
+    for (let offset = 0; offset > -8; offset--) {
+      const d = buildAt(offset);
+      if (d.getTime() <= now.getTime()) return d.getTime();
+    }
+    return null;
+  }
+
+  // weekly
+  if (alarm.days.length === 0) return null;
+  for (let offset = 0; offset > -8; offset--) {
+    const d = buildAt(offset);
+    if (!alarm.days.includes(d.getDay())) continue;
+    if (d.getTime() > now.getTime()) continue;
+    return d.getTime();
+  }
+  return null;
+}
+
 // ─── 유효성 검증 ────────────────────────────────────
 
 function isValidRepeat(r: any): r is AlarmRepeat {

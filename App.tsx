@@ -49,7 +49,7 @@ import { loadRoutines } from './src/constants/routines';
 import AlarmkitBridge from './modules/alarmkit-bridge';
 import { SUPPRESS_ALARMKIT_BANNER_IN_FG } from './src/constants/featureFlags';
 import { loadAlarmMetadata, deleteAlarmMetadata, listAllAlarmMetadata } from './src/utils/alarmkitMappingTable';
-import { loadAlarms } from './src/constants/alarms';
+import { loadAlarms, lastAlarmOccurrenceTime } from './src/constants/alarms';
 import {
   syncAllAlarms,
   disableOnceAlarmIfNeeded,
@@ -57,6 +57,7 @@ import {
   cleanupGhostAlarms,
   migrateSoundRename,
   migrateChainFixedSafety,
+  getHandledFireAt,
   ALARM_CHAIN_MAX_INDEX,
   ALARM_CHAIN_INTERVAL_MS,
   rearmSafetyChain,
@@ -605,9 +606,11 @@ function AppNavigator() {
     return () => sub.remove();
   }, []);
 
-  // #LockedColdStartGap (2026-06-05) — alerting 알람이 없을 때(안전체인 2분 gap) "발화 사이클 진행 중 +
-  //   미해제" 알람을 메타로 추론해 라이브 alerting 케이스와 동일 흐름(onAlarmFire+navigate)으로 진입.
-  //   상세/근거: docs/analysis-2026-06-05-locked-routine-coldstart.md
+  // #LockedColdStartGap (2026-06-05 도입 / 2026-06-21 재설계) — alerting 알람이 없는 콜드 스타트에서
+  //   "방금 발화했지만 아직 미해제" 알람을 추론해 라이브 alerting 케이스와 동일 흐름(onAlarmFire+navigate)으로 진입.
+  //   2026-06-21 재설계 사유: 옛 판별(미래 안전멤버 2분 윈도우)은 콜드 스타트 syncAllAlarms가 안전체인을
+  //     내일 base로 재무장 → fireAt이 윈도우 밖 → 영구 미진입(dead code) 회귀. 실기기 os_log로 확인.
+  //     교체: 알람의 직전 발화 시각(lastAlarmOccurrenceTime) 기준 + handledFireAt 재진입 가드.
   const runLockedColdStartGapFallback = useCallback(async () => {
     // iOS 전용 — 본 추론은 iOS 체인 구조(chainIndex 1+ = .fixed 단발 소비형) 전제.
     //   Android 는 chainIndex 1+ 가 native daily 반복(소비 X)이라 fireAt 계산이 달라 오작동 위험 → 제외.
@@ -618,25 +621,31 @@ function AppNavigator() {
     if ((curRoute as string) === 'RoutineTab' || curRoute === 'RoutineAlarm' || curRoute === 'Alarm') return;
     const now = Date.now();
     const allMeta = await listAllAlarmMetadata();
-    const enabledIds = new Set((await loadAlarms()).filter(a => a.enabled).map(a => a.id));
-    // 미해제 진행 중 신호 = 다음 안전멤버(chainIndex≥1)가 2분 내 발화 예정 (= 사이클 살아있음).
-    //   해제 시 안전체인 삭제 → 없음. 내일치 안전체인(base=내일)은 fireAt≈23h → 윈도우 밖 → 제외.
-    const liveSafety = allMeta.find(m => {
-      if (m.type !== 'alarm_main' || m.deleted === true) return false;
-      if ((m.chainIndex ?? 0) < 1) return false;
-      if (!enabledIds.has(m.entityId)) return false;
-      if (m.chainBaseFireAt == null) return false;
-      const fireAt = m.chainBaseFireAt + (m.chainIndex ?? 0) * ALARM_CHAIN_INTERVAL_MS;
-      return fireAt > now && fireAt <= now + ALARM_CHAIN_INTERVAL_MS;
-    });
-    if (!liveSafety) return;
-    const entityId = liveSafety.entityId;
-    // 세션의 currentAlarmId = chain0(.relative) 우선, 없으면 안전멤버 id.
-    const chain0 = allMeta.find(
-      m => m.type === 'alarm_main' && m.entityId === entityId && (m.chainIndex ?? 0) === 0 && m.deleted !== true,
-    );
-    const fireAlarmId = chain0?.alarmId ?? liveSafety.alarmId;
-    Logger.warn('NAV-DBG-COLD', `lockedColdStartGap detected entityId=${entityId} fireAlarmId=${fireAlarmId} → onAlarmFire+navigate Alarm`);
+    const alarms = await loadAlarms();
+    // #LockedColdStartGap 재설계 (2026-06-21) — 판별 기준을 "미래 안전멤버 존재"에서 "방금 지나간 발화 시각"으로 교체.
+    //   옛 방식은 콜드 스타트 시 syncAllAlarms가 안전체인을 내일 base로 재무장 → fireAt이 윈도우 밖 → 영구 미진입(dead code) 회귀.
+    //   (AlarmKit framework는 "방금 발화" 신호를 안 줌 = 시각 추론이 유일 경로. Apple Forums 809398 / mjtsai 확인.)
+    //   판별: enabled 알람의 직전 발화 시각(lastAlarmOccurrenceTime)이 활성 윈도우(체인 전체 ≈ 60분) 안 + 아직 미처리(handledFireAt < lastOcc).
+    const ACTIVE_WINDOW_MS = (ALARM_CHAIN_MAX_INDEX + 1) * ALARM_CHAIN_INTERVAL_MS; // 30회 × 2분 = 60분
+    let target: { entityId: string; fireAlarmId: string } | null = null;
+    for (const alarm of alarms) {
+      if (!alarm.enabled) continue;
+      const lastOcc = lastAlarmOccurrenceTime(alarm, new Date(now));
+      if (lastOcc == null) continue;
+      if (now - lastOcc > ACTIVE_WINDOW_MS) continue; // 발화 활성 윈도우 밖 = 이미 끝난 사이클
+      const handledAt = await getHandledFireAt(alarm.id);
+      if (handledAt != null && handledAt >= lastOcc) continue; // 이 발화는 사용자가 이미 처리(해제/루틴시작)
+      // 세션의 currentAlarmId = chain0(.relative) 우선. 메타 없으면 해당 알람 skip (= 발화 알람 식별 불가).
+      const chain0 = allMeta.find(
+        m => m.type === 'alarm_main' && m.entityId === alarm.id && (m.chainIndex ?? 0) === 0 && m.deleted !== true,
+      );
+      if (!chain0) continue;
+      target = { entityId: alarm.id, fireAlarmId: chain0.alarmId };
+      break;
+    }
+    if (!target) return;
+    const { entityId, fireAlarmId } = target;
+    Logger.warn('NAV-DBG-COLD', `lockedColdStartGap(recentFire) detected entityId=${entityId} fireAlarmId=${fireAlarmId} → onAlarmFire+navigate Alarm`);
     // 라이브 케이스에서 onAlarmStateChange listener 가 하던 세션 생성을 직접 수행 (gap 엔 alerting 이벤트 X).
     //   AlarmScreen goHome(dismiss) 의 routine 시작은 currentSession 존재가 전제(R-7 가드)이므로 필수.
     await onAlarmFire({ alarmId: fireAlarmId, entityId, alarmType: 'main' }).catch(() => ({ ghost: false }));

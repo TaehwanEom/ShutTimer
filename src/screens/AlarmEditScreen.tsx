@@ -449,7 +449,6 @@ export default function AlarmEditScreen({ navigation, route }: Props) {
         <TimeWheelPicker
           isVisible={true}
           inline
-          playTickSound
           initialHour={initialTime.h}
           initialMinute={initialTime.m}
           onConfirm={handleTimeConfirm}

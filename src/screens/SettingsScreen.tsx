@@ -34,6 +34,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import i18n, { SUPPORTED_LANGS, LANGUAGE_NAMES, LANGUAGE_STORAGE_KEY } from '../i18n';
 import { setCachedDismissMethod } from '../utils/settingsCache';
 import { clearPreloadedSound } from '../utils/alarmSoundPreload';
+import { rescheduleAllAlarmChains } from '../utils/alarmScheduler';
 import { isSamsung, openSamsungDeviceCare, requestIgnoreBatteryOptimization } from '../utils/oemBatteryHelper';
 
 // v1.7 hotfix #DebugUIGate — EAS profile env 측 디버그 UI 분기 (production = false / dev + preview = true).
@@ -312,7 +313,11 @@ export default function SettingsScreen({ navigation }: Props) {
 
   const handleSoundSelect = (soundId: string) => {
     setSelectedSoundId(soundId);
-    AsyncStorage.setItem(SETTINGS_KEY.ALARM_SOUND, soundId);
+    // #SoundChangeReschedule (2026-06-23) — 설정 저장 후, 이미 예약된 알람 안전체인을 새 사운드로 재예약.
+    //   저장(setItem)이 끝난 뒤 호출해야 resolveSoundName()이 새 값을 읽음. 미호출 시 = 잠금 발화 시 옛 소리 잔존.
+    AsyncStorage.setItem(SETTINGS_KEY.ALARM_SOUND, soundId)
+      .then(() => rescheduleAllAlarmChains())
+      .catch(() => {});
     // v1.5: preload는 이전 사운드로 로드된 상태 → AlarmScreen에서 최신 선택을 반영하도록 무효화.
     //       HomeScreen이 다음 scheduleAlarm에서 새 사운드로 다시 preload함.
     clearPreloadedSound().catch(() => {});

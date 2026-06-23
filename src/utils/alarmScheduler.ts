@@ -752,6 +752,35 @@ export async function migrateSoundRename(): Promise<void> {
  */
 const CHAIN_FIXED_SAFETY_MIGRATION_KEY = '@shuttimer/chain_fixed_safety_migration_v2_0';
 
+// #SoundChangeReschedule (2026-06-23) — 알람 사운드 변경 시 이미 예약된 안전체인을 새 사운드로 재예약.
+//   문제: handleSoundSelect는 ALARM_SOUND 설정만 저장 → 이미 AlarmKit에 예약된 체인은 옛 사운드가 박혀 있어,
+//     잠금 상태 발화 시 옛 소리가 나오고, 콜드 스타트 재무장 때만 새 소리로 바뀜(사용자 보고 = "옛 소리 나다 갑자기 새 소리").
+//   근거: scheduleAlarmMain → scheduleAlarmAt → resolveSoundName()이 매번 현재 ALARM_SOUND를 읽음(line 54).
+//     syncAllAlarms는 멱등(기존 체인 skip)이라 부적합 → migrateChainFixedSafety와 동일한 "전체 cancel + 재예약" 필요.
+//   iOS 전용: Android는 별도 알람 엔진(AlarmScheduler.kt) → 회귀 방지 위해 미적용(Android 사운드 갱신은 별도 과제).
+//   호출: SettingsScreen.handleSoundSelect에서 setItem(ALARM_SOUND) 완료 후 1회.
+export async function rescheduleAllAlarmChains(): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  if (!isAlarmKitAvailableSync()) return;
+  try {
+    const alarms = await loadAlarms();
+    const allMeta = await listAllAlarmMetadata();
+    let count = 0;
+    for (const alarm of alarms) {
+      if (!alarm.enabled) continue;
+      // 옛 체인(chain[0..N]) 전체 cancel — disable 부수효과 없는 cancelAlarm 사용(migrate와 동일 패턴).
+      const chainMetas = allMeta.filter(m => m.type === 'alarm_main' && m.entityId === alarm.id);
+      for (const meta of chainMetas) await cancelAlarm(meta.alarmId);
+      // scheduleAlarmMain → resolveSoundName()이 현재 사운드를 박아 새 사운드로 전체 재예약.
+      await scheduleAlarmMain(alarm);
+      count += 1;
+    }
+    Logger.warn('alarmScheduler', `rescheduleAllAlarmChains 완료 — ${count}개 알람 현재 사운드로 재예약`);
+  } catch (e) {
+    Logger.warn('alarmScheduler', `rescheduleAllAlarmChains error=${String(e)}`);
+  }
+}
+
 export async function migrateChainFixedSafety(): Promise<void> {
   if (Platform.OS !== 'ios') return;
   if (!isAlarmKitAvailableSync()) return;

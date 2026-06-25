@@ -49,6 +49,7 @@
     "notifBodyReminder3": "Das ist wirklich das letzte Mal... bitte ausschalten. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Mission abschließen",
     "reshuffle": "Neu mischen",
     "retrying": "Wiederholen",
     "missionNotFound": "Nicht gefunden",
@@ -417,6 +418,7 @@
     "second": "Sek."
   },
   "routine": {
+    "laAlertMessage": "Routine fortsetzen",
     "actionDelete": "Löschen",
     "actionEdit": "Bearbeiten",
     "addMission": "Aufgabe hinzufügen",

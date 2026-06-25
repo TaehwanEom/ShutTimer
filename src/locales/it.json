@@ -49,6 +49,7 @@
     "notifBodyReminder3": "Questa è davvero l'ultima... per favore spegnila. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Completa la missione",
     "reshuffle": "Mescola",
     "retrying": "Riprova",
     "missionNotFound": "Non trovato",
@@ -417,6 +418,7 @@
     "second": "s"
   },
   "routine": {
+    "laAlertMessage": "Continua la routine",
     "actionDelete": "Elimina",
     "actionEdit": "Modifica",
     "addMission": "Aggiungi missione",

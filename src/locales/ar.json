@@ -49,6 +49,7 @@
     "notifBodyReminder3": "هذه آخر مرة فعلاً... من فضلك أوقفه. 😭"
   },
   "alarm": {
+    "laAlertMessage": "أكمل المهمة",
     "reshuffle": "إعادة التوزيع",
     "retrying": "إعادة المحاولة",
     "missionNotFound": "لم يتم العثور",
@@ -417,6 +418,7 @@
     "second": "ث"
   },
   "routine": {
+    "laAlertMessage": "تابع الروتين",
     "actionDelete": "حذف",
     "actionEdit": "تعديل",
     "addMission": "إضافة مهمة",

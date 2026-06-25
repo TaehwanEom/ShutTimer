@@ -49,6 +49,7 @@
     "notifBodyReminder3": "Bu gerçekten son... lütfen kapatın. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Görevi tamamla",
     "reshuffle": "Karıştır",
     "retrying": "Yeniden dene",
     "missionNotFound": "Bulunamadı",
@@ -417,6 +418,7 @@
     "second": "sn"
   },
   "routine": {
+    "laAlertMessage": "Rutine devam et",
     "actionDelete": "Sil",
     "actionEdit": "Düzenle",
     "addMission": "Görev ekle",

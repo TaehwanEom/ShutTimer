@@ -375,6 +375,7 @@ public class AlarmkitBridgeModule: Module {
         pausedAt: params.laPausedAt,
         routineId: params.laRoutineId ?? params.entityId,
         routineName: params.laRoutineName ?? params.title,
+        alertMessage: params.laAlertMessage,
         alarmId: id.uuidString
       )
       let timerAttributesAll = AlarmAttributes<ShutTimerAlarmMetadata>(
@@ -762,4 +763,6 @@ struct ScheduleAlarmParams: Record {
   @Field var laPausedAt: Double?
   @Field var laRoutineId: String?
   @Field var laRoutineName: String?
+  // 2026-06-25 — 위젯 LA(.alert) 안내 문구(JS 현지화). 미전달 시 nil → 빈 슬롯.
+  @Field var laAlertMessage: String?
 }

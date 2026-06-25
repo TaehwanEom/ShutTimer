@@ -70,6 +70,8 @@ export type ScheduleAlarmParams = {
   laPausedAt?: number;
   laRoutineId?: string;
   laRoutineName?: string;
+  /** 2026-06-25 — 위젯 LA(.alert) 큰 글씨 안내 문구(현지화). 알람="종료 미션을 진행"/루틴="다음 루틴을 진행". */
+  laAlertMessage?: string;
 };
 
 /**

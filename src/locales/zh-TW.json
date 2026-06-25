@@ -56,6 +56,7 @@
     "notifBodyReminder3": "真的是最後一次了... 請趕快關掉。😭"
   },
   "alarm": {
+    "laAlertMessage": "完成結束任務",
     "reshuffle": "重新抽取",
     "retrying": "重試",
     "missionNotFound": "未找到",
@@ -424,6 +425,7 @@
     "second": "秒"
   },
   "routine": {
+    "laAlertMessage": "繼續下一個流程",
     "actionDelete": "刪除",
     "actionEdit": "編輯",
     "addMission": "新增任務",

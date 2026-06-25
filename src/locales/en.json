@@ -56,6 +56,7 @@
     "notifBodyReminder3": "This is really the last one... please turn it off. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Complete the mission",
     "reshuffle": "Shuffle",
     "retrying": "Retry",
     "missionNotFound": "Not found",
@@ -424,6 +425,7 @@
     "second": "sec"
   },
   "routine": {
+    "laAlertMessage": "Continue your routine",
     "listTitle": "Routines",
     "newTitle": "New Routine",
     "editTitle": "Edit Routine",

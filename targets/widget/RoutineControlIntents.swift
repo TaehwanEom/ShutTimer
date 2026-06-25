@@ -104,6 +104,8 @@ private struct WidgetRoutineSnapshot: Codable {
     var routineEnded: Bool?
     // v1.6 — 마지막 step alerting UI title. optional = 이전 snapshot 호환.
     var i18nRoutineCompleteTitle: String?
+    // 2026-06-25 — 위젯 LA(.alert) 안내 문구(루틴="다음 루틴을 진행"). optional = 이전 snapshot 호환.
+    var i18nLaAlertMessage: String?
 }
 
 private func readRoutineSnapshot() -> WidgetRoutineSnapshot? {
@@ -319,7 +321,8 @@ private func scheduleNextStepAlarm(snapshot: WidgetRoutineSnapshot, nextStepIdx:
         paused: false,
         pausedAt: nil,
         routineId: snapshot.routineId,
-        routineName: snapshot.routineName
+        routineName: snapshot.routineName,
+        alertMessage: snapshot.i18nLaAlertMessage
     )
     let attributes = AlarmAttributes<ShutTimerAlarmMetadata>(
         presentation: presentation,

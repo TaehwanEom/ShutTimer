@@ -161,9 +161,12 @@ async function scheduleAlarmAt(
 ): Promise<string | null> {
   const soundName = await resolveSoundName();
   const title = alarm.label || i18n.t('alarm.defaultTitle', { defaultValue: '알람' });
-  // v1.8 — alarm 측 = LA 안 만듦 (= native .alarm(schedule:) factory + alert-only presentation 측).
-  // countdownTitle / laMeta 측 = .alarm 분기 측 unused. 호환성 위해 전달은 유지.
-  const countdownTitle = '다음 알람\n남은 시간';
+  // v1.8 — alarm 측 = native .alarm(schedule:) factory + alert-only presentation (스케줄 시 LA 미생성).
+  // 2026-06-24 #LAAlertI18n — 단, 발화(alert) 시점엔 AlarmKit이 위젯 ActivityConfiguration으로 LA를 띄워
+  //   metadata.routineName 을 노출함(Log_0624 line 383 .fixed alert 시 Activity.count 1→2 실측 확인).
+  //   직전 = 하드코딩 한국어 '다음 알람\n남은 시간' → 영문 앱에도 한국어 노출 + alert엔 "남은 시간" 무의미.
+  //   정정 = localized title(alarm.label || i18n alarm.defaultTitle) 사용 → 알람명 표시 + 다국어 정합.
+  const countdownTitle = title;
   // v2.0 #ChainFixedSafety (2026-05-28) — chainIndex 0 = .relative(daily/weekly) OS 반복. chainIndex 1+ = .fixed 단발.
   const recurrence = chainMemberRecurrence(alarm, chainIndex, fireAt, chainBaseFireAt);
   Logger.warn(
@@ -176,7 +179,10 @@ async function scheduleAlarmAt(
     laTotalSteps: 1,
     laStage: 'step',
     laRoutineId: alarm.id,
-    laRoutineName: '다음 알람\n남은 시간',
+    // 2026-06-24 #LAAlertI18n — 하드코딩 '다음 알람\n남은 시간' → localized title(알람명). 위젯 LA(.alert) leading 노출 정합.
+    laRoutineName: title,
+    // 2026-06-25 — 위젯 LA(.alert) 큰 글씨 안내 문구(알람 종료 시). 현지화 전달.
+    laAlertMessage: i18n.t('alarm.laAlertMessage', { defaultValue: '종료 미션을 진행' }),
   } as const;
   let nativeId: string | null = null;
   try {
@@ -682,6 +688,25 @@ export async function cleanupGhostAlarms(): Promise<number> {
       await AlarmkitBridge.cancelAlarm(ghostId).catch(() => {});
       // v1.9 #SoftDeleteGhostFix — deleted=true metadata 측 = native cancel 후 정식 deleteAlarmMetadata.
       await deleteAlarmMetadata(ghostId).catch(() => {});
+    }
+
+    // 2026-06-24 #StrandedTombstoneSweep — deleted=true 인데 native framework 에도 부재한 메타는
+    //   ghostIds(=native에 살아있는 미등록 id) 후보가 아니고, knownIds(=deleted!==true)에서도 제외돼
+    //   어떤 cleanup 경로로도 정식 삭제되지 않아 장부가 단조 증가한다.
+    //   실제 누수원: cancelAlarmsForEntity F2 verify 가 3회 실패해 deleted=true 로 남은 alarm_main/timer_main
+    //   tombstone 이, 이후 OS 에서 사라져 framework 목록에서도 빠진 경우. (confirm_prompt realert 는 hard-delete 라 해당 X.)
+    //   native 부재를 확인했으므로(향후 이벤트 없음) tombstone 을 정식 제거해 장부 성장 차단.
+    //   검수 반영 — listAlarms 가 일시적으로 빈 배열을 success 반환하는 race 시 살아있는 tombstone 까지
+    //   stranded 로 오인해 과삭제할 수 있으므로, framework 목록이 비었는데 장부엔 있으면 sweep skip.
+    const frameworkIdSet = new Set(frameworkAlarms.map(a => a.id));
+    const stranded = allMeta.filter(m => m.deleted === true && !frameworkIdSet.has(m.alarmId));
+    if (stranded.length > 0 && !(frameworkAlarms.length === 0 && allMeta.length > 0)) {
+      Logger.warn('GhostCleanup', `strandedTombstone sweep count=${stranded.length}`);
+      for (const m of stranded) {
+        await deleteAlarmMetadata(m.alarmId).catch(() => {});
+      }
+    } else if (stranded.length > 0) {
+      Logger.warn('GhostCleanup', `strandedTombstone sweep skip — listAlarms 빈 반환 race 의심 (stranded=${stranded.length})`);
     }
     return ghostIds.length;
   } catch (e) {

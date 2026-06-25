@@ -81,7 +81,7 @@ struct AlarmKitLiveActivity: Widget {
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(context.attributes.metadata?.routineName ?? "타이머")
+                        Text(context.attributes.metadata?.routineName ?? "")
                             .font(.caption)
                             .foregroundColor(.brand)
                             .lineLimit(1)
@@ -95,7 +95,7 @@ struct AlarmKitLiveActivity: Widget {
                     AlarmKitStepBottomLabel(context: context)
                 }
             } compactLeading: {
-                Text(context.attributes.metadata?.routineName ?? "타이머")
+                Text(context.attributes.metadata?.routineName ?? "")
                     .font(.caption2)
                     .foregroundColor(.brand)
                     .lineLimit(1)
@@ -149,7 +149,7 @@ struct AlarmKitWatchView: View {
     // 컨트롤 = 카드 탭 → AlarmKit framework auto fullscreen → X / pause.
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(context.attributes.metadata?.routineName ?? "타이머")
+            Text(context.attributes.metadata?.routineName ?? "")
                 .font(.caption2)
                 .foregroundColor(.brand)
                 .lineLimit(1)
@@ -209,7 +209,7 @@ struct AlarmKitLockScreenView: View {
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     // v1.8 #LACountdownTitle — routineName 측 2줄 허용 (= "다음 알람\n남은 시간" 측 wrap 정합).
-                    Text(context.attributes.metadata?.routineName ?? "타이머")
+                    Text(context.attributes.metadata?.routineName ?? "")
                         .font(.caption)
                         .foregroundColor(.brand)
                         .lineLimit(2)
@@ -278,11 +278,14 @@ struct AlarmKitCountdownText: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
         case .alert:
-            Text("알람")
-                .font(fontStyle)
+            // 2026-06-25 — alert 상태엔 남은 시간이 없으므로 안내 문구(alertMessage) 표시.
+            //   시간 표시용 큰 폰트(fontStyle, 56pt)는 문장에 부적합 → 읽기 좋은 작은 크기(.headline)로 고정.
+            //   알람="종료 미션을 진행" / 루틴="다음 루틴을 진행"(JS 현지화 metadata 전달). 미전달 시 빈 슬롯.
+            Text(context.attributes.metadata?.alertMessage ?? "")
+                .font(.headline)
                 .foregroundColor(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
         }
     }
 }
@@ -503,7 +506,9 @@ struct ShutTimerWatchLATimeText: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.4)
         default:
-            Text("알람")
+            // 폐기 위젯(ShutTimerWatchLAWidget = index.swift 미등록 dead) — 라이브 워치 미러는 AlarmKitWatchView.
+            //   라이브 경로 alert 문구는 AlarmKitCountdownText(.alert)에서 처리. 이 dead 슬롯은 손대지 않음.
+            Text(state.routineName)
                 .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)

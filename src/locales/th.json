@@ -49,6 +49,7 @@
     "notifBodyReminder3": "นี่เป็นครั้งสุดท้ายจริงๆ... กรุณาปิด 😭"
   },
   "alarm": {
+    "laAlertMessage": "ทำภารกิจให้เสร็จ",
     "reshuffle": "สุ่มใหม่",
     "retrying": "ลองใหม่",
     "missionNotFound": "ไม่พบ",
@@ -417,6 +418,7 @@
     "second": "วิ"
   },
   "routine": {
+    "laAlertMessage": "ทำกิจวัตรต่อไป",
     "actionDelete": "ลบ",
     "actionEdit": "แก้ไข",
     "addMission": "เพิ่มภารกิจ",

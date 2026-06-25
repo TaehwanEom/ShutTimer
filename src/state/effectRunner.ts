@@ -23,6 +23,8 @@ import {
 import {
   scheduleRoutineConfirmPrompt,
   cancelRoutineConfirmPrompt,
+  scheduleConfirmPromptRealertChain,
+  cancelStaleConfirmPrompts,
 } from '../utils/routineScheduler';
 import AlarmkitBridge from '../../modules/alarmkit-bridge';
 import {
@@ -495,6 +497,8 @@ async function runEffect(effect: SideEffect): Promise<void> {
           i18nRoutineCompleteTitle:
             effect.routineCompleteTitle ??
             i18n.t('routine.routineCompleteTitle', { defaultValue: '루틴 완료' }),
+          // 2026-06-25 — native advance(AdvanceNextStepIntent)가 읽어 위젯 LA(.alert) 안내 문구로 사용.
+          i18nLaAlertMessage: i18n.t('routine.laAlertMessage', { defaultValue: '다음 루틴을 진행' }),
           savedAt: Date.now(),
           autoCountdownSec: clampCountdown(effect.autoCountdownSec),
           completedStepIndices: [],
@@ -526,6 +530,35 @@ async function runEffect(effect: SideEffect): Promise<void> {
       if (effect.scheduleKey && currentRunningAlarmId) {
         lastScheduleKey = effect.scheduleKey;
         lastScheduleAt = Date.now();
+      }
+      return;
+    }
+
+    case 'SyncNativeAdvanceRealerts': {
+      // 2026-06-24 #NativeAdvanceRealertGap — 네이티브 advance_done 경로는 ScheduleConfirmPrompt를 안 거쳐
+      //   (a) 이전 step confirm_prompt 재알림이 안 지워지고 (b) 새 step 재알림 체인이 안 깔린다.
+      //   RN Advance 경로(ScheduleConfirmPrompt의 #ConfirmPromptDedup + realert 루프)와 대칭이 되게 둘 다 처리.
+      //   keepAlarmId = 네이티브가 방금 만든 새 step primary(취소 제외). 두 경로는 advance당 상호배타라 중복 위험 0.
+      try {
+        const canceled = await cancelStaleConfirmPrompts(effect.routineId, effect.keepAlarmId);
+        if (canceled > 0) {
+          Logger.warn('effectRunner', `SyncNativeAdvanceRealerts staleCancel=${canceled} keep=${effect.keepAlarmId} routineId=${effect.routineId}`);
+        }
+      } catch (e) {
+        Logger.warn('effectRunner', `SyncNativeAdvanceRealerts cancel error=${String(e)}`);
+      }
+      try {
+        // 순서 주의(load-bearing): 반드시 위 cancelStaleConfirmPrompts 다음에 실행.
+        //   새 체인은 type='confirm_prompt'+entityId 동일이라, 순서 뒤집으면 cancel이 방금 만든 체인을 sweep함.
+        const n = await scheduleConfirmPromptRealertChain(
+          effect.routineId,
+          effect.baseFireAt,
+          effect.nextStepName,
+          effect.endMethod,
+        );
+        Logger.warn('effectRunner', `SyncNativeAdvanceRealerts realert scheduled ${n} routineId=${effect.routineId} baseFireAt=${effect.baseFireAt}`);
+      } catch (e) {
+        Logger.warn('effectRunner', `SyncNativeAdvanceRealerts realert error=${String(e)}`);
       }
       return;
     }

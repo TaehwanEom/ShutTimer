@@ -49,6 +49,7 @@
     "notifBodyReminder3": "Ini benar-benar yang terakhir... tolong matikan. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Selesaikan misi",
     "reshuffle": "Acak Ulang",
     "retrying": "Coba Lagi",
     "missionNotFound": "Tidak ditemukan",
@@ -417,6 +418,7 @@
     "second": "dtk"
   },
   "routine": {
+    "laAlertMessage": "Lanjutkan rutin",
     "actionDelete": "Hapus",
     "actionEdit": "Edit",
     "addMission": "Tambah misi",

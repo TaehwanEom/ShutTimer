@@ -33,6 +33,13 @@ export type AlarmMetaRecord = {
    *   직전 = F0 정식 delete → cancel 실패 시 = native banner+사운드 잔존 fire = orphan 동일 회귀.
    */
   deleted?: boolean;
+  /**
+   * 2026-06-24 #RealertMetaCleanup — type='confirm_prompt' 중 단계 종료 재알림 체인 멤버 표시.
+   *   primary confirm_prompt(.timer 카운트다운)는 false/undefined, 2분 간격 재알림(.fixed)은 true.
+   *   발화 후 OS가 .fixed를 자동 제거하나 JS metadata는 잔존 → listener가 realert=true만 발화 후 정식 삭제(장부 누수 차단).
+   *   primary는 advance/#ConfirmPromptDedup이 정리하므로 보존.
+   */
+  realert?: boolean;
 };
 
 async function loadAll(): Promise<AlarmMetaRecord[]> {

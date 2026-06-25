@@ -96,7 +96,18 @@ export type SideEffect =
     } // App Group routine_snapshot mirror
   | { kind: 'CancelRoutinePrealerts'; routineId: string } // 잔존 prealert 일괄 cancel
   // v2.0 C.H — OnSnapshotChange transition 측 effectRunner 모듈 변수 갱신
-  | { kind: 'SetCurrentRunningAlarmId'; alarmId: string; scheduleKey?: string };
+  | { kind: 'SetCurrentRunningAlarmId'; alarmId: string; scheduleKey?: string }
+  // 2026-06-24 #NativeAdvanceRealertGap — 네이티브 advance_done 경로(OnSnapshotChange)는 ScheduleConfirmPrompt를
+  //   안 거쳐 (a) 이전 step confirm_prompt 재알림 미취소 (b) 새 step 재알림 체인 미예약 → 잠금 단계 전환 시 회귀.
+  //   RN Advance 경로와 대칭이 되게 둘 다 처리. keepAlarmId = 네이티브가 만든 새 step primary(취소 제외).
+  | {
+      kind: 'SyncNativeAdvanceRealerts';
+      routineId: string;
+      keepAlarmId: string;
+      baseFireAt: number;
+      nextStepName?: string;
+      endMethod?: string;
+    };
 
 export type TransitionResult = {
   next: Session | null;
@@ -686,6 +697,20 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       );
       return { next: current, effects: [] };
     }
+    // 2026-06-24 #SnapshotMonotonicity — OnSnapshotChange는 native advance_done 전용(진행은 항상 전진).
+    //   nextStepIndex가 현재 이하면 지연 도착한 옛 신호/중복이다. 안 막으면 (a) 진행 중 step을 되감거나(rewind)
+    //   (b) 같은 advance 재처리로 step 중복 기록·상태 교란(Log_0624 검수 H2/H3). 전진 신호만 처리.
+    //   '<=' 의도적: '==' 도 skip(= 매 polling(1.5~3초)마다 같은 step 재신호 시 SyncNativeAdvanceRealerts realert
+    //   cancel+reschedule churn 방지). 불변식 의존: native AdvanceNextStepIntent.swift 가 completedStepIndices.append
+    //   와 currentStepIndex 증가를 항상 lockstep(Swift:355-358)으로 수행 → completes 가 찬 snapshot 은 항상
+    //   nextStepIndex > current 라 flush 누락 없음. native 가 이 lockstep 을 깨면 step 기록 유실 가능(현재 도달 불가).
+    if (action.nextStepIndex <= current.currentStepIndex) {
+      Logger.warn(
+        'SessionController',
+        `OnSnapshotChange non-forward skip cur=${current.currentStepIndex} next=${action.nextStepIndex} routineId=${action.routineId}`
+      );
+      return { next: current, effects: [] };
+    }
     const effects: SideEffect[] = action.completedStepIndices.map((idx) => ({
       kind: 'RecordStepSession',
       routineId: current.sessionId,
@@ -709,6 +734,20 @@ function transition(current: Session | null, action: SessionAction): TransitionR
       alarmId: action.currentAlarmId,
       scheduleKey: `${current.sessionId}:${next.currentStepIndex}:${next.stepEndAt}`,
     });
+    // 2026-06-24 #NativeAdvanceRealertGap — RN Advance 경로와 대칭. 이전 step 재알림 일괄 취소(새 primary 제외) +
+    //   새 step 재알림 체인 예약. currentAlarmId 없으면(=네이티브 새 알람 없음) skip(전체 취소 위험 방지).
+    if (action.currentAlarmId) {
+      const nextCurStep = current.steps[next.currentStepIndex];
+      const stepAfterNext = current.steps[next.currentStepIndex + 1];
+      effects.push({
+        kind: 'SyncNativeAdvanceRealerts',
+        routineId: current.sessionId,
+        keepAlarmId: action.currentAlarmId,
+        baseFireAt: next.stepEndAt,
+        nextStepName: stepAfterNext?.name,
+        endMethod: nextCurStep?.endMethod,
+      });
+    }
     effects.push({ kind: 'SaveActiveRoutine', session: next });
     effects.push({
       kind: 'EmitEvent',

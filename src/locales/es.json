@@ -49,6 +49,7 @@
     "notifBodyReminder3": "¡Esta es realmente la última! Por favor apágala. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Completa la misión",
     "reshuffle": "Reordenar",
     "retrying": "Reintentar",
     "missionNotFound": "No encontrado",
@@ -417,6 +418,7 @@
     "second": "s"
   },
   "routine": {
+    "laAlertMessage": "Continúa la rutina",
     "actionDelete": "Eliminar",
     "actionEdit": "Editar",
     "addMission": "Añadir misión",

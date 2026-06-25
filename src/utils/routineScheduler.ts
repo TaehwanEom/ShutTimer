@@ -144,28 +144,6 @@ export type ScheduleStatus = {
   lastSyncedAt: number;
 };
 
-/**
- * 사용자 설정 기준 푸시 사운드 파일명 반환.
- * HomeScreen 패턴과 일관성 유지.
- * alarmEnabled=false면 false 반환 (무음).
- */
-async function resolveSound(): Promise<string | false> {
-  try {
-    const [soundId, enabledRaw] = await Promise.all([
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND),
-      AsyncStorage.getItem(SETTINGS_KEY.ALARM_ENABLED),
-    ]);
-    const enabled = enabledRaw !== 'false';
-    if (!enabled) return false;
-    const effective = soundId ?? 'alarm_01';
-    return effective.startsWith('ringtone_')
-      ? 'ringtone_02.wav'
-      : 'alarm_01.wav';
-  } catch {
-    return 'alarm_01.wav';
-  }
-}
-
 type ScheduledRoutineRecord = {
   routineId: string;
   /** AlarmKit 경로 alarm UUID */
@@ -457,6 +435,91 @@ export async function scheduleRoutineConfirmPrompt(
 const CONFIRM_PROMPT_REALERT_COUNT = 15;
 const CONFIRM_PROMPT_REALERT_INTERVAL_MS = 120000; // 2분 (본체 ALARM_CHAIN_INTERVAL_MS 동일)
 
+/**
+ * 단계 종료 시각(baseFireAtMs) 기준 2분 간격 confirm_prompt 재알림 체인 예약.
+ * primary(.timer 카운트다운)는 별도. 재알림은 recurrence{mode:'never'}=네이티브 .alarm(.fixed) 지속 알림.
+ * RN Advance 경로(scheduleConfirmPromptViaAlarmKit)와 네이티브 advance 경로(effectRunner.SyncNativeAdvanceRealerts) 공용.
+ */
+export async function scheduleConfirmPromptRealertChain(
+  routineId: string,
+  baseFireAtMs: number,
+  nextStepName?: string,
+  endMethod?: string,
+): Promise<number> {
+  // 2026-06-24 #LastStepNoRealert — 마지막 단계(nextStepName 없음 = "루틴 완료" 프롬프트)는 재알림 미예약.
+  //   완료 프롬프트는 다음 단계가 없어 2분 간격 30분 재알림의 가치가 낮고(미확인 방치 시 "루틴 완료"만 30분 발화),
+  //   primary는 1회 발화하므로 사용자는 깨어날 때 확인 가능. 진행 필요한 중간 단계만 재알림 유지.
+  if (!nextStepName) {
+    Logger.warn('routine', `confirm_prompt realert skip — 마지막 단계(루틴 완료) routineId=${routineId}`);
+    return 0;
+  }
+  const soundId = await AsyncStorage.getItem(SETTINGS_KEY.ALARM_SOUND) ?? DEFAULT_SOUND_ID;
+  const soundItem = ALARM_SOUNDS.find(s => s.id === soundId) ?? ALARM_SOUNDS[0];
+  const baseTitle = i18n.t('routine.confirmPromptTitle', { defaultValue: '다음 루틴' });
+  // nextStepName 없으면 위에서 early-return → 여기선 항상 존재.
+  const title = `${baseTitle} ${nextStepName}`;
+  let realertOk = 0;
+  for (let i = 1; i <= CONFIRM_PROMPT_REALERT_COUNT; i++) {
+    const realertAt = baseFireAtMs + i * CONFIRM_PROMPT_REALERT_INTERVAL_MS;
+    try {
+      const realertId = await AlarmkitBridge.scheduleAlarm({
+        entityId: routineId,
+        title,
+        fireAt: realertAt,
+        stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
+        type: 'confirm_prompt',
+        // recurrence{mode:'never'} → 네이티브 .alarm(.fixed) 강제(지속 알림). secondaryLabel 미전달(=깨진 버튼 방지).
+        recurrence: { mode: 'never' },
+        soundName: soundItem.pushSound,
+        endMethod: endMethod as any,
+        // 2026-06-25 — 재알림도 alert 상태 → 위젯 안내 문구 동일 전달.
+        laAlertMessage: i18n.t('routine.laAlertMessage', { defaultValue: '다음 루틴을 진행' }),
+      });
+      if (realertId) {
+        realertOk++;
+        // 2026-06-24 #RealertMetaCleanup — realert 마커로 primary와 구분 → listener가 발화 후 정식 삭제.
+        await saveAlarmMetadata({ alarmId: realertId, type: 'confirm_prompt', entityId: routineId, realert: true });
+      }
+    } catch (e) {
+      Logger.warn('routine', `confirm_prompt realert[${i}] schedule error=${String(e)}`);
+    }
+  }
+  return realertOk;
+}
+
+/**
+ * routineId의 잔존 confirm_prompt(primary + 재알림) 일괄 cancel — keepAlarmId 하나만 보존.
+ * 네이티브 advance_done 경로는 ScheduleConfirmPrompt의 #ConfirmPromptDedup을 안 거쳐 이전 step 재알림이
+ * 살아남아 다음 step 중 발화 → 사용자가 끄면 루틴 조기 종료(2026-06-24 Log_0624 실측 회귀). 그 누락을 메움.
+ * keepAlarmId = 네이티브가 방금 만든 새 step primary(취소하면 다음 step 깨짐).
+ */
+export async function cancelStaleConfirmPrompts(routineId: string, keepAlarmId?: string): Promise<number> {
+  // 2026-06-24 검수 반영 — keepAlarmId 미전달 시 routineId의 모든 confirm_prompt(=활성 primary 포함)를
+  //   무차별 삭제하는 사고를 방지. 보존 대상이 없으면 호출 의도가 모호하므로 no-op.
+  if (!keepAlarmId) {
+    Logger.warn('routine', `cancelStaleConfirmPrompts skip — keepAlarmId 없음 routineId=${routineId}`);
+    return 0;
+  }
+  let canceled = 0;
+  try {
+    const allMeta = await listAllAlarmMetadata();
+    const stale = allMeta.filter(m =>
+      m.type === 'confirm_prompt' &&
+      m.entityId === routineId &&
+      m.deleted !== true &&
+      m.alarmId !== keepAlarmId
+    );
+    for (const meta of stale) {
+      await AlarmkitBridge.cancelAlarm(meta.alarmId).catch(() => {});
+      await deleteAlarmMetadata(meta.alarmId).catch(() => {});
+      canceled++;
+    }
+  } catch (e) {
+    Logger.warn('routine', `cancelStaleConfirmPrompts error=${String(e)}`);
+  }
+  return canceled;
+}
+
 /** AlarmKit 경로 — iOS 26+. */
 async function scheduleConfirmPromptViaAlarmKit(
   routineId: string,
@@ -500,6 +563,8 @@ async function scheduleConfirmPromptViaAlarmKit(
       laStepIndex,
       laTotalSteps,
       laRoutineId: routineId,
+      // 2026-06-25 — 위젯 LA(.alert) 큰 글씨 안내 문구(루틴 단계). 현지화 전달.
+      laAlertMessage: i18n.t('routine.laAlertMessage', { defaultValue: '다음 루틴을 진행' }),
     });
     Logger.warn('routine', `confirm_prompt akId=${id}`);
     if (!id) return null;
@@ -516,33 +581,7 @@ async function scheduleConfirmPromptViaAlarmKit(
     //   취소: 다음 step ScheduleConfirmPrompt의 #ConfirmPromptDedup(type=confirm_prompt+entityId 전체) + ClearActiveRoutine가
     //   모든 멤버 일괄 제거. (재알림 fire는 auto-advance 아님 → 취소 전 spurious 발화돼도 추가 배너뿐, 다음 dedup이 자가치유.)
     //   eager 필수: lazy(발화 시 다음 1개 등록)는 잠금 suspend 시 깨짐(project_alarm_chain_must_be_eager).
-    let realertOk = 0;
-    for (let i = 1; i <= CONFIRM_PROMPT_REALERT_COUNT; i++) {
-      const realertAt = fireAt.getTime() + i * CONFIRM_PROMPT_REALERT_INTERVAL_MS;
-      try {
-        const realertId = await AlarmkitBridge.scheduleAlarm({
-          entityId: routineId,
-          title,
-          fireAt: realertAt,
-          stopLabel: i18n.t('routine.confirmPromptStop', { defaultValue: '확인' }),
-          type: 'confirm_prompt',
-          // recurrence{mode:'never'} → 네이티브 .alarm(.fixed) 강제(지속 알림). secondaryLabel 미전달(=깨진 버튼 방지).
-          recurrence: { mode: 'never' },
-          soundName: soundItem.pushSound,
-          endMethod: endMethod as any,
-        });
-        if (realertId) {
-          realertOk++;
-          await saveAlarmMetadata({
-            alarmId: realertId,
-            type: 'confirm_prompt',
-            entityId: routineId,
-          });
-        }
-      } catch (e) {
-        Logger.warn('routine', `confirm_prompt realert[${i}] schedule error=${String(e)}`);
-      }
-    }
+    const realertOk = await scheduleConfirmPromptRealertChain(routineId, fireAt.getTime(), nextStepName, endMethod);
     // 검증용 — 재알림 몇 개 깔렸는지(2분 간격). baseFireAt = 단계 종료 시각.
     Logger.warn('routine', `confirm_prompt realert scheduled ${realertOk}/${CONFIRM_PROMPT_REALERT_COUNT} routineId=${routineId} baseFireAt=${fireAt.getTime()}`);
 

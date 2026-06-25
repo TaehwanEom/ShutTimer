@@ -530,6 +530,12 @@ function AppNavigator() {
         const fireTab = isAdhocAlarmRoutine(meta.entityId) ? 'AlarmTab' : 'RoutineTab';
         Logger.warn('onAlarmStateChange-DBG', `confirm_prompt fire → navigate ${fireTab} entityId=${meta.entityId}`);
         DeviceEventEmitter.emit(SESSION_EVENT_NAVIGATE, { target: fireTab });
+        // 2026-06-24 #RealertMetaCleanup — 발화한 재알림(.fixed)은 OS가 자동 제거하나 JS metadata 잔존 → 장부 누수.
+        //   realert=true(2분 간격 재알림)만 발화 후 정식 삭제. primary(realert 미표시)는 advance/#ConfirmPromptDedup이 정리하므로 보존.
+        //   navigate(re-nag) 이후 + nav-ready 가드(아래) 이전에 두어 누락 없이 정리. 다른 재알림 멤버는 별도 alarmId라 영향 없음.
+        if (meta.realert === true) {
+          await deleteAlarmMetadata(event.alarmId).catch(() => {});
+        }
       }
       // 옵션 4 fix + Sub A-3 (2026-05-25) — alarm_main + timer_main 둘 다 포그라운드 + AppState='active' 시 SESSION_EVENT_NAVIGATE Alarm emit.
       //   원인: suppressFlag 가드 (line 332-337) 가 포그라운드 알람 즉시 cancel → native UI X. 위반-11 fix 후 NavigateAlarmScreen effect 제거 → in-app mount path X.

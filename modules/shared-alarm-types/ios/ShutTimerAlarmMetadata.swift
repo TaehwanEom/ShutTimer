@@ -30,6 +30,9 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
     public var pausedAt: Double? = nil
     public var routineId: String? = nil
     public var routineName: String? = nil
+    // 2026-06-25 — 위젯 LA(.alert) 큰 글씨 슬롯 안내 문구. 알람="종료 미션을 진행" / 루틴="다음 루틴을 진행"(JS 현지화 전달).
+    //   미전달 시 nil → 위젯 빈 슬롯(회귀 X).
+    public var alertMessage: String? = nil
     // v1.8 #LARelevanceMatch — AlarmKit Alarm.id 측 = Activity.id ≠ 영역 → metadata 측 alarmId 매칭 키 영역.
     //   updateActivityRelevance 측 = activities.first(where: { $0.attributes.metadata?.alarmId == alarmId }) 사용.
     public var alarmId: String? = nil
@@ -43,6 +46,7 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
         pausedAt: Double? = nil,
         routineId: String? = nil,
         routineName: String? = nil,
+        alertMessage: String? = nil,
         alarmId: String? = nil
     ) {
         self.currentStepName = currentStepName
@@ -53,6 +57,7 @@ public nonisolated struct ShutTimerAlarmMetadata: AlarmMetadata {
         self.pausedAt = pausedAt
         self.routineId = routineId
         self.routineName = routineName
+        self.alertMessage = alertMessage
         self.alarmId = alarmId
     }
 }

@@ -49,6 +49,7 @@
     "notifBodyReminder3": "Esta é realmente a última... por favor desligue. 😭"
   },
   "alarm": {
+    "laAlertMessage": "Conclua a missão",
     "reshuffle": "Embaralhar",
     "retrying": "Tentar novamente",
     "missionNotFound": "Não encontrado",
@@ -417,6 +418,7 @@
     "second": "s"
   },
   "routine": {
+    "laAlertMessage": "Continue a rotina",
     "actionDelete": "Excluir",
     "actionEdit": "Editar",
     "addMission": "Adicionar missão",

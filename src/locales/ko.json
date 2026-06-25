@@ -56,6 +56,7 @@
     "notifBodyReminder3": "정말 마지막이에요... 얼른 꺼주세요. 😭"
   },
   "alarm": {
+    "laAlertMessage": "종료 미션을 진행",
     "reshuffle": "다시 뽑기",
     "retrying": "재시도",
     "missionNotFound": "못 찾았어요",
@@ -424,6 +425,7 @@
     "second": "초"
   },
   "routine": {
+    "laAlertMessage": "다음 루틴을 진행",
     "listTitle": "루틴",
     "newTitle": "새 루틴",
     "editTitle": "루틴 편집",

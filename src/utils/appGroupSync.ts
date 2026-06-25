@@ -97,6 +97,8 @@ export type RoutineSnapshot = {
   i18nAdvanceLabel: string;
   /** v1.6 — 마지막 step alerting UI title (= 모든 루틴 끝났을 때). optional = 이전 snapshot 호환 */
   i18nRoutineCompleteTitle?: string;
+  /** 2026-06-25 — 위젯 LA(.alert) 안내 문구(루틴="다음 루틴을 진행"). native advance가 읽음. optional = 호환 */
+  i18nLaAlertMessage?: string;
   /** snapshot 작성 시점 ms (stale 검증) */
   savedAt: number;
   /**

@@ -181,8 +181,14 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
             //   사유: useEffect-awaitingConfirm (= line 205) 측 deps `[ar?.awaitingConfirm, ar?.currentStepIndex]` 측 = mount 시점 첫 값 trigger 보장 (= React 표준).
             //   본 영역 측 호출 = 두 useEffect 측 같은 시점 trigger → 200ms 지연 race → 두 사운드 동시 fire 회귀 (= sound 중첩).
             //   modal 표시 영역 = useEffect-awaitingConfirm 측 통합 영역.
-            setModalStage('next');
-            setModalVisible(true);
+            // 2026-06-27 #ConfirmModalDoublePresent — init 과 useEffect-awaitingConfirm 이 같은 렌더 사이클에
+            //   둘 다 setModalVisible(true) 호출 시, modalVisible state(비동기 반영)는 stale false 라 가드가 뚫려 모달 2번 표시.
+            //   modalVisibleRef(동기)로 먼저 set 한 쪽이 막는다(양쪽 경로 유지 → 마운트-복귀/단계전환 모두 1회 보장).
+            if (!modalVisibleRef.current) {
+              modalVisibleRef.current = true;
+              setModalStage('next');
+              setModalVisible(true);
+            }
             Logger.warn('SOUND-DBG', `init mount = useEffect-awaitingConfirm 측 trigger 위임 awaitingConfirm=${r.ar?.awaitingConfirm} stepIdx=${r.ar?.currentStepIndex}`);
           }
         }
@@ -197,7 +203,9 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
   // init 측 = mount 시 1회만 검증 → 다음 step alerting 시점 측 갱신 시 모달 표시 ❌ 영역 보강.
   // last step 측 = AlarmScreen navigate 영역 분리 (= init 측 처리, 본 useEffect 측 진입 ❌).
   useEffect(() => {
-    if (!ar?.awaitingConfirm || modalVisible || !routine) return;
+    // 2026-06-27 #ConfirmModalDoublePresent — modalVisible state 대신 modalVisibleRef(동기) 가드.
+    //   state 는 같은 렌더 사이클에 stale false 라 init 경로와 동시 통과 → 이중 표시. ref 는 동기라 막힘.
+    if (!ar?.awaitingConfirm || modalVisibleRef.current || !routine) return;
     const isLastStep = ar.currentStepIndex + 1 >= routine.steps.length;
     if (isLastStep) {
       // 옵션 A fix 추가 (2026-05-25, 사용자 요구) — background/잠금 상태 자동 navigate 차단 (log02 trigger 위치).
@@ -227,6 +235,7 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
     // 일반 step alerting → modal 표시 + JS 사운드/진동 시작.
     // (#StaleAwaitingConfirm hasAlerting 검증 제거 = active 시점 측 App.tsx listener cancelAlarm 으로 alerting=false → false negative → 모달 미표시 회귀 회피.
     //  stale 케이스 측 = restoreRoutineState (= cold-start / foreground 복귀) 측 sync 처리 영역.)
+    modalVisibleRef.current = true;
     setModalStage('next');
     setModalVisible(true);
     Logger.warn('SOUND-DBG', `startAlarmEffects call from=useEffect-awaitingConfirm awaitingConfirm=${ar?.awaitingConfirm} stepIdx=${ar?.currentStepIndex} modalVisible=${modalVisible}`);

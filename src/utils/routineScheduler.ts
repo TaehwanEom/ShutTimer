@@ -433,7 +433,7 @@ export async function scheduleRoutineConfirmPrompt(
 //   본체 알람 안전체인(.alarm(.fixed) 2분 간격 eager)과 동일 방식으로, 단계 종료 후 재알림을 미리 깔아 끌 때까지 깨운다.
 //   개수 15회 × 2분 = 30분(기상 깨움 충분 + AlarmKit 동시 한계 여유). 필요 시 조정 가능한 단일 지점.
 const CONFIRM_PROMPT_REALERT_COUNT = 15;
-const CONFIRM_PROMPT_REALERT_INTERVAL_MS = 120000; // 2분 (본체 ALARM_CHAIN_INTERVAL_MS 동일)
+const CONFIRM_PROMPT_REALERT_INTERVAL_MS = 120000; // 2분 (루틴 전용. 2026-06-27 알람 체인은 iOS 2초로 단축됐으나 루틴은 현행 유지)
 
 /**
  * 단계 종료 시각(baseFireAtMs) 기준 2분 간격 confirm_prompt 재알림 체인 예약.

@@ -506,12 +506,15 @@ export async function cancelSafetyChainPreservingDaily(alarmEntityId: string): P
   Logger.warn('cancelSafetyChain-DBG', `done entityId=${alarmEntityId} safety=${safetyTargets.length} nativeFail=${nativeFailCount} finalStale=${stale.length} chain0Preserved=${chain0Meta != null}`);
 }
 
-// v1.8 #AlarmChainEager — 2분 간격 chain. 알람 등록 시점 scheduleAlarmMain 측에서 chain 전체 미리 예약.
-//   chainIndex 0..29 = 총 30회 = 60분. 활성 알람 갯수만큼 분배.
+// v1.8 #AlarmChainEager — 간격 chain. 알람 등록 시점 scheduleAlarmMain 측에서 chain 전체 미리 예약.
 //   직전 lazy chain (scheduleAlarmChainNext = 발화 listener 측 다음 1개 등록) 폐기 — 잠금 suspend 시 미발화 회귀.
-//   v1.9 — chain 50 → 30 축소 (= 100분 → 60분 ringing 보장). 사용자 100분까지 도달하지 않을 영역.
-export const ALARM_CHAIN_INTERVAL_MS = 120000; // 2분
-export const ALARM_CHAIN_MAX_INDEX = 29; // chainIndex 0..29 = 총 30회 = 60분
+//   v1.9 — chain 50 → 30 축소 (= 100분 → 60분 ringing 보장).
+// 2026-06-27 #AlarmFastReFire — 알람(타이머/루틴 제외)을 끈 직후 즉시 재발화: iOS 체인 간격 2분 → 2초.
+//   커버 5분 유지 위해 멤버 30 → 150 (= 150회 × 2초 = 5분). AlarmKit 한도는 보도상 무제한이나 실기기 검증 필요.
+//   Android는 별도 알람 엔진 + chainIndex 1+ native 자동반복 전제(60분/자정 1회) → 현행 유지(회귀 0).
+//   ※ 의존 로직(chainLifespanMs, App.tsx ACTIVE_WINDOW_MS)은 본 상수로 자동 스케일 → iOS 총 작동시간 = 5분.
+export const ALARM_CHAIN_INTERVAL_MS = Platform.OS === 'ios' ? 2000 : 120000; // iOS 2초 / Android 2분(현행)
+export const ALARM_CHAIN_MAX_INDEX = Platform.OS === 'ios' ? 149 : 29; // iOS 150회×2초=5분 / Android 30회×2분=60분
 
 // #LockedColdStartGap (2026-06-21) — entity별 "사용자가 발화를 처리(해제/루틴시작)한 시각" 기록.
 //   콜드 스타트 fallback이 lastAlarmOccurrenceTime(과거 발화 시각)과 비교해 "이미 처리한 발화 재진입"을 차단.

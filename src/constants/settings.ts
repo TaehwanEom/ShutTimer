@@ -9,6 +9,8 @@ export const SETTINGS_KEY = {
   MISSION_DURATION: 'shutimer_mission_duration',
   SELECTED_MISSIONS: 'shutimer_selected_missions',
   KEEP_SCREEN_ON: 'shutimer_keep_screen_on',
+  // 2026-06-27 디버그 전용 — 알람 미션 화면에 테스트 이미지 표시(production 미노출).
+  DEBUG_ALARM_TEST_IMAGE: 'shutimer_debug_alarm_test_image',
 } as const;
 
 export const MIN_SELECTED_MISSIONS = 1;

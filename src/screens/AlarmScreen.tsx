@@ -12,6 +12,7 @@ import {
   Platform,
   ScrollView,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Accelerometer } from 'expo-sensors';
@@ -198,6 +199,23 @@ export default function AlarmScreen({ navigation, route }: Props) {
   }, []);
 
   const [currentMission, setCurrentMission] = useState<string>(pickInitialRandomMission);
+
+  // 2026-06-27 디버그 전용 — 알람 미션 화면에 테스트 이미지 표시(설정 토글). production 미노출.
+  const [debugTestImage, setDebugTestImage] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(SETTINGS_KEY.DEBUG_ALARM_TEST_IMAGE)
+      .then((v) => setDebugTestImage(v === 'true'))
+      .catch(() => {});
+  }, []);
+  // 디버그 테스트 이미지 오버레이 — 절대배치 + pointerEvents none(미션 터치/레이아웃 영향 0). 모든 미션 화면 공용.
+  const debugTestImageOverlay = debugTestImage ? (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: (insets?.top ?? 0) + 8, left: 0, right: 0, alignItems: 'center', zIndex: 9999 }}
+    >
+      <Image source={require('../../assets/icon.png')} style={{ width: 140, height: 140, opacity: 0.95 }} resizeMode="contain" />
+    </View>
+  ) : null;
   const currentMissionRef = useRef(currentMission);
   useEffect(() => {
     currentMissionRef.current = currentMission;
@@ -1314,6 +1332,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'math') {
     return (
       <View style={{ flex: 1 }}>
+        {debugTestImageOverlay}
         <AlarmMathMode colors={colors} t={t} onSuccess={() => enterResult('success')} remainingMs={missionDuration === 0 ? undefined : remainingMs} />
         <AdBanner />
       </View>
@@ -1324,6 +1343,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'typing') {
     return (
       <View style={{ flex: 1 }}>
+        {debugTestImageOverlay}
         <AlarmTypingMode colors={colors} t={t} locale={i18n.language} onSuccess={() => enterResult('success')} remainingMs={missionDuration === 0 ? undefined : remainingMs} />
         <AdBanner />
       </View>
@@ -1334,6 +1354,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'tapcharge') {
     return (
       <View style={{ flex: 1 }}>
+        {debugTestImageOverlay}
         <TapChargeMission colors={colors} t={t} onSuccess={() => enterResult('success')} />
         <AdBanner />
       </View>
@@ -1357,6 +1378,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
 
     return (
       <View style={[styles.container, { backgroundColor: '#F6F7FB', paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        {debugTestImageOverlay}
         <View style={styles.cameraHeader}>
           <View>
             <Text style={styles.cameraHeaderTitle}>ShutTimer</Text>
@@ -1406,6 +1428,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   if (dismissMethod === 'tap') {
     return (
       <SafeAreaView style={styles.tapContainer}>
+        {debugTestImageOverlay}
         <View style={styles.tapHeader}>
           <View>
             <Text style={styles.tapHeaderTitle}>ShutTimer</Text>
@@ -1444,6 +1467,7 @@ export default function AlarmScreen({ navigation, route }: Props) {
   // Shake 모드 레이아웃
   return (
     <SafeAreaView style={styles.shakeContainer}>
+      {debugTestImageOverlay}
       <ShakeLiquidMission
         fill={shakeLiquid.fill}
         accelX={shakeLiquid.accelX}

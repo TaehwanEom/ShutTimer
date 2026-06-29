@@ -207,6 +207,8 @@ export default function SettingsScreen({ navigation }: Props) {
   const [dismissMethod, setDismissMethod] = useState<DismissMethod>(DEFAULT_SETTINGS.dismissMethod);
   const [alarmEnabled, setAlarmEnabled] = useState(DEFAULT_SETTINGS.alarmEnabled);
   const [vibrationEnabled, setVibrationEnabled] = useState(DEFAULT_SETTINGS.vibrationEnabled);
+  // 2026-06-27 디버그 전용 — 알람 미션 화면 테스트 이미지 토글.
+  const [debugTestImage, setDebugTestImage] = useState(false);
   const [selectedSoundId, setSelectedSoundId] = useState(DEFAULT_SOUND_ID);
   const [soundModalVisible, setSoundModalVisible] = useState(false);
   const [selectedLang, setSelectedLang] = useState<string | null>(null);
@@ -258,7 +260,7 @@ export default function SettingsScreen({ navigation }: Props) {
   );
 
   useEffect(() => {
-    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION, SETTINGS_KEY.KEEP_SCREEN_ON]).then(pairs => {
+    AsyncStorage.multiGet([SETTINGS_KEY.DISMISS_METHOD, SETTINGS_KEY.VIBRATION_ENABLED, LANGUAGE_STORAGE_KEY, SETTINGS_KEY.ALARM_SOUND, SETTINGS_KEY.ALARM_ENABLED, SETTINGS_KEY.MISSION_DURATION, SETTINGS_KEY.KEEP_SCREEN_ON, SETTINGS_KEY.DEBUG_ALARM_TEST_IMAGE]).then(pairs => {
       const method = pairs[0][1] as DismissMethod | null;
       const vibration = pairs[1][1];
       const lang = pairs[2][1];
@@ -266,6 +268,8 @@ export default function SettingsScreen({ navigation }: Props) {
       const alarm = pairs[4][1];
       const duration = pairs[5][1];
       const keep = pairs[6][1];
+      const debugImg = pairs[7][1];
+      if (debugImg !== null) setDebugTestImage(debugImg === 'true');
       if (method) setDismissMethod(method);
       if (alarm !== null) setAlarmEnabled(alarm === 'true');
       if (vibration !== null) setVibrationEnabled(vibration === 'true');
@@ -755,6 +759,23 @@ export default function SettingsScreen({ navigation }: Props) {
         {SHOW_DEBUG_UI && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>디버그 (v1.7 hotfix 임시)</Text>
+            {/* 2026-06-27 디버그 전용 — 알람 미션 화면에 테스트 이미지 표시 토글. */}
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleLeft}>
+                <MaterialIcons name="image" size={22} color={colors.onBackground} />
+                <Text style={styles.toggleLabel}>알람 미션 테스트 이미지</Text>
+              </View>
+              <Switch
+                value={debugTestImage}
+                onValueChange={(v) => {
+                  setDebugTestImage(v);
+                  AsyncStorage.setItem(SETTINGS_KEY.DEBUG_ALARM_TEST_IMAGE, String(v));
+                }}
+                trackColor={{ false: colors.outlineVariant, true: colors.primary }}
+                thumbColor={colors.onPrimary}
+                style={{ transform: [{ scale: 0.85 }] }}
+              />
+            </View>
             <TouchableOpacity
               style={styles.toggleRow}
               onPress={async () => {

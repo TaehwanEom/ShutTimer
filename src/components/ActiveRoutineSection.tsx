@@ -188,6 +188,10 @@ export default function ActiveRoutineSection({ routineId, onClose }: Props) {
               modalVisibleRef.current = true;
               setModalStage('next');
               setModalVisible(true);
+              // 2026-06-30 #ConfirmModalDoublePresent 회귀 fix — init이 모달을 띄우면 useEffect-awaitingConfirm가
+              //   modalVisibleRef 가드(208)로 막혀 startAlarmEffects가 안 불려 인앱 사운드가 누락됨(마운트-복귀 경로).
+              //   여기서 사운드도 같이 시작. startAlarmEffects 내부 inProgressRef가 중복 재생을 막으므로 이중음 없음.
+              startAlarmEffects();
             }
             Logger.warn('SOUND-DBG', `init mount = useEffect-awaitingConfirm 측 trigger 위임 awaitingConfirm=${r.ar?.awaitingConfirm} stepIdx=${r.ar?.currentStepIndex}`);
           }

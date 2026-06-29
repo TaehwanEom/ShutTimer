@@ -107,6 +107,17 @@ export type SideEffect =
       baseFireAt: number;
       nextStepName?: string;
       endMethod?: string;
+    }
+  // 2026-06-29 #PausedRealertFire — 일시정지 시 미리 깔린 confirm_prompt 재알림(.fixed)이 안 꺼져 정지 중 발화하는 버그.
+  //   Pause: 재알림 체인 취소(primary 유지 — PauseAlarmNative가 멈춤). effectRunner가 currentRunningAlarmId를 keep으로 사용.
+  | { kind: 'PauseConfirmPromptRealerts'; routineId: string }
+  //   Resume: 새 stepEndAt 기준 재알림 재무장(주 알람 미변경). 재무장 안 하면 resume 후 재나그 유실.
+  | {
+      kind: 'ResumeConfirmPromptRealerts';
+      routineId: string;
+      baseFireAt: number;
+      nextStepName?: string;
+      endMethod?: string;
     };
 
 export type TransitionResult = {
@@ -452,6 +463,11 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     // v2.0 우선순위 13 — 이미 CONFIRMING + awaitingConfirm=true 시 next === current 명시 (idempotent skip).
     if (action.alarmType === 'confirm_prompt') {
       if (!current) return { next: null, effects: [] };
+      // 2026-06-29 #PausedRealertFire — 일시정지 중 confirm_prompt(주/재알림) 발화는 무시.
+      //   안 막으면 PAUSED → CONFIRMING + awaitingConfirm=true 로 넘어가 인앱 사운드+진행(Log_0629 실측 버그).
+      if (current.state === 'PAUSED') {
+        return { next: current, effects: [] };
+      }
       if (current.state === 'CONFIRMING' && current.awaitingConfirm) {
         return { next: current, effects: [] };
       }
@@ -510,6 +526,8 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     if (action.source !== 'la') {
       effects.push({ kind: 'PauseAlarmNative' });
     }
+    // 2026-06-29 #PausedRealertFire — 정지 시 미리 깔린 confirm_prompt 재알림 체인 취소(primary는 PauseAlarmNative가 멈춤).
+    effects.push({ kind: 'PauseConfirmPromptRealerts', routineId: current.sessionId });
     effects.push({ kind: 'SaveActiveRoutine', session: paused });
     effects.push({
       kind: 'EmitEvent',
@@ -538,6 +556,14 @@ function transition(current: Session | null, action: SessionAction): TransitionR
     if (action.source !== 'la') {
       effects.push({ kind: 'ResumeAlarmNative' });
     }
+    // 2026-06-29 #PausedRealertFire — 정지 때 취소한 재알림을 새 stepEndAt 기준으로 재무장(주 알람 미변경).
+    effects.push({
+      kind: 'ResumeConfirmPromptRealerts',
+      routineId: current.sessionId,
+      baseFireAt: resumed.stepEndAt,
+      nextStepName: current.steps[current.currentStepIndex + 1]?.name,
+      endMethod: current.steps[current.currentStepIndex]?.endMethod,
+    });
     effects.push({ kind: 'SaveActiveRoutine', session: resumed });
     effects.push({
       kind: 'EmitEvent',

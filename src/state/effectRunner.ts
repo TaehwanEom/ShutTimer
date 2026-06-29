@@ -562,6 +562,35 @@ async function runEffect(effect: SideEffect): Promise<void> {
       }
       return;
     }
+
+    case 'PauseConfirmPromptRealerts': {
+      // 2026-06-29 #PausedRealertFire — 일시정지 시 미리 깔린 재알림 체인 취소(primary=currentRunningAlarmId 유지 → PauseAlarmNative가 멈춤).
+      try {
+        const canceled = currentRunningAlarmId
+          ? await cancelStaleConfirmPrompts(effect.routineId, currentRunningAlarmId)
+          : 0;
+        Logger.warn('effectRunner', `PauseConfirmPromptRealerts canceled=${canceled} keep=${currentRunningAlarmId} routineId=${effect.routineId}`);
+      } catch (e) {
+        Logger.warn('effectRunner', `PauseConfirmPromptRealerts error=${String(e)}`);
+      }
+      return;
+    }
+
+    case 'ResumeConfirmPromptRealerts': {
+      // 2026-06-29 #PausedRealertFire — 재개 시 새 stepEndAt 기준 재알림 재무장(주 알람 미변경. 정지 때 이미 취소됨).
+      try {
+        const n = await scheduleConfirmPromptRealertChain(
+          effect.routineId,
+          effect.baseFireAt,
+          effect.nextStepName,
+          effect.endMethod,
+        );
+        Logger.warn('effectRunner', `ResumeConfirmPromptRealerts scheduled ${n} routineId=${effect.routineId} baseFireAt=${effect.baseFireAt}`);
+      } catch (e) {
+        Logger.warn('effectRunner', `ResumeConfirmPromptRealerts error=${String(e)}`);
+      }
+      return;
+    }
   }
 }
 

@@ -1,7 +1,8 @@
-// 알람 종료 미션 = 연타 가속 게이지(물). 화면 전체가 게이지 바 — 빠르게 연타할수록 가속이 붙어 차오르고 멈추면 내려간다. 100% 도달 시 onSuccess. 시간제한 없음.
-// 채움 = 하단 파랑→연두→상단 노랑 그라데이션(SVG, 화면 고정·차오를수록 드러남). 탭 지점에서 물 파문(가는 동심원 여러 겹). (sloshing 물결표면 적용 직전 버전)
+// 알람 종료 미션 = 연속 탭 100회 게이지(물). 탭 1회 = 게이지 1/100, 100회 도달 시 onSuccess. 시간제한 없음.
+//   2026-06-30 — 속도 기반 가속(마찰/중력) 폐기 → 단순 100탭 카운트. 남은 횟수 카운트다운 숫자 표시.
+// 채움 = 하단 파랑→연두→상단 노랑 그라데이션(SVG, 화면 고정·차오를수록 드러남). 탭 지점에서 물 파문(가는 동심원 여러 겹).
 
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -23,12 +24,8 @@ type Props = {
   onSuccess: () => void;
 };
 
-// 게이지 가속 보정값
-const TAP_IMPULSE = 0.6;
-const MAX_VEL = 2.2;
-const FRICTION = 6;
-const GRAVITY = 0.32;
-const TICK_MS = 16;
+// 연속 탭 100회로 클리어.
+const TAP_TARGET = 100;
 
 // 물 파문(동심원 링 여러 겹)
 const RING_POOL = 42;
@@ -40,8 +37,8 @@ const RING_COLOR = 'rgba(255,59,48,0.26)';
 
 export default function TapChargeMission({ colors, t, onSuccess }: Props) {
   const { width: SW, height: SH } = useWindowDimensions();
-  const gaugeRef = useRef(0);
-  const velRef = useRef(0);
+  const tapCountRef = useRef(0);
+  const [remaining, setRemaining] = useState(TAP_TARGET);
   const fill = useRef(new Animated.Value(0)).current;
   const iconScale = useRef(new Animated.Value(1)).current;
   const doneRef = useRef(false);
@@ -55,26 +52,6 @@ export default function TapChargeMission({ colors, t, onSuccess }: Props) {
   ).current;
   const ringIdx = useRef(0);
 
-  useEffect(() => {
-    let last = 0;
-    const id = setInterval(() => {
-      if (doneRef.current) return;
-      const now = Date.now();
-      const dt = last ? Math.min(0.05, (now - last) / 1000) : TICK_MS / 1000;
-      last = now;
-      velRef.current = Math.max(0, velRef.current - velRef.current * FRICTION * dt);
-      const rate = velRef.current - GRAVITY;
-      gaugeRef.current = Math.min(1, Math.max(0, gaugeRef.current + rate * dt));
-      fill.setValue(gaugeRef.current);
-      if (gaugeRef.current >= 1 && !doneRef.current) {
-        doneRef.current = true;
-        fill.setValue(1);
-        onSuccess();
-      }
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [fill, onSuccess]);
-
   const spawnRing = (lx: number, ly: number) => {
     const ring = rings[ringIdx.current];
     ringIdx.current = (ringIdx.current + 1) % RING_POOL;
@@ -86,7 +63,16 @@ export default function TapChargeMission({ colors, t, onSuccess }: Props) {
 
   const onTap = (e: any) => {
     if (doneRef.current) return;
-    velRef.current = Math.min(MAX_VEL, velRef.current + TAP_IMPULSE);
+    // 2026-06-30 — 탭 1회 = 게이지 1/100 + 남은 횟수 카운트다운. 100회 도달 시 클리어.
+    const next = tapCountRef.current + 1;
+    tapCountRef.current = next;
+    setRemaining(Math.max(0, TAP_TARGET - next));
+    fill.setValue(Math.min(1, next / TAP_TARGET));
+    if (next >= TAP_TARGET) {
+      doneRef.current = true;
+      fill.setValue(1);
+      onSuccess();
+    }
     // 탭마다 햅틱 손맛 (Heavy = 가장 강함).
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     Animated.sequence([
@@ -153,6 +139,8 @@ export default function TapChargeMission({ colors, t, onSuccess }: Props) {
             <MaterialIcons name="touch-app" size={76} color={colors.primary} />
           </Animated.View>
           <Text style={styles.title}>{t('alarm.timerDone')}</Text>
+          {/* 2026-06-30 — 남은 탭 횟수 카운트다운 */}
+          <Text style={styles.countdown}>{remaining}</Text>
           <Text style={styles.subtitle}>
             {t('alarm.tapchargeInstruction')}
           </Text>
@@ -197,5 +185,7 @@ const makeStyles = (colors: ThemeColors) =>
     },
     badgeText: { fontSize: 12, fontWeight: '900', color: colors.primary, letterSpacing: -0.1 },
     title: { fontSize: 28, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
+    // 2026-06-30 — 남은 탭 횟수 카운트다운 (크게)
+    countdown: { fontSize: 72, fontWeight: '900', color: '#111827', letterSpacing: -2, fontVariant: ['tabular-nums'] },
     subtitle: { fontSize: 16, fontWeight: '700', color: '#6B7280', textAlign: 'center', lineHeight: 23 },
   });

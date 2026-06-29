@@ -174,16 +174,6 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    badge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      backgroundColor: 'rgba(255,240,239,0.88)',
-    },
-    badgeText: { fontSize: 12, fontWeight: '900', color: colors.primary, letterSpacing: -0.1 },
     title: { fontSize: 28, fontWeight: '900', color: '#111827', letterSpacing: -0.5 },
     // 2026-06-30 — 남은 탭 횟수 카운트다운 (크게)
     countdown: { fontSize: 72, fontWeight: '900', color: '#111827', letterSpacing: -2, fontVariant: ['tabular-nums'] },
